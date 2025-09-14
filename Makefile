@@ -4,31 +4,12 @@ run_app:
 	wget -r http://127.0.0.1:8050/
 	wget -r http://127.0.0.1:8050/_dash-layout
 	wget -r http://127.0.0.1:8050/_dash-dependencies
-
-	wget -r http://127.0.0.1:8050/_dash-component-suites/dash/dcc/async-graph.js
-	wget -r http://127.0.0.1:8050/_dash-component-suites/dash/dcc/async-highlight.js
-	wget -r http://127.0.0.1:8050/_dash-component-suites/dash/dcc/async-markdown.js
-	wget -r http://127.0.0.1:8050/_dash-component-suites/dash/dcc/async-datepicker.js
-
-	wget -r http://127.0.0.1:8050/_dash-component-suites/dash/dash_table/async-table.js
-	wget -r http://127.0.0.1:8050/_dash-component-suites/dash/dash_table/async-highlight.js
-
-	wget -r http://127.0.0.1:8050/_dash-component-suites/plotly/package_data/plotly.min.js
-
-	mv 127.0.0.1:8050 pages_files
-	ls -a pages_files
-	ls -a pages_files/assets
-
-	find pages_files -exec sed -i.bak 's|_dash-component-suites|touch-rugby-analyzer\\/_dash-component-suites|g' {} \;
-	find pages_files -exec sed -i.bak 's|_dash-layout|touch-rugby-analyzer/_dash-layout.json|g' {} \;
-	find pages_files -exec sed -i.bak 's|_dash-dependencies|touch-rugby-analyzer/_dash-dependencies.json|g' {} \;
-	find pages_files -exec sed -i.bak 's|_reload-hash|touch-rugby-analyzer/_reload-hash|g' {} \;
-	find pages_files -exec sed -i.bak 's|_dash-update-component|touch-rugby-analyzer/_dash-update-component|g' {} \;
-	find pages_files -exec sed -i.bak 's|assets|touch-rugby-analyzer/assets|g' {} \;
-
-	mv pages_files/_dash-layout pages_files/_dash-layout.json
-	mv pages_files/_dash-dependencies pages_files/_dash-dependencies.json
-	mv assets/* pages_files/assets/
+	sed -i 's/_dash-layout/_dash-layout.json/g' 127.0.0.1:8050/_dash-component-suites/dash_renderer/*.js
+	sed -i 's/_dash-dependencies/_dash-dependencies.json/g' 127.0.0.1:8050/_dash-component-suites/dash_renderer/*.js
+	# Add our head
+	sed -i '/<head>/ r head.html' 127.0.0.1:8050/index.html
+	mv 127.0.0.1:8050/_dash-layout 127.0.0.1:8050/_dash-layout.json
+	mv 127.0.0.1:8050/_dash-dependencies 127.0.0.1:8050/_dash-dependencies.json
 
 	ps -C python -o pid= | xargs kill -9
 
