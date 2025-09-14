@@ -6,6 +6,8 @@ import numpy as np
 # Initialize the Dash app
 app = dash.Dash(__name__)
 
+server = app.server
+
 # Sample data
 categories = ['A', 'B', 'C', 'D']
 values1 = np.random.randint(10, 100, size=4)
