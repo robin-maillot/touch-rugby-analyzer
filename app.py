@@ -9,25 +9,34 @@ app = dash.Dash(__name__)
 server = app.server
 
 # Sample data
-categories = ['A', 'B', 'C', 'D']
+categories = ["A", "B", "C", "D"]
 values1 = np.random.randint(10, 100, size=4)
 values2 = np.random.randint(10, 100, size=4)
 
 # App layout
-app.layout = html.Div([
-    dcc.Graph(id='bar-chart'),
-    dcc.Dropdown(
-        id='chart-type-dropdown',
-        options=[
-            {'label': 'Grouped', 'value': 'group'},
-            {'label': 'Stacked', 'value': 'stack'}
-        ],
-        value='group',  # Default value
-        clearable=False,
-        style={'width': '50%'}
-    ),
-    dcc.Store(id='bar-data', data={'categories': categories, 'values1': list(values1), 'values2': list(values2)})
-])
+app.layout = html.Div(
+    [
+        dcc.Graph(id="bar-chart"),
+        dcc.Dropdown(
+            id="chart-type-dropdown",
+            options=[
+                {"label": "Grouped", "value": "group"},
+                {"label": "Stacked", "value": "stack"},
+            ],
+            value="group",  # Default value
+            clearable=False,
+            style={"width": "50%"},
+        ),
+        dcc.Store(
+            id="bar-data",
+            data={
+                "categories": categories,
+                "values1": list(values1),
+                "values2": list(values2),
+            },
+        ),
+    ]
+)
 
 # Client-side callback (JavaScript function)
 app.clientside_callback(
@@ -61,11 +70,11 @@ app.clientside_callback(
         };
     }
     """,
-    Output('bar-chart', 'figure'),
-    [Input('chart-type-dropdown', 'value')],
-    [Input('bar-data', 'data')]
+    Output("bar-chart", "figure"),
+    [Input("chart-type-dropdown", "value")],
+    [Input("bar-data", "data")],
 )
 
 # Run the app
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run_server(debug=False)
