@@ -1,19 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="utf-8" />
   <title>Touch Rugby Analyzer</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
     body {
-      font-family: "Segoe UI", Tahoma, sans-serif;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
       background: #f5f5f5;
       margin: 0;
       padding: 0;
     }
     header {
       text-align: center;
-      padding: 20px;
+      padding: 18px;
       background: #2c3e50;
       color: white;
     }
@@ -21,29 +21,44 @@
       display: flex;
       justify-content: center;
       gap: 10px;
-      padding: 10px;
+      padding: 12px;
       background: #ecf0f1;
     }
     nav button {
-      padding: 10px 20px;
+      padding: 10px 18px;
       border: none;
       background: #3498db;
-      color: white;
-      border-radius: 5px;
+      color: #fff;
+      border-radius: 6px;
       cursor: pointer;
-      transition: background 0.3s;
+      font-size: 15px;
     }
     nav button.active,
     nav button:hover {
       background: #2980b9;
     }
-    #content {
-      max-width: 1000px;
+
+    #iframe-container {
+      max-width: 1200px;
       margin: 20px auto;
-      padding: 20px;
-      background: white;
+      padding: 0 12px;
+    }
+
+    /* <<< key bit: make this big enough to avoid internal scrollbars >>> */
+    iframe {
+      width: 100%;
+      height: 1600px;    /* <-- increase this if you still see scrollbars (try 2000px) */
+      border: none;
       border-radius: 8px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+      background: white;
+      overflow: hidden;  /* doesn't remove inner page scrolling but prevents breakpoint scrollbar from the iframe element */
+    }
+
+    @media (max-width: 800px) {
+      iframe { height: 2200px; } /* mobile: pages often stack taller */
+      nav { flex-direction: column; align-items: center; }
+      nav button { width: 100%; max-width: 340px; }
     }
   </style>
 </head>
@@ -51,44 +66,48 @@
   <header>
     <h1>Touch Rugby Analyzer</h1>
   </header>
+
   <nav>
-    <button id="btn-game1" class="active">Game 1</button>
-    <button id="btn-game2">Game 2</button>
+    <!-- data-src makes it easy to reuse handler; files must be in same repo folder or adjust path -->
+    <button id="btn-game1" class="active" data-src="./game_0.html">Game 1</button>
+    <button id="btn-game2" data-src="./game_1.html">Game 2</button>
   </nav>
 
-  <div id="content">Loading Game 1...</div>
+  <div id="iframe-container">
+    <!-- scrolling="no" is deprecated but sometimes helpful; main control is a big height above -->
+    <iframe id="gameFrame" src="./game_1.html" scrolling="no"></iframe>
+  </div>
 
   <script>
-    // Grab elements
-    const btn1 = document.getElementById('btn-game1');
-    const btn2 = document.getElementById('btn-game2');
-    const content = document.getElementById('content');
+    const frame = document.getElementById('gameFrame');
+    const buttons = document.querySelectorAll('nav button');
 
-    // Helper to load html into #content
-    function loadGame(file, clickedBtn) {
-      fetch(file)
-        .then(res => {
-          if (!res.ok) throw new Error("HTTP " + res.status);
-          return res.text();
-        })
-        .then(html => {
-          content.innerHTML = html;
-          // Update active button styles
-          document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
-          clickedBtn.classList.add('active');
-        })
-        .catch(err => {
-          content.innerHTML = "<p>Could not load content.</p>";
-          console.error(err);
-        });
+    function setActive(button) {
+      buttons.forEach(b => b.classList.remove('active'));
+      button.classList.add('active');
     }
 
-    // Bind events
-    btn1.addEventListener('click', () => loadGame('./game_0.html', btn1));
-    btn2.addEventListener('click', () => loadGame('./game_1.html', btn2));
+    // Generic click handler: force reload by appending a tiny timestamp query param
+    buttons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const src = btn.dataset.src;
+        if (!src) return;
 
-    // Initial load
-    loadGame('game_0.html', btn1);
+        // Force reload even if same file by adding a cache-busting param
+        const forced = src + (src.includes('?') ? '&' : '?') + '_=' + Date.now();
+        frame.src = forced;
+        setActive(btn);
+
+        // optional: scroll main page to top of iframe so user sees it immediately
+        frame.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+
+    // If you want to quickly change iframe height from JS, uncomment and adjust:
+    // frame.style.height = '2000px';
+
+    // Tip: if charts render after page load and you still see a small inner scrollbar,
+    // increase the iframe height value above (1600px -> 2000px or 2500px) until it disappears.
   </script>
 </body>
 </html>
