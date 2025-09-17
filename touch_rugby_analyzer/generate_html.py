@@ -3,7 +3,9 @@ from jinja2 import Template
 
 from touch_rugby_analyzer.constants import ASSETS_ROOT, ROOT, DATA_ROOT
 from touch_rugby_analyzer import utils
+
 input_template_path = ASSETS_ROOT / "template.html"
+
 for i, data_path in enumerate(
     [
         DATA_ROOT / "france_pays-bas.csv",
