@@ -5,7 +5,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import rich
-
+from collections import defaultdict
 from touch_rugby_analyzer.constants import ASSETS_ROOT, ROOT, DATA_ROOT
 
 output_data_root = DATA_ROOT / "output"
@@ -169,15 +169,11 @@ def make_fig_1(data_df, local_team_name, other_team_name):
         title=f"Statistics for {local_team_name} vs {other_team_name}",
     )
     fig.write_html(output_data_root / "events.html")
-    fig.show()
     return fig
 
 
 def make_game_fig(data_df, local_team_name, other_team_name):
     fig = go.Figure()
-    score_data = []
-    against_local, prev_time = None, None
-
     for n, colour in [(local_team_name, "green"), (other_team_name, "red")]:
         points_x, points_y = [], []
         for i, row in data_df.iterrows():
@@ -242,14 +238,47 @@ def make_game_fig(data_df, local_team_name, other_team_name):
     fig.update_layout(annotations=annotations)
     # fig.update_layout(hovermode="x unified", annotations)
     # fig.write_html(output_data_root / "events_v2.html")
-    fig.show()
     return fig
+
+def get_possessions(data_df: pd.DataFrame) -> dict[str, int]:
+    possessions = defaultdict(list)
+    possession_start_time = None
+    prev_ball_owner = None
+    for i, row in data_df.iterrows():
+        if possession_start_time is None or row.Name == "Game Start":
+            possession_start_time = row.Time
+            prev_ball_owner = row.ball_owner
+
+        if row.ball_owner != prev_ball_owner:
+            possessions[prev_ball_owner].append(
+                (row.Time - possession_start_time).total_seconds()
+            )
+            possession_start_time = row.Time
+            prev_ball_owner = row.ball_owner
+    return possessions
+
 
 
 def get_stats_df(
     data_df: pd.DataFrame, local_team_name: str, other_team_name: str
 ) -> dict[str, pd.DataFrame]:
     output_dict = dict()
+    possession_stats = get_possessions(data_df)
+    data = []
+    index_names = []
+    for n, _ in possession_stats.items():
+        index_names.append(n)
+        data.append([
+            len(_),
+            np.round(np.mean(_), 3),
+        ])
+    possession_stats_df = pd.DataFrame(
+        data,
+        index=index_names,
+        columns=["N Possessions", "Av Possession (in s)"],
+    )
+    output_dict["Possession"] = possession_stats_df
+
     for data_type in ["Penalty", "Turnover", "Try"]:
         _data_df = data_df[
             [
