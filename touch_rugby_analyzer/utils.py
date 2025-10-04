@@ -1,15 +1,24 @@
 import pandas as pd
 from pathlib import Path
 import numpy as np
-import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import rich
 from collections import defaultdict
-from touch_rugby_analyzer.constants import ASSETS_ROOT, ROOT, DATA_ROOT
+import json
+
+from touch_rugby_analyzer.constants import DATA_ROOT
 
 output_data_root = DATA_ROOT / "output"
 output_data_root.mkdir(parents=True, exist_ok=True)
+
+AGAINST_LOCALS_COL = "Against France"
+FIG_WIDTH = 800
+
+
+def save_json(data, p: Path):
+    with p.open("w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)  # indent for pretty formatting
 
 
 def time_to_n_seconds(time_obj):
@@ -42,16 +51,16 @@ def load_data(data_path, local_team_name, other_team_name):
             ids.append(i)
     data_df.Time[ids] += delta
 
-    data_df["Against France"].fillna(False, inplace=True)
+    data_df[AGAINST_LOCALS_COL].fillna(False, inplace=True)
     data_df["To Review"].fillna(False, inplace=True)
 
     data_df["Team"] = data_df.apply(
         lambda row: (
             local_team_name
             if (
-                (row["Against France"] and row["Type"] in ["Penalty", "Turnover"])
+                (row[AGAINST_LOCALS_COL] and row["Type"] in ["Penalty", "Turnover"])
                 or (
-                    not row["Against France"]
+                    not row[AGAINST_LOCALS_COL]
                     and row["Type"] not in ["Penalty", "Turnover"]
                 )
             )
@@ -59,14 +68,14 @@ def load_data(data_path, local_team_name, other_team_name):
         ),
         axis=1,
     )
-    data_df["TeamOld"] = data_df["Against France"].apply(
+    data_df["TeamOld"] = data_df[AGAINST_LOCALS_COL].apply(
         lambda x: other_team_name if x else local_team_name
     )
 
     def add_team_after(data_df: pd.DataFrame):
         ball_owners = []
         for i, row in data_df.iterrows():
-            against_local = row["Against France"]
+            against_local = row[AGAINST_LOCALS_COL]
             if i == 0:
                 new_expected_ball_owner = (
                     other_team_name if against_local else local_team_name
@@ -104,17 +113,20 @@ def load_data(data_path, local_team_name, other_team_name):
 
 
 def make_fig_1(data_df, local_team_name, other_team_name):
-    events = ["Try", "Turnover", "Penalty"]
-    fig = make_subplots(len(events), 1, subplot_titles=events, shared_xaxes=True)
+    events = ["Try", "Penalty", "Turnover"]
+    subplot_titles = ["Tries (from)", "Penalties (by)", "Turnovers (by)"]
+    fig = make_subplots(
+        len(events), 1, subplot_titles=subplot_titles, shared_xaxes=True
+    )
 
     for i, event_name in enumerate(events):
         event_data = []
         event_local, event_other = 0, 0
         for j, row in data_df[data_df["Type"] == event_name].iterrows():
-            if row["Against France"]:
-                event_other += 1
-            else:
+            if row["Team"] == local_team_name:
                 event_local += 1
+            else:
+                event_other += 1
             event_data.append(
                 [
                     row["Time"],
@@ -167,6 +179,8 @@ def make_fig_1(data_df, local_team_name, other_team_name):
     fig.update_layout(
         hovermode="x unified",
         title=f"Statistics for {local_team_name} vs {other_team_name}",
+        height=int(FIG_WIDTH * 1.5),
+        width=FIG_WIDTH,
     )
     fig.write_html(output_data_root / "events.html")
     return fig
@@ -235,10 +249,11 @@ def make_game_fig(data_df, local_team_name, other_team_name):
             )
         )
 
-    fig.update_layout(annotations=annotations)
+    fig.update_layout(annotations=annotations, height=FIG_WIDTH // 2, width=FIG_WIDTH)
     # fig.update_layout(hovermode="x unified", annotations)
     # fig.write_html(output_data_root / "events_v2.html")
     return fig
+
 
 def get_possessions(data_df: pd.DataFrame) -> dict[str, int]:
     possessions = defaultdict(list)
@@ -258,7 +273,6 @@ def get_possessions(data_df: pd.DataFrame) -> dict[str, int]:
     return possessions
 
 
-
 def get_stats_df(
     data_df: pd.DataFrame, local_team_name: str, other_team_name: str
 ) -> dict[str, pd.DataFrame]:
@@ -268,10 +282,12 @@ def get_stats_df(
     index_names = []
     for n, _ in possession_stats.items():
         index_names.append(n)
-        data.append([
-            len(_),
-            np.round(np.mean(_), 3),
-        ])
+        data.append(
+            [
+                len(_),
+                np.round(np.mean(_), 3),
+            ]
+        )
     possession_stats_df = pd.DataFrame(
         data,
         index=index_names,
@@ -299,7 +315,9 @@ def get_stats_df(
         )
         for i, row in _data_df.iterrows():
             new_stats_df.loc[row["Team"], row["Name"]] += 1
-        new_stats_df["Total"] = new_stats_df.sum(axis=1)
+        rich.print(new_stats_df.columns, len(new_stats_df.columns))
+        if len(new_stats_df.columns) > 1:
+            new_stats_df["Total"] = new_stats_df.sum(axis=1)
         # new_stats_df["Average Possession Time"] = [np.mean(local_possesion_ts).round(3), np.mean(other_possesion_ts).round(3)]
         # rich.print(f"{np.mean(local_possesion_ts):.3f}s ({len(local_possesion_ts)} possessions)")
         # rich.print(f"{np.mean(other_possesion_ts):.3f}s ({len(other_possesion_ts)} possessions)")
