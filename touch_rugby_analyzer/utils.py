@@ -13,7 +13,7 @@ output_data_root = DATA_ROOT / "output"
 output_data_root.mkdir(parents=True, exist_ok=True)
 
 AGAINST_LOCALS_COL = "Against France"
-FIG_WIDTH = 800
+FIG_WIDTH = 1000
 
 
 def save_json(data, p: Path):

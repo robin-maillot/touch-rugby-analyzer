@@ -1,8 +1,6 @@
-import io
-import shutil
 import string
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -10,8 +8,7 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
-import rich
-from touch_rugby_analyzer.constants import ASSETS_ROOT, ROOT, DATA_ROOT
+from touch_rugby_analyzer.constants import DATA_ROOT
 
 # If modifying these scopes, delete the file token.json.
 SCOPES = [
