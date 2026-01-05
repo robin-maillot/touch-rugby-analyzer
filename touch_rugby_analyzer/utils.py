@@ -27,6 +27,10 @@ def time_to_n_seconds(time_obj):
 
 def load_data(data_path, local_team_name, other_team_name):
     data_df = pd.read_csv(data_path)
+
+    if "Against France" not in data_df.columns:
+        data_df["Against France"] = data_df["Possession Owner"].apply(lambda x: x=="Team 2")
+    rich.print(data_df)
     data_df = data_df.dropna(axis=0, how="all", subset="Time")
     # data_df.Time = pd.to_datetime(data_df.Time).dt.time
     data_df.Time = pd.to_datetime(data_df.Time)

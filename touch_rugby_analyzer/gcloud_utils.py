@@ -1,6 +1,6 @@
 import string
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional, Union, List
 
 import numpy as np
 import pandas as pd
@@ -9,6 +9,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from touch_rugby_analyzer.constants import DATA_ROOT
+import rich
 
 # If modifying these scopes, delete the file token.json.
 SCOPES = [
@@ -50,9 +51,7 @@ def get_sheet_values(
     sheet_id: str, range: str, service=None, valueRenderOption: str = "FORMULA"
 ) -> list:
     if service is None:
-        service = login_to_gcloud(
-            Path(__file__).resolve().parent / "token.json", service_name="sheets"
-        )
+        service = login_to_gcloud(service_name="sheets")
     # Call the Sheets API
     sheet = service.spreadsheets()
     result = (
@@ -70,9 +69,7 @@ def get_sheet_values(
 
 def get_sheet_info(sheet_id: str, range: str, service=None) -> pd.DataFrame:
     if service is None:
-        service = login_to_gcloud(
-            Path(__file__).resolve().parent / "token.json", service_name="sheets"
-        )
+        service = login_to_gcloud(service_name="sheets")
     # Call the Sheets API
     result = get_sheet_values(sheet_id=sheet_id, range=range, service=service)
     for n_columns, c_name in enumerate(result[2]):
@@ -131,9 +128,7 @@ def upload_df_to_gsheet(
     service=None,
 ):
     if service is None:
-        service = login_to_gcloud(
-            Path(__file__).resolve().parent / "token.json", service_name="sheets"
-        )
+        service = login_to_gcloud(service_name="sheets")
 
     if isinstance(data, (Path, str)):
         data = pd.read_csv(data, index_col=0)
@@ -196,7 +191,7 @@ def create_gsheet(
     service=None,
 ) -> Optional[str]:
     if service is None:
-        service = login_to_gcloud(Path(__file__).resolve().parent / "token.json")
+        service = login_to_gcloud()
     file_metadata = {
         "name": spreadsheet_name,
         "parents": [parent_id],
@@ -238,11 +233,38 @@ def fetch_gsheet(
     return df
 
 
+def get_all_sheet_names(spreadsheet_id: str) -> List[str]:
+    service = login_to_gcloud(service_name="sheets")
+    # 1. Fetch the spreadsheet metadata
+    # We use 'fields' to only return the specific data we need (optional but faster)
+    spreadsheet = (
+        service.spreadsheets()
+        .get(spreadsheetId=spreadsheet_id, fields="sheets(properties(title))")
+        .execute()
+    )
+
+    # 2. Extract the titles from the nested dictionary
+    sheet_names = [
+        sheet["properties"]["title"] for sheet in spreadsheet.get("sheets", [])
+    ]
+    return sheet_names
+
+
+def sheet_name_to_csv_name(sheet_name: str) -> str:
+    team_1_name, team_2_name = sheet_name.lower().split("/")
+    return f"{team_1_name}_{team_2_name}.csv"
+
+
 if __name__ == "__main__":
     sheet_id = "1B9DwThGoINgicevtjoUDkeQBoGBCD6QFjL0oL7mAU-k"
-    for sheet_tab, csv_name in [
-        ("France/England", "france_england.csv"),
-        ("France/Pays-Bas", "france_pays-bas.csv"),
-    ]:
+    sheet_names = get_all_sheet_names(sheet_id)
+    for sheet_tab in sheet_names:
+        csv_name = sheet_name_to_csv_name(sheet_tab)
+        rich.print(f"{sheet_tab:>20} -> {csv_name}")
         _ = fetch_gsheet(sheet_id, sheet_tab, return_raw=False)
         _.to_csv(DATA_ROOT / csv_name, index=False)
+
+#     for sheet_tab, csv_name in [
+#         ("France/England", "france_england.csv"),
+#         ("France/Pays-Bas", "france_pays-bas.csv"),
+#     ]:

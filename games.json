@@ -1,10 +1,14 @@
 [
   {
-    "name": "france vs pays-bas",
+    "name": "france vs england",
     "file": "game_0.html"
   },
   {
-    "name": "france vs england",
+    "name": "france vs pays-bas",
     "file": "game_1.html"
+  },
+  {
+    "name": "team1 vs team2",
+    "file": "game_2.html"
   }
 ]

@@ -1,5 +1,6 @@
 import pandas as pd
 from jinja2 import Template
+import rich
 
 from touch_rugby_analyzer.constants import ASSETS_ROOT, ROOT, DATA_ROOT
 from touch_rugby_analyzer import utils
@@ -10,9 +11,11 @@ data_paths = [
     DATA_ROOT / "france_pays-bas.csv",
     DATA_ROOT / "france_england.csv",
 ]
+data_paths = sorted([_ for _ in DATA_ROOT.glob("*.csv") if "parsed" not in _.stem])
 
 games_data = []
 for i, data_path in enumerate(data_paths):
+    rich.print(data_path)
     output_html_path = ROOT / f"game_{i}.html"
     local_team_name, other_team_name = utils.get_names(data_path)
 
