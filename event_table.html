@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Touch Rugby CSV Analyzer</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1e40af;
+            --bg: #f8fafc;
+            --surface: #ffffff;
+            --text: #0f172a;
+            --border: #e2e8f0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        header {
+            margin-bottom: 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            color: var(--primary-dark);
+        }
+
+        /* Controls */
+        .controls {
+            background: var(--surface);
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            background-color: var(--primary);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 0.9rem;
+            transition: background 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn:hover {
+            background-color: var(--primary-dark);
+        }
+
+        .btn-outline {
+            background-color: transparent;
+            border: 1px solid var(--border);
+            color: var(--text);
+        }
+
+        .btn-outline:hover {
+            background-color: var(--bg);
+            border-color: #cbd5e1;
+        }
+
+        .search-box {
+            flex-grow: 1;
+            position: relative;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 10px 16px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 1rem;
+            box-sizing: border-box;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+        }
+
+        /* Table */
+        .table-container {
+            background: var(--surface);
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.95rem;
+        }
+
+        th, td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background-color: #f1f5f9;
+            font-weight: 600;
+            color: #475569;
+            cursor: pointer;
+            user-select: none;
+            white-space: nowrap;
+        }
+
+        th:hover {
+            background-color: #e2e8f0;
+        }
+
+        th.sort-asc::after { content: " ▲"; font-size: 0.7em; }
+        th.sort-desc::after { content: " ▼"; font-size: 0.7em; }
+
+        tr:hover {
+            background-color: #f8fafc;
+        }
+
+        /* Status Pills (custom logic for Win/Loss columns if detected) */
+        .status-pill {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        .status-win { background-color: #dcfce7; color: #166534; }
+        .status-loss { background-color: #fee2e2; color: #991b1b; }
+        .status-draw { background-color: #fef9c3; color: #854d0e; }
+
+        .empty-state {
+            padding: 3rem;
+            text-align: center;
+            color: #64748b;
+        }
+
+        @media (max-width: 640px) {
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Touch Rugby Analyzer</h1>
+        <div>
+            <span id="row-count" style="color: #64748b; font-size: 0.9rem;">0 rows</span>
+        </div>
+    </header>
+
+    <div class="controls">
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="Search team, player, result...">
+        </div>
+        <!-- Refresh button re-fetches the static CSV -->
+        <button class="btn btn-outline" onclick="loadStaticCSV()">↺ Refresh Data</button>
+    </div>
+
+    <div class="table-container">
+        <table id="dataTable">
+            <thead>
+                <!-- Headers will be injected here -->
+            </thead>
+            <tbody>
+                <!-- Rows will be injected here -->
+            </tbody>
+        </table>
+        <div id="emptyState" class="empty-state" style="display: none;">
+            No matching records found.
+        </div>
+    </div>
+</div>
+
+<script>
+    // Fallback data in case 'assets/all_events.csv' is missing in this preview environment
+    const SAMPLE_CSV = `Date,Opponent,Result,Us,Them,MVP,Notes
+2023-10-01,Thunderbirds,WIN,7,5,Sarah L.,Great defense in second half
+2023-10-08,Vipers,LOSS,3,6,Tom B.,Struggled with their speed
+2023-10-15,Cyclones,DRAW,5,5,Jessica,Wet conditions played poorly
+2023-10-22,Raptors,WIN,8,2,Mike T.,Total domination
+2023-10-29,Wolves,WIN,6,4,Sarah L.,Close game nice interception
+2023-11-05,Sharks,LOSS,2,7,John D.,They had 2 subs we had 0
+2023-11-12,Eagles,WIN,5,3,Jenny,Comeback from 1-3 down`;
+
+    let currentData = [];
+    let headers = [];
+    let sortCol = -1;
+    let sortAsc = true;
+
+    // --- CSV Parsing Logic ---
+    function parseCSV(str) {
+        const arr = [];
+        let quote = false;
+        let col = 0, row = 0;
+
+        for (let i = 0; i < str.length; i++) {
+            let cc = str[i], nc = str[i + 1];
+            arr[row] = arr[row] || [];
+            arr[row][col] = arr[row][col] || '';
+
+            if (cc == '"' && quote && nc == '"') {
+                arr[row][col] += cc;
+                ++i;
+                continue;
+            }
+            if (cc == '"') {
+                quote = !quote;
+                continue;
+            }
+            if (cc == ',' && !quote) {
+                ++col;
+                continue;
+            }
+            if (cc == '\r' && nc == '\n' && !quote) {
+                ++row;
+                col = 0;
+                ++i;
+                continue;
+            }
+            if (cc == '\n' && !quote) {
+                ++row;
+                col = 0;
+                continue;
+            }
+            if (cc == '\r' && !quote) {
+                ++row;
+                col = 0;
+                continue;
+            }
+            arr[row][col] += cc;
+        }
+        return arr;
+    }
+
+    function processData(csvText) {
+        const rows = parseCSV(csvText);
+        if (rows.length < 2) return;
+
+        // Extract headers
+        headers = rows[0].map(h => h.trim());
+
+        // Extract body (filter out empty rows)
+        currentData = rows.slice(1).filter(r => r.length === headers.length || r.join('').trim().length > 0);
+
+        renderHeaders();
+        renderTable(currentData);
+    }
+
+    // --- Rendering ---
+    function renderHeaders() {
+        const thead = document.querySelector('#dataTable thead');
+        thead.innerHTML = '';
+        const tr = document.createElement('tr');
+
+        headers.forEach((h, index) => {
+            const th = document.createElement('th');
+            th.textContent = h;
+            th.onclick = () => sortTable(index);
+            if (index === sortCol) {
+                th.classList.add(sortAsc ? 'sort-asc' : 'sort-desc');
+            }
+            tr.appendChild(th);
+        });
+        thead.appendChild(tr);
+    }
+
+    function renderTable(rows) {
+        const tbody = document.querySelector('#dataTable tbody');
+        const emptyState = document.getElementById('emptyState');
+        const countSpan = document.getElementById('row-count');
+
+        tbody.innerHTML = '';
+        countSpan.textContent = `${rows.length} rows`;
+
+        if (rows.length === 0) {
+            emptyState.style.display = 'block';
+            return;
+        }
+        emptyState.style.display = 'none';
+
+        rows.forEach(row => {
+            const tr = document.createElement('tr');
+            row.forEach((cell, idx) => {
+                const td = document.createElement('td');
+
+                // Smart formatting for "Result" column
+                const headerName = headers[idx]?.toLowerCase();
+                if (headerName === 'result') {
+                    const span = document.createElement('span');
+                    span.textContent = cell;
+                    span.className = 'status-pill ' +
+                        (cell.toLowerCase().includes('win') ? 'status-win' :
+                         cell.toLowerCase().includes('loss') ? 'status-loss' : 'status-draw');
+                    td.appendChild(span);
+                } else {
+                    td.textContent = cell;
+                }
+                tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+        });
+    }
+
+    // --- Actions ---
+    function sortTable(colIndex) {
+        if (sortCol === colIndex) {
+            sortAsc = !sortAsc;
+        } else {
+            sortCol = colIndex;
+            sortAsc = true;
+        }
+
+        // Detect if column is numeric
+        const isNumeric = currentData.every(row => !isNaN(parseFloat(row[colIndex])) && isFinite(row[colIndex]));
+
+        currentData.sort((a, b) => {
+            let valA = a[colIndex];
+            let valB = b[colIndex];
+
+            if (isNumeric) {
+                return sortAsc ? valA - valB : valB - valA;
+            }
+
+            valA = valA.toLowerCase();
+            valB = valB.toLowerCase();
+            if (valA < valB) return sortAsc ? -1 : 1;
+            if (valA > valB) return sortAsc ? 1 : -1;
+            return 0;
+        });
+
+        renderHeaders(); // Re-render to update arrows
+        filterAndRender(); // Re-render body respecting current search
+    }
+
+    function filterAndRender() {
+        const query = document.getElementById('searchInput').value.toLowerCase();
+
+        const filtered = currentData.filter(row => {
+            return row.some(cell => String(cell).toLowerCase().includes(query));
+        });
+
+        renderTable(filtered);
+    }
+
+    function loadStaticCSV() {
+        // Tries to load assets/all_events.csv, falls back to sample data if not found
+        // Use a timestamp to prevent browser caching when updating the file
+        fetch('./assets/all_events.csv?t=' + Date.now())
+            .then(response => {
+                if (!response.ok) throw new Error("Network response was not ok");
+                return response.text();
+            })
+            .then(csvText => {
+                console.log("Loaded assets/all_events.csv successfully");
+                processData(csvText);
+            })
+            .catch(error => {
+                console.warn("Could not load assets/all_events.csv (using sample data):", error);
+                processData(SAMPLE_CSV);
+            });
+    }
+
+    document.getElementById('searchInput').addEventListener('input', filterAndRender);
+
+    // Initial Load
+    loadStaticCSV();
+
+</script>
+
+</body>
+</html>

@@ -13,6 +13,26 @@ data_paths = [
 ]
 data_paths = sorted([_ for _ in DATA_ROOT.glob("*.csv") if "parsed" not in _.stem])
 
+# Create a single final parsed csv with all the data:
+
+full_data_df = []
+for i, data_path in enumerate(data_paths):
+    local_team_name, other_team_name = utils.get_names(data_path)
+    data_df = utils.load_data(data_path, local_team_name, other_team_name)
+    simple_data_df = data_df[[
+        "Time",
+        "Type",
+        "Name",
+        "Comment",
+        "Youtube Link",
+        "Team",
+    ]]
+    simple_data_df["game"] = data_path.stem
+    full_data_df.append(simple_data_df)
+
+full_data_df = pd.concat(full_data_df, ignore_index=True, axis=0)
+full_data_df.to_csv(ASSETS_ROOT / "all_events.csv")
+
 games_data = []
 for i, data_path in enumerate(data_paths):
     rich.print(data_path)
