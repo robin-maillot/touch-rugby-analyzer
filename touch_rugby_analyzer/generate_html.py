@@ -19,14 +19,16 @@ full_data_df = []
 for i, data_path in enumerate(data_paths):
     local_team_name, other_team_name = utils.get_names(data_path)
     data_df = utils.load_data(data_path, local_team_name, other_team_name)
-    simple_data_df = data_df[[
-        "Time",
-        "Type",
-        "Name",
-        "Comment",
-        "Youtube Link",
-        "Team",
-    ]]
+    simple_data_df = data_df[
+        [
+            "Time",
+            "Type",
+            "Name",
+            "Comment",
+            "Youtube Link",
+            "Team",
+        ]
+    ]
     simple_data_df["game"] = data_path.stem
     full_data_df.append(simple_data_df)
 

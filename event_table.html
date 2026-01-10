@@ -24,7 +24,7 @@
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
         }
 
@@ -87,6 +87,31 @@
             border-color: #cbd5e1;
         }
 
+        /* Search & Select Group */
+        .search-group {
+            display: flex;
+            flex-grow: 1;
+            gap: 0; /* Attach them */
+        }
+
+        .column-select {
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-right: none;
+            border-radius: 6px 0 0 6px;
+            background-color: #f1f5f9;
+            color: #475569;
+            font-size: 0.9rem;
+            cursor: pointer;
+            outline: none;
+            max-width: 150px;
+        }
+
+        .column-select:focus {
+            border-color: var(--primary);
+            z-index: 2;
+        }
+
         .search-box {
             flex-grow: 1;
             position: relative;
@@ -96,7 +121,7 @@
             width: 100%;
             padding: 10px 16px;
             border: 1px solid var(--border);
-            border-radius: 6px;
+            border-radius: 0 6px 6px 0;
             font-size: 1rem;
             box-sizing: border-box;
         }
@@ -105,6 +130,7 @@
             outline: none;
             border-color: var(--primary);
             box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+            z-index: 2;
         }
 
         /* Table */
@@ -118,13 +144,14 @@
         table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 0.95rem;
+            font-size: 0.9rem;
         }
 
         th, td {
             padding: 12px 16px;
             text-align: left;
             border-bottom: 1px solid var(--border);
+            vertical-align: middle;
         }
 
         th {
@@ -147,16 +174,39 @@
             background-color: #f8fafc;
         }
 
-        /* Status Pills (custom logic for Win/Loss columns if detected) */
+        /* Styling for specific data types */
+        .video-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            color: #ef4444; /* YouTube Red */
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.85rem;
+            background: #fef2f2;
+            padding: 4px 10px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+        .video-link:hover {
+            background: #fee2e2;
+            text-decoration: underline;
+        }
+
         .status-pill {
             padding: 4px 8px;
             border-radius: 12px;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
-        .status-win { background-color: #dcfce7; color: #166534; }
-        .status-loss { background-color: #fee2e2; color: #991b1b; }
-        .status-draw { background-color: #fef9c3; color: #854d0e; }
+        .tag-england { background-color: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; }
+        .tag-france { background-color: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+
+        .type-penalty { color: #dc2626; font-weight: 600; }
+        .type-try { color: #16a34a; font-weight: 700; }
+        .type-turnover { color: #ea580c; }
 
         .empty-state {
             padding: 3rem;
@@ -169,6 +219,18 @@
                 flex-direction: column;
                 align-items: stretch;
             }
+            .search-group {
+                flex-direction: column;
+            }
+            .column-select {
+                border-radius: 6px 6px 0 0;
+                border-right: 1px solid var(--border);
+                border-bottom: none;
+                max-width: 100%;
+            }
+            .search-box input {
+                border-radius: 0 0 6px 6px;
+            }
         }
     </style>
 </head>
@@ -176,18 +238,24 @@
 
 <div class="container">
     <header>
-        <h1>Touch Rugby Analyzer</h1>
+        <h1>Event Table</h1>
         <div>
             <span id="row-count" style="color: #64748b; font-size: 0.9rem;">0 rows</span>
         </div>
     </header>
 
     <div class="controls">
-        <div class="search-box">
-            <input type="text" id="searchInput" placeholder="Search team, player, result...">
+        <div class="search-group">
+            <select id="searchColumn" class="column-select">
+                <option value="-1">All Columns</option>
+                <!-- Options populated by JS -->
+            </select>
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="Search...">
+            </div>
         </div>
         <!-- Refresh button re-fetches the static CSV -->
-        <button class="btn btn-outline" onclick="loadStaticCSV()">↺ Refresh Data</button>
+        <button class="btn btn-outline" onclick="loadStaticCSV()">↺ Reset Data</button>
     </div>
 
     <div class="table-container">
@@ -206,15 +274,18 @@
 </div>
 
 <script>
-    // Fallback data in case 'assets/all_events.csv' is missing in this preview environment
-    const SAMPLE_CSV = `Date,Opponent,Result,Us,Them,MVP,Notes
-2023-10-01,Thunderbirds,WIN,7,5,Sarah L.,Great defense in second half
-2023-10-08,Vipers,LOSS,3,6,Tom B.,Struggled with their speed
-2023-10-15,Cyclones,DRAW,5,5,Jessica,Wet conditions played poorly
-2023-10-22,Raptors,WIN,8,2,Mike T.,Total domination
-2023-10-29,Wolves,WIN,6,4,Sarah L.,Close game nice interception
-2023-11-05,Sharks,LOSS,2,7,John D.,They had 2 subs we had 0
-2023-11-12,Eagles,WIN,5,3,Jenny,Comeback from 1-3 down`;
+    // Updated Sample Data
+    const SAMPLE_CSV = `,Time,Type,Name,Comment,Youtube Link,Team,game
+0,2026-01-10 00:00:00,Game Event,Game Start,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=0,england,france_england
+1,2026-01-10 00:00:25,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=25,england,france_england
+2,2026-01-10 00:00:34,Penalty,Offside,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=34,england,france_england
+3,2026-01-10 00:00:45,Penalty,In The Ruck,Should have been taken 10m up,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=45,england,france_england
+4,2026-01-10 00:01:05,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=65,france,france_england
+5,2026-01-10 00:01:31,Try,Scoop,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=91,england,france_england
+6,2026-01-10 00:02:13,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=133,france,france_england
+7,2026-01-10 00:02:47,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=167,england,france_england
+8,2026-01-10 00:03:07,Penalty,Offside,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=187,england,france_england
+9,2026-01-10 00:03:30,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=210,france,france_england`;
 
     let currentData = [];
     let headers = [];
@@ -276,8 +347,29 @@
         // Extract body (filter out empty rows)
         currentData = rows.slice(1).filter(r => r.length === headers.length || r.join('').trim().length > 0);
 
+        updateColumnSelect();
         renderHeaders();
         renderTable(currentData);
+    }
+
+    function updateColumnSelect() {
+        const select = document.getElementById('searchColumn');
+        // Save current selection if possible, else default to -1
+        const currentVal = select.value;
+
+        select.innerHTML = '<option value="-1">All Columns</option>';
+        headers.forEach((h, i) => {
+            const opt = document.createElement('option');
+            opt.value = i;
+            // Handle the empty first header in your CSV
+            opt.textContent = h === '' ? '#' : h;
+            select.appendChild(opt);
+        });
+
+        // Restore selection if it still exists
+        if (currentVal && select.querySelector(`option[value="${currentVal}"]`)) {
+            select.value = currentVal;
+        }
     }
 
     // --- Rendering ---
@@ -288,7 +380,8 @@
 
         headers.forEach((h, index) => {
             const th = document.createElement('th');
-            th.textContent = h;
+            // Handle the empty first header
+            th.textContent = h === '' ? '#' : h;
             th.onclick = () => sortTable(index);
             if (index === sortCol) {
                 th.classList.add(sortAsc ? 'sort-asc' : 'sort-desc');
@@ -316,17 +409,35 @@
             const tr = document.createElement('tr');
             row.forEach((cell, idx) => {
                 const td = document.createElement('td');
+                const headerName = headers[idx]?.toLowerCase() || '';
 
-                // Smart formatting for "Result" column
-                const headerName = headers[idx]?.toLowerCase();
-                if (headerName === 'result') {
+                // Feature: Clickable YouTube Links
+                if ((headerName.includes('link') || headerName.includes('youtube')) && cell.startsWith('http')) {
+                    const a = document.createElement('a');
+                    a.href = cell;
+                    a.target = '_blank';
+                    a.rel = 'noopener noreferrer';
+                    a.className = 'video-link';
+                    a.innerHTML = `<span>▶ Watch</span>`;
+                    td.appendChild(a);
+                }
+                // Feature: Styling for Team tags
+                else if (headerName === 'team') {
                     const span = document.createElement('span');
                     span.textContent = cell;
-                    span.className = 'status-pill ' +
-                        (cell.toLowerCase().includes('win') ? 'status-win' :
-                         cell.toLowerCase().includes('loss') ? 'status-loss' : 'status-draw');
+                    span.className = 'status-pill ' + (cell.toLowerCase() === 'england' ? 'tag-england' : 'tag-france');
                     td.appendChild(span);
-                } else {
+                }
+                // Feature: Styling for Types (Penalty vs Try)
+                else if (headerName === 'type') {
+                     const span = document.createElement('span');
+                     span.textContent = cell;
+                     if(cell.toLowerCase().includes('try')) span.className = 'type-try';
+                     else if(cell.toLowerCase().includes('penalty')) span.className = 'type-penalty';
+                     else if(cell.toLowerCase().includes('turnover')) span.className = 'type-turnover';
+                     td.appendChild(span);
+                }
+                else {
                     td.textContent = cell;
                 }
                 tr.appendChild(td);
@@ -362,15 +473,21 @@
             return 0;
         });
 
-        renderHeaders(); // Re-render to update arrows
-        filterAndRender(); // Re-render body respecting current search
+        renderHeaders();
+        filterAndRender();
     }
 
     function filterAndRender() {
         const query = document.getElementById('searchInput').value.toLowerCase();
+        const colIdx = parseInt(document.getElementById('searchColumn').value);
 
         const filtered = currentData.filter(row => {
-            return row.some(cell => String(cell).toLowerCase().includes(query));
+            // If All Columns selected (-1), search everywhere
+            if (colIdx === -1) {
+                return row.some(cell => String(cell).toLowerCase().includes(query));
+            }
+            // Otherwise search only the specific column
+            return String(row[colIdx]).toLowerCase().includes(query);
         });
 
         renderTable(filtered);
@@ -379,22 +496,24 @@
     function loadStaticCSV() {
         // Tries to load assets/all_events.csv, falls back to sample data if not found
         // Use a timestamp to prevent browser caching when updating the file
-        fetch('./assets/all_events.csv?t=' + Date.now())
+        fetch('assets/all_events.csv?t=' + Date.now())
             .then(response => {
                 if (!response.ok) throw new Error("Network response was not ok");
                 return response.text();
             })
             .then(csvText => {
-                console.log("Loaded assets/all_events.csv successfully");
+                console.log("Loaded all_events.csv successfully");
                 processData(csvText);
             })
             .catch(error => {
-                console.warn("Could not load assets/all_events.csv (using sample data):", error);
+                console.warn("Could not load all_events.csv (using sample data):", error);
                 processData(SAMPLE_CSV);
             });
     }
 
+    // Event Listeners
     document.getElementById('searchInput').addEventListener('input', filterAndRender);
+    document.getElementById('searchColumn').addEventListener('change', filterAndRender);
 
     // Initial Load
     loadStaticCSV();
