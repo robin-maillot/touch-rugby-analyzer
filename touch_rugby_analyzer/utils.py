@@ -25,7 +25,8 @@ def time_to_n_seconds(time_obj):
     return 3600 * time_obj.hour + 60 * time_obj.minute + time_obj.second
 
 
-def load_data(data_path, local_team_name, other_team_name):
+def load_data(data_path: Path, simple: bool = False):
+    local_team_name, other_team_name = get_names(data_path)
     data_df = pd.read_csv(data_path)
 
     if "Against France" not in data_df.columns:
@@ -36,26 +37,28 @@ def load_data(data_path, local_team_name, other_team_name):
     data_df = data_df.dropna(axis=0, how="all", subset="Time")
     # data_df.Time = pd.to_datetime(data_df.Time).dt.time
     data_df.Time = pd.to_datetime(data_df.Time)
-    game_start_events = data_df[data_df["Name"] == "Game Start"]
-    game_end_events = data_df[data_df["Name"] == "Game End"]
 
-    assert len(game_start_events) == len(game_end_events) == 2
+    if not simple:
+        game_start_events = data_df[data_df["Name"] == "Game Start"]
+        game_end_events = data_df[data_df["Name"] == "Game End"]
 
-    half_time_start_time = game_end_events.Time.to_list()[0]
-    half_time_end_time = game_start_events.Time.to_list()[1]
-    half_time_end_index = game_start_events.index.to_list()[1]
+        assert len(game_start_events) == len(game_end_events) == 2
 
-    new_game_end_time = half_time_start_time + pd.Timedelta(minutes=2)
-    delta = new_game_end_time - half_time_end_time
+        half_time_start_time = game_end_events.Time.to_list()[0]
+        half_time_end_time = game_start_events.Time.to_list()[1]
+        half_time_end_index = game_start_events.index.to_list()[1]
 
-    halftime_passed = False
-    ids = []
-    for i, row in data_df.iterrows():
-        if i == half_time_end_index:
-            halftime_passed = True
-        if halftime_passed:
-            ids.append(i)
-    data_df.Time[ids] += delta
+        new_game_end_time = half_time_start_time + pd.Timedelta(minutes=2)
+        delta = new_game_end_time - half_time_end_time
+
+        halftime_passed = False
+        ids = []
+        for i, row in data_df.iterrows():
+            if i == half_time_end_index:
+                halftime_passed = True
+            if halftime_passed:
+                ids.append(i)
+        data_df.Time[ids] += delta
 
     data_df[AGAINST_LOCALS_COL].fillna(False, inplace=True)
     data_df["To Review"].fillna(False, inplace=True)
@@ -114,7 +117,8 @@ def load_data(data_path, local_team_name, other_team_name):
             ball_owners.append(new_expected_ball_owner)
         data_df["ball_owner"] = ball_owners
 
-    add_team_after(data_df)
+    if not simple:
+        add_team_after(data_df)
     return data_df
 
 

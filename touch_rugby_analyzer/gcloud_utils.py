@@ -258,13 +258,13 @@ def sheet_name_to_csv_name(sheet_name: str) -> str:
 if __name__ == "__main__":
     sheet_id = "1B9DwThGoINgicevtjoUDkeQBoGBCD6QFjL0oL7mAU-k"
     sheet_names = get_all_sheet_names(sheet_id)
+
+    for csv_path in DATA_ROOT.glob("*.csv"):
+        rich.print(f"[yellow] Removing old csv: {csv_path} [/yellow]")
+        csv_path.unlink()
+
     for sheet_tab in sheet_names:
         csv_name = sheet_name_to_csv_name(sheet_tab)
         rich.print(f"{sheet_tab:>20} -> {csv_name}")
         _ = fetch_gsheet(sheet_id, sheet_tab, return_raw=False)
         _.to_csv(DATA_ROOT / csv_name, index=False)
-
-#     for sheet_tab, csv_name in [
-#         ("France/England", "france_england.csv"),
-#         ("France/Pays-Bas", "france_pays-bas.csv"),
-#     ]:

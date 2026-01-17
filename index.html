@@ -11,6 +11,68 @@
       margin: 0;
       padding: 0;
     }
+
+    /* --- Login Screen Styles --- */
+    #login-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #2c3e50;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      color: white;
+    }
+    #login-box {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      text-align: center;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+      max-width: 90%;
+      width: 300px;
+    }
+    #login-box h2 {
+      margin-top: 0;
+      color: #333;
+    }
+    #password-input {
+      width: 100%;
+      padding: 10px;
+      margin: 15px 0;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+      font-size: 16px;
+    }
+    #login-btn {
+      width: 100%;
+      padding: 10px;
+      background: #3498db;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    #login-btn:hover { background: #2980b9; }
+    #error-msg {
+      color: #e74c3c;
+      margin-top: 10px;
+      display: none;
+      font-size: 14px;
+    }
+
+    /* --- Main Content (Hidden Initially) --- */
+    #app-content {
+      display: none; /* Hidden until password is correct */
+    }
+
+    /* --- Existing Styles --- */
     header {
       text-align: center;
       padding: 18px;
@@ -48,7 +110,7 @@
 
     iframe {
       width: 100%;
-      height: 2000px;  /* adjust to fit your pages */
+      height: 2000px;
       border: none;
       border-radius: 8px;
       box-shadow: 0 2px 6px rgba(0,0,0,0.08);
@@ -64,52 +126,109 @@
   </style>
 </head>
 <body>
-  <header>
-    <h1>Touch Rugby Analyzer</h1>
-  </header>
 
-<nav id="nav">
-  <!-- Static link for the Event Table -->
-  <button data-src="event_table.html">Event Table</button>
-</nav>
+  <div id="login-screen">
+    <div id="login-box">
+      <h2>Restricted Access</h2>
+      <input type="password" id="password-input" placeholder="Enter Password" />
+      <button id="login-btn">Login</button>
+      <div id="error-msg">Incorrect Password</div>
+    </div>
+  </div>
 
-<div id="iframe-container">
-  <iframe id="gameFrame" scrolling="no"></iframe>
-</div>
+  <div id="app-content">
+    <header>
+      <h1>Touch Rugby Analyzer</h1>
+    </header>
+
+    <nav id="nav">
+      <button data-src="event_table.html">Event Table</button>
+    </nav>
+
+    <div id="iframe-container">
+      <iframe id="gameFrame" scrolling="no"></iframe>
+    </div>
+  </div>
 
 <script>
-  const nav = document.getElementById('nav');
-  const frame = document.getElementById('gameFrame');
+  // --- PASSWORD LOGIC ---
+  const CORRECT_PASSWORD = "M30"; // Set your password here
+  const loginScreen = document.getElementById('login-screen');
+  const appContent = document.getElementById('app-content');
+  const passInput = document.getElementById('password-input');
+  const loginBtn = document.getElementById('login-btn');
+  const errorMsg = document.getElementById('error-msg');
 
-  fetch('./games.json?_=' + Date.now()) // cache-bust JSON too
-    .then(res => res.json())
-    .then(files => {
-      files.forEach((entry, idx) => {
-        // entry.name and entry.file come from JSON
-        const btn = document.createElement('button');
-        btn.textContent = entry.name;
-        btn.dataset.src = entry.file;
+  function checkPassword() {
+    if (passInput.value === CORRECT_PASSWORD) {
+      // Hide login, show app
+      loginScreen.style.display = 'none';
+      appContent.style.display = 'block';
+      // Initialize the app (fetch data) only after login
+      initApp();
+    } else {
+      errorMsg.style.display = 'block';
+      passInput.value = '';
+      passInput.focus();
+    }
+  }
 
-        if (idx === 0) btn.classList.add('active');
+  // Listen for click
+  loginBtn.addEventListener('click', checkPassword);
 
-        btn.addEventListener('click', () => {
-          const forced = entry.file + (entry.file.includes('?') ? '&' : '?') + '_=' + Date.now();
-          frame.src = forced;
+  // Listen for Enter key
+  passInput.addEventListener('keypress', function (e) {
+    if (e.key === 'Enter') {
+      checkPassword();
+    }
+  });
 
-          // remove active from others
-          document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
-          btn.classList.add('active');
-          frame.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  // --- APP LOGIC (Wrapped in initApp) ---
+  function initApp() {
+    const nav = document.getElementById('nav');
+    const frame = document.getElementById('gameFrame');
+
+    fetch('./games.json?_=' + Date.now())
+      .then(res => res.json())
+      .then(files => {
+        files.forEach((entry, idx) => {
+          const btn = document.createElement('button');
+          btn.textContent = entry.name;
+          btn.dataset.src = entry.file;
+
+          if (idx === 0) btn.classList.add('active');
+
+          btn.addEventListener('click', () => {
+            const forced = entry.file + (entry.file.includes('?') ? '&' : '?') + '_=' + Date.now();
+            frame.src = forced;
+
+            document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            frame.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          });
+
+          nav.appendChild(btn);
         });
 
-        nav.appendChild(btn);
+        // Load first game automatically
+        if (files.length) frame.src = files[0].file;
+
+        // Setup the static button event listener manually if needed,
+        // or ensure it works with the existing flow.
+        // The static button in your HTML needs an event listener if not handled by the loop:
+        const staticBtn = nav.querySelector('button[data-src="event_table.html"]');
+        if(staticBtn) {
+            staticBtn.addEventListener('click', () => {
+                frame.src = "event_table.html?_=" + Date.now();
+                document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+                staticBtn.classList.add('active');
+            });
+        }
+      })
+      .catch(err => {
+        console.error('Error loading games.json:', err);
       });
-
-      // load first game automatically
-      if (files.length) frame.src = files[0].file;
-    })
-    .catch(err => {
-      console.error('Error loading games.json:', err);
-    });
+  }
 </script>
-
+</body>
+</html>
