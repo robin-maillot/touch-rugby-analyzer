@@ -1,162 +1,176 @@
 ,Time,Type,Name,Comment,Youtube Link,Team,game
-0,2026-01-17 00:00:00,Game Event,Game Start,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=-5,england,france_england
-1,2026-01-17 00:00:25,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=20,england,france_england
-2,2026-01-17 00:00:34,Penalty,Offside,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=29,england,france_england
-3,2026-01-17 00:00:45,Penalty,In The Ruck,Should have been taken 10m up,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=40,england,france_england
-4,2026-01-17 00:01:05,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=60,france,france_england
-5,2026-01-17 00:01:31,Try,Scoop,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=86,england,france_england
-6,2026-01-17 00:02:13,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=128,france,france_england
-7,2026-01-17 00:02:47,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=162,england,france_england
-8,2026-01-17 00:03:07,Penalty,Offside,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=182,england,france_england
-9,2026-01-17 00:03:30,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=205,france,france_england
-10,2026-01-17 00:03:58,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=233,england,france_england
-11,2026-01-17 00:04:30,Turnover,6th Touch,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=265,france,france_england
-12,2026-01-17 00:04:50,Penalty,Hard Touch,Is it hard?,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=285,france,france_england
-13,2026-01-17 00:05:25,Turnover,6th Touch,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=320,england,france_england
-14,2026-01-17 00:05:42,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=337,france,france_england
-15,2026-01-17 00:06:24,Try,32 - Long Ball,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=379,england,france_england
-16,2026-01-17 00:07:20,Turnover,6th Touch,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=435,france,france_england
-17,2026-01-17 00:07:58,Try,Scoop,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=473,england,france_england
-18,2026-01-17 00:08:38,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=513,france,france_england
-19,2026-01-17 00:09:04,Turnover,6 Again,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=539,france,france_england
-20,2026-01-17 00:09:17,Try,33 - Quicky,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=552,england,france_england
-21,2026-01-17 00:09:55,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=590,france,france_england
-22,2026-01-17 00:10:36,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=631,england,france_england
-23,2026-01-17 00:10:54,Penalty,Hard Touch,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=649,england,france_england
-24,2026-01-17 00:11:14,Penalty,Not Moving Forward,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=669,england,france_england
-25,2026-01-17 00:12:00,Turnover,6th Touch,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=715,france,france_england
-26,2026-01-17 00:12:32,Turnover,6 Again,"Seems very harsh, touch made while the palyer had the ball",https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=747,france,france_england
-27,2026-01-17 00:12:48,To Review,Bad Roll,"Does the foot go over the ball, clean roll?",https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=763,france,france_england
-28,2026-01-17 00:13:03,Try,33,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=778,england,france_england
-29,2026-01-17 00:13:45,Penalty,Not Moving Forward,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=820,england,france_england
-30,2026-01-17 00:14:25,Try,Scoop,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=860,france,france_england
-31,2026-01-17 00:15:02,Try,33 - Quicky,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=897,england,france_england
-32,2026-01-17 00:15:55,Turnover,6th Touch,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=950,france,france_england
-33,2026-01-17 00:16:17,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=972,england,france_england
-34,2026-01-17 00:17:08,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=1023,france,france_england
-35,2026-01-17 00:17:47,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=1062,england,france_england
-36,2026-01-17 00:18:15,Turnover,6th Touch,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=1090,france,france_england
-37,2026-01-17 00:18:42,Turnover,6th Touch,Touch and Pass ?,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=1117,france,france_england
-38,2026-01-17 00:19:14,Turnover,Interception,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=1149,france,france_england
-39,2026-01-17 00:19:37,Try,Scoop,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=1172,england,france_england
-40,2026-01-17 00:20:05,Game Event,Game End,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=1200,france,france_england
-41,2026-01-17 00:00:02,Game Event,Game Start,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=-3,france,france_england
-42,2026-01-17 00:00:29,Turnover,Interception,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=24,france,france_england
-43,2026-01-17 00:00:56,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=51,england,france_england
-44,2026-01-17 00:01:28,Turnover,6th Touch,Ball down first?,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=83,france,france_england
-45,2026-01-17 00:02:35,Turnover,6 Again,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=150,france,france_england
-46,2026-01-17 00:03:02,Try,33 - Quicky,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=177,england,france_england
-47,2026-01-17 00:04:00,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=235,france,france_england
-48,2026-01-17 00:04:19,Penalty,Forward Pass,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=254,england,france_england
-49,2026-01-17 00:04:42,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=277,france,france_england
-50,2026-01-17 00:05:08,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=303,england,france_england
-51,2026-01-17 00:05:41,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=336,france,france_england
-52,2026-01-17 00:06:02,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=357,england,france_england
-53,2026-01-17 00:06:40,Penalty,Forward Pass,Maybe,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=395,france,france_england
-54,2026-01-17 00:07:12,Try,32 - Cut,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=427,england,france_england
-55,2026-01-17 00:08:01,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=476,france,france_england
-56,2026-01-17 00:08:21,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=496,england,france_england
-57,2026-01-17 00:08:52,Turnover,6th Touch,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=527,france,france_england
-58,2026-01-17 00:09:27,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=562,england,france_england
-59,2026-01-17 00:10:05,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=600,france,france_england
-60,2026-01-17 00:10:18,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=613,england,france_england
-61,2026-01-17 00:11:00,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=655,france,france_england
-62,2026-01-17 00:11:38,Penalty,Offside,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=693,france,france_england
-63,2026-01-17 00:12:07,Try,33 - Quicky,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=722,england,france_england
-64,2026-01-17 00:13:00,Turnover,6th Touch,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=775,france,france_england
-65,2026-01-17 00:13:12,Penalty,Off The Mark,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=787,england,france_england
-66,2026-01-17 00:13:58,Turnover,6th Touch,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=833,france,france_england
-67,2026-01-17 00:15:00,Penalty,Forward Pass,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=895,england,france_england
-68,2026-01-17 00:15:47,Turnover,6th Touch,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=942,france,france_england
-69,2026-01-17 00:16:24,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=979,england,france_england
-70,2026-01-17 00:16:56,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=1011,france,france_england
-71,2026-01-17 00:17:21,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=1036,england,france_england
-72,2026-01-17 00:17:59,Try,French Flair,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=1074,france,france_england
-73,2026-01-17 00:18:33,Try,32 - Cut,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=1108,england,france_england
-74,2026-01-17 00:20:03,Game Event,Game End,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=1198,england,france_england
-75,2026-01-17 00:02:14,Game Event,Game Start,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=129,pays-bas,france_pays-bas
-76,2026-01-17 00:02:45,Try,Try,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=160,pays-bas,france_pays-bas
-77,2026-01-17 00:03:54,Turnover,6th Touch,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=229,france,france_pays-bas
-78,2026-01-17 00:04:27,Turnover,Ball Down,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=262,pays-bas,france_pays-bas
-79,2026-01-17 00:04:46,Turnover,6th Touch,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=281,france,france_pays-bas
-80,2026-01-17 00:05:28,Turnover,6th Touch,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=323,pays-bas,france_pays-bas
-81,2026-01-17 00:06:08,Penalty,Touch and Pass,To compare,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=363,france,france_pays-bas
-82,2026-01-17 00:06:51,Try,Try,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=406,pays-bas,france_pays-bas
-83,2026-01-17 00:07:43,Penalty,Forward Pass,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=458,france,france_pays-bas
-84,2026-01-17 00:08:44,Turnover,Ball Down,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=519,pays-bas,france_pays-bas
-85,2026-01-17 00:09:27,Try,Try,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=562,france,france_pays-bas
-86,2026-01-17 00:11:03,Turnover,Ball Down,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=658,pays-bas,france_pays-bas
-87,2026-01-17 00:11:43,Try,Try,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=698,france,france_pays-bas
-88,2026-01-17 00:12:30,Turnover,Ball Down,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=745,pays-bas,france_pays-bas
-89,2026-01-17 00:13:05,Penalty,Offside,Not sure if offside or not moving up,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=780,pays-bas,france_pays-bas
-90,2026-01-17 00:13:21,Turnover,Ball Down,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=796,france,france_pays-bas
-91,2026-01-17 00:14:00,Turnover,6th Touch,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=835,pays-bas,france_pays-bas
-92,2026-01-17 00:14:30,Turnover,Dummy Touch,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=865,france,france_pays-bas
-93,2026-01-17 00:15:06,Turnover,6th Touch,Possible Touch and Pass,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=901,pays-bas,france_pays-bas
-94,2026-01-17 00:15:20,Penalty,Forward Pass,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=915,france,france_pays-bas
-95,2026-01-17 00:16:05,Penalty,Offside,Not sure if offside or early drop,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=960,france,france_pays-bas
-96,2026-01-17 00:16:20,To Review,Bad Roll,Missed not over the ball?,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=975,france,france_pays-bas
-97,2026-01-17 00:17:00,Turnover,Interception,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1015,pays-bas,france_pays-bas
-98,2026-01-17 00:17:05,To Review,Bad Roll,Clear not over the ball,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1020,pays-bas,france_pays-bas
-99,2026-01-17 00:17:24,Penalty,Delay of Play,Harsh ?,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1039,france,france_pays-bas
-100,2026-01-17 00:17:54,Turnover,6th Touch,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1069,pays-bas,france_pays-bas
-101,2026-01-17 00:18:19,Penalty,Hard Touch,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1094,pays-bas,france_pays-bas
-102,2026-01-17 00:18:55,Penalty,Forward Pass,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1130,france,france_pays-bas
-103,2026-01-17 00:19:31,Turnover,Ball Down,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1166,pays-bas,france_pays-bas
-104,2026-01-17 00:19:57,Try,Try,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1192,france,france_pays-bas
-105,2026-01-17 00:20:47,Turnover,6th Touch,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1242,pays-bas,france_pays-bas
-106,2026-01-17 00:21:04,Turnover,Ball Down,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1259,france,france_pays-bas
-107,2026-01-17 00:21:34,Turnover,Ball Down,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1289,pays-bas,france_pays-bas
-108,2026-01-17 00:21:48,To Review,In The Ruck,In the ruck ?,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1303,france,france_pays-bas
-109,2026-01-17 00:21:57,Penalty,Offside,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1312,pays-bas,france_pays-bas
-110,2026-01-17 00:22:03,To Review,Other,Off the ball skirmish,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1318,france,france_pays-bas
-111,2026-01-17 00:22:15,Game Event,Game End,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1330,france,france_pays-bas
-112,2026-01-17 00:27:13,Game Event,Game Start,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1628,france,france_pays-bas
-113,2026-01-17 00:27:22,Turnover,Ball Down,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1637,france,france_pays-bas
-114,2026-01-17 00:27:43,Penalty,Forward Pass,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1658,pays-bas,france_pays-bas
-115,2026-01-17 00:28:29,Try,Try,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1704,france,france_pays-bas
-116,2026-01-17 00:29:24,Turnover,6th Touch,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1759,pays-bas,france_pays-bas
-117,2026-01-17 00:29:33,Turnover,Ball Down,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1768,france,france_pays-bas
-118,2026-01-17 00:29:52,Penalty,In The Ruck,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1787,france,france_pays-bas
-119,2026-01-17 00:30:33,Turnover,Ball Down,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1828,pays-bas,france_pays-bas
-120,2026-01-17 00:31:04,Turnover,6th Touch,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1859,france,france_pays-bas
-121,2026-01-17 00:31:32,Turnover,6th Touch,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1887,pays-bas,france_pays-bas
-122,2026-01-17 00:32:06,Turnover,6th Touch,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1921,france,france_pays-bas
-123,2026-01-17 00:32:25,Turnover,Ball Down,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1940,pays-bas,france_pays-bas
-124,2026-01-17 00:32:56,Turnover,Ball Down,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1971,france,france_pays-bas
-125,2026-01-17 00:33:26,Turnover,6 Again,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2001,france,france_pays-bas
-126,2026-01-17 00:33:41,Try,Try,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2016,pays-bas,france_pays-bas
-127,2026-01-17 00:34:18,Turnover,Ball Down,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2053,france,france_pays-bas
-128,2026-01-17 00:34:50,Turnover,6 Again,6 again or not?,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2085,france,france_pays-bas
-129,2026-01-17 00:35:43,Turnover,6th Touch,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2138,pays-bas,france_pays-bas
-130,2026-01-17 00:36:15,Turnover,Ball Down,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2170,france,france_pays-bas
-131,2026-01-17 00:36:50,Turnover,Ball Down,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2205,pays-bas,france_pays-bas
-132,2026-01-17 00:37:14,Penalty,Hard Touch,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2229,pays-bas,france_pays-bas
-133,2026-01-17 00:37:32,Penalty,Forward Pass,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2247,pays-bas,france_pays-bas
-134,2026-01-17 00:38:14,Try,Try,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2289,france,france_pays-bas
-135,2026-01-17 00:38:44,Penalty,Forward Pass,Not sure which one,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2319,pays-bas,france_pays-bas
-136,2026-01-17 00:39:28,Turnover,Ball Down,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2363,france,france_pays-bas
-137,2026-01-17 00:39:51,Penalty,In The Ruck,"I really don't understand this one, seems more like an overstep",https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2386,france,france_pays-bas
-138,2026-01-17 00:40:39,Try,Try,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2434,pays-bas,france_pays-bas
-139,2026-01-17 00:41:12,Try,Try,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2467,france,france_pays-bas
-140,2026-01-17 00:41:48,Turnover,6 Again,6 again or not?,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2503,france,france_pays-bas
-141,2026-01-17 00:42:24,Try,Try,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2539,pays-bas,france_pays-bas
-142,2026-01-17 00:43:18,Penalty,Forward Pass,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2593,france,france_pays-bas
-143,2026-01-17 00:43:51,Turnover,6th Touch,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2626,pays-bas,france_pays-bas
-144,2026-01-17 00:44:19,Turnover,Ball Down,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2654,france,france_pays-bas
-145,2026-01-17 00:44:53,Turnover,Ball Down,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2688,pays-bas,france_pays-bas
-146,2026-01-17 00:45:04,Penalty,Shoulder,When we freeze frame seems like there is an arm,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2699,france,france_pays-bas
-147,2026-01-17 00:45:35,Turnover,Ball Down,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2730,pays-bas,france_pays-bas
-148,2026-01-17 00:46:08,Try,Try,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2763,france,france_pays-bas
-149,2026-01-17 00:46:35,To Review,Other,Seems like the same as the shoulder against France above,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2790,france,france_pays-bas
-150,2026-01-17 00:46:58,Turnover,6th Touch,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2813,pays-bas,france_pays-bas
-151,2026-01-17 00:47:17,Game Event,Game End,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2832,france,france_pays-bas
-152,2026-01-17 00:10:35,Game Event,Game Start,,https://www.youtube.com/watch?v=tMx5ct-8iRo&t=630,team1,team1_team2
-153,2026-01-17 00:10:59,Turnover,Ball Down,,https://www.youtube.com/watch?v=tMx5ct-8iRo&t=654,team2,team1_team2
-154,2026-01-17 00:11:15,Penalty,Offside,,https://www.youtube.com/watch?v=tMx5ct-8iRo&t=670,team2,team1_team2
-155,2026-01-17 00:11:47,Turnover,Dummy Touch,,https://www.youtube.com/watch?v=tMx5ct-8iRo&t=702,team2,team1_team2
-156,2026-01-17 00:12:21,Turnover,6th Touch,,https://www.youtube.com/watch?v=tMx5ct-8iRo&t=736,team2,team1_team2
-157,2026-01-17 00:12:23,Game Event,Game End,,https://www.youtube.com/watch?v=tMx5ct-8iRo&t=738,team1,team1_team2
-158,2026-01-17 00:13:13,Game Event,Game Start,,https://www.youtube.com/watch?v=tMx5ct-8iRo&t=788,team1,team1_team2
-159,2026-01-17 00:13:40,Turnover,6th Touch,,https://www.youtube.com/watch?v=tMx5ct-8iRo&t=815,team2,team1_team2
-160,2026-01-17 00:14:08,Turnover,6th Touch,,https://www.youtube.com/watch?v=tMx5ct-8iRo&t=843,team2,team1_team2
+0,2026-01-24 00:00:00,Game Event,Game Start,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=-5,england,france_england
+1,2026-01-24 00:00:25,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=20,england,france_england
+2,2026-01-24 00:00:34,Penalty,Offside,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=29,england,france_england
+3,2026-01-24 00:00:45,Penalty,In The Ruck,Should have been taken 10m up,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=40,england,france_england
+4,2026-01-24 00:01:05,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=60,france,france_england
+5,2026-01-24 00:01:31,Try,Scoop,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=86,england,france_england
+6,2026-01-24 00:02:13,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=128,france,france_england
+7,2026-01-24 00:02:47,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=162,england,france_england
+8,2026-01-24 00:03:07,Penalty,Offside,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=182,england,france_england
+9,2026-01-24 00:03:30,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=205,france,france_england
+10,2026-01-24 00:03:58,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=233,england,france_england
+11,2026-01-24 00:04:30,Turnover,6th Touch,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=265,france,france_england
+12,2026-01-24 00:04:50,Penalty,Hard Touch,Is it hard?,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=285,france,france_england
+13,2026-01-24 00:05:25,Turnover,6th Touch,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=320,england,france_england
+14,2026-01-24 00:05:42,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=337,france,france_england
+15,2026-01-24 00:06:24,Try,32 - Long Ball,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=379,england,france_england
+16,2026-01-24 00:07:20,Turnover,6th Touch,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=435,france,france_england
+17,2026-01-24 00:07:58,Try,Scoop,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=473,england,france_england
+18,2026-01-24 00:08:38,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=513,france,france_england
+19,2026-01-24 00:09:04,Turnover,6 Again,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=539,france,france_england
+20,2026-01-24 00:09:17,Try,33 - Quicky,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=552,england,france_england
+21,2026-01-24 00:09:55,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=590,france,france_england
+22,2026-01-24 00:10:36,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=631,england,france_england
+23,2026-01-24 00:10:54,Penalty,Hard Touch,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=649,england,france_england
+24,2026-01-24 00:11:14,Penalty,Not Moving Forward,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=669,england,france_england
+25,2026-01-24 00:12:00,Turnover,6th Touch,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=715,france,france_england
+26,2026-01-24 00:12:32,Turnover,6 Again,"Seems very harsh, touch made while the palyer had the ball",https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=747,france,france_england
+27,2026-01-24 00:12:48,To Review,Bad Roll,"Does the foot go over the ball, clean roll?",https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=763,france,france_england
+28,2026-01-24 00:13:03,Try,33,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=778,england,france_england
+29,2026-01-24 00:13:45,Penalty,Not Moving Forward,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=820,england,france_england
+30,2026-01-24 00:14:25,Try,Scoop,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=860,france,france_england
+31,2026-01-24 00:15:02,Try,33 - Quicky,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=897,england,france_england
+32,2026-01-24 00:15:55,Turnover,6th Touch,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=950,france,france_england
+33,2026-01-24 00:16:17,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=972,england,france_england
+34,2026-01-24 00:17:08,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=1023,france,france_england
+35,2026-01-24 00:17:47,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=1062,england,france_england
+36,2026-01-24 00:18:15,Turnover,6th Touch,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=1090,france,france_england
+37,2026-01-24 00:18:42,Turnover,6th Touch,Touch and Pass ?,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=1117,france,france_england
+38,2026-01-24 00:19:14,Turnover,Interception,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=1149,france,france_england
+39,2026-01-24 00:19:37,Try,Scoop,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=1172,england,france_england
+40,2026-01-24 00:20:05,Game Event,Game End,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=1200,france,france_england
+41,2026-01-24 00:00:02,Game Event,Game Start,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=-3,france,france_england
+42,2026-01-24 00:00:29,Turnover,Interception,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=24,france,france_england
+43,2026-01-24 00:00:56,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=51,england,france_england
+44,2026-01-24 00:01:28,Turnover,6th Touch,Ball down first?,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=83,france,france_england
+45,2026-01-24 00:02:35,Turnover,6 Again,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=150,france,france_england
+46,2026-01-24 00:03:02,Try,33 - Quicky,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=177,england,france_england
+47,2026-01-24 00:04:00,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=235,france,france_england
+48,2026-01-24 00:04:19,Penalty,Forward Pass,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=254,england,france_england
+49,2026-01-24 00:04:42,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=277,france,france_england
+50,2026-01-24 00:05:08,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=303,england,france_england
+51,2026-01-24 00:05:41,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=336,france,france_england
+52,2026-01-24 00:06:02,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=357,england,france_england
+53,2026-01-24 00:06:40,Penalty,Forward Pass,Maybe,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=395,france,france_england
+54,2026-01-24 00:07:12,Try,32 - Cut,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=427,england,france_england
+55,2026-01-24 00:08:01,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=476,france,france_england
+56,2026-01-24 00:08:21,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=496,england,france_england
+57,2026-01-24 00:08:52,Turnover,6th Touch,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=527,france,france_england
+58,2026-01-24 00:09:27,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=562,england,france_england
+59,2026-01-24 00:10:05,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=600,france,france_england
+60,2026-01-24 00:10:18,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=613,england,france_england
+61,2026-01-24 00:11:00,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=655,france,france_england
+62,2026-01-24 00:11:38,Penalty,Offside,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=693,france,france_england
+63,2026-01-24 00:12:07,Try,33 - Quicky,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=722,england,france_england
+64,2026-01-24 00:13:00,Turnover,6th Touch,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=775,france,france_england
+65,2026-01-24 00:13:12,Penalty,Off The Mark,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=787,england,france_england
+66,2026-01-24 00:13:58,Turnover,6th Touch,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=833,france,france_england
+67,2026-01-24 00:15:00,Penalty,Forward Pass,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=895,england,france_england
+68,2026-01-24 00:15:47,Turnover,6th Touch,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=942,france,france_england
+69,2026-01-24 00:16:24,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=979,england,france_england
+70,2026-01-24 00:16:56,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=1011,france,france_england
+71,2026-01-24 00:17:21,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=1036,england,france_england
+72,2026-01-24 00:17:59,Try,French Flair,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=1074,france,france_england
+73,2026-01-24 00:18:33,Try,32 - Cut,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=1108,england,france_england
+74,2026-01-24 00:20:03,Game Event,Game End,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=1198,england,france_england
+75,2026-01-24 00:02:14,Game Event,Game Start,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=129,pays-bas,france_pays-bas
+76,2026-01-24 00:02:45,Try,Try,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=160,pays-bas,france_pays-bas
+77,2026-01-24 00:03:54,Turnover,6th Touch,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=229,france,france_pays-bas
+78,2026-01-24 00:04:27,Turnover,Ball Down,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=262,pays-bas,france_pays-bas
+79,2026-01-24 00:04:46,Turnover,6th Touch,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=281,france,france_pays-bas
+80,2026-01-24 00:05:28,Turnover,6th Touch,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=323,pays-bas,france_pays-bas
+81,2026-01-24 00:06:08,Penalty,Touch and Pass,To compare,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=363,france,france_pays-bas
+82,2026-01-24 00:06:51,Try,Try,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=406,pays-bas,france_pays-bas
+83,2026-01-24 00:07:43,Penalty,Forward Pass,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=458,france,france_pays-bas
+84,2026-01-24 00:08:44,Turnover,Ball Down,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=519,pays-bas,france_pays-bas
+85,2026-01-24 00:09:27,Try,Try,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=562,france,france_pays-bas
+86,2026-01-24 00:11:03,Turnover,Ball Down,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=658,pays-bas,france_pays-bas
+87,2026-01-24 00:11:43,Try,Try,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=698,france,france_pays-bas
+88,2026-01-24 00:12:30,Turnover,Ball Down,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=745,pays-bas,france_pays-bas
+89,2026-01-24 00:13:05,Penalty,Offside,Not sure if offside or not moving up,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=780,pays-bas,france_pays-bas
+90,2026-01-24 00:13:21,Turnover,Ball Down,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=796,france,france_pays-bas
+91,2026-01-24 00:14:00,Turnover,6th Touch,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=835,pays-bas,france_pays-bas
+92,2026-01-24 00:14:30,Turnover,Dummy Touch,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=865,france,france_pays-bas
+93,2026-01-24 00:15:06,Turnover,6th Touch,Possible Touch and Pass,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=901,pays-bas,france_pays-bas
+94,2026-01-24 00:15:20,Penalty,Forward Pass,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=915,france,france_pays-bas
+95,2026-01-24 00:16:05,Penalty,Offside,Not sure if offside or early drop,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=960,france,france_pays-bas
+96,2026-01-24 00:16:20,To Review,Bad Roll,Missed not over the ball?,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=975,france,france_pays-bas
+97,2026-01-24 00:17:00,Turnover,Interception,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1015,pays-bas,france_pays-bas
+98,2026-01-24 00:17:05,To Review,Bad Roll,Clear not over the ball,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1020,pays-bas,france_pays-bas
+99,2026-01-24 00:17:24,Penalty,Delay of Play,Harsh ?,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1039,france,france_pays-bas
+100,2026-01-24 00:17:54,Turnover,6th Touch,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1069,pays-bas,france_pays-bas
+101,2026-01-24 00:18:19,Penalty,Hard Touch,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1094,pays-bas,france_pays-bas
+102,2026-01-24 00:18:55,Penalty,Forward Pass,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1130,france,france_pays-bas
+103,2026-01-24 00:19:31,Turnover,Ball Down,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1166,pays-bas,france_pays-bas
+104,2026-01-24 00:19:57,Try,Try,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1192,france,france_pays-bas
+105,2026-01-24 00:20:47,Turnover,6th Touch,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1242,pays-bas,france_pays-bas
+106,2026-01-24 00:21:04,Turnover,Ball Down,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1259,france,france_pays-bas
+107,2026-01-24 00:21:34,Turnover,Ball Down,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1289,pays-bas,france_pays-bas
+108,2026-01-24 00:21:48,To Review,In The Ruck,In the ruck ?,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1303,france,france_pays-bas
+109,2026-01-24 00:21:57,Penalty,Offside,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1312,pays-bas,france_pays-bas
+110,2026-01-24 00:22:03,To Review,Other,Off the ball skirmish,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1318,france,france_pays-bas
+111,2026-01-24 00:22:15,Game Event,Game End,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1330,france,france_pays-bas
+112,2026-01-24 00:27:13,Game Event,Game Start,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1628,france,france_pays-bas
+113,2026-01-24 00:27:22,Turnover,Ball Down,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1637,france,france_pays-bas
+114,2026-01-24 00:27:43,Penalty,Forward Pass,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1658,pays-bas,france_pays-bas
+115,2026-01-24 00:28:29,Try,Try,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1704,france,france_pays-bas
+116,2026-01-24 00:29:24,Turnover,6th Touch,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1759,pays-bas,france_pays-bas
+117,2026-01-24 00:29:33,Turnover,Ball Down,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1768,france,france_pays-bas
+118,2026-01-24 00:29:52,Penalty,In The Ruck,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1787,france,france_pays-bas
+119,2026-01-24 00:30:33,Turnover,Ball Down,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1828,pays-bas,france_pays-bas
+120,2026-01-24 00:31:04,Turnover,6th Touch,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1859,france,france_pays-bas
+121,2026-01-24 00:31:32,Turnover,6th Touch,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1887,pays-bas,france_pays-bas
+122,2026-01-24 00:32:06,Turnover,6th Touch,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1921,france,france_pays-bas
+123,2026-01-24 00:32:25,Turnover,Ball Down,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1940,pays-bas,france_pays-bas
+124,2026-01-24 00:32:56,Turnover,Ball Down,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1971,france,france_pays-bas
+125,2026-01-24 00:33:26,Turnover,6 Again,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2001,france,france_pays-bas
+126,2026-01-24 00:33:41,Try,Try,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2016,pays-bas,france_pays-bas
+127,2026-01-24 00:34:18,Turnover,Ball Down,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2053,france,france_pays-bas
+128,2026-01-24 00:34:50,Turnover,6 Again,6 again or not?,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2085,france,france_pays-bas
+129,2026-01-24 00:35:43,Turnover,6th Touch,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2138,pays-bas,france_pays-bas
+130,2026-01-24 00:36:15,Turnover,Ball Down,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2170,france,france_pays-bas
+131,2026-01-24 00:36:50,Turnover,Ball Down,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2205,pays-bas,france_pays-bas
+132,2026-01-24 00:37:14,Penalty,Hard Touch,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2229,pays-bas,france_pays-bas
+133,2026-01-24 00:37:32,Penalty,Forward Pass,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2247,pays-bas,france_pays-bas
+134,2026-01-24 00:38:14,Try,Try,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2289,france,france_pays-bas
+135,2026-01-24 00:38:44,Penalty,Forward Pass,Not sure which one,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2319,pays-bas,france_pays-bas
+136,2026-01-24 00:39:28,Turnover,Ball Down,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2363,france,france_pays-bas
+137,2026-01-24 00:39:51,Penalty,In The Ruck,"I really don't understand this one, seems more like an overstep",https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2386,france,france_pays-bas
+138,2026-01-24 00:40:39,Try,Try,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2434,pays-bas,france_pays-bas
+139,2026-01-24 00:41:12,Try,Try,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2467,france,france_pays-bas
+140,2026-01-24 00:41:48,Turnover,6 Again,6 again or not?,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2503,france,france_pays-bas
+141,2026-01-24 00:42:24,Try,Try,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2539,pays-bas,france_pays-bas
+142,2026-01-24 00:43:18,Penalty,Forward Pass,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2593,france,france_pays-bas
+143,2026-01-24 00:43:51,Turnover,6th Touch,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2626,pays-bas,france_pays-bas
+144,2026-01-24 00:44:19,Turnover,Ball Down,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2654,france,france_pays-bas
+145,2026-01-24 00:44:53,Turnover,Ball Down,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2688,pays-bas,france_pays-bas
+146,2026-01-24 00:45:04,Penalty,Shoulder,When we freeze frame seems like there is an arm,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2699,france,france_pays-bas
+147,2026-01-24 00:45:35,Turnover,Ball Down,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2730,pays-bas,france_pays-bas
+148,2026-01-24 00:46:08,Try,Try,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2763,france,france_pays-bas
+149,2026-01-24 00:46:35,To Review,Other,Seems like the same as the shoulder against France above,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2790,france,france_pays-bas
+150,2026-01-24 00:46:58,Turnover,6th Touch,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2813,pays-bas,france_pays-bas
+151,2026-01-24 00:47:17,Game Event,Game End,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2832,france,france_pays-bas
+152,2026-01-24 00:00:00,Game Event,Game Start,,https://www.youtube.com/watch?v=JzIXeUTY7eo&t=-5,wales,france_wales
+153,2026-01-24 00:08:14,Try,Try,,https://www.youtube.com/watch?v=JzIXeUTY7eo&t=489,wales,france_wales
+154,2026-01-24 00:33:34,Try,Try,Too much complaining,https://www.youtube.com/watch?v=JzIXeUTY7eo&t=2009,france,france_wales
+155,2026-01-24 00:43:59,Try,Try,Too much complaining,,wales,france_wales
+156,2026-01-24 00:46:02,To Review,Other,5th touch count issue,,france,france_wales
+157,2026-01-24 00:08:12,To Review,Other,Great Timing 7m roll,https://www.youtube.com/watch?v=YouwSdF3w7o&t=487,sharks,sharks_saxons
+158,2026-01-24 00:29:20,To Review,,Not over the ball ,,sharks,sharks_saxons
+159,2026-01-24 00:30:47,To Review,,Forward pass,,sharks,sharks_saxons
+160,2026-01-24 00:31:51,To Review,,No touch defence - play on,,sharks,sharks_saxons
+161,2026-01-24 00:35:58,To Review,,No touch defence - play on,,sharks,sharks_saxons
+162,2026-01-24 00:37:35,To Review,,Hard Touch okay,,sharks,sharks_saxons
+163,2026-01-24 00:41:18,To Review,,No touch defence - play on,,sharks,sharks_saxons
+164,2026-01-24 00:43:07,To Review,,Good dive example defence,,sharks,sharks_saxons
+165,2026-01-24 00:45:47,To Review,,Not over the ball ,,sharks,sharks_saxons
+166,2026-01-24 00:10:35,Game Event,Game Start,,https://www.youtube.com/watch?v=tMx5ct-8iRo&t=630,team1,team1_team2
+167,2026-01-24 00:10:59,Turnover,Ball Down,,https://www.youtube.com/watch?v=tMx5ct-8iRo&t=654,team2,team1_team2
+168,2026-01-24 00:11:15,Penalty,Offside,,https://www.youtube.com/watch?v=tMx5ct-8iRo&t=670,team2,team1_team2
+169,2026-01-24 00:11:47,Turnover,Dummy Touch,,https://www.youtube.com/watch?v=tMx5ct-8iRo&t=702,team2,team1_team2
+170,2026-01-24 00:12:21,Turnover,6th Touch,,https://www.youtube.com/watch?v=tMx5ct-8iRo&t=736,team2,team1_team2
+171,2026-01-24 00:12:23,Game Event,Game End,,https://www.youtube.com/watch?v=tMx5ct-8iRo&t=738,team1,team1_team2
+172,2026-01-24 00:13:13,Game Event,Game Start,,https://www.youtube.com/watch?v=tMx5ct-8iRo&t=788,team1,team1_team2
+173,2026-01-24 00:13:40,Turnover,6th Touch,,https://www.youtube.com/watch?v=tMx5ct-8iRo&t=815,team2,team1_team2
+174,2026-01-24 00:14:08,Turnover,6th Touch,,https://www.youtube.com/watch?v=tMx5ct-8iRo&t=843,team2,team1_team2
