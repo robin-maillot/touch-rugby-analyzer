@@ -20,7 +20,6 @@ if __name__ == "__main__":
 
     generate_html.generate_html()
 
-
     for cmd in [
         ["git", "add", "-u"],
         ["git", "commit", "-m", f"update html {datetime.datetime.now()}"],

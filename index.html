@@ -226,6 +226,8 @@
 
         // Load events tables at the start
         frame.src = "event_table.html?_=" + Date.now();
+        document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+        staticBtn.classList.add('active');
       })
       .catch(err => {
         console.error('Error loading games.json:', err);
