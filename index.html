@@ -210,8 +210,6 @@
           nav.appendChild(btn);
         });
 
-        // Load first game automatically
-        if (files.length) frame.src = files[0].file;
 
         // Setup the static button event listener manually if needed,
         // or ensure it works with the existing flow.
@@ -224,6 +222,10 @@
                 staticBtn.classList.add('active');
             });
         }
+
+
+        // Load events tables at the start
+        frame.src = "event_table.html?_=" + Date.now();
       })
       .catch(err => {
         console.error('Error loading games.json:', err);

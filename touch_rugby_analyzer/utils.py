@@ -12,7 +12,7 @@ from touch_rugby_analyzer.constants import DATA_ROOT
 output_data_root = DATA_ROOT / "output"
 output_data_root.mkdir(parents=True, exist_ok=True)
 
-AGAINST_LOCALS_COL = "Against France"
+AGAINST_LOCALS_COL = "Against Team1"
 FIG_WIDTH = 1000
 
 
@@ -29,8 +29,8 @@ def load_data(data_path: Path, simple: bool = False):
     local_team_name, other_team_name = get_names(data_path)
     data_df = pd.read_csv(data_path)
 
-    if "Against France" not in data_df.columns:
-        data_df["Against France"] = data_df["Possession Owner"].apply(
+    if AGAINST_LOCALS_COL not in data_df.columns:
+        data_df[AGAINST_LOCALS_COL] = data_df["Possession Owner"].apply(
             lambda x: x == "Team 2"
         )
     rich.print(data_df)
@@ -225,7 +225,7 @@ def make_game_fig(data_df, local_team_name, other_team_name):
 
     annotations = []
     for i, row in data_df.iterrows():
-        # rich.print(f"{row['Type']}-{row['Name']} (Against Local={row['Against France']})")
+        # rich.print(f"{row['Type']}-{row['Name']} (Against Local={row[AGAINST_LOCALS_COL]})")
 
         if row["Type"] == "Penalty":
             color = "red"
