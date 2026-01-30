@@ -1,27 +1,27 @@
 -- VLC Extension
 local d = nil
 local current_owner = ""
+local current_category = ""
+local current_sub_option = ""
 
 function descriptor()
     return {
         title = "1 - Rugby Logger Pro",
-        version = "1.15",
+        version = "1.19",
         author = "Gemini",
         capabilities = {"menu"}
     }
 end
 
 function activate()
-    -- SMART PAUSE LOGIC
+    -- SMART PAUSE LOGIC (State 2 = Playing)
     local input = vlc.object.input()
     if input then
         local state = vlc.var.get(input, "state")
-        -- Only pause if state is 3 (Playing). If 4 (Paused), do nothing.
         if state == 2 then
             vlc.playlist.pause()
         end
     end
-
     show_owner_menu()
 end
 
@@ -46,10 +46,14 @@ local MENU_STRUCTURE = {
 
 function get_csv_path()
     local path = ""
-    if os and os.getenv then
-        path = os.getenv("USERPROFILE") .. "\\Desktop\\rugby_events.csv"
+    local user_profile = os.getenv("USERPROFILE")
+    local home = os.getenv("HOME")
+    if user_profile then
+        path = user_profile .. "\\Desktop\\rugby_events.csv"
+    elseif home then
+        path = home .. "/Desktop/rugby_events.csv"
     else
-        path = vlc.config.userdatadir() .. "\\rugby_events.csv"
+        path = vlc.config.userdatadir() .. "/rugby_events.csv"
     end
     return path
 end
@@ -66,36 +70,25 @@ end
 function show_owner_menu()
     if d then d:delete() end
     d = vlc.dialog("Possession Owner")
-    if not d then return end
-
     d:add_label("<b>Who has possession?</b>", 1, 1, 2, 1)
-
-    d:add_button("Team 1", function()
-        current_owner = "Team 1"
-        show_main_menu()
-    end, 1, 2, 1, 1)
-
-    d:add_button("Team 2", function()
-        current_owner = "Team 2"
-        show_main_menu()
-    end, 2, 2, 1, 1)
-
+    d:add_button("Team 1", function() current_owner = "Team 1" show_main_menu() end, 1, 2, 1, 1)
+    d:add_button("Team 2", function() current_owner = "Team 2" show_main_menu() end, 2, 2, 1, 1)
     d:add_button("Undo Last", undo_last, 1, 3, 1, 1)
     d:add_button("EXIT", function() vlc.deactivate() end, 2, 3, 1, 1)
 end
 
 function show_main_menu()
     if d then d:delete() end
-    d = vlc.dialog("Event Category (" .. current_owner .. ")")
-    if not d then return end
-
+    d = vlc.dialog("Event (" .. current_owner .. ")")
     local categories = {"Penalty", "Turnover", "Try", "Game Event", "To Review"}
     for i, cat in ipairs(categories) do
         d:add_button(cat, function()
+            current_category = cat
             if MENU_STRUCTURE[cat] and #MENU_STRUCTURE[cat] > 0 then
                 show_submenu(cat)
             else
-                log_choice(cat, "")
+                current_sub_option = ""
+                show_comment_dialog()
             end
         end, 1, i+1, 2, 1)
     end
@@ -109,16 +102,37 @@ function show_submenu(category)
     local options = MENU_STRUCTURE[category]
     local row, col = 2, 1
     for _, opt in ipairs(options) do
-        d:add_button(opt, function() log_choice(category, opt) end, col, row, 1, 1)
+        d:add_button(opt, function() 
+            current_sub_option = opt
+            show_comment_dialog() 
+        end, col, row, 1, 1)
         if col == 1 then col = 2 else col = 1; row = row + 1 end
     end
     d:add_button("<- Back", show_main_menu, 1, row + 1, 1, 1)
-    d:add_button("Exit", function() vlc.deactivate() end, 2, row + 1, 1, 1)
+end
+
+-- NEW: Comment Input Field
+function show_comment_dialog()
+    if d then d:delete() end
+    d = vlc.dialog("Add Comment")
+    
+    d:add_label("<b>Add a comment for this event (Optional):</b>", 1, 1, 2, 1)
+    
+    -- The text input field
+    local comment_input = d:add_text_input("", 1, 2, 2, 1)
+    
+    d:add_button("Save & Log", function()
+        log_choice(comment_input:get_text())
+    end, 1, 3, 1, 1)
+    
+    d:add_button("Skip Comment", function()
+        log_choice("")
+    end, 2, 3, 1, 1)
 end
 
 -- --- LOGGING LOGIC ---
 
-function log_choice(category, sub_option)
+function log_choice(comment)
     local input = vlc.object.input()
     local item = vlc.input.item()
     if not input or not item then
@@ -143,14 +157,18 @@ function log_choice(category, sub_option)
         file:write("Time,Possession Owner,Type,Name,Video Name,To Review,Comment,Youtube Link\n")
     end
 
-    local review_status = (category == "To Review") and "YES" or ""
-    local row = string.format("%s,\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",, \n",
-                                time_string, current_owner, category, sub_option, video_name, review_status)
+    local review_status = (current_category == "To Review") and "YES" or ""
+    
+    -- Properly escape the comment for CSV
+    local clean_comment = comment:gsub("\"", "'") 
+
+    local row = string.format("%s,\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\", \n",
+                                time_string, current_owner, current_category, current_sub_option, 
+                                video_name, review_status, clean_comment)
 
     file:write(row)
     file:close()
-    vlc.osd.message("Logged [" .. current_owner .. "]: " .. category)
-
+    vlc.osd.message("Logged: " .. current_category)
     vlc.deactivate()
 end
 
@@ -158,11 +176,9 @@ function undo_last()
     local file_path = get_csv_path()
     local f = io.open(file_path, "r")
     if not f then vlc.deactivate() return end
-
     local lines = {}
     for line in f:lines() do table.insert(lines, line) end
     f:close()
-
     if #lines > 1 then
         table.remove(lines)
         local out = io.open(file_path, "w")
