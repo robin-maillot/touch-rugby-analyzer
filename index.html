@@ -72,36 +72,47 @@
       display: none; /* Hidden until password is correct */
     }
 
-    /* --- Existing Styles --- */
+    /* --- Header & Nav --- */
     header {
       text-align: center;
       padding: 18px;
       background: #2c3e50;
       color: white;
     }
+
     nav {
       display: flex;
       justify-content: center;
-      gap: 10px;
-      padding: 12px;
+      align-items: center;
+      padding: 15px;
       background: #ecf0f1;
-      flex-wrap: wrap;
-    }
-    nav button {
-      padding: 10px 18px;
-      border: none;
-      background: #3498db;
-      color: #fff;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 15px;
-      margin: 4px 0;
-    }
-    nav button.active,
-    nav button:hover {
-      background: #2980b9;
+      gap: 15px;
     }
 
+    /* Dropdown Styles */
+    label {
+      font-weight: 600;
+      color: #2c3e50;
+    }
+
+    select#game-select {
+      padding: 10px 15px;
+      font-size: 16px;
+      border: 1px solid #bdc3c7;
+      border-radius: 6px;
+      background-color: white;
+      color: #2c3e50;
+      cursor: pointer;
+      min-width: 300px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    select#game-select:focus {
+      border-color: #3498db;
+    }
+
+    /* --- Iframe --- */
     #iframe-container {
       max-width: 1400px;
       margin: 20px auto;
@@ -120,8 +131,8 @@
 
     @media (max-width: 800px) {
       iframe { height: 2500px; }
-      nav { flex-direction: column; align-items: center; }
-      nav button { width: 100%; max-width: 340px; }
+      nav { flex-direction: column; align-items: stretch; }
+      select#game-select { width: 100%; }
     }
   </style>
 </head>
@@ -142,7 +153,10 @@
     </header>
 
     <nav id="nav">
-      <button data-src="event_table.html">Event Table</button>
+      <label for="game-select">Select View:</label>
+      <select id="game-select">
+        <option value="event_table.html">Event Table</option>
+        </select>
     </nav>
 
     <div id="iframe-container">
@@ -185,49 +199,36 @@
 
   // --- APP LOGIC (Wrapped in initApp) ---
   function initApp() {
-    const nav = document.getElementById('nav');
     const frame = document.getElementById('gameFrame');
+    const selectMenu = document.getElementById('game-select');
 
+    // Function to load content into iframe with cache busting
+    function loadContent(url) {
+        const forcedUrl = url + (url.includes('?') ? '&' : '?') + '_=' + Date.now();
+        frame.src = forcedUrl;
+    }
+
+    // Load default view (Event Table) immediately
+    loadContent(selectMenu.value);
+
+    // Fetch Game Data
     fetch('./games.json?_=' + Date.now())
       .then(res => res.json())
       .then(files => {
-        files.forEach((entry, idx) => {
-          const btn = document.createElement('button');
-          btn.textContent = entry.name;
-          btn.dataset.src = entry.file;
-
-          if (idx === 0) btn.classList.add('active');
-
-          btn.addEventListener('click', () => {
-            const forced = entry.file + (entry.file.includes('?') ? '&' : '?') + '_=' + Date.now();
-            frame.src = forced;
-
-            document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            frame.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          });
-
-          nav.appendChild(btn);
+        // Populate Dropdown
+        files.forEach((entry) => {
+          const option = document.createElement('option');
+          option.textContent = entry.name;
+          option.value = entry.file;
+          selectMenu.appendChild(option);
         });
 
-
-        // Setup the static button event listener manually if needed,
-        // or ensure it works with the existing flow.
-        // The static button in your HTML needs an event listener if not handled by the loop:
-        const staticBtn = nav.querySelector('button[data-src="event_table.html"]');
-        if(staticBtn) {
-            staticBtn.addEventListener('click', () => {
-                frame.src = "event_table.html?_=" + Date.now();
-                document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
-                staticBtn.classList.add('active');
-            });
-        }
-
-
-        // Load events tables at the start
-        frame.src = "event_table.html?_=" + Date.now();
-        document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
-        staticBtn.classList.add('active');
+        // Listen for dropdown changes
+        selectMenu.addEventListener('change', (e) => {
+            loadContent(e.target.value);
+            // Optional: scroll to top of iframe when changing games
+            // frame.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
       })
       .catch(err => {
         console.error('Error loading games.json:', err);
