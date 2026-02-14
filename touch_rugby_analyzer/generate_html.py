@@ -46,7 +46,9 @@ def generate_html():
         try:
             output_html_path = ROOT / f"game_{len(games_data)}.html"
             local_team_name, other_team_name = utils.get_names(data_path)
-            year, division_name, competition_name = utils.get_year_division_competition(data_path)
+            year, division_name, competition_name = utils.get_year_division_competition(
+                data_path
+            )
             data_df = utils.load_data(data_path)
             data_df.to_csv(DATA_ROOT / f"{data_path.stem}_parsed.csv")
             stats_dict = utils.get_stats_df(data_df, local_team_name, other_team_name)

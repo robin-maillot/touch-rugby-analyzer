@@ -350,7 +350,7 @@ def get_names(data_path: Path) -> tuple[str, str]:
 
 def get_year_division_competition(data_path: Path) -> tuple[int, str, str]:
     split_data_path = data_path.stem.split("_")[:-2]
-    if len(split_data_path)>0:
+    if len(split_data_path) > 0:
         year, division_name, competition_name = split_data_path
     else:
         year, division_name, competition_name = 1999, "unknown", "unknown"
