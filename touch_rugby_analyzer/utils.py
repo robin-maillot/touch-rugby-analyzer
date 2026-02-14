@@ -27,7 +27,11 @@ def time_to_n_seconds(time_obj):
 
 def load_data(data_path: Path, simple: bool = False):
     local_team_name, other_team_name = get_names(data_path)
+    year, division_name, competition_name = get_year_division_competition(data_path)
     data_df = pd.read_csv(data_path)
+    data_df["Year"] = year
+    data_df["Division"] = division_name
+    data_df["Competition"] = competition_name
 
     if AGAINST_LOCALS_COL not in data_df.columns:
         data_df[AGAINST_LOCALS_COL] = data_df["Possession Owner"].apply(
@@ -338,6 +342,16 @@ def get_stats_df(
 
 
 def get_names(data_path: Path) -> tuple[str, str]:
-    name_1 = data_path.stem.split("_")[0]
-    name_2 = data_path.stem.split("_")[1]
+    split_data_path = data_path.stem.split("_")
+    name_1 = split_data_path[-2]
+    name_2 = split_data_path[-1]
     return name_1, name_2
+
+
+def get_year_division_competition(data_path: Path) -> tuple[int, str, str]:
+    split_data_path = data_path.stem.split("_")[:-2]
+    if len(split_data_path)>0:
+        year, division_name, competition_name = split_data_path
+    else:
+        year, division_name, competition_name = 1999, "unknown", "unknown"
+    return year, division_name, competition_name

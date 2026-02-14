@@ -71,30 +71,6 @@ def get_sheet_values(
     return result.get("values", [])
 
 
-def get_sheet_info(sheet_id: str, range: str, service=None) -> pd.DataFrame:
-    if service is None:
-        service = login_to_gcloud(service_name="sheets")
-    # Call the Sheets API
-    result = get_sheet_values(sheet_id=sheet_id, range=range, service=service)
-    for n_columns, c_name in enumerate(result[2]):
-        if c_name.lower() == "datasets.yaml":
-            break
-    result_values = [result_line[:n_columns] for result_line in result[2:]]
-    column_names = []
-    for c in result_values[0]:
-        column_name = stringify(c)
-        while column_name in column_names:
-            column_name += "_copy"
-        column_names.append(column_name)
-    df = pd.DataFrame(result_values[1:], columns=column_names)
-    df.replace("", None, inplace=True)
-    df.dropna(how="all", inplace=True, axis=0)
-    df.dropna(how="all", inplace=True, axis=1)
-    df["material"] = range.split("!")[0]
-    df["n_columns"] = n_columns
-    return df
-
-
 def stringify(s: str) -> str:
     return s.lower().rstrip().lstrip().replace(" ", "_").replace(".", "")
 
@@ -255,8 +231,8 @@ def get_all_sheet_names(spreadsheet_id: str) -> List[str]:
 
 
 def sheet_name_to_csv_name(sheet_name: str) -> str:
-    team_1_name, team_2_name = sheet_name.lower().split("/")
-    return f"{team_1_name}_{team_2_name}.csv"
+    csv_stem = sheet_name.lower().replace("/", "_")
+    return f"{csv_stem}.csv"
 
 
 if __name__ == "__main__":
