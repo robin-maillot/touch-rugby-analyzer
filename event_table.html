@@ -33,7 +33,7 @@
             width: 100%;
             display: flex;
             flex-direction: column;
-            height: 100%;
+            height: 100%; /* Fill body height */
         }
 
         /* Header */
@@ -63,7 +63,7 @@
             display: flex;
             flex-direction: column;
             gap: 1rem;
-            flex-shrink: 0;
+            flex-shrink: 0; /* Never shrink controls */
         }
 
         /* Top Row: Search and Reset */
@@ -209,16 +209,19 @@
             background: var(--surface);
             border-radius: 8px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            overflow: hidden;
+            overflow: hidden; /* Hide outer scrollbar */
             display: flex;
             flex-direction: column;
-            flex-grow: 1; /* Takes up remaining space */
-            min-height: 0; /* Important for flex scrolling */
+            flex-grow: 1; /* Take all remaining vertical space */
+            min-height: 0; /* Crucial for nested flex scrolling */
         }
 
         .table-scroll {
-            overflow: auto;
-            flex-grow: 1;
+            overflow: auto; /* Scroll inside this div */
+            /* flex-shrink: 1 -> allows this to shrink if content is huge
+               flex-grow: 0   -> prevents it from forcing whitespace if content is small
+            */
+            flex: 0 1 auto;
         }
 
         table {
@@ -283,7 +286,7 @@
 
         .empty-state { padding: 3rem; text-align: center; color: #64748b; }
 
-        /* Pagination Controls - Fixed at Bottom */
+        /* Pagination Controls */
         .pagination-controls {
             display: flex;
             justify-content: space-between;
@@ -291,7 +294,7 @@
             padding: 1rem;
             background-color: #fff;
             border-top: 1px solid var(--border);
-            flex-shrink: 0; /* Prevent shrinking */
+            flex-shrink: 0; /* Always keep visible */
             z-index: 20;
         }
 
