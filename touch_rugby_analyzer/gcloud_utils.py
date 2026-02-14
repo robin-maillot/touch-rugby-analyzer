@@ -29,8 +29,12 @@ def login_to_gcloud(
     # If there are no (valid) credentials available, let the user log in.
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
+            try:
+                creds.refresh(Request())
+            except Exception as e:
+                rich.print(e)
+                creds = None
+        if creds is None:
             flow = InstalledAppFlow.from_client_secrets_file(
                 str(CREDENTIALS_PATH), SCOPES
             )

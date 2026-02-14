@@ -5,6 +5,7 @@ import rich
 from touch_rugby_analyzer.constants import ASSETS_ROOT, ROOT, DATA_ROOT
 from touch_rugby_analyzer import utils
 
+
 def generate_html():
     input_template_path = ASSETS_ROOT / "template.html"
 
@@ -36,7 +37,6 @@ def generate_html():
         rich.print(f"[yellow] Removing old html: {html_path} [/yellow]")
         html_path.unlink()
 
-
     games_data = []
     for i, data_path in enumerate(data_paths):
         rich.print(data_path)
@@ -53,8 +53,12 @@ def generate_html():
                 "game_fig": game_fig.to_html(full_html=False),
                 "trend_fig": trend_fig.to_html(full_html=False),
                 "stats_tries_table": stats_dict.get("Try", pd.DataFrame()).to_html(),
-                "stats_penalties_table": stats_dict.get("Penalty", pd.DataFrame()).to_html(),
-                "stats_turnovers_table": stats_dict.get("Turnover", pd.DataFrame()).to_html(),
+                "stats_penalties_table": stats_dict.get(
+                    "Penalty", pd.DataFrame()
+                ).to_html(),
+                "stats_turnovers_table": stats_dict.get(
+                    "Turnover", pd.DataFrame()
+                ).to_html(),
                 "stats_possessions_table": stats_dict.get(
                     "Possession", pd.DataFrame()
                 ).to_html(),
@@ -67,7 +71,10 @@ def generate_html():
                     output_file.write(j2_template.render(plotly_jinja_data))
 
             games_data.append(
-                dict(name=f"{local_team_name} vs {other_team_name}", file=output_html_path.name)
+                dict(
+                    name=f"{local_team_name} vs {other_team_name}",
+                    file=output_html_path.name,
+                )
             )
         except Exception as e:
             rich.print(f"[red]Skipping {data_path.stem} plots due to {e}[/red]")
