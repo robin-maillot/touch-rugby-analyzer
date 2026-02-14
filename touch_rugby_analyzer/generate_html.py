@@ -76,7 +76,7 @@ def generate_html():
 
             name = f"{local_team_name} vs {other_team_name}"
             if competition_name != "unknown":
-                name += f"({year} {division_name} {competition_name})"
+                name += f" ({year} {division_name} {competition_name})"
 
             games_data.append(
                 dict(
