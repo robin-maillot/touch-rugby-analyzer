@@ -44,17 +44,33 @@
             color: var(--primary-dark);
         }
 
-        /* Controls */
-        .controls {
+        /* Controls Area */
+        .controls-wrapper {
             background: var(--surface);
             padding: 1.5rem;
             border-radius: 8px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
             margin-bottom: 2rem;
             display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        /* Top Row: Search and Reset */
+        .top-controls {
+            display: flex;
             gap: 1rem;
             align-items: center;
             flex-wrap: wrap;
+        }
+
+        /* Bottom Row: Filters */
+        .filter-row {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border);
         }
 
         .btn {
@@ -72,9 +88,8 @@
             gap: 0.5rem;
         }
 
-        .btn:hover {
-            background-color: var(--primary-dark);
-        }
+        .btn:hover { background-color: var(--primary-dark); }
+        .btn:disabled { background-color: #cbd5e1; cursor: not-allowed; }
 
         .btn-outline {
             background-color: transparent;
@@ -87,11 +102,10 @@
             border-color: #cbd5e1;
         }
 
-        /* Search & Select Group */
+        /* Search Group */
         .search-group {
             display: flex;
             flex-grow: 1;
-            gap: 0; /* Attach them */
         }
 
         .column-select {
@@ -105,11 +119,6 @@
             cursor: pointer;
             outline: none;
             max-width: 150px;
-        }
-
-        .column-select:focus {
-            border-color: var(--primary);
-            z-index: 2;
         }
 
         .search-box {
@@ -133,11 +142,67 @@
             z-index: 2;
         }
 
+        /* --- Custom Multi-Select Dropdown Styles --- */
+        .multi-select-container {
+            position: relative;
+            min-width: 180px;
+        }
+
+        .select-btn {
+            width: 100%;
+            padding: 10px;
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            font-size: 0.9rem;
+            user-select: none;
+        }
+
+        .select-btn:hover { border-color: #cbd5e1; }
+        .select-btn::after { content: '▼'; font-size: 0.7em; color: #94a3b8; }
+
+        .select-dropdown {
+            position: absolute;
+            top: 105%;
+            left: 0;
+            width: 100%;
+            max-height: 300px;
+            overflow-y: auto;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            z-index: 100;
+            display: none;
+            padding: 5px 0;
+        }
+
+        .select-dropdown.show { display: block; }
+
+        .select-dropdown label {
+            display: flex;
+            align-items: center;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .select-dropdown label:hover { background-color: #f1f5f9; }
+        .select-dropdown input[type="checkbox"] { margin-right: 10px; }
+
         /* Table */
         .table-container {
             background: var(--surface);
             border-radius: 8px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .table-scroll {
             overflow-x: auto;
         }
 
@@ -163,35 +228,25 @@
             white-space: nowrap;
         }
 
-        th:hover {
-            background-color: #e2e8f0;
-        }
-
+        th:hover { background-color: #e2e8f0; }
         th.sort-asc::after { content: " ▲"; font-size: 0.7em; }
         th.sort-desc::after { content: " ▼"; font-size: 0.7em; }
-
-        tr:hover {
-            background-color: #f8fafc;
-        }
+        tr:hover { background-color: #f8fafc; }
 
         /* Styling for specific data types */
         .video-link {
             display: inline-flex;
             align-items: center;
             gap: 4px;
-            color: #ef4444; /* YouTube Red */
+            color: #ef4444;
             text-decoration: none;
             font-weight: 600;
             font-size: 0.85rem;
             background: #fef2f2;
             padding: 4px 10px;
             border-radius: 4px;
-            transition: background 0.2s;
         }
-        .video-link:hover {
-            background: #fee2e2;
-            text-decoration: underline;
-        }
+        .video-link:hover { background: #fee2e2; text-decoration: underline; }
 
         .status-pill {
             padding: 4px 8px;
@@ -208,29 +263,45 @@
         .type-try { color: #16a34a; font-weight: 700; }
         .type-turnover { color: #ea580c; }
 
-        .empty-state {
-            padding: 3rem;
-            text-align: center;
+        .empty-state { padding: 3rem; text-align: center; color: #64748b; }
+
+        /* Pagination Controls */
+        .pagination-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            background-color: #fff;
+            border-top: 1px solid var(--border);
+        }
+
+        .pagination-info {
+            font-size: 0.9rem;
             color: #64748b;
         }
 
-        @media (max-width: 640px) {
-            .controls {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            .search-group {
-                flex-direction: column;
-            }
-            .column-select {
-                border-radius: 6px 6px 0 0;
-                border-right: 1px solid var(--border);
-                border-bottom: none;
-                max-width: 100%;
-            }
-            .search-box input {
-                border-radius: 0 0 6px 6px;
-            }
+        .pagination-actions {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .rows-per-page-select {
+            padding: 6px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 0.9rem;
+            color: var(--text);
+        }
+
+        @media (max-width: 768px) {
+            .top-controls { flex-direction: column; align-items: stretch; }
+            .search-group { flex-direction: column; }
+            .column-select { border-radius: 6px 6px 0 0; border-right: 1px solid var(--border); border-bottom: none; max-width: 100%; }
+            .search-box input { border-radius: 0 0 6px 6px; }
+            .filter-row { flex-direction: column; }
+            .multi-select-container { width: 100%; }
+            .pagination-controls { flex-direction: column; gap: 1rem; }
         }
     </style>
 </head>
@@ -240,35 +311,55 @@
     <header>
         <h1>Event Table</h1>
         <div>
-            <span id="row-count" style="color: #64748b; font-size: 0.9rem;">0 rows</span>
+            <span id="total-count" style="color: #64748b; font-size: 0.9rem;">0 rows</span>
         </div>
     </header>
 
-    <div class="controls">
-        <div class="search-group">
-            <select id="searchColumn" class="column-select">
-                <option value="-1">All Columns</option>
-                <!-- Options populated by JS -->
-            </select>
-            <div class="search-box">
-                <input type="text" id="searchInput" placeholder="Search...">
+    <div class="controls-wrapper">
+        <div class="top-controls">
+            <div class="search-group">
+                <select id="searchColumn" class="column-select">
+                    <option value="-1">All Columns</option>
+                    </select>
+                <div class="search-box">
+                    <input type="text" id="searchInput" placeholder="Search text...">
+                </div>
             </div>
+            <button class="btn btn-outline" onclick="loadStaticCSV()">↺ Reset Data</button>
         </div>
-        <!-- Refresh button re-fetches the static CSV -->
-        <button class="btn btn-outline" onclick="loadStaticCSV()">↺ Reset Data</button>
+
+        <div id="filter-container" class="filter-row">
+            </div>
     </div>
 
     <div class="table-container">
-        <table id="dataTable">
-            <thead>
-                <!-- Headers will be injected here -->
-            </thead>
-            <tbody>
-                <!-- Rows will be injected here -->
-            </tbody>
-        </table>
+        <div class="table-scroll">
+            <table id="dataTable">
+                <thead></thead>
+                <tbody></tbody>
+            </table>
+        </div>
         <div id="emptyState" class="empty-state" style="display: none;">
             No matching records found.
+        </div>
+
+        <div class="pagination-controls" id="paginationControls">
+            <div class="pagination-info">
+                Showing <span id="startRange">0</span> to <span id="endRange">0</span> of <span id="totalRows">0</span> entries
+            </div>
+            <div class="pagination-actions">
+                <label>
+                    Rows per page:
+                    <select id="rowsPerPage" class="rows-per-page-select">
+                        <option value="10">10</option>
+                        <option value="50" selected>50</option>
+                        <option value="100">100</option>
+                    </select>
+                </label>
+                <button id="prevBtn" class="btn btn-outline" disabled>Previous</button>
+                <span id="pageIndicator" style="font-size: 0.9rem;">Page 1</span>
+                <button id="nextBtn" class="btn btn-outline" disabled>Next</button>
+            </div>
         </div>
     </div>
 </div>
@@ -287,10 +378,19 @@
 8,2026-01-10 00:03:07,Penalty,Offside,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=187,england,france_england
 9,2026-01-10 00:03:30,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=210,france,france_england`;
 
-    let currentData = [];
+    let allData = []; // Stores all parsed rows
+    let currentFilteredData = []; // Stores rows after search/filter
     let headers = [];
     let sortCol = -1;
     let sortAsc = true;
+
+    // Pagination State
+    let currentPage = 1;
+    let rowsPerPage = 50;
+
+    // Filter Configuration
+    const FILTERABLE_COLUMNS = ['Type', 'Name', 'Team', 'game'];
+    let activeFilters = {};
 
     // --- CSV Parsing Logic ---
     function parseCSV(str) {
@@ -303,35 +403,12 @@
             arr[row] = arr[row] || [];
             arr[row][col] = arr[row][col] || '';
 
-            if (cc == '"' && quote && nc == '"') {
-                arr[row][col] += cc;
-                ++i;
-                continue;
-            }
-            if (cc == '"') {
-                quote = !quote;
-                continue;
-            }
-            if (cc == ',' && !quote) {
-                ++col;
-                continue;
-            }
-            if (cc == '\r' && nc == '\n' && !quote) {
-                ++row;
-                col = 0;
-                ++i;
-                continue;
-            }
-            if (cc == '\n' && !quote) {
-                ++row;
-                col = 0;
-                continue;
-            }
-            if (cc == '\r' && !quote) {
-                ++row;
-                col = 0;
-                continue;
-            }
+            if (cc == '"' && quote && nc == '"') { arr[row][col] += cc; ++i; continue; }
+            if (cc == '"') { quote = !quote; continue; }
+            if (cc == ',' && !quote) { ++col; continue; }
+            if (cc == '\r' && nc == '\n' && !quote) { ++row; col = 0; ++i; continue; }
+            if (cc == '\n' && !quote) { ++row; col = 0; continue; }
+            if (cc == '\r' && !quote) { ++row; col = 0; continue; }
             arr[row][col] += cc;
         }
         return arr;
@@ -341,46 +418,117 @@
         const rows = parseCSV(csvText);
         if (rows.length < 2) return;
 
-        // Extract headers
         headers = rows[0].map(h => h.trim());
+        allData = rows.slice(1).filter(r => r.length === headers.length || r.join('').trim().length > 0);
 
-        // Extract body (filter out empty rows)
-        currentData = rows.slice(1).filter(r => r.length === headers.length || r.join('').trim().length > 0);
+        // Reset state
+        currentFilteredData = [...allData];
+        currentPage = 1;
 
         updateColumnSelect();
+        buildFilterDropdowns();
         renderHeaders();
-        renderTable(currentData);
+        updatePagination(); // Initial render happens here
     }
 
     function updateColumnSelect() {
         const select = document.getElementById('searchColumn');
-        // Save current selection if possible, else default to -1
         const currentVal = select.value;
-
         select.innerHTML = '<option value="-1">All Columns</option>';
         headers.forEach((h, i) => {
             const opt = document.createElement('option');
             opt.value = i;
-            // Handle the empty first header in your CSV
             opt.textContent = h === '' ? '#' : h;
             select.appendChild(opt);
         });
-
-        // Restore selection if it still exists
         if (currentVal && select.querySelector(`option[value="${currentVal}"]`)) {
             select.value = currentVal;
         }
     }
+
+    function buildFilterDropdowns() {
+        const container = document.getElementById('filter-container');
+        container.innerHTML = '';
+        activeFilters = {};
+
+        FILTERABLE_COLUMNS.forEach(colName => {
+            const colIndex = headers.findIndex(h => h.toLowerCase() === colName.toLowerCase());
+            if (colIndex === -1) return;
+
+            activeFilters[colName] = new Set();
+            const uniqueValues = [...new Set(allData.map(row => row[colIndex]))].sort();
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'multi-select-container';
+
+            const btn = document.createElement('div');
+            btn.className = 'select-btn';
+            btn.innerHTML = `<span>${colName}</span>`;
+
+            const list = document.createElement('div');
+            list.className = 'select-dropdown';
+
+            uniqueValues.forEach(val => {
+                if(!val) return;
+                const label = document.createElement('label');
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.value = val;
+
+                checkbox.addEventListener('change', (e) => {
+                    if(e.target.checked) activeFilters[colName].add(val);
+                    else activeFilters[colName].delete(val);
+
+                    updateFilterButtonText(btn, colName);
+                    applyFilters(); // Re-run filters and reset to page 1
+                });
+
+                label.appendChild(checkbox);
+                label.appendChild(document.createTextNode(val));
+                list.appendChild(label);
+            });
+
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                document.querySelectorAll('.select-dropdown').forEach(el => {
+                    if(el !== list) el.classList.remove('show');
+                });
+                list.classList.toggle('show');
+            });
+
+            wrapper.appendChild(btn);
+            wrapper.appendChild(list);
+            container.appendChild(wrapper);
+        });
+    }
+
+    function updateFilterButtonText(btn, colName) {
+        const count = activeFilters[colName].size;
+        const span = btn.querySelector('span');
+        if (count > 0) {
+            span.textContent = `${colName} (${count})`;
+            btn.style.borderColor = 'var(--primary)';
+            btn.style.color = 'var(--primary)';
+            btn.style.fontWeight = 'bold';
+        } else {
+            span.textContent = colName;
+            btn.style.borderColor = 'var(--border)';
+            btn.style.color = 'inherit';
+            btn.style.fontWeight = 'normal';
+        }
+    }
+
+    document.addEventListener('click', () => {
+        document.querySelectorAll('.select-dropdown').forEach(el => el.classList.remove('show'));
+    });
 
     // --- Rendering ---
     function renderHeaders() {
         const thead = document.querySelector('#dataTable thead');
         thead.innerHTML = '';
         const tr = document.createElement('tr');
-
         headers.forEach((h, index) => {
             const th = document.createElement('th');
-            // Handle the empty first header
             th.textContent = h === '' ? '#' : h;
             th.onclick = () => sortTable(index);
             if (index === sortCol) {
@@ -394,10 +542,7 @@
     function renderTable(rows) {
         const tbody = document.querySelector('#dataTable tbody');
         const emptyState = document.getElementById('emptyState');
-        const countSpan = document.getElementById('row-count');
-
         tbody.innerHTML = '';
-        countSpan.textContent = `${rows.length} rows`;
 
         if (rows.length === 0) {
             emptyState.style.display = 'block';
@@ -411,7 +556,6 @@
                 const td = document.createElement('td');
                 const headerName = headers[idx]?.toLowerCase() || '';
 
-                // Feature: Clickable YouTube Links
                 if ((headerName.includes('link') || headerName.includes('youtube')) && cell.startsWith('http')) {
                     const a = document.createElement('a');
                     a.href = cell;
@@ -421,14 +565,12 @@
                     a.innerHTML = `<span>▶ Watch</span>`;
                     td.appendChild(a);
                 }
-                // Feature: Styling for Team tags
                 else if (headerName === 'team') {
                     const span = document.createElement('span');
                     span.textContent = cell;
                     span.className = 'status-pill ' + (cell.toLowerCase() === 'england' ? 'tag-england' : 'tag-france');
                     td.appendChild(span);
                 }
-                // Feature: Styling for Types (Penalty vs Try)
                 else if (headerName === 'type') {
                      const span = document.createElement('span');
                      span.textContent = cell;
@@ -446,76 +588,147 @@
         });
     }
 
-    // --- Actions ---
+    // --- Sorting ---
     function sortTable(colIndex) {
-        if (sortCol === colIndex) {
-            sortAsc = !sortAsc;
-        } else {
-            sortCol = colIndex;
-            sortAsc = true;
-        }
+        if (sortCol === colIndex) sortAsc = !sortAsc;
+        else { sortCol = colIndex; sortAsc = true; }
 
-        // Detect if column is numeric
-        const isNumeric = currentData.every(row => !isNaN(parseFloat(row[colIndex])) && isFinite(row[colIndex]));
+        const isNumeric = currentFilteredData.every(row => !isNaN(parseFloat(row[colIndex])) && isFinite(row[colIndex]));
 
-        currentData.sort((a, b) => {
+        currentFilteredData.sort((a, b) => {
             let valA = a[colIndex];
             let valB = b[colIndex];
-
-            if (isNumeric) {
-                return sortAsc ? valA - valB : valB - valA;
-            }
-
-            valA = valA.toLowerCase();
-            valB = valB.toLowerCase();
+            if (isNumeric) return sortAsc ? valA - valB : valB - valA;
+            valA = valA.toLowerCase(); valB = valB.toLowerCase();
             if (valA < valB) return sortAsc ? -1 : 1;
             if (valA > valB) return sortAsc ? 1 : -1;
             return 0;
         });
 
         renderHeaders();
-        filterAndRender();
+        updatePagination(); // Re-render current page sorted
     }
 
-    function filterAndRender() {
+    // --- Filtering ---
+    function applyFilters() {
         const query = document.getElementById('searchInput').value.toLowerCase();
-        const colIdx = parseInt(document.getElementById('searchColumn').value);
+        const searchColIdx = parseInt(document.getElementById('searchColumn').value);
 
-        const filtered = currentData.filter(row => {
-            // If All Columns selected (-1), search everywhere
-            if (colIdx === -1) {
-                return row.some(cell => String(cell).toLowerCase().includes(query));
+        currentFilteredData = allData.filter(row => {
+            // 1. Text Search Logic
+            let textMatch = false;
+            if (searchColIdx === -1) {
+                textMatch = row.some(cell => String(cell).toLowerCase().includes(query));
+            } else {
+                textMatch = String(row[searchColIdx]).toLowerCase().includes(query);
             }
-            // Otherwise search only the specific column
-            return String(row[colIdx]).toLowerCase().includes(query);
+
+            if (!textMatch) return false;
+
+            // 2. Dropdown Filter Logic
+            for (const colName of FILTERABLE_COLUMNS) {
+                if (activeFilters[colName] && activeFilters[colName].size > 0) {
+                    const colIndex = headers.findIndex(h => h.toLowerCase() === colName.toLowerCase());
+                    const cellValue = row[colIndex];
+                    if (!activeFilters[colName].has(cellValue)) {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
         });
 
-        renderTable(filtered);
+        // Reset to page 1 whenever filters change
+        currentPage = 1;
+
+        // If sort is active, re-sort the filtered data
+        if (sortCol !== -1) {
+            const isNumeric = currentFilteredData.every(row => !isNaN(parseFloat(row[sortCol])) && isFinite(row[sortCol]));
+            currentFilteredData.sort((a, b) => {
+                let valA = a[sortCol];
+                let valB = b[sortCol];
+                if (isNumeric) return sortAsc ? valA - valB : valB - valA;
+                valA = valA.toLowerCase(); valB = valB.toLowerCase();
+                if (valA < valB) return sortAsc ? -1 : 1;
+                if (valA > valB) return sortAsc ? 1 : -1;
+                return 0;
+            });
+        }
+
+        updatePagination();
     }
 
+    // --- Pagination Logic ---
+    function updatePagination() {
+        const totalRows = currentFilteredData.length;
+        const totalPages = Math.ceil(totalRows / rowsPerPage);
+
+        // Ensure currentPage is valid
+        if (currentPage < 1) currentPage = 1;
+        if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
+
+        const startIndex = (currentPage - 1) * rowsPerPage;
+        const endIndex = Math.min(startIndex + rowsPerPage, totalRows);
+
+        // Slice data for current page
+        const pageData = currentFilteredData.slice(startIndex, endIndex);
+
+        // Update UI Text
+        document.getElementById('total-count').textContent = `${totalRows} rows`;
+        document.getElementById('totalRows').textContent = totalRows;
+        document.getElementById('startRange').textContent = totalRows === 0 ? 0 : startIndex + 1;
+        document.getElementById('endRange').textContent = endIndex;
+        document.getElementById('pageIndicator').textContent = totalPages === 0 ? 'Page 0 of 0' : `Page ${currentPage} of ${totalPages}`;
+
+        // Update Buttons
+        document.getElementById('prevBtn').disabled = currentPage <= 1;
+        document.getElementById('nextBtn').disabled = currentPage >= totalPages;
+
+        // Render the sliced data
+        renderTable(pageData);
+    }
+
+    // Event Listeners for Pagination
+    document.getElementById('rowsPerPage').addEventListener('change', (e) => {
+        rowsPerPage = parseInt(e.target.value);
+        currentPage = 1; // Reset to page 1 when changing density
+        updatePagination();
+    });
+
+    document.getElementById('prevBtn').addEventListener('click', () => {
+        if (currentPage > 1) {
+            currentPage--;
+            updatePagination();
+        }
+    });
+
+    document.getElementById('nextBtn').addEventListener('click', () => {
+        const totalPages = Math.ceil(currentFilteredData.length / rowsPerPage);
+        if (currentPage < totalPages) {
+            currentPage++;
+            updatePagination();
+        }
+    });
+
+    // Event Listeners for Search
+    document.getElementById('searchInput').addEventListener('input', applyFilters);
+    document.getElementById('searchColumn').addEventListener('change', applyFilters);
+
+    // Initial Load
     function loadStaticCSV() {
-        // Tries to load assets/all_events.csv, falls back to sample data if not found
-        // Use a timestamp to prevent browser caching when updating the file
         fetch('assets/all_events.csv?t=' + Date.now())
             .then(response => {
                 if (!response.ok) throw new Error("Network response was not ok");
                 return response.text();
             })
-            .then(csvText => {
-                console.log("Loaded all_events.csv successfully");
-                processData(csvText);
-            })
+            .then(csvText => processData(csvText))
             .catch(error => {
-                console.warn("Could not load all_events.csv (using sample data):", error);
+                console.warn("Using sample data:", error);
                 processData(SAMPLE_CSV);
             });
     }
 
-    // Event Listeners
-    document.getElementById('searchInput').addEventListener('input', filterAndRender);
-    document.getElementById('searchColumn').addEventListener('change', filterAndRender);
-
-    // Initial Load
     loadStaticCSV();
 
 </script>
