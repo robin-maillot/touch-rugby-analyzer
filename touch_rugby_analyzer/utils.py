@@ -6,7 +6,7 @@ from plotly.subplots import make_subplots
 import rich
 from collections import defaultdict
 import json
-
+from typing import Tuple
 from touch_rugby_analyzer.constants import DATA_ROOT
 
 output_data_root = DATA_ROOT / "output"
@@ -25,7 +25,48 @@ def time_to_n_seconds(time_obj):
     return 3600 * time_obj.hour + 60 * time_obj.minute + time_obj.second
 
 
-def load_data(data_path: Path, simple: bool = False):
+def opponent(team_name: str, team_names :Tuple[str, str] = ("Team 1", "Team 2")) -> str:
+    if team_name == team_names[0]:
+        return team_names[1]
+    else:
+        return team_names[0]
+
+
+def is_turnover(row: pd.Series):
+    _is_turnover = False
+    if row.Type == "Try":
+        _is_turnover = True
+    elif row.Type == "Penalty" and row.Name not in ["Offside", "Not Moving Forward", "Shoulder"]:
+        _is_turnover = True
+    elif row.Type == "Turnover" and row.Name not in ["6 Again"]:
+        _is_turnover = True
+    return _is_turnover
+
+
+def infer_possession_owner(data_df: pd.DataFrame):
+    turnover = False
+    possession_owner = None
+    new_possession_owners = []
+    for i, row in data_df.iterrows():
+        row_possession_owner = row["Possession Owner"]
+        if row.Type == "Game Event":
+            turnover = False
+            possession_owner = row_possession_owner
+        elif row.Type == "To Review":
+            new_possession_owners.append(row_possession_owner)
+            continue
+        # if row.Type == "Try":
+        else:
+            if turnover:
+                possession_owner = opponent(possession_owner)
+            turnover = row.Turnover
+        # if possession_owner != possession_owner:
+        #     rich.print(f"{possession_owner = }, {possession_owner = }")
+        #     rich.print(row)
+        new_possession_owners.append(possession_owner)
+    data_df["Possession Owner"] = new_possession_owners
+
+def load_data(data_path: Path, simple: bool = False) -> pd.DataFrame:
     local_team_name, other_team_name = get_names(data_path)
     year, division_name, competition_name = get_year_division_competition(data_path)
     data_df = pd.read_csv(data_path)
@@ -34,10 +75,13 @@ def load_data(data_path: Path, simple: bool = False):
     data_df["Competition"] = competition_name
 
     if AGAINST_LOCALS_COL not in data_df.columns:
+        # infer the ball owner using logic
+        data_df["Turnover"] = data_df.apply(is_turnover, axis=1)
+        infer_possession_owner(data_df)
+
         data_df[AGAINST_LOCALS_COL] = data_df["Possession Owner"].apply(
             lambda x: x == "Team 2"
         )
-    rich.print(data_df)
     data_df = data_df.dropna(axis=0, how="all", subset="Time")
     # data_df.Time = pd.to_datetime(data_df.Time).dt.time
     data_df.Time = pd.to_datetime(data_df.Time)
@@ -81,50 +125,48 @@ def load_data(data_path: Path, simple: bool = False):
         ),
         axis=1,
     )
-    data_df["TeamOld"] = data_df[AGAINST_LOCALS_COL].apply(
-        lambda x: other_team_name if x else local_team_name
-    )
 
-    def add_team_after(data_df: pd.DataFrame):
-        ball_owners = []
-        for i, row in data_df.iterrows():
-            against_local = row[AGAINST_LOCALS_COL]
-            if i == 0:
+    if not simple:
+        # data_df.to_csv("test.csv", index=True)
+        add_team_after(data_df, local_team_name, other_team_name)
+    return data_df
+
+
+def add_team_after(data_df: pd.DataFrame, local_team_name: str, other_team_name: str):
+    ball_owners = []
+    for i, row in data_df.iterrows():
+        against_local = row[AGAINST_LOCALS_COL]
+        if i == 0:
+            new_expected_ball_owner = (
+                other_team_name if against_local else local_team_name
+            )
+        else:
+            if row["Type"] == "Try":
+                if not (
+                    (against_local and ball_owners[-1] == other_team_name)
+                    or (not against_local and ball_owners[-1] == local_team_name)
+                ):
+                    rich.print(data_df)
+                    rich.print(row)
+                    raise Exception("wtf")
+                new_expected_ball_owner = (
+                    local_team_name if against_local else other_team_name
+                )
+            elif row["Type"] in ["Penalty", "Turnover"] and (
+                (against_local and ball_owners[-1] == local_team_name)
+                or (not against_local and ball_owners[-1] == other_team_name)
+            ):
+                new_expected_ball_owner = (
+                    other_team_name if against_local else local_team_name
+                )
+            elif row["Type"] in ["Game Event"]:
                 new_expected_ball_owner = (
                     other_team_name if against_local else local_team_name
                 )
             else:
-                if row["Type"] == "Try":
-                    if not (
-                        (against_local and ball_owners[-1] == other_team_name)
-                        or (not against_local and ball_owners[-1] == local_team_name)
-                    ):
-                        rich.print(data_df)
-                        rich.print(row)
-                        raise Exception("wtf")
-                    new_expected_ball_owner = (
-                        local_team_name if against_local else other_team_name
-                    )
-                elif row["Type"] in ["Penalty", "Turnover"] and (
-                    (against_local and ball_owners[-1] == local_team_name)
-                    or (not against_local and ball_owners[-1] == other_team_name)
-                ):
-                    new_expected_ball_owner = (
-                        other_team_name if against_local else local_team_name
-                    )
-                elif row["Type"] in ["Game Event"]:
-                    new_expected_ball_owner = (
-                        other_team_name if against_local else local_team_name
-                    )
-                else:
-                    new_expected_ball_owner = ball_owners[-1]
-            ball_owners.append(new_expected_ball_owner)
-        data_df["ball_owner"] = ball_owners
-
-    if not simple:
-        add_team_after(data_df)
-    return data_df
-
+                new_expected_ball_owner = ball_owners[-1]
+        ball_owners.append(new_expected_ball_owner)
+    data_df["ball_owner"] = ball_owners
 
 def make_fig_1(data_df, local_team_name, other_team_name):
     events = ["Try", "Penalty", "Turnover"]
