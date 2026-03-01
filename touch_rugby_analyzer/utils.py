@@ -8,11 +8,12 @@ from collections import defaultdict
 import json
 from typing import Tuple
 from touch_rugby_analyzer.constants import DATA_ROOT
-
+import datetime
 output_data_root = DATA_ROOT / "output"
 output_data_root.mkdir(parents=True, exist_ok=True)
 
 AGAINST_LOCALS_COL = "Against Team1"
+POSSESSION_COL = "Possession Owner"
 FIG_WIDTH = 1000
 
 
@@ -42,20 +43,39 @@ def is_turnover(row: pd.Series):
         _is_turnover = True
     return _is_turnover
 
+def is_fully_analysable(data_df: pd.DataFrame):
+    game_start_events = data_df[data_df["Name"] == "Game Start"]
+    game_end_events = data_df[data_df["Name"] == "Game End"]
+    return len(game_start_events) == len(game_end_events) and len(game_end_events)>0
 
 def infer_possession_owner(data_df: pd.DataFrame):
+    data_df["Turnover"] = data_df.apply(is_turnover, axis=1)
+    if not is_fully_analysable(data_df):
+        rich.print("[yellow] Cannot infer possession owner [/yellow]")
+        if POSSESSION_COL not in data_df:
+            data_df[POSSESSION_COL] = data_df[AGAINST_LOCALS_COL].apply(lambda against_local: "Team 2" if AGAINST_LOCALS_COL else "Team 1")
+        return
+
     turnover = False
     possession_owner = None
     new_possession_owners = []
     for i, row in data_df.iterrows():
-        row_possession_owner = row["Possession Owner"]
+        if POSSESSION_COL in row:
+            row_possession_owner = row[POSSESSION_COL]
+        elif AGAINST_LOCALS_COL in row:
+            if row[AGAINST_LOCALS_COL]:
+                row_possession_owner = "Team 2"
+            else:
+                row_possession_owner = "Team 1"
+        else:
+            raise Exception(f"Cannot find {POSSESSION_COL} or {AGAINST_LOCALS_COL} in {row}")
+
         if row.Type == "Game Event":
             turnover = False
             possession_owner = row_possession_owner
         elif row.Type == "To Review":
             new_possession_owners.append(row_possession_owner)
             continue
-        # if row.Type == "Try":
         else:
             if turnover:
                 possession_owner = opponent(possession_owner)
@@ -64,109 +84,58 @@ def infer_possession_owner(data_df: pd.DataFrame):
         #     rich.print(f"{possession_owner = }, {possession_owner = }")
         #     rich.print(row)
         new_possession_owners.append(possession_owner)
-    data_df["Possession Owner"] = new_possession_owners
+    data_df[POSSESSION_COL] = new_possession_owners
+
+
+def infer_action_owner(data_df: pd.DataFrame):
+    action_owners = []
+    for i, row in data_df.iterrows():
+        row_possession_owner = row[POSSESSION_COL]
+        row_turnover = row.Turnover
+        row_action_owner = row_possession_owner
+        if row.Type in ["Penalty", "Turnover"] and not row_turnover:
+            row_action_owner = opponent(row_possession_owner)
+        else:
+            row_action_owner = row_possession_owner
+        action_owners.append(row_action_owner)
+    data_df["Action Owner"] = action_owners
+
+
+def add_game_time(data_df: pd.DataFrame):
+    game_start_events = data_df[data_df["Name"] == "Game Start"]
+    game_end_events = data_df[data_df["Name"] == "Game End"]
+
+    # assert len(game_start_events) == len(game_end_events), f"{game_start_events} {game_end_events}"
+
+    if len(game_start_events) == 0:
+        data_df["GameTime"] = data_df["Time"]
+    else:
+        dt = game_start_events.iloc[0].Time
+        # dts = []
+        # for i, row in data_df.iterrows():
+        #     if row["Name"] in ["Game Start", "Game End"]:
+        #         dt = row["Time"]
+        #     dts.append(dt)
+        data_df["GameTime"] = datetime.datetime(1999, 1, 1) + (data_df["Time"] - dt)
+        # data_df["GameTime"] = datetime.datetime(1999, 1, 1) + (data_df["Time"] - np.array(dts))
 
 def load_data(data_path: Path, simple: bool = False) -> pd.DataFrame:
     local_team_name, other_team_name = get_names(data_path)
     year, division_name, competition_name = get_year_division_competition(data_path)
     data_df = pd.read_csv(data_path)
+    data_df = data_df.dropna(axis=0, how="all", subset="Time")
     data_df["Year"] = year
     data_df["Division"] = division_name
     data_df["Competition"] = competition_name
-
-    if AGAINST_LOCALS_COL not in data_df.columns:
-        # infer the ball owner using logic
-        data_df["Turnover"] = data_df.apply(is_turnover, axis=1)
-        infer_possession_owner(data_df)
-
-        data_df[AGAINST_LOCALS_COL] = data_df["Possession Owner"].apply(
-            lambda x: x == "Team 2"
-        )
-    data_df = data_df.dropna(axis=0, how="all", subset="Time")
-    # data_df.Time = pd.to_datetime(data_df.Time).dt.time
+    if AGAINST_LOCALS_COL in data_df:
+        data_df[AGAINST_LOCALS_COL].fillna(False, inplace=True)
+    infer_possession_owner(data_df)
+    infer_action_owner(data_df)
     data_df.Time = pd.to_datetime(data_df.Time)
+    add_game_time(data_df)
 
-    if not simple:
-        game_start_events = data_df[data_df["Name"] == "Game Start"]
-        game_end_events = data_df[data_df["Name"] == "Game End"]
-
-        assert len(game_start_events) == len(game_end_events) == 2
-
-        half_time_start_time = game_end_events.Time.to_list()[0]
-        half_time_end_time = game_start_events.Time.to_list()[1]
-        half_time_end_index = game_start_events.index.to_list()[1]
-
-        new_game_end_time = half_time_start_time + pd.Timedelta(minutes=2)
-        delta = new_game_end_time - half_time_end_time
-
-        halftime_passed = False
-        ids = []
-        for i, row in data_df.iterrows():
-            if i == half_time_end_index:
-                halftime_passed = True
-            if halftime_passed:
-                ids.append(i)
-        data_df.Time[ids] += delta
-
-    data_df[AGAINST_LOCALS_COL].fillna(False, inplace=True)
     data_df["To Review"].fillna(False, inplace=True)
-
-    data_df["Team"] = data_df.apply(
-        lambda row: (
-            local_team_name
-            if (
-                (row[AGAINST_LOCALS_COL] and row["Type"] in ["Penalty", "Turnover"])
-                or (
-                    not row[AGAINST_LOCALS_COL]
-                    and row["Type"] not in ["Penalty", "Turnover"]
-                )
-            )
-            else other_team_name
-        ),
-        axis=1,
-    )
-
-    if not simple:
-        # data_df.to_csv("test.csv", index=True)
-        add_team_after(data_df, local_team_name, other_team_name)
     return data_df
-
-
-def add_team_after(data_df: pd.DataFrame, local_team_name: str, other_team_name: str):
-    ball_owners = []
-    for i, row in data_df.iterrows():
-        against_local = row[AGAINST_LOCALS_COL]
-        if i == 0:
-            new_expected_ball_owner = (
-                other_team_name if against_local else local_team_name
-            )
-        else:
-            if row["Type"] == "Try":
-                if not (
-                    (against_local and ball_owners[-1] == other_team_name)
-                    or (not against_local and ball_owners[-1] == local_team_name)
-                ):
-                    rich.print(data_df)
-                    rich.print(row)
-                    raise Exception("wtf")
-                new_expected_ball_owner = (
-                    local_team_name if against_local else other_team_name
-                )
-            elif row["Type"] in ["Penalty", "Turnover"] and (
-                (against_local and ball_owners[-1] == local_team_name)
-                or (not against_local and ball_owners[-1] == other_team_name)
-            ):
-                new_expected_ball_owner = (
-                    other_team_name if against_local else local_team_name
-                )
-            elif row["Type"] in ["Game Event"]:
-                new_expected_ball_owner = (
-                    other_team_name if against_local else local_team_name
-                )
-            else:
-                new_expected_ball_owner = ball_owners[-1]
-        ball_owners.append(new_expected_ball_owner)
-    data_df["ball_owner"] = ball_owners
 
 def make_fig_1(data_df, local_team_name, other_team_name):
     events = ["Try", "Penalty", "Turnover"]
