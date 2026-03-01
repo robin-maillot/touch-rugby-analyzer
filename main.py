@@ -18,12 +18,12 @@ if __name__ == "__main__":
         _ = gcloud_utils.fetch_gsheet(sheet_id, sheet_tab, return_raw=False)
         _.to_csv(DATA_ROOT / csv_name, index=False)
 
-    generate_html_v2.generate_htmls()
-
+    games_data = generate_html_v2.generate_htmls()
     for cmd in [
         ["git", "add", "-u"],
+        ["git", "add"] + [game_data["file"] for game_data in games_data],
         ["git", "commit", "-m", f"update html {datetime.datetime.now()}"],
-        ["git", "push"]
+        ["git", "push"],
     ]:
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE)
         output = process.communicate()[0]

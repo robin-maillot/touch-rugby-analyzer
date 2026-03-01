@@ -1,0 +1,1339 @@
+
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+      <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
+      <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+      <style>
+        body { font-family: sans-serif; margin: 20px; }
+        .table {
+            font-family: Arial, Helvetica, sans-serif;
+            border-collapse: collapse;
+            width: 800px; /* Match chart width */
+            margin: 20px auto;
+        }
+        .table td, .table th {
+            border: 1px solid #ddd;
+            padding: 8px;
+        }
+        .table tr:nth-child(even){background-color: #f2f2f2;}
+        .table tr:hover {background-color: #ddd;}
+        .table th {
+            padding-top: 12px;
+            padding-bottom: 12px;
+            text-align: left;
+            background-color: #04AA6D;
+            color: white;
+        }
+        h2 { text-align: center; }
+        #vis { width: 100%; display: flex; justify-content: center; }
+      </style>
+    </head>
+    <body>
+      <div id="vis"></div>
+      <h2>Team Statistics</h2>
+      <table class="dataframe table">
+  <thead>
+    <tr style="text-align: right;">
+      <th>Team</th>
+      <th>Possessions</th>
+      <th>Tries</th>
+      <th>Success Rate (%)</th>
+      <th>Completions</th>
+      <th>Avg Time (s)</th>
+      <th>Total Time (s)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>france</td>
+      <td>33</td>
+      <td>5</td>
+      <td>15.2%</td>
+      <td>10</td>
+      <td>35.7</td>
+      <td>1179.0</td>
+    </tr>
+    <tr>
+      <td>pays-bas</td>
+      <td>32</td>
+      <td>7</td>
+      <td>21.9%</td>
+      <td>15</td>
+      <td>38.3</td>
+      <td>1226.0</td>
+    </tr>
+  </tbody>
+</table>
+      <script>
+        var spec = {
+  "$schema": "https://vega.github.io/schema/vega-lite/v6.1.0.json",
+  "config": {
+    "view": {
+      "continuousHeight": 300,
+      "continuousWidth": 300
+    }
+  },
+  "datasets": {
+    "data-5f5bf201ff8ef81b562c475f1d19e314": [
+      {
+        "Count": 0,
+        "Event": "Game Start",
+        "GameTime": "1999-01-01T00:00:00",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=129",
+        "Team": "france"
+      },
+      {
+        "Count": 1,
+        "Event": "Try",
+        "GameTime": "1999-01-01T00:07:13",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=562",
+        "Team": "france"
+      },
+      {
+        "Count": 2,
+        "Event": "Try",
+        "GameTime": "1999-01-01T00:09:29",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=698",
+        "Team": "france"
+      },
+      {
+        "Count": 3,
+        "Event": "Try",
+        "GameTime": "1999-01-01T00:26:15",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1704",
+        "Team": "france"
+      },
+      {
+        "Count": 4,
+        "Event": "Try",
+        "GameTime": "1999-01-01T00:31:27",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2016",
+        "Team": "france"
+      },
+      {
+        "Count": 5,
+        "Event": "Try",
+        "GameTime": "1999-01-01T00:38:58",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2467",
+        "Team": "france"
+      },
+      {
+        "Count": 5,
+        "Event": "Game End",
+        "GameTime": "1999-01-01T00:45:03",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2832",
+        "Team": "france"
+      },
+      {
+        "Count": 0,
+        "Event": "Game Start",
+        "GameTime": "1999-01-01T00:00:00",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=129",
+        "Team": "pays-bas"
+      },
+      {
+        "Count": 1,
+        "Event": "Try",
+        "GameTime": "1999-01-01T00:00:31",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=160",
+        "Team": "pays-bas"
+      },
+      {
+        "Count": 2,
+        "Event": "Try",
+        "GameTime": "1999-01-01T00:04:37",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=406",
+        "Team": "pays-bas"
+      },
+      {
+        "Count": 3,
+        "Event": "Try",
+        "GameTime": "1999-01-01T00:17:43",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1192",
+        "Team": "pays-bas"
+      },
+      {
+        "Count": 4,
+        "Event": "Try",
+        "GameTime": "1999-01-01T00:36:00",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2289",
+        "Team": "pays-bas"
+      },
+      {
+        "Count": 5,
+        "Event": "Try",
+        "GameTime": "1999-01-01T00:38:25",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2434",
+        "Team": "pays-bas"
+      },
+      {
+        "Count": 6,
+        "Event": "Try",
+        "GameTime": "1999-01-01T00:40:10",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2539",
+        "Team": "pays-bas"
+      },
+      {
+        "Count": 7,
+        "Event": "Try",
+        "GameTime": "1999-01-01T00:43:54",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2763",
+        "Team": "pays-bas"
+      },
+      {
+        "Count": 7,
+        "Event": "Game End",
+        "GameTime": "1999-01-01T00:45:03",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2832",
+        "Team": "pays-bas"
+      }
+    ],
+    "data-bc9540f0ca942dad5e309b03e5be8119": [
+      {
+        "Color_Category": "Try",
+        "Duration_Sec": 31.0,
+        "End": "1999-01-01T00:00:31",
+        "End_Event": "Try",
+        "End_Type": "Try",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=160",
+        "Start": "1999-01-01T00:00:00",
+        "Team": "pays-bas"
+      },
+      {
+        "Color_Category": "6th Touch",
+        "Duration_Sec": 69.0,
+        "End": "1999-01-01T00:01:40",
+        "End_Event": "6th Touch",
+        "End_Type": "Turnover",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=229",
+        "Start": "1999-01-01T00:00:31",
+        "Team": "france"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 33.0,
+        "End": "1999-01-01T00:02:13",
+        "End_Event": "Ball Down",
+        "End_Type": "Turnover",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=262",
+        "Start": "1999-01-01T00:01:40",
+        "Team": "pays-bas"
+      },
+      {
+        "Color_Category": "6th Touch",
+        "Duration_Sec": 19.0,
+        "End": "1999-01-01T00:02:32",
+        "End_Event": "6th Touch",
+        "End_Type": "Turnover",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=281",
+        "Start": "1999-01-01T00:02:13",
+        "Team": "france"
+      },
+      {
+        "Color_Category": "6th Touch",
+        "Duration_Sec": 42.0,
+        "End": "1999-01-01T00:03:14",
+        "End_Event": "6th Touch",
+        "End_Type": "Turnover",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=323",
+        "Start": "1999-01-01T00:02:32",
+        "Team": "pays-bas"
+      },
+      {
+        "Color_Category": "Penalty",
+        "Duration_Sec": 40.0,
+        "End": "1999-01-01T00:03:54",
+        "End_Event": "Touch and Pass",
+        "End_Type": "Penalty",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=363",
+        "Start": "1999-01-01T00:03:14",
+        "Team": "france"
+      },
+      {
+        "Color_Category": "Try",
+        "Duration_Sec": 43.0,
+        "End": "1999-01-01T00:04:37",
+        "End_Event": "Try",
+        "End_Type": "Try",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=406",
+        "Start": "1999-01-01T00:03:54",
+        "Team": "pays-bas"
+      },
+      {
+        "Color_Category": "Penalty",
+        "Duration_Sec": 52.0,
+        "End": "1999-01-01T00:05:29",
+        "End_Event": "Forward Pass",
+        "End_Type": "Penalty",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=458",
+        "Start": "1999-01-01T00:04:37",
+        "Team": "france"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 61.0,
+        "End": "1999-01-01T00:06:30",
+        "End_Event": "Ball Down",
+        "End_Type": "Turnover",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=519",
+        "Start": "1999-01-01T00:05:29",
+        "Team": "pays-bas"
+      },
+      {
+        "Color_Category": "Try",
+        "Duration_Sec": 43.0,
+        "End": "1999-01-01T00:07:13",
+        "End_Event": "Try",
+        "End_Type": "Try",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=562",
+        "Start": "1999-01-01T00:06:30",
+        "Team": "france"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 96.0,
+        "End": "1999-01-01T00:08:49",
+        "End_Event": "Ball Down",
+        "End_Type": "Turnover",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=658",
+        "Start": "1999-01-01T00:07:13",
+        "Team": "pays-bas"
+      },
+      {
+        "Color_Category": "Try",
+        "Duration_Sec": 40.0,
+        "End": "1999-01-01T00:09:29",
+        "End_Event": "Try",
+        "End_Type": "Try",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=698",
+        "Start": "1999-01-01T00:08:49",
+        "Team": "france"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 47.0,
+        "End": "1999-01-01T00:10:16",
+        "End_Event": "Ball Down",
+        "End_Type": "Turnover",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=745",
+        "Start": "1999-01-01T00:09:29",
+        "Team": "pays-bas"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 51.0,
+        "End": "1999-01-01T00:11:07",
+        "End_Event": "Ball Down",
+        "End_Type": "Turnover",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=796",
+        "Start": "1999-01-01T00:10:16",
+        "Team": "france"
+      },
+      {
+        "Color_Category": "6th Touch",
+        "Duration_Sec": 39.0,
+        "End": "1999-01-01T00:11:46",
+        "End_Event": "6th Touch",
+        "End_Type": "Turnover",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=835",
+        "Start": "1999-01-01T00:11:07",
+        "Team": "pays-bas"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 30.0,
+        "End": "1999-01-01T00:12:16",
+        "End_Event": "Dummy Touch",
+        "End_Type": "Turnover",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=865",
+        "Start": "1999-01-01T00:11:46",
+        "Team": "france"
+      },
+      {
+        "Color_Category": "6th Touch",
+        "Duration_Sec": 36.0,
+        "End": "1999-01-01T00:12:52",
+        "End_Event": "6th Touch",
+        "End_Type": "Turnover",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=901",
+        "Start": "1999-01-01T00:12:16",
+        "Team": "pays-bas"
+      },
+      {
+        "Color_Category": "Penalty",
+        "Duration_Sec": 14.0,
+        "End": "1999-01-01T00:13:06",
+        "End_Event": "Forward Pass",
+        "End_Type": "Penalty",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=915",
+        "Start": "1999-01-01T00:12:52",
+        "Team": "france"
+      },
+      {
+        "Color_Category": "Penalty",
+        "Duration_Sec": 45.0,
+        "End": "1999-01-01T00:13:51",
+        "End_Event": "Offside",
+        "End_Type": "Penalty",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=960",
+        "Start": "1999-01-01T00:13:06",
+        "Team": "pays-bas"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 15.0,
+        "End": "1999-01-01T00:14:06",
+        "End_Event": "Bad Roll",
+        "End_Type": "To Review",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=975",
+        "Start": "1999-01-01T00:13:51",
+        "Team": "france"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 45.0,
+        "End": "1999-01-01T00:14:51",
+        "End_Event": "Bad Roll",
+        "End_Type": "To Review",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1020",
+        "Start": "1999-01-01T00:14:06",
+        "Team": "pays-bas"
+      },
+      {
+        "Color_Category": "Penalty",
+        "Duration_Sec": 19.0,
+        "End": "1999-01-01T00:15:10",
+        "End_Event": "Delay of Play",
+        "End_Type": "Penalty",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1039",
+        "Start": "1999-01-01T00:14:51",
+        "Team": "france"
+      },
+      {
+        "Color_Category": "6th Touch",
+        "Duration_Sec": 30.0,
+        "End": "1999-01-01T00:15:40",
+        "End_Event": "6th Touch",
+        "End_Type": "Turnover",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1069",
+        "Start": "1999-01-01T00:15:10",
+        "Team": "pays-bas"
+      },
+      {
+        "Color_Category": "Penalty",
+        "Duration_Sec": 25.0,
+        "End": "1999-01-01T00:16:05",
+        "End_Event": "Hard Touch",
+        "End_Type": "Penalty",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1094",
+        "Start": "1999-01-01T00:15:40",
+        "Team": "france"
+      },
+      {
+        "Color_Category": "Penalty",
+        "Duration_Sec": 36.0,
+        "End": "1999-01-01T00:16:41",
+        "End_Event": "Forward Pass",
+        "End_Type": "Penalty",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1130",
+        "Start": "1999-01-01T00:16:05",
+        "Team": "pays-bas"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 36.0,
+        "End": "1999-01-01T00:17:17",
+        "End_Event": "Ball Down",
+        "End_Type": "Turnover",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1166",
+        "Start": "1999-01-01T00:16:41",
+        "Team": "france"
+      },
+      {
+        "Color_Category": "Try",
+        "Duration_Sec": 26.0,
+        "End": "1999-01-01T00:17:43",
+        "End_Event": "Try",
+        "End_Type": "Try",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1192",
+        "Start": "1999-01-01T00:17:17",
+        "Team": "pays-bas"
+      },
+      {
+        "Color_Category": "6th Touch",
+        "Duration_Sec": 50.0,
+        "End": "1999-01-01T00:18:33",
+        "End_Event": "6th Touch",
+        "End_Type": "Turnover",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1242",
+        "Start": "1999-01-01T00:17:43",
+        "Team": "france"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 17.0,
+        "End": "1999-01-01T00:18:50",
+        "End_Event": "Ball Down",
+        "End_Type": "Turnover",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1259",
+        "Start": "1999-01-01T00:18:33",
+        "Team": "pays-bas"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 44.0,
+        "End": "1999-01-01T00:19:34",
+        "End_Event": "In The Ruck",
+        "End_Type": "To Review",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1303",
+        "Start": "1999-01-01T00:18:50",
+        "Team": "france"
+      },
+      {
+        "Color_Category": "Penalty",
+        "Duration_Sec": 9.0,
+        "End": "1999-01-01T00:19:43",
+        "End_Event": "Offside",
+        "End_Type": "Penalty",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1312",
+        "Start": "1999-01-01T00:19:34",
+        "Team": "pays-bas"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 18.0,
+        "End": "1999-01-01T00:20:01",
+        "End_Event": "Game End",
+        "End_Type": "Game Event",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1330",
+        "Start": "1999-01-01T00:19:43",
+        "Team": "france"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 9.0,
+        "End": "1999-01-01T00:25:08",
+        "End_Event": "Ball Down",
+        "End_Type": "Turnover",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1637",
+        "Start": "1999-01-01T00:24:59",
+        "Team": "france"
+      },
+      {
+        "Color_Category": "Penalty",
+        "Duration_Sec": 21.0,
+        "End": "1999-01-01T00:25:29",
+        "End_Event": "Forward Pass",
+        "End_Type": "Penalty",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1658",
+        "Start": "1999-01-01T00:25:08",
+        "Team": "pays-bas"
+      },
+      {
+        "Color_Category": "Try",
+        "Duration_Sec": 46.0,
+        "End": "1999-01-01T00:26:15",
+        "End_Event": "Try",
+        "End_Type": "Try",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1704",
+        "Start": "1999-01-01T00:25:29",
+        "Team": "france"
+      },
+      {
+        "Color_Category": "6th Touch",
+        "Duration_Sec": 55.0,
+        "End": "1999-01-01T00:27:10",
+        "End_Event": "6th Touch",
+        "End_Type": "Turnover",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1759",
+        "Start": "1999-01-01T00:26:15",
+        "Team": "pays-bas"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 9.0,
+        "End": "1999-01-01T00:27:19",
+        "End_Event": "Ball Down",
+        "End_Type": "Turnover",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1768",
+        "Start": "1999-01-01T00:27:10",
+        "Team": "france"
+      },
+      {
+        "Color_Category": "Penalty",
+        "Duration_Sec": 19.0,
+        "End": "1999-01-01T00:27:38",
+        "End_Event": "In The Ruck",
+        "End_Type": "Penalty",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1787",
+        "Start": "1999-01-01T00:27:19",
+        "Team": "pays-bas"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 41.0,
+        "End": "1999-01-01T00:28:19",
+        "End_Event": "Ball Down",
+        "End_Type": "Turnover",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1828",
+        "Start": "1999-01-01T00:27:38",
+        "Team": "france"
+      },
+      {
+        "Color_Category": "6th Touch",
+        "Duration_Sec": 31.0,
+        "End": "1999-01-01T00:28:50",
+        "End_Event": "6th Touch",
+        "End_Type": "Turnover",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1859",
+        "Start": "1999-01-01T00:28:19",
+        "Team": "pays-bas"
+      },
+      {
+        "Color_Category": "6th Touch",
+        "Duration_Sec": 28.0,
+        "End": "1999-01-01T00:29:18",
+        "End_Event": "6th Touch",
+        "End_Type": "Turnover",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1887",
+        "Start": "1999-01-01T00:28:50",
+        "Team": "france"
+      },
+      {
+        "Color_Category": "6th Touch",
+        "Duration_Sec": 34.0,
+        "End": "1999-01-01T00:29:52",
+        "End_Event": "6th Touch",
+        "End_Type": "Turnover",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1921",
+        "Start": "1999-01-01T00:29:18",
+        "Team": "pays-bas"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 19.0,
+        "End": "1999-01-01T00:30:11",
+        "End_Event": "Ball Down",
+        "End_Type": "Turnover",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1940",
+        "Start": "1999-01-01T00:29:52",
+        "Team": "france"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 31.0,
+        "End": "1999-01-01T00:30:42",
+        "End_Event": "Ball Down",
+        "End_Type": "Turnover",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1971",
+        "Start": "1999-01-01T00:30:11",
+        "Team": "pays-bas"
+      },
+      {
+        "Color_Category": "Try",
+        "Duration_Sec": 45.0,
+        "End": "1999-01-01T00:31:27",
+        "End_Event": "Try",
+        "End_Type": "Try",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2016",
+        "Start": "1999-01-01T00:30:42",
+        "Team": "france"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 37.0,
+        "End": "1999-01-01T00:32:04",
+        "End_Event": "Ball Down",
+        "End_Type": "Turnover",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2053",
+        "Start": "1999-01-01T00:31:27",
+        "Team": "pays-bas"
+      },
+      {
+        "Color_Category": "6th Touch",
+        "Duration_Sec": 85.0,
+        "End": "1999-01-01T00:33:29",
+        "End_Event": "6th Touch",
+        "End_Type": "Turnover",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2138",
+        "Start": "1999-01-01T00:32:04",
+        "Team": "france"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 32.0,
+        "End": "1999-01-01T00:34:01",
+        "End_Event": "Ball Down",
+        "End_Type": "Turnover",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2170",
+        "Start": "1999-01-01T00:33:29",
+        "Team": "pays-bas"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 35.0,
+        "End": "1999-01-01T00:34:36",
+        "End_Event": "Ball Down",
+        "End_Type": "Turnover",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2205",
+        "Start": "1999-01-01T00:34:01",
+        "Team": "france"
+      },
+      {
+        "Color_Category": "Penalty",
+        "Duration_Sec": 24.0,
+        "End": "1999-01-01T00:35:00",
+        "End_Event": "Hard Touch",
+        "End_Type": "Penalty",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2229",
+        "Start": "1999-01-01T00:34:36",
+        "Team": "pays-bas"
+      },
+      {
+        "Color_Category": "Penalty",
+        "Duration_Sec": 18.0,
+        "End": "1999-01-01T00:35:18",
+        "End_Event": "Forward Pass",
+        "End_Type": "Penalty",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2247",
+        "Start": "1999-01-01T00:35:00",
+        "Team": "france"
+      },
+      {
+        "Color_Category": "Try",
+        "Duration_Sec": 42.0,
+        "End": "1999-01-01T00:36:00",
+        "End_Event": "Try",
+        "End_Type": "Try",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2289",
+        "Start": "1999-01-01T00:35:18",
+        "Team": "pays-bas"
+      },
+      {
+        "Color_Category": "Penalty",
+        "Duration_Sec": 30.0,
+        "End": "1999-01-01T00:36:30",
+        "End_Event": "Forward Pass",
+        "End_Type": "Penalty",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2319",
+        "Start": "1999-01-01T00:36:00",
+        "Team": "france"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 44.0,
+        "End": "1999-01-01T00:37:14",
+        "End_Event": "Ball Down",
+        "End_Type": "Turnover",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2363",
+        "Start": "1999-01-01T00:36:30",
+        "Team": "pays-bas"
+      },
+      {
+        "Color_Category": "Penalty",
+        "Duration_Sec": 23.0,
+        "End": "1999-01-01T00:37:37",
+        "End_Event": "In The Ruck",
+        "End_Type": "Penalty",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2386",
+        "Start": "1999-01-01T00:37:14",
+        "Team": "france"
+      },
+      {
+        "Color_Category": "Try",
+        "Duration_Sec": 48.0,
+        "End": "1999-01-01T00:38:25",
+        "End_Event": "Try",
+        "End_Type": "Try",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2434",
+        "Start": "1999-01-01T00:37:37",
+        "Team": "pays-bas"
+      },
+      {
+        "Color_Category": "Try",
+        "Duration_Sec": 33.0,
+        "End": "1999-01-01T00:38:58",
+        "End_Event": "Try",
+        "End_Type": "Try",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2467",
+        "Start": "1999-01-01T00:38:25",
+        "Team": "france"
+      },
+      {
+        "Color_Category": "Try",
+        "Duration_Sec": 72.0,
+        "End": "1999-01-01T00:40:10",
+        "End_Event": "Try",
+        "End_Type": "Try",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2539",
+        "Start": "1999-01-01T00:38:58",
+        "Team": "pays-bas"
+      },
+      {
+        "Color_Category": "Penalty",
+        "Duration_Sec": 54.0,
+        "End": "1999-01-01T00:41:04",
+        "End_Event": "Forward Pass",
+        "End_Type": "Penalty",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2593",
+        "Start": "1999-01-01T00:40:10",
+        "Team": "france"
+      },
+      {
+        "Color_Category": "6th Touch",
+        "Duration_Sec": 33.0,
+        "End": "1999-01-01T00:41:37",
+        "End_Event": "6th Touch",
+        "End_Type": "Turnover",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2626",
+        "Start": "1999-01-01T00:41:04",
+        "Team": "pays-bas"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 28.0,
+        "End": "1999-01-01T00:42:05",
+        "End_Event": "Ball Down",
+        "End_Type": "Turnover",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2654",
+        "Start": "1999-01-01T00:41:37",
+        "Team": "france"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 34.0,
+        "End": "1999-01-01T00:42:39",
+        "End_Event": "Ball Down",
+        "End_Type": "Turnover",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2688",
+        "Start": "1999-01-01T00:42:05",
+        "Team": "pays-bas"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 42.0,
+        "End": "1999-01-01T00:43:21",
+        "End_Event": "Ball Down",
+        "End_Type": "Turnover",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2730",
+        "Start": "1999-01-01T00:42:39",
+        "Team": "france"
+      },
+      {
+        "Color_Category": "Try",
+        "Duration_Sec": 33.0,
+        "End": "1999-01-01T00:43:54",
+        "End_Event": "Try",
+        "End_Type": "Try",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2763",
+        "Start": "1999-01-01T00:43:21",
+        "Team": "pays-bas"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 69.0,
+        "End": "1999-01-01T00:45:03",
+        "End_Event": "Game End",
+        "End_Type": "Game Event",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2832",
+        "Start": "1999-01-01T00:43:54",
+        "Team": "france"
+      }
+    ],
+    "data-dd4f563551bddefa86411cd9af0edab9": [
+      {
+        "Count": 0,
+        "Event": "Game Start",
+        "GameTime": "1999-01-01T00:00:00",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=129",
+        "Team": "france"
+      },
+      {
+        "Count": 1,
+        "Event": "Touch and Pass",
+        "GameTime": "1999-01-01T00:03:54",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=363",
+        "Team": "france"
+      },
+      {
+        "Count": 2,
+        "Event": "Forward Pass",
+        "GameTime": "1999-01-01T00:05:29",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=458",
+        "Team": "france"
+      },
+      {
+        "Count": 3,
+        "Event": "Forward Pass",
+        "GameTime": "1999-01-01T00:13:06",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=915",
+        "Team": "france"
+      },
+      {
+        "Count": 4,
+        "Event": "Offside",
+        "GameTime": "1999-01-01T00:13:51",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=960",
+        "Team": "france"
+      },
+      {
+        "Count": 5,
+        "Event": "Delay of Play",
+        "GameTime": "1999-01-01T00:15:10",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1039",
+        "Team": "france"
+      },
+      {
+        "Count": 6,
+        "Event": "Hard Touch",
+        "GameTime": "1999-01-01T00:16:05",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1094",
+        "Team": "france"
+      },
+      {
+        "Count": 7,
+        "Event": "Offside",
+        "GameTime": "1999-01-01T00:19:43",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1312",
+        "Team": "france"
+      },
+      {
+        "Count": 8,
+        "Event": "Forward Pass",
+        "GameTime": "1999-01-01T00:35:18",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2247",
+        "Team": "france"
+      },
+      {
+        "Count": 9,
+        "Event": "Forward Pass",
+        "GameTime": "1999-01-01T00:36:30",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2319",
+        "Team": "france"
+      },
+      {
+        "Count": 10,
+        "Event": "In The Ruck",
+        "GameTime": "1999-01-01T00:37:37",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2386",
+        "Team": "france"
+      },
+      {
+        "Count": 11,
+        "Event": "Forward Pass",
+        "GameTime": "1999-01-01T00:41:04",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2593",
+        "Team": "france"
+      },
+      {
+        "Count": 11,
+        "Event": "Game End",
+        "GameTime": "1999-01-01T00:45:03",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2832",
+        "Team": "france"
+      },
+      {
+        "Count": 0,
+        "Event": "Game Start",
+        "GameTime": "1999-01-01T00:00:00",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=129",
+        "Team": "pays-bas"
+      },
+      {
+        "Count": 1,
+        "Event": "Offside",
+        "GameTime": "1999-01-01T00:10:51",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=780",
+        "Team": "pays-bas"
+      },
+      {
+        "Count": 2,
+        "Event": "Forward Pass",
+        "GameTime": "1999-01-01T00:16:41",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1130",
+        "Team": "pays-bas"
+      },
+      {
+        "Count": 3,
+        "Event": "Forward Pass",
+        "GameTime": "1999-01-01T00:25:29",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1658",
+        "Team": "pays-bas"
+      },
+      {
+        "Count": 4,
+        "Event": "In The Ruck",
+        "GameTime": "1999-01-01T00:27:38",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=1787",
+        "Team": "pays-bas"
+      },
+      {
+        "Count": 5,
+        "Event": "Hard Touch",
+        "GameTime": "1999-01-01T00:35:00",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2229",
+        "Team": "pays-bas"
+      },
+      {
+        "Count": 6,
+        "Event": "Shoulder",
+        "GameTime": "1999-01-01T00:42:50",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2699",
+        "Team": "pays-bas"
+      },
+      {
+        "Count": 6,
+        "Event": "Game End",
+        "GameTime": "1999-01-01T00:45:03",
+        "Link": "https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2832",
+        "Team": "pays-bas"
+      }
+    ]
+  },
+  "params": [
+    {
+      "bind": "scales",
+      "name": "param_1e9efca18e7a2868",
+      "select": {
+        "encodings": [
+          "x",
+          "y"
+        ],
+        "type": "interval"
+      },
+      "views": [
+        "view_7a88bcfc77d93c82_0",
+        "view_1d6c032835f93203_0"
+      ]
+    }
+  ],
+  "resolve": {
+    "scale": {
+      "color": "independent"
+    }
+  },
+  "vconcat": [
+    {
+      "data": {
+        "name": "data-5f5bf201ff8ef81b562c475f1d19e314"
+      },
+      "height": 200,
+      "layer": [
+        {
+          "encoding": {
+            "color": {
+              "field": "Team",
+              "scale": {
+                "domain": [
+                  "france",
+                  "pays-bas"
+                ],
+                "range": [
+                  "#008000",
+                  "#FF0000"
+                ]
+              },
+              "type": "nominal"
+            },
+            "order": {
+              "field": "GameTime",
+              "type": "temporal"
+            },
+            "x": {
+              "axis": {
+                "format": "%H:%M:%S",
+                "title": "Game Time"
+              },
+              "field": "GameTime",
+              "type": "temporal"
+            },
+            "y": {
+              "axis": {
+                "tickMinStep": 1
+              },
+              "field": "Count",
+              "title": "Cumulative Tries",
+              "type": "quantitative"
+            }
+          },
+          "mark": {
+            "interpolate": "step-after",
+            "type": "line"
+          },
+          "name": "view_7a88bcfc77d93c82_0"
+        },
+        {
+          "encoding": {
+            "color": {
+              "field": "Team",
+              "scale": {
+                "domain": [
+                  "france",
+                  "pays-bas"
+                ],
+                "range": [
+                  "#008000",
+                  "#FF0000"
+                ]
+              },
+              "type": "nominal"
+            },
+            "href": {
+              "field": "Link",
+              "type": "nominal"
+            },
+            "tooltip": [
+              {
+                "field": "GameTime",
+                "type": "temporal"
+              },
+              {
+                "field": "Team",
+                "type": "nominal"
+              },
+              {
+                "field": "Event",
+                "type": "nominal"
+              },
+              {
+                "field": "Count",
+                "type": "quantitative"
+              }
+            ],
+            "x": {
+              "axis": {
+                "format": "%H:%M:%S",
+                "title": "Game Time"
+              },
+              "field": "GameTime",
+              "type": "temporal"
+            },
+            "y": {
+              "axis": {
+                "tickMinStep": 1
+              },
+              "field": "Count",
+              "title": "Cumulative Tries",
+              "type": "quantitative"
+            }
+          },
+          "mark": {
+            "size": 100,
+            "type": "circle"
+          },
+          "transform": [
+            {
+              "filter": "((datum.Event !== 'Game Start') && (datum.Event !== 'Game End'))"
+            }
+          ]
+        }
+      ],
+      "title": "Tries vs Time",
+      "width": 800
+    },
+    {
+      "data": {
+        "name": "data-dd4f563551bddefa86411cd9af0edab9"
+      },
+      "height": 200,
+      "layer": [
+        {
+          "encoding": {
+            "color": {
+              "field": "Team",
+              "scale": {
+                "domain": [
+                  "france",
+                  "pays-bas"
+                ],
+                "range": [
+                  "#008000",
+                  "#FF0000"
+                ]
+              },
+              "type": "nominal"
+            },
+            "order": {
+              "field": "GameTime",
+              "type": "temporal"
+            },
+            "x": {
+              "axis": {
+                "format": "%H:%M:%S",
+                "title": "Game Time"
+              },
+              "field": "GameTime",
+              "type": "temporal"
+            },
+            "y": {
+              "axis": {
+                "tickMinStep": 1
+              },
+              "field": "Count",
+              "title": "Cumulative Penalties",
+              "type": "quantitative"
+            }
+          },
+          "mark": {
+            "interpolate": "step-after",
+            "type": "line"
+          },
+          "name": "view_1d6c032835f93203_0"
+        },
+        {
+          "encoding": {
+            "color": {
+              "field": "Team",
+              "scale": {
+                "domain": [
+                  "france",
+                  "pays-bas"
+                ],
+                "range": [
+                  "#008000",
+                  "#FF0000"
+                ]
+              },
+              "type": "nominal"
+            },
+            "href": {
+              "field": "Link",
+              "type": "nominal"
+            },
+            "tooltip": [
+              {
+                "field": "GameTime",
+                "type": "temporal"
+              },
+              {
+                "field": "Team",
+                "type": "nominal"
+              },
+              {
+                "field": "Event",
+                "type": "nominal"
+              },
+              {
+                "field": "Count",
+                "type": "quantitative"
+              }
+            ],
+            "x": {
+              "axis": {
+                "format": "%H:%M:%S",
+                "title": "Game Time"
+              },
+              "field": "GameTime",
+              "type": "temporal"
+            },
+            "y": {
+              "axis": {
+                "tickMinStep": 1
+              },
+              "field": "Count",
+              "title": "Cumulative Penalties",
+              "type": "quantitative"
+            }
+          },
+          "mark": {
+            "size": 100,
+            "type": "circle"
+          }
+        }
+      ],
+      "title": "Penalties vs Time",
+      "width": 800
+    },
+    {
+      "data": {
+        "name": "data-bc9540f0ca942dad5e309b03e5be8119"
+      },
+      "encoding": {
+        "color": {
+          "field": "Color_Category",
+          "scale": {
+            "domain": [
+              "Try",
+              "Penalty",
+              "6th Touch",
+              "Other"
+            ],
+            "range": [
+              "Green",
+              "Red",
+              "Gold",
+              "Orange"
+            ]
+          },
+          "title": "Outcome",
+          "type": "nominal"
+        },
+        "href": {
+          "field": "Link",
+          "type": "nominal"
+        },
+        "tooltip": [
+          {
+            "field": "Start",
+            "format": "%H:%M:%S",
+            "title": "Start",
+            "type": "temporal"
+          },
+          {
+            "field": "End",
+            "format": "%H:%M:%S",
+            "title": "End",
+            "type": "temporal"
+          },
+          {
+            "field": "Team",
+            "type": "nominal"
+          },
+          {
+            "field": "End_Event",
+            "type": "nominal"
+          },
+          {
+            "field": "End_Type",
+            "type": "nominal"
+          },
+          {
+            "field": "Duration_Sec",
+            "format": ".1f",
+            "title": "Duration (s)",
+            "type": "quantitative"
+          }
+        ],
+        "x": {
+          "axis": {
+            "format": "%H:%M:%S",
+            "title": "Game Time"
+          },
+          "field": "Start",
+          "type": "temporal"
+        },
+        "x2": {
+          "field": "End"
+        },
+        "y": {
+          "field": "Team",
+          "title": "Possession Owner",
+          "type": "nominal"
+        }
+      },
+      "height": 200,
+      "mark": {
+        "type": "bar"
+      },
+      "title": "Possession Timeline",
+      "width": 800
+    }
+  ]
+};
+        vegaEmbed('#vis', spec);
+      </script>
+    </body>
+    </html>
+    

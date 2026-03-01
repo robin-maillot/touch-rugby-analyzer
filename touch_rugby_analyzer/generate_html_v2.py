@@ -7,258 +7,293 @@ import pandas as pd
 import altair as alt
 from pathlib import Path
 
-def generate_html_from_df(df: pd.DataFrame, output_html_path: Path, team_names: Tuple = ('Team 1', 'Team 2')):
+
+def generate_html_from_df(
+    df: pd.DataFrame, output_html_path: Path, team_names: Tuple = ("Team 1", "Team 2")
+):
     # --- 1. Global Time Filter ---
-    start_events = df[df['Name'] == 'Game Start']
-    end_events = df[df['Name'] == 'Game End']
+    start_events = df[df["Name"] == "Game Start"]
+    end_events = df[df["Name"] == "Game End"]
 
     if not start_events.empty:
-        global_start = start_events.iloc[0]['GameTime']
-        start_link = start_events.iloc[0]['Youtube Link']
+        global_start = start_events.iloc[0]["GameTime"]
+        start_link = start_events.iloc[0]["Youtube Link"]
     else:
-        global_start = df['GameTime'].min()
-        start_link = ''
+        global_start = df["GameTime"].min()
+        start_link = ""
 
     if not end_events.empty:
-        global_end = end_events.iloc[-1]['GameTime']
-        end_link = end_events.iloc[-1]['Youtube Link']
+        global_end = end_events.iloc[-1]["GameTime"]
+        end_link = end_events.iloc[-1]["Youtube Link"]
     else:
-        global_end = df['GameTime'].max()
-        end_link = ''
-    df = df[(df['GameTime'] >= global_start) & (df['GameTime'] <= global_end)].copy()
-    df = df.sort_values('GameTime')
+        global_end = df["GameTime"].max()
+        end_link = ""
+    df = df[(df["GameTime"] >= global_start) & (df["GameTime"] <= global_end)].copy()
+    df = df.sort_values("GameTime")
 
     # Common visual properties
     chart_width = 800
-    team_colors = alt.Scale(domain=team_names, range=['#008000', '#FF0000'])  # Green, Red
+    team_colors = alt.Scale(
+        domain=team_names, range=["#008000", "#FF0000"]
+    )  # Green, Red
 
     # --- 2. Tries Chart Data & Plot ---
     tries_data = []
     for team in team_names:
         # Start Point
-        tries_data.append({
-            'GameTime': global_start,
-            'Team': team,
-            'Event': 'Game Start',
-            'Count': 0,
-            'Link': start_link
-        })
+        tries_data.append(
+            {
+                "GameTime": global_start,
+                "Team": team,
+                "Event": "Game Start",
+                "Count": 0,
+                "Link": start_link,
+            }
+        )
 
         # Tries
-        team_tries = df[(df['Type'] == 'Try') & (df['Action Owner'] == team)].sort_values('GameTime')
+        team_tries = df[
+            (df["Type"] == "Try") & (df["Action Owner"] == team)
+        ].sort_values("GameTime")
         count = 0
         for _, row in team_tries.iterrows():
             count += 1
-            tries_data.append({
-                'GameTime': row['GameTime'],
-                'Team': team,
-                'Event': row['Name'],
-                'Count': count,
-                'Link': row['Youtube Link']
-            })
+            tries_data.append(
+                {
+                    "GameTime": row["GameTime"],
+                    "Team": team,
+                    "Event": row["Name"],
+                    "Count": count,
+                    "Link": row["Youtube Link"],
+                }
+            )
 
         # End Point
-        tries_data.append({
-            'GameTime': global_end,
-            'Team': team,
-            'Event': 'Game End',
-            'Count': count,  # Holds final score
-            'Link': end_link
-        })
+        tries_data.append(
+            {
+                "GameTime": global_end,
+                "Team": team,
+                "Event": "Game End",
+                "Count": count,  # Holds final score
+                "Link": end_link,
+            }
+        )
 
     tries_df = pd.DataFrame(tries_data)
 
     tries_base = alt.Chart(tries_df).encode(
-        x=alt.X('GameTime:T', axis=alt.Axis(format='%H:%M:%S', title='Game Time')),
-        y=alt.Y('Count:Q', axis=alt.Axis(tickMinStep=1), title='Cumulative Tries'),
-        color=alt.Color('Team:N', scale=team_colors)
+        x=alt.X("GameTime:T", axis=alt.Axis(format="%H:%M:%S", title="Game Time")),
+        y=alt.Y("Count:Q", axis=alt.Axis(tickMinStep=1), title="Cumulative Tries"),
+        color=alt.Color("Team:N", scale=team_colors),
     )
-    tries_lines = tries_base.mark_line(interpolate='step-after').encode(
-        order='GameTime:T'
+    tries_lines = tries_base.mark_line(interpolate="step-after").encode(
+        order="GameTime:T"
     )
-    tries_points = tries_base.transform_filter(
-        (alt.datum.Event != 'Game Start') & (alt.datum.Event != 'Game End')
-        # Only clickable tries? Or all? Previous request said start/end too. Let's keep all clickable if link exists.
-    ).mark_circle(size=100).encode(
-        href='Link:N',
-        tooltip=['GameTime:T', 'Team:N', 'Event:N', 'Count:Q']
+    tries_points = (
+        tries_base.transform_filter(
+            (alt.datum.Event != "Game Start")
+            & (alt.datum.Event != "Game End")
+            # Only clickable tries? Or all? Previous request said start/end too. Let's keep all clickable if link exists.
+        )
+        .mark_circle(size=100)
+        .encode(href="Link:N", tooltip=["GameTime:T", "Team:N", "Event:N", "Count:Q"])
     )
     # Actually, let's keep Start/End points but maybe smaller or just consistent. The user liked Start/End points before.
-    tries_chart = (tries_lines + tries_points).properties(
-        title='Tries vs Time',
-        width=chart_width,
-        height=200
-    ).interactive()
+    tries_chart = (
+        (tries_lines + tries_points)
+        .properties(title="Tries vs Time", width=chart_width, height=200)
+        .interactive()
+    )
 
     # --- 3. Penalties Chart Data & Plot ---
     penalties_data = []
     for team in team_names:
         # Start Point
-        penalties_data.append({
-            'GameTime': global_start,
-            'Team': team,
-            'Event': 'Game Start',
-            'Count': 0,
-            'Link': start_link
-        })
+        penalties_data.append(
+            {
+                "GameTime": global_start,
+                "Team": team,
+                "Event": "Game Start",
+                "Count": 0,
+                "Link": start_link,
+            }
+        )
 
         # Penalties
         # Note: 'Action Owner' is the one committing the penalty usually?
         # Or is it the beneficiary?
         # In standard rugby data, "Penalty - Forward Pass - Team 1" usually means Team 1 committed it.
         # The user input has "Action Owner". Let's assume Action Owner is the team getting the penalty count.
-        team_penalties = df[(df['Type'] == 'Penalty') & (df['Action Owner'] == team)].sort_values('GameTime')
+        team_penalties = df[
+            (df["Type"] == "Penalty") & (df["Action Owner"] == team)
+        ].sort_values("GameTime")
         count = 0
         for _, row in team_penalties.iterrows():
             count += 1
-            penalties_data.append({
-                'GameTime': row['GameTime'],
-                'Team': team,
-                'Event': row['Name'],
-                'Count': count,
-                'Link': row['Youtube Link']
-            })
+            penalties_data.append(
+                {
+                    "GameTime": row["GameTime"],
+                    "Team": team,
+                    "Event": row["Name"],
+                    "Count": count,
+                    "Link": row["Youtube Link"],
+                }
+            )
 
         # End Point
-        penalties_data.append({
-            'GameTime': global_end,
-            'Team': team,
-            'Event': 'Game End',
-            'Count': count,
-            'Link': end_link
-        })
+        penalties_data.append(
+            {
+                "GameTime": global_end,
+                "Team": team,
+                "Event": "Game End",
+                "Count": count,
+                "Link": end_link,
+            }
+        )
 
     pen_df = pd.DataFrame(penalties_data)
 
     pen_base = alt.Chart(pen_df).encode(
-        x=alt.X('GameTime:T', axis=alt.Axis(format='%H:%M:%S', title='Game Time')),
-        y=alt.Y('Count:Q', axis=alt.Axis(tickMinStep=1), title='Cumulative Penalties'),
-        color=alt.Color('Team:N', scale=team_colors)
+        x=alt.X("GameTime:T", axis=alt.Axis(format="%H:%M:%S", title="Game Time")),
+        y=alt.Y("Count:Q", axis=alt.Axis(tickMinStep=1), title="Cumulative Penalties"),
+        color=alt.Color("Team:N", scale=team_colors),
     )
-    pen_lines = pen_base.mark_line(interpolate='step-after').encode(
-        order='GameTime:T'
-    )
+    pen_lines = pen_base.mark_line(interpolate="step-after").encode(order="GameTime:T")
     pen_points = pen_base.mark_circle(size=100).encode(
-        href='Link:N',
-        tooltip=['GameTime:T', 'Team:N', 'Event:N', 'Count:Q']
+        href="Link:N", tooltip=["GameTime:T", "Team:N", "Event:N", "Count:Q"]
     )
 
-    pen_chart = (pen_lines + pen_points).properties(
-        title='Penalties vs Time',
-        width=chart_width,
-        height=200
-    ).interactive()
+    pen_chart = (
+        (pen_lines + pen_points)
+        .properties(title="Penalties vs Time", width=chart_width, height=200)
+        .interactive()
+    )
 
     # --- 4. Possession Chart Data & Plot ---
     # Logic from previous step
-    df['Owner_Change'] = df['Possession Owner'] != df['Possession Owner'].shift(1)
-    df['Is_Start'] = df['Name'] == 'Game Start'
-    df['Prev_Is_End'] = df['Name'].shift(1) == 'Game End'
-    df['New_Possession'] = df['Owner_Change'] | df['Is_Start'] | df['Prev_Is_End']
-    df.loc[df.index[0], 'New_Possession'] = True
-    df['Possession_ID'] = df['New_Possession'].cumsum()
+    df["Owner_Change"] = df["Possession Owner"] != df["Possession Owner"].shift(1)
+    df["Is_Start"] = df["Name"] == "Game Start"
+    df["Prev_Is_End"] = df["Name"].shift(1) == "Game End"
+    df["New_Possession"] = df["Owner_Change"] | df["Is_Start"] | df["Prev_Is_End"]
+    df.loc[df.index[0], "New_Possession"] = True
+    df["Possession_ID"] = df["New_Possession"].cumsum()
 
     possessions_raw = []
-    for pid, group in df.groupby('Possession_ID'):
-        owner = group['Possession Owner'].iloc[0]
-        possessions_raw.append({
-            'Possession_ID': pid,
-            'Team': owner,
-            'Raw_Start_Time': group['GameTime'].min(),
-            'Raw_End_Time': group['GameTime'].max(),
-            'End_Type': group.iloc[-1]['Type'],
-            'End_Event': group.iloc[-1]['Name'],
-            'Start_Event': group.iloc[0]['Name'],
-            'Link': group.iloc[-1]['Youtube Link']
-        })
+    for pid, group in df.groupby("Possession_ID"):
+        owner = group["Possession Owner"].iloc[0]
+        possessions_raw.append(
+            {
+                "Possession_ID": pid,
+                "Team": owner,
+                "Raw_Start_Time": group["GameTime"].min(),
+                "Raw_End_Time": group["GameTime"].max(),
+                "End_Type": group.iloc[-1]["Type"],
+                "End_Event": group.iloc[-1]["Name"],
+                "Start_Event": group.iloc[0]["Name"],
+                "Link": group.iloc[-1]["Youtube Link"],
+            }
+        )
 
     possessions_final = []
     for i, p in enumerate(possessions_raw):
         if i == 0:
-            start_time = p['Raw_Start_Time']
+            start_time = p["Raw_Start_Time"]
         else:
             prev_p = possessions_raw[i - 1]
-            if prev_p['End_Event'] == 'Game End':
-                start_time = p['Raw_Start_Time']
+            if prev_p["End_Event"] == "Game End":
+                start_time = p["Raw_Start_Time"]
             else:
-                start_time = prev_p['Raw_End_Time']
-        end_time = p['Raw_End_Time']
+                start_time = prev_p["Raw_End_Time"]
+        end_time = p["Raw_End_Time"]
 
-        if p['End_Type'] == 'Try':
-            cat = 'Try'
-        elif p['End_Type'] == 'Penalty':
-            cat = 'Penalty'
-        elif p['End_Event'] == '6th Touch':
-            cat = '6th Touch'
+        if p["End_Type"] == "Try":
+            cat = "Try"
+        elif p["End_Type"] == "Penalty":
+            cat = "Penalty"
+        elif p["End_Event"] == "6th Touch":
+            cat = "6th Touch"
         else:
-            cat = 'Other'
+            cat = "Other"
 
-        possessions_final.append({
-            'Team': p['Team'],
-            'Start': start_time,
-            'End': end_time,
-            'Duration_Sec': (end_time - start_time).total_seconds(),
-            'End_Type': p['End_Type'],
-            'End_Event': p['End_Event'],
-            'Color_Category': cat,
-            'Link': p['Link']
-        })
+        possessions_final.append(
+            {
+                "Team": p["Team"],
+                "Start": start_time,
+                "End": end_time,
+                "Duration_Sec": (end_time - start_time).total_seconds(),
+                "End_Type": p["End_Type"],
+                "End_Event": p["End_Event"],
+                "Color_Category": cat,
+                "Link": p["Link"],
+            }
+        )
 
     poss_df = pd.DataFrame(possessions_final)
 
     # Visualization
     # Using specific colors to ensure visibility
-    poss_domain = ['Try', 'Penalty', '6th Touch', 'Other']
-    poss_range = ['Green', 'Red', 'Gold', 'Orange']
+    poss_domain = ["Try", "Penalty", "6th Touch", "Other"]
+    poss_range = ["Green", "Red", "Gold", "Orange"]
 
-    poss_chart = alt.Chart(poss_df).mark_bar().encode(
-        x=alt.X('Start:T', axis=alt.Axis(format='%H:%M:%S', title='Game Time')),
-        x2='End:T',
-        y=alt.Y('Team:N', title='Possession Owner'),
-        color=alt.Color('Color_Category:N', scale=alt.Scale(domain=poss_domain, range=poss_range), title='Outcome'),
-        href='Link:N',
-        tooltip=[
-            alt.Tooltip('Start:T', format='%H:%M:%S', title='Start'),
-            alt.Tooltip('End:T', format='%H:%M:%S', title='End'),
-            'Team:N',
-            'End_Event:N',
-            'End_Type:N',
-            alt.Tooltip('Duration_Sec:Q', format='.1f', title='Duration (s)')
-        ]
-    ).properties(
-        title='Possession Timeline',
-        width=chart_width,
-        height=200
+    poss_chart = (
+        alt.Chart(poss_df)
+        .mark_bar()
+        .encode(
+            x=alt.X("Start:T", axis=alt.Axis(format="%H:%M:%S", title="Game Time")),
+            x2="End:T",
+            y=alt.Y("Team:N", title="Possession Owner"),
+            color=alt.Color(
+                "Color_Category:N",
+                scale=alt.Scale(domain=poss_domain, range=poss_range),
+                title="Outcome",
+            ),
+            href="Link:N",
+            tooltip=[
+                alt.Tooltip("Start:T", format="%H:%M:%S", title="Start"),
+                alt.Tooltip("End:T", format="%H:%M:%S", title="End"),
+                "Team:N",
+                "End_Event:N",
+                "End_Type:N",
+                alt.Tooltip("Duration_Sec:Q", format=".1f", title="Duration (s)"),
+            ],
+        )
+        .properties(title="Possession Timeline", width=chart_width, height=200)
     )
 
     # --- 5. Combine Charts ---
-    final_chart = alt.vconcat(tries_chart, pen_chart, poss_chart).resolve_scale(color='independent') # .resolve_scale(x='shared')
+    final_chart = alt.vconcat(tries_chart, pen_chart, poss_chart).resolve_scale(
+        color="independent"
+    )  # .resolve_scale(x='shared')
 
     # --- 6. Metrics Table ---
     metrics = []
-    for team, group in poss_df.groupby('Team'):
+    for team, group in poss_df.groupby("Team"):
         num_possessions = len(group)
-        num_tries = len(group[group['End_Type'] == 'Try'])
+        num_tries = len(group[group["End_Type"] == "Try"])
         success_rate = (num_tries / num_possessions) * 100 if num_possessions > 0 else 0
-        completions = len(group[(group['End_Type'] == 'Try') | (group['End_Event'] == '6th Touch')])
-        avg_time = group['Duration_Sec'].mean()
-        total_time = group['Duration_Sec'].sum()
+        completions = len(
+            group[(group["End_Type"] == "Try") | (group["End_Event"] == "6th Touch")]
+        )
+        avg_time = group["Duration_Sec"].mean()
+        total_time = group["Duration_Sec"].sum()
 
-        metrics.append({
-            'Team': team,
-            'Possessions': num_possessions,
-            'Tries': num_tries,
-            'Success Rate (%)': f"{success_rate:.1f}%",
-            'Completions': completions,
-            'Avg Time (s)': f"{avg_time:.1f}",
-            'Total Time (s)': f"{total_time:.1f}"
-        })
+        metrics.append(
+            {
+                "Team": team,
+                "Possessions": num_possessions,
+                "Tries": num_tries,
+                "Success Rate (%)": f"{success_rate:.1f}%",
+                "Completions": completions,
+                "Avg Time (s)": f"{avg_time:.1f}",
+                "Total Time (s)": f"{total_time:.1f}",
+            }
+        )
 
     metrics_df = pd.DataFrame(metrics)
 
     # --- 7. Save HTML ---
     chart_json = final_chart.to_json()
-    table_html = metrics_df.to_html(index=False, classes='table', border=0)
+    table_html = metrics_df.to_html(index=False, classes="table", border=0)
 
     html_content = f"""
     <!DOCTYPE html>
@@ -304,8 +339,9 @@ def generate_html_from_df(df: pd.DataFrame, output_html_path: Path, team_names: 
     </html>
     """
 
-    with output_html_path.open('w') as f:
+    with output_html_path.open("w") as f:
         f.write(html_content)
+
 
 def generate_htmls():
     data_paths = sorted([_ for _ in DATA_ROOT.glob("*.csv") if "parsed" not in _.stem])
@@ -351,7 +387,11 @@ def generate_htmls():
             data_df = utils.load_data(data_path)
             data_df.to_csv(DATA_ROOT / f"{data_path.stem}_parsed.csv")
             if utils.is_fully_analysable(data_df):
-                generate_html_from_df(data_df, output_html_path, team_names=(local_team_name, other_team_name))
+                generate_html_from_df(
+                    data_df,
+                    output_html_path,
+                    team_names=(local_team_name, other_team_name),
+                )
 
                 name = f"{local_team_name} vs {other_team_name}"
                 if competition_name != "unknown":
@@ -367,6 +407,7 @@ def generate_htmls():
             rich.print(f"[red]Skipping {data_path.stem} plots due to {e}[/red]")
             raise e
     utils.save_json(games_data, ROOT / "games.json")
+    return games_data
 
 
 if __name__ == "__main__":

@@ -1,0 +1,1315 @@
+
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+      <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
+      <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+      <style>
+        body { font-family: sans-serif; margin: 20px; }
+        .table {
+            font-family: Arial, Helvetica, sans-serif;
+            border-collapse: collapse;
+            width: 800px; /* Match chart width */
+            margin: 20px auto;
+        }
+        .table td, .table th {
+            border: 1px solid #ddd;
+            padding: 8px;
+        }
+        .table tr:nth-child(even){background-color: #f2f2f2;}
+        .table tr:hover {background-color: #ddd;}
+        .table th {
+            padding-top: 12px;
+            padding-bottom: 12px;
+            text-align: left;
+            background-color: #04AA6D;
+            color: white;
+        }
+        h2 { text-align: center; }
+        #vis { width: 100%; display: flex; justify-content: center; }
+      </style>
+    </head>
+    <body>
+      <div id="vis"></div>
+      <h2>Team Statistics</h2>
+      <table class="dataframe table">
+  <thead>
+    <tr style="text-align: right;">
+      <th>Team</th>
+      <th>Possessions</th>
+      <th>Tries</th>
+      <th>Success Rate (%)</th>
+      <th>Completions</th>
+      <th>Avg Time (s)</th>
+      <th>Total Time (s)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>australia</td>
+      <td>29</td>
+      <td>4</td>
+      <td>13.8%</td>
+      <td>13</td>
+      <td>41.9</td>
+      <td>1216.0</td>
+    </tr>
+    <tr>
+      <td>new zealand</td>
+      <td>28</td>
+      <td>4</td>
+      <td>14.3%</td>
+      <td>10</td>
+      <td>37.2</td>
+      <td>1043.0</td>
+    </tr>
+  </tbody>
+</table>
+      <script>
+        var spec = {
+  "$schema": "https://vega.github.io/schema/vega-lite/v6.1.0.json",
+  "config": {
+    "view": {
+      "continuousHeight": 300,
+      "continuousWidth": 300
+    }
+  },
+  "datasets": {
+    "data-5733c69728739879e7c79faeb9a72803": [
+      {
+        "Count": 0,
+        "Event": "Game Start",
+        "GameTime": "1999-01-01T00:00:00",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=697",
+        "Team": "australia"
+      },
+      {
+        "Count": 1,
+        "Event": "Forward Pass",
+        "GameTime": "1999-01-01T00:02:37",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=854",
+        "Team": "australia"
+      },
+      {
+        "Count": 2,
+        "Event": "Offside",
+        "GameTime": "1999-01-01T00:06:59",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=1116",
+        "Team": "australia"
+      },
+      {
+        "Count": 3,
+        "Event": "Not Moving Forward",
+        "GameTime": "1999-01-01T00:12:24",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=1441",
+        "Team": "australia"
+      },
+      {
+        "Count": 4,
+        "Event": "Forward Pass",
+        "GameTime": "1999-01-01T00:13:45",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=1522",
+        "Team": "australia"
+      },
+      {
+        "Count": 5,
+        "Event": "Shoulder",
+        "GameTime": "1999-01-01T00:13:55",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=1532",
+        "Team": "australia"
+      },
+      {
+        "Count": 6,
+        "Event": "Offside",
+        "GameTime": "1999-01-01T00:23:03",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=2080",
+        "Team": "australia"
+      },
+      {
+        "Count": 7,
+        "Event": "Offside",
+        "GameTime": "1999-01-01T00:27:15",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=2332",
+        "Team": "australia"
+      },
+      {
+        "Count": 8,
+        "Event": "Offside",
+        "GameTime": "1999-01-01T00:28:02",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=2379",
+        "Team": "australia"
+      },
+      {
+        "Count": 9,
+        "Event": "Forward Pass",
+        "GameTime": "1999-01-01T00:33:36",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=2713",
+        "Team": "australia"
+      },
+      {
+        "Count": 10,
+        "Event": "Off the Mark",
+        "GameTime": "1999-01-01T00:34:05",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=2742",
+        "Team": "australia"
+      },
+      {
+        "Count": 11,
+        "Event": "Forward Pass",
+        "GameTime": "1999-01-01T00:38:04",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=2981",
+        "Team": "australia"
+      },
+      {
+        "Count": 12,
+        "Event": "Touch and Pass",
+        "GameTime": "1999-01-01T00:39:11",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=3048",
+        "Team": "australia"
+      },
+      {
+        "Count": 12,
+        "Event": "Game End",
+        "GameTime": "1999-01-01T00:42:17",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=3234",
+        "Team": "australia"
+      },
+      {
+        "Count": 0,
+        "Event": "Game Start",
+        "GameTime": "1999-01-01T00:00:00",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=697",
+        "Team": "new zealand"
+      },
+      {
+        "Count": 1,
+        "Event": "Forward Pass",
+        "GameTime": "1999-01-01T00:02:52",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=869",
+        "Team": "new zealand"
+      },
+      {
+        "Count": 2,
+        "Event": "Delay of Play",
+        "GameTime": "1999-01-01T00:04:03",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=940",
+        "Team": "new zealand"
+      },
+      {
+        "Count": 3,
+        "Event": "Shoulder",
+        "GameTime": "1999-01-01T00:04:43",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=980",
+        "Team": "new zealand"
+      },
+      {
+        "Count": 4,
+        "Event": "Forward Pass",
+        "GameTime": "1999-01-01T00:05:50",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=1047",
+        "Team": "new zealand"
+      },
+      {
+        "Count": 5,
+        "Event": "Offside",
+        "GameTime": "1999-01-01T00:08:18",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=1195",
+        "Team": "new zealand"
+      },
+      {
+        "Count": 6,
+        "Event": "Not Moving Forward",
+        "GameTime": "1999-01-01T00:08:50",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=1227",
+        "Team": "new zealand"
+      },
+      {
+        "Count": 7,
+        "Event": "Shoulder",
+        "GameTime": "1999-01-01T00:10:05",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=1302",
+        "Team": "new zealand"
+      },
+      {
+        "Count": 8,
+        "Event": "Offside",
+        "GameTime": "1999-01-01T00:10:25",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=1322",
+        "Team": "new zealand"
+      },
+      {
+        "Count": 9,
+        "Event": "Offside",
+        "GameTime": "1999-01-01T00:16:13",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=1670",
+        "Team": "new zealand"
+      },
+      {
+        "Count": 10,
+        "Event": "Forward Pass",
+        "GameTime": "1999-01-01T00:25:40",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=2237",
+        "Team": "new zealand"
+      },
+      {
+        "Count": 11,
+        "Event": "Shoulder",
+        "GameTime": "1999-01-01T00:33:09",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=2686",
+        "Team": "new zealand"
+      },
+      {
+        "Count": 12,
+        "Event": "Forward Pass",
+        "GameTime": "1999-01-01T00:34:23",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=2760",
+        "Team": "new zealand"
+      },
+      {
+        "Count": 13,
+        "Event": "Forward Pass",
+        "GameTime": "1999-01-01T00:35:42",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=2839",
+        "Team": "new zealand"
+      },
+      {
+        "Count": 14,
+        "Event": "In the Ruck",
+        "GameTime": "1999-01-01T00:36:20",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=2877",
+        "Team": "new zealand"
+      },
+      {
+        "Count": 15,
+        "Event": "Offside",
+        "GameTime": "1999-01-01T00:40:38",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=3135",
+        "Team": "new zealand"
+      },
+      {
+        "Count": 16,
+        "Event": "Delay of Play",
+        "GameTime": "1999-01-01T00:41:35",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=3192",
+        "Team": "new zealand"
+      },
+      {
+        "Count": 16,
+        "Event": "Game End",
+        "GameTime": "1999-01-01T00:42:17",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=3234",
+        "Team": "new zealand"
+      }
+    ],
+    "data-cbbeebcdc174beb8758430657c8aef81": [
+      {
+        "Color_Category": "6th Touch",
+        "Duration_Sec": 93.0,
+        "End": "1999-01-01T00:01:33",
+        "End_Event": "6th Touch",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=790",
+        "Start": "1999-01-01T00:00:00",
+        "Team": "australia"
+      },
+      {
+        "Color_Category": "6th Touch",
+        "Duration_Sec": 25.0,
+        "End": "1999-01-01T00:01:58",
+        "End_Event": "6th Touch",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=815",
+        "Start": "1999-01-01T00:01:33",
+        "Team": "new zealand"
+      },
+      {
+        "Color_Category": "Penalty",
+        "Duration_Sec": 39.0,
+        "End": "1999-01-01T00:02:37",
+        "End_Event": "Forward Pass",
+        "End_Type": "Penalty",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=854",
+        "Start": "1999-01-01T00:01:58",
+        "Team": "australia"
+      },
+      {
+        "Color_Category": "Penalty",
+        "Duration_Sec": 15.0,
+        "End": "1999-01-01T00:02:52",
+        "End_Event": "Forward Pass",
+        "End_Type": "Penalty",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=869",
+        "Start": "1999-01-01T00:02:37",
+        "Team": "new zealand"
+      },
+      {
+        "Color_Category": "6th Touch",
+        "Duration_Sec": 45.0,
+        "End": "1999-01-01T00:03:37",
+        "End_Event": "6th Touch",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=914",
+        "Start": "1999-01-01T00:02:52",
+        "Team": "australia"
+      },
+      {
+        "Color_Category": "Penalty",
+        "Duration_Sec": 26.0,
+        "End": "1999-01-01T00:04:03",
+        "End_Event": "Delay of Play",
+        "End_Type": "Penalty",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=940",
+        "Start": "1999-01-01T00:03:37",
+        "Team": "new zealand"
+      },
+      {
+        "Color_Category": "6th Touch",
+        "Duration_Sec": 82.0,
+        "End": "1999-01-01T00:05:25",
+        "End_Event": "6th Touch",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=1022",
+        "Start": "1999-01-01T00:04:03",
+        "Team": "australia"
+      },
+      {
+        "Color_Category": "Penalty",
+        "Duration_Sec": 25.0,
+        "End": "1999-01-01T00:05:50",
+        "End_Event": "Forward Pass",
+        "End_Type": "Penalty",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=1047",
+        "Start": "1999-01-01T00:05:25",
+        "Team": "new zealand"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 43.0,
+        "End": "1999-01-01T00:06:33",
+        "End_Event": "Ball Down",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=1090",
+        "Start": "1999-01-01T00:05:50",
+        "Team": "australia"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 77.0,
+        "End": "1999-01-01T00:07:50",
+        "End_Event": "Ball Down",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=1167",
+        "Start": "1999-01-01T00:06:33",
+        "Team": "new zealand"
+      },
+      {
+        "Color_Category": "Try",
+        "Duration_Sec": 72.0,
+        "End": "1999-01-01T00:09:02",
+        "End_Event": "33 Quicky",
+        "End_Type": "Try",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=1239",
+        "Start": "1999-01-01T00:07:50",
+        "Team": "australia"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 41.0,
+        "End": "1999-01-01T00:09:43",
+        "End_Event": "Ball Down",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=1280",
+        "Start": "1999-01-01T00:09:02",
+        "Team": "new zealand"
+      },
+      {
+        "Color_Category": "Try",
+        "Duration_Sec": 81.0,
+        "End": "1999-01-01T00:11:04",
+        "End_Event": "33",
+        "End_Type": "Try",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=1361",
+        "Start": "1999-01-01T00:09:43",
+        "Team": "australia"
+      },
+      {
+        "Color_Category": "6th Touch",
+        "Duration_Sec": 43.0,
+        "End": "1999-01-01T00:11:47",
+        "End_Event": "6th Touch",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=1404",
+        "Start": "1999-01-01T00:11:04",
+        "Team": "new zealand"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 11.0,
+        "End": "1999-01-01T00:11:58",
+        "End_Event": "Ball Down",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=1415",
+        "Start": "1999-01-01T00:11:47",
+        "Team": "australia"
+      },
+      {
+        "Color_Category": "Try",
+        "Duration_Sec": 79.0,
+        "End": "1999-01-01T00:13:17",
+        "End_Event": "33",
+        "End_Type": "Try",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=1494",
+        "Start": "1999-01-01T00:11:58",
+        "Team": "new zealand"
+      },
+      {
+        "Color_Category": "Penalty",
+        "Duration_Sec": 28.0,
+        "End": "1999-01-01T00:13:45",
+        "End_Event": "Forward Pass",
+        "End_Type": "Penalty",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=1522",
+        "Start": "1999-01-01T00:13:17",
+        "Team": "australia"
+      },
+      {
+        "Color_Category": "Try",
+        "Duration_Sec": 43.0,
+        "End": "1999-01-01T00:14:28",
+        "End_Event": "Scoop",
+        "End_Type": "Try",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=1565",
+        "Start": "1999-01-01T00:13:45",
+        "Team": "new zealand"
+      },
+      {
+        "Color_Category": "6th Touch",
+        "Duration_Sec": 60.0,
+        "End": "1999-01-01T00:15:28",
+        "End_Event": "6th Touch",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=1625",
+        "Start": "1999-01-01T00:14:28",
+        "Team": "australia"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 23.0,
+        "End": "1999-01-01T00:15:51",
+        "End_Event": "Ball Down",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=1648",
+        "Start": "1999-01-01T00:15:28",
+        "Team": "new zealand"
+      },
+      {
+        "Color_Category": "6th Touch",
+        "Duration_Sec": 27.0,
+        "End": "1999-01-01T00:16:18",
+        "End_Event": "6th Touch",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=1675",
+        "Start": "1999-01-01T00:15:51",
+        "Team": "australia"
+      },
+      {
+        "Color_Category": "Try",
+        "Duration_Sec": 19.0,
+        "End": "1999-01-01T00:16:37",
+        "End_Event": "Other",
+        "End_Type": "Try",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=1694",
+        "Start": "1999-01-01T00:16:18",
+        "Team": "new zealand"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 60.0,
+        "End": "1999-01-01T00:17:37",
+        "End_Event": "Game End",
+        "End_Type": "Game Event",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=1754",
+        "Start": "1999-01-01T00:16:37",
+        "Team": "australia"
+      },
+      {
+        "Color_Category": "6th Touch",
+        "Duration_Sec": 25.0,
+        "End": "1999-01-01T00:22:40",
+        "End_Event": "6th Touch",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=2057",
+        "Start": "1999-01-01T00:22:15",
+        "Team": "new zealand"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 19.0,
+        "End": "1999-01-01T00:22:59",
+        "End_Event": "Ball Down",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=2076",
+        "Start": "1999-01-01T00:22:40",
+        "Team": "australia"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 68.0,
+        "End": "1999-01-01T00:24:07",
+        "End_Event": "Dummy Touch",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=2144",
+        "Start": "1999-01-01T00:22:59",
+        "Team": "new zealand"
+      },
+      {
+        "Color_Category": "Try",
+        "Duration_Sec": 37.0,
+        "End": "1999-01-01T00:24:44",
+        "End_Event": "Other",
+        "End_Type": "Try",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=2181",
+        "Start": "1999-01-01T00:24:07",
+        "Team": "australia"
+      },
+      {
+        "Color_Category": "Penalty",
+        "Duration_Sec": 56.0,
+        "End": "1999-01-01T00:25:40",
+        "End_Event": "Forward Pass",
+        "End_Type": "Penalty",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=2237",
+        "Start": "1999-01-01T00:24:44",
+        "Team": "new zealand"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 22.0,
+        "End": "1999-01-01T00:26:02",
+        "End_Event": "Ball Down",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=2259",
+        "Start": "1999-01-01T00:25:40",
+        "Team": "australia"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 26.0,
+        "End": "1999-01-01T00:26:28",
+        "End_Event": "Dummy Touch",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=2285",
+        "Start": "1999-01-01T00:26:02",
+        "Team": "new zealand"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 35.0,
+        "End": "1999-01-01T00:27:03",
+        "End_Event": "Ball Down",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=2320",
+        "Start": "1999-01-01T00:26:28",
+        "Team": "australia"
+      },
+      {
+        "Color_Category": "Try",
+        "Duration_Sec": 98.0,
+        "End": "1999-01-01T00:28:41",
+        "End_Event": "33",
+        "End_Type": "Try",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=2418",
+        "Start": "1999-01-01T00:27:03",
+        "Team": "new zealand"
+      },
+      {
+        "Color_Category": "6th Touch",
+        "Duration_Sec": 40.0,
+        "End": "1999-01-01T00:29:21",
+        "End_Event": "6th Touch",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=2458",
+        "Start": "1999-01-01T00:28:41",
+        "Team": "australia"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 35.0,
+        "End": "1999-01-01T00:29:56",
+        "End_Event": "Bad Roll",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=2493",
+        "Start": "1999-01-01T00:29:21",
+        "Team": "new zealand"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 27.0,
+        "End": "1999-01-01T00:30:23",
+        "End_Event": "Ball Down",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=2520",
+        "Start": "1999-01-01T00:29:56",
+        "Team": "australia"
+      },
+      {
+        "Color_Category": "6th Touch",
+        "Duration_Sec": 78.0,
+        "End": "1999-01-01T00:31:41",
+        "End_Event": "6th Touch",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=2598",
+        "Start": "1999-01-01T00:30:23",
+        "Team": "new zealand"
+      },
+      {
+        "Color_Category": "6th Touch",
+        "Duration_Sec": 44.0,
+        "End": "1999-01-01T00:32:25",
+        "End_Event": "6th Touch",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=2642",
+        "Start": "1999-01-01T00:31:41",
+        "Team": "australia"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 22.0,
+        "End": "1999-01-01T00:32:47",
+        "End_Event": "Dummy Touch",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=2664",
+        "Start": "1999-01-01T00:32:25",
+        "Team": "new zealand"
+      },
+      {
+        "Color_Category": "Penalty",
+        "Duration_Sec": 49.0,
+        "End": "1999-01-01T00:33:36",
+        "End_Event": "Forward Pass",
+        "End_Type": "Penalty",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=2713",
+        "Start": "1999-01-01T00:32:47",
+        "Team": "australia"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 23.0,
+        "End": "1999-01-01T00:33:59",
+        "End_Event": "Interception",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=2736",
+        "Start": "1999-01-01T00:33:36",
+        "Team": "new zealand"
+      },
+      {
+        "Color_Category": "Penalty",
+        "Duration_Sec": 6.0,
+        "End": "1999-01-01T00:34:05",
+        "End_Event": "Off the Mark",
+        "End_Type": "Penalty",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=2742",
+        "Start": "1999-01-01T00:33:59",
+        "Team": "australia"
+      },
+      {
+        "Color_Category": "Penalty",
+        "Duration_Sec": 18.0,
+        "End": "1999-01-01T00:34:23",
+        "End_Event": "Forward Pass",
+        "End_Type": "Penalty",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=2760",
+        "Start": "1999-01-01T00:34:05",
+        "Team": "new zealand"
+      },
+      {
+        "Color_Category": "Try",
+        "Duration_Sec": 47.0,
+        "End": "1999-01-01T00:35:10",
+        "End_Event": "33 Quicky",
+        "End_Type": "Try",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=2807",
+        "Start": "1999-01-01T00:34:23",
+        "Team": "australia"
+      },
+      {
+        "Color_Category": "Penalty",
+        "Duration_Sec": 32.0,
+        "End": "1999-01-01T00:35:42",
+        "End_Event": "Forward Pass",
+        "End_Type": "Penalty",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=2839",
+        "Start": "1999-01-01T00:35:10",
+        "Team": "new zealand"
+      },
+      {
+        "Color_Category": "6th Touch",
+        "Duration_Sec": 26.0,
+        "End": "1999-01-01T00:36:08",
+        "End_Event": "6th Touch",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=2865",
+        "Start": "1999-01-01T00:35:42",
+        "Team": "australia"
+      },
+      {
+        "Color_Category": "Penalty",
+        "Duration_Sec": 12.0,
+        "End": "1999-01-01T00:36:20",
+        "End_Event": "In the Ruck",
+        "End_Type": "Penalty",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=2877",
+        "Start": "1999-01-01T00:36:08",
+        "Team": "new zealand"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 39.0,
+        "End": "1999-01-01T00:36:59",
+        "End_Event": "Interception",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=2916",
+        "Start": "1999-01-01T00:36:20",
+        "Team": "australia"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 28.0,
+        "End": "1999-01-01T00:37:27",
+        "End_Event": "Dummy Touch",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=2944",
+        "Start": "1999-01-01T00:36:59",
+        "Team": "new zealand"
+      },
+      {
+        "Color_Category": "Penalty",
+        "Duration_Sec": 37.0,
+        "End": "1999-01-01T00:38:04",
+        "End_Event": "Forward Pass",
+        "End_Type": "Penalty",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=2981",
+        "Start": "1999-01-01T00:37:27",
+        "Team": "australia"
+      },
+      {
+        "Color_Category": "6th Touch",
+        "Duration_Sec": 32.0,
+        "End": "1999-01-01T00:38:36",
+        "End_Event": "6th Touch",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=3013",
+        "Start": "1999-01-01T00:38:04",
+        "Team": "new zealand"
+      },
+      {
+        "Color_Category": "Penalty",
+        "Duration_Sec": 35.0,
+        "End": "1999-01-01T00:39:11",
+        "End_Event": "Touch and Pass",
+        "End_Type": "Penalty",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=3048",
+        "Start": "1999-01-01T00:38:36",
+        "Team": "australia"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 18.0,
+        "End": "1999-01-01T00:39:29",
+        "End_Event": "Ball Down",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=3066",
+        "Start": "1999-01-01T00:39:11",
+        "Team": "new zealand"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 30.0,
+        "End": "1999-01-01T00:39:59",
+        "End_Event": "Ball Down",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=3096",
+        "Start": "1999-01-01T00:39:29",
+        "Team": "australia"
+      },
+      {
+        "Color_Category": "6th Touch",
+        "Duration_Sec": 28.0,
+        "End": "1999-01-01T00:40:27",
+        "End_Event": "6th Touch",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=3124",
+        "Start": "1999-01-01T00:39:59",
+        "Team": "new zealand"
+      },
+      {
+        "Color_Category": "6th Touch",
+        "Duration_Sec": 40.0,
+        "End": "1999-01-01T00:41:07",
+        "End_Event": "6th Touch",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=3164",
+        "Start": "1999-01-01T00:40:27",
+        "Team": "australia"
+      },
+      {
+        "Color_Category": "Penalty",
+        "Duration_Sec": 28.0,
+        "End": "1999-01-01T00:41:35",
+        "End_Event": "Delay of Play",
+        "End_Type": "Penalty",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=3192",
+        "Start": "1999-01-01T00:41:07",
+        "Team": "new zealand"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 42.0,
+        "End": "1999-01-01T00:42:17",
+        "End_Event": "Game End",
+        "End_Type": "Game Event",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=3234",
+        "Start": "1999-01-01T00:41:35",
+        "Team": "australia"
+      }
+    ],
+    "data-f539c8518f9ab7e0380584e605c2c0cf": [
+      {
+        "Count": 0,
+        "Event": "Game Start",
+        "GameTime": "1999-01-01T00:00:00",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=697",
+        "Team": "australia"
+      },
+      {
+        "Count": 1,
+        "Event": "33 Quicky",
+        "GameTime": "1999-01-01T00:09:02",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=1239",
+        "Team": "australia"
+      },
+      {
+        "Count": 2,
+        "Event": "33",
+        "GameTime": "1999-01-01T00:11:04",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=1361",
+        "Team": "australia"
+      },
+      {
+        "Count": 3,
+        "Event": "Other",
+        "GameTime": "1999-01-01T00:16:55",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=1712",
+        "Team": "australia"
+      },
+      {
+        "Count": 4,
+        "Event": "Other",
+        "GameTime": "1999-01-01T00:24:44",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=2181",
+        "Team": "australia"
+      },
+      {
+        "Count": 5,
+        "Event": "33 Quicky",
+        "GameTime": "1999-01-01T00:35:10",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=2807",
+        "Team": "australia"
+      },
+      {
+        "Count": 5,
+        "Event": "Game End",
+        "GameTime": "1999-01-01T00:42:17",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=3234",
+        "Team": "australia"
+      },
+      {
+        "Count": 0,
+        "Event": "Game Start",
+        "GameTime": "1999-01-01T00:00:00",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=697",
+        "Team": "new zealand"
+      },
+      {
+        "Count": 1,
+        "Event": "33",
+        "GameTime": "1999-01-01T00:13:17",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=1494",
+        "Team": "new zealand"
+      },
+      {
+        "Count": 2,
+        "Event": "Scoop",
+        "GameTime": "1999-01-01T00:14:28",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=1565",
+        "Team": "new zealand"
+      },
+      {
+        "Count": 3,
+        "Event": "Other",
+        "GameTime": "1999-01-01T00:16:37",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=1694",
+        "Team": "new zealand"
+      },
+      {
+        "Count": 4,
+        "Event": "33",
+        "GameTime": "1999-01-01T00:28:41",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=2418",
+        "Team": "new zealand"
+      },
+      {
+        "Count": 4,
+        "Event": "Game End",
+        "GameTime": "1999-01-01T00:42:17",
+        "Link": "https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=3234",
+        "Team": "new zealand"
+      }
+    ]
+  },
+  "params": [
+    {
+      "bind": "scales",
+      "name": "param_1e9efca18e7a2868",
+      "select": {
+        "encodings": [
+          "x",
+          "y"
+        ],
+        "type": "interval"
+      },
+      "views": [
+        "view_a32b8ace667b99e0_0",
+        "view_915897cebd749be0_0"
+      ]
+    }
+  ],
+  "resolve": {
+    "scale": {
+      "color": "independent"
+    }
+  },
+  "vconcat": [
+    {
+      "data": {
+        "name": "data-f539c8518f9ab7e0380584e605c2c0cf"
+      },
+      "height": 200,
+      "layer": [
+        {
+          "encoding": {
+            "color": {
+              "field": "Team",
+              "scale": {
+                "domain": [
+                  "australia",
+                  "new zealand"
+                ],
+                "range": [
+                  "#008000",
+                  "#FF0000"
+                ]
+              },
+              "type": "nominal"
+            },
+            "order": {
+              "field": "GameTime",
+              "type": "temporal"
+            },
+            "x": {
+              "axis": {
+                "format": "%H:%M:%S",
+                "title": "Game Time"
+              },
+              "field": "GameTime",
+              "type": "temporal"
+            },
+            "y": {
+              "axis": {
+                "tickMinStep": 1
+              },
+              "field": "Count",
+              "title": "Cumulative Tries",
+              "type": "quantitative"
+            }
+          },
+          "mark": {
+            "interpolate": "step-after",
+            "type": "line"
+          },
+          "name": "view_a32b8ace667b99e0_0"
+        },
+        {
+          "encoding": {
+            "color": {
+              "field": "Team",
+              "scale": {
+                "domain": [
+                  "australia",
+                  "new zealand"
+                ],
+                "range": [
+                  "#008000",
+                  "#FF0000"
+                ]
+              },
+              "type": "nominal"
+            },
+            "href": {
+              "field": "Link",
+              "type": "nominal"
+            },
+            "tooltip": [
+              {
+                "field": "GameTime",
+                "type": "temporal"
+              },
+              {
+                "field": "Team",
+                "type": "nominal"
+              },
+              {
+                "field": "Event",
+                "type": "nominal"
+              },
+              {
+                "field": "Count",
+                "type": "quantitative"
+              }
+            ],
+            "x": {
+              "axis": {
+                "format": "%H:%M:%S",
+                "title": "Game Time"
+              },
+              "field": "GameTime",
+              "type": "temporal"
+            },
+            "y": {
+              "axis": {
+                "tickMinStep": 1
+              },
+              "field": "Count",
+              "title": "Cumulative Tries",
+              "type": "quantitative"
+            }
+          },
+          "mark": {
+            "size": 100,
+            "type": "circle"
+          },
+          "transform": [
+            {
+              "filter": "((datum.Event !== 'Game Start') && (datum.Event !== 'Game End'))"
+            }
+          ]
+        }
+      ],
+      "title": "Tries vs Time",
+      "width": 800
+    },
+    {
+      "data": {
+        "name": "data-5733c69728739879e7c79faeb9a72803"
+      },
+      "height": 200,
+      "layer": [
+        {
+          "encoding": {
+            "color": {
+              "field": "Team",
+              "scale": {
+                "domain": [
+                  "australia",
+                  "new zealand"
+                ],
+                "range": [
+                  "#008000",
+                  "#FF0000"
+                ]
+              },
+              "type": "nominal"
+            },
+            "order": {
+              "field": "GameTime",
+              "type": "temporal"
+            },
+            "x": {
+              "axis": {
+                "format": "%H:%M:%S",
+                "title": "Game Time"
+              },
+              "field": "GameTime",
+              "type": "temporal"
+            },
+            "y": {
+              "axis": {
+                "tickMinStep": 1
+              },
+              "field": "Count",
+              "title": "Cumulative Penalties",
+              "type": "quantitative"
+            }
+          },
+          "mark": {
+            "interpolate": "step-after",
+            "type": "line"
+          },
+          "name": "view_915897cebd749be0_0"
+        },
+        {
+          "encoding": {
+            "color": {
+              "field": "Team",
+              "scale": {
+                "domain": [
+                  "australia",
+                  "new zealand"
+                ],
+                "range": [
+                  "#008000",
+                  "#FF0000"
+                ]
+              },
+              "type": "nominal"
+            },
+            "href": {
+              "field": "Link",
+              "type": "nominal"
+            },
+            "tooltip": [
+              {
+                "field": "GameTime",
+                "type": "temporal"
+              },
+              {
+                "field": "Team",
+                "type": "nominal"
+              },
+              {
+                "field": "Event",
+                "type": "nominal"
+              },
+              {
+                "field": "Count",
+                "type": "quantitative"
+              }
+            ],
+            "x": {
+              "axis": {
+                "format": "%H:%M:%S",
+                "title": "Game Time"
+              },
+              "field": "GameTime",
+              "type": "temporal"
+            },
+            "y": {
+              "axis": {
+                "tickMinStep": 1
+              },
+              "field": "Count",
+              "title": "Cumulative Penalties",
+              "type": "quantitative"
+            }
+          },
+          "mark": {
+            "size": 100,
+            "type": "circle"
+          }
+        }
+      ],
+      "title": "Penalties vs Time",
+      "width": 800
+    },
+    {
+      "data": {
+        "name": "data-cbbeebcdc174beb8758430657c8aef81"
+      },
+      "encoding": {
+        "color": {
+          "field": "Color_Category",
+          "scale": {
+            "domain": [
+              "Try",
+              "Penalty",
+              "6th Touch",
+              "Other"
+            ],
+            "range": [
+              "Green",
+              "Red",
+              "Gold",
+              "Orange"
+            ]
+          },
+          "title": "Outcome",
+          "type": "nominal"
+        },
+        "href": {
+          "field": "Link",
+          "type": "nominal"
+        },
+        "tooltip": [
+          {
+            "field": "Start",
+            "format": "%H:%M:%S",
+            "title": "Start",
+            "type": "temporal"
+          },
+          {
+            "field": "End",
+            "format": "%H:%M:%S",
+            "title": "End",
+            "type": "temporal"
+          },
+          {
+            "field": "Team",
+            "type": "nominal"
+          },
+          {
+            "field": "End_Event",
+            "type": "nominal"
+          },
+          {
+            "field": "End_Type",
+            "type": "nominal"
+          },
+          {
+            "field": "Duration_Sec",
+            "format": ".1f",
+            "title": "Duration (s)",
+            "type": "quantitative"
+          }
+        ],
+        "x": {
+          "axis": {
+            "format": "%H:%M:%S",
+            "title": "Game Time"
+          },
+          "field": "Start",
+          "type": "temporal"
+        },
+        "x2": {
+          "field": "End"
+        },
+        "y": {
+          "field": "Team",
+          "title": "Possession Owner",
+          "type": "nominal"
+        }
+      },
+      "height": 200,
+      "mark": {
+        "type": "bar"
+      },
+      "title": "Possession Timeline",
+      "width": 800
+    }
+  ]
+};
+        vegaEmbed('#vis', spec);
+      </script>
+    </body>
+    </html>
+    

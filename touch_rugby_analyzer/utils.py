@@ -9,6 +9,7 @@ import json
 from typing import Tuple, Dict
 from touch_rugby_analyzer.constants import DATA_ROOT
 import datetime
+
 output_data_root = DATA_ROOT / "output"
 output_data_root.mkdir(parents=True, exist_ok=True)
 
@@ -26,7 +27,7 @@ def time_to_n_seconds(time_obj):
     return 3600 * time_obj.hour + 60 * time_obj.minute + time_obj.second
 
 
-def opponent(team_name: str, team_names :Tuple[str, str] = ("Team 1", "Team 2")) -> str:
+def opponent(team_name: str, team_names: Tuple[str, str] = ("Team 1", "Team 2")) -> str:
     if team_name == team_names[0]:
         return team_names[1]
     else:
@@ -37,23 +38,31 @@ def is_turnover(row: pd.Series):
     _is_turnover = False
     if row.Type == "Try":
         _is_turnover = True
-    elif row.Type == "Penalty" and row.Name not in ["Offside", "Not Moving Forward", "Shoulder"]:
+    elif row.Type == "Penalty" and row.Name not in [
+        "Offside",
+        "Not Moving Forward",
+        "Shoulder",
+    ]:
         _is_turnover = True
     elif row.Type == "Turnover" and row.Name not in ["6 Again"]:
         _is_turnover = True
     return _is_turnover
 
+
 def is_fully_analysable(data_df: pd.DataFrame):
     game_start_events = data_df[data_df["Name"] == "Game Start"]
     game_end_events = data_df[data_df["Name"] == "Game End"]
-    return len(game_start_events) == len(game_end_events) and len(game_end_events)>0
+    return len(game_start_events) == len(game_end_events) and len(game_end_events) > 0
+
 
 def infer_possession_owner(data_df: pd.DataFrame):
     data_df["Turnover"] = data_df.apply(is_turnover, axis=1)
     if not is_fully_analysable(data_df):
         rich.print("[yellow] Cannot infer possession owner [/yellow]")
         if POSSESSION_COL not in data_df:
-            data_df[POSSESSION_COL] = data_df[AGAINST_LOCALS_COL].apply(lambda against_local: "Team 2" if AGAINST_LOCALS_COL else "Team 1")
+            data_df[POSSESSION_COL] = data_df[AGAINST_LOCALS_COL].apply(
+                lambda against_local: "Team 2" if AGAINST_LOCALS_COL else "Team 1"
+            )
         return
 
     turnover = False
@@ -68,7 +77,9 @@ def infer_possession_owner(data_df: pd.DataFrame):
             else:
                 row_possession_owner = "Team 1"
         else:
-            raise Exception(f"Cannot find {POSSESSION_COL} or {AGAINST_LOCALS_COL} in {row}")
+            raise Exception(
+                f"Cannot find {POSSESSION_COL} or {AGAINST_LOCALS_COL} in {row}"
+            )
 
         if row.Type == "Game Event":
             turnover = False
@@ -124,10 +135,14 @@ def add_game_time(data_df: pd.DataFrame):
         data_df["GameTime"] = datetime.datetime(1999, 1, 1) + (data_df["Time"] - dt)
         # data_df["GameTime"] = datetime.datetime(1999, 1, 1) + (data_df["Time"] - np.array(dts))
 
+
 def replace_team_names(data_df: pd.DataFrame, mapping: Dict[str, str]):
     for col in ["Possession Owner", "Action Owner"]:
         if col in data_df:
-            data_df[col] = data_df[col].apply(lambda team_name: mapping.get(team_name, team_name))
+            data_df[col] = data_df[col].apply(
+                lambda team_name: mapping.get(team_name, team_name)
+            )
+
 
 def load_data(data_path: Path, simple: bool = False) -> pd.DataFrame:
     local_team_name, other_team_name = get_names(data_path)
@@ -141,13 +156,16 @@ def load_data(data_path: Path, simple: bool = False) -> pd.DataFrame:
         data_df[AGAINST_LOCALS_COL].fillna(False, inplace=True)
     infer_possession_owner(data_df)
     infer_action_owner(data_df)
-    replace_team_names(data_df, mapping={"Team 1": local_team_name, "Team 2": other_team_name})
+    replace_team_names(
+        data_df, mapping={"Team 1": local_team_name, "Team 2": other_team_name}
+    )
 
     data_df.Time = pd.to_datetime(data_df.Time)
     add_game_time(data_df)
 
     data_df["To Review"].fillna(False, inplace=True)
     return data_df
+
 
 def make_fig_1(data_df, local_team_name, other_team_name):
     events = ["Try", "Penalty", "Turnover"]
