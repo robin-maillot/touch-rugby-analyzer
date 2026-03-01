@@ -6,7 +6,7 @@ from plotly.subplots import make_subplots
 import rich
 from collections import defaultdict
 import json
-from typing import Tuple
+from typing import Tuple, Dict
 from touch_rugby_analyzer.constants import DATA_ROOT
 import datetime
 output_data_root = DATA_ROOT / "output"
@@ -111,11 +111,16 @@ def add_game_time(data_df: pd.DataFrame):
         data_df["GameTime"] = data_df["Time"]
     else:
         dt = game_start_events.iloc[0].Time
+        dt_end = dt
         # dts = []
         # for i, row in data_df.iterrows():
         #     if row["Name"] in ["Game Start", "Game End"]:
         #         dt = row["Time"]
+        #     elif row["Name"] in ["Game Start", "Game End"]:
+        #         dt = row["Time"]
         #     dts.append(dt)
+        #     if row["Name"] == "Game End":
+        #         dt = row["Time"]
         data_df["GameTime"] = datetime.datetime(1999, 1, 1) + (data_df["Time"] - dt)
         # data_df["GameTime"] = datetime.datetime(1999, 1, 1) + (data_df["Time"] - np.array(dts))
 

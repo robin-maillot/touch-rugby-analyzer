@@ -1,22 +1,14 @@
 [
   {
-    "name": "france vs wales (2023 wo euros)",
+    "name": "australia vs new zealand (2024 m30 worldcup)",
     "file": "game_0.html"
   },
   {
-    "name": "australia vs new zealand (2024 m30 worldcup)",
+    "name": "france vs england (2025 m30 seniorscup)",
     "file": "game_1.html"
   },
   {
-    "name": "france vs england (2025 m30 seniorscup)",
-    "file": "game_2.html"
-  },
-  {
     "name": "france vs pays-bas (2025 m30 seniorscup)",
-    "file": "game_3.html"
-  },
-  {
-    "name": "sharks vs saxons (2025 mo englishnationals)",
-    "file": "game_4.html"
+    "file": "game_2.html"
   }
 ]

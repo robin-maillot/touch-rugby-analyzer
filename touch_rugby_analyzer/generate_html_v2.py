@@ -351,18 +351,18 @@ def generate_htmls():
             data_df = utils.load_data(data_path)
             data_df.to_csv(DATA_ROOT / f"{data_path.stem}_parsed.csv")
             if utils.is_fully_analysable(data_df):
-                generate_html_from_df(data_df, output_html_path)
+                generate_html_from_df(data_df, output_html_path, team_names=(local_team_name, other_team_name))
 
-            name = f"{local_team_name} vs {other_team_name}"
-            if competition_name != "unknown":
-                name += f" ({year} {division_name} {competition_name})"
+                name = f"{local_team_name} vs {other_team_name}"
+                if competition_name != "unknown":
+                    name += f" ({year} {division_name} {competition_name})"
 
-            games_data.append(
-                dict(
-                    name=name,
-                    file=output_html_path.name,
+                games_data.append(
+                    dict(
+                        name=name,
+                        file=output_html_path.name,
+                    )
                 )
-            )
         except Exception as e:
             rich.print(f"[red]Skipping {data_path.stem} plots due to {e}[/red]")
             raise e
