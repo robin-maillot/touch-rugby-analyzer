@@ -72,7 +72,10 @@ def infer_possession_owner(data_df: pd.DataFrame):
 
         if row.Type == "Game Event":
             turnover = False
-            possession_owner = row_possession_owner
+            if row.Name == "Game End":
+                possession_owner = new_possession_owners[-1]
+            else:
+                possession_owner = row_possession_owner
         elif row.Type == "To Review":
             new_possession_owners.append(row_possession_owner)
             continue
@@ -80,9 +83,6 @@ def infer_possession_owner(data_df: pd.DataFrame):
             if turnover:
                 possession_owner = opponent(possession_owner)
             turnover = row.Turnover
-        # if possession_owner != possession_owner:
-        #     rich.print(f"{possession_owner = }, {possession_owner = }")
-        #     rich.print(row)
         new_possession_owners.append(possession_owner)
     data_df[POSSESSION_COL] = new_possession_owners
 
@@ -119,6 +119,11 @@ def add_game_time(data_df: pd.DataFrame):
         data_df["GameTime"] = datetime.datetime(1999, 1, 1) + (data_df["Time"] - dt)
         # data_df["GameTime"] = datetime.datetime(1999, 1, 1) + (data_df["Time"] - np.array(dts))
 
+def replace_team_names(data_df: pd.DataFrame, mapping: Dict[str, str]):
+    for col in ["Possession Owner", "Action Owner"]:
+        if col in data_df:
+            data_df[col] = data_df[col].apply(lambda team_name: mapping.get(team_name, team_name))
+
 def load_data(data_path: Path, simple: bool = False) -> pd.DataFrame:
     local_team_name, other_team_name = get_names(data_path)
     year, division_name, competition_name = get_year_division_competition(data_path)
@@ -131,6 +136,8 @@ def load_data(data_path: Path, simple: bool = False) -> pd.DataFrame:
         data_df[AGAINST_LOCALS_COL].fillna(False, inplace=True)
     infer_possession_owner(data_df)
     infer_action_owner(data_df)
+    replace_team_names(data_df, mapping={"Team 1": local_team_name, "Team 2": other_team_name})
+
     data_df.Time = pd.to_datetime(data_df.Time)
     add_game_time(data_df)
 

@@ -1,15 +1,13 @@
-import pandas as pd
-from jinja2 import Template
 import rich
 
 from touch_rugby_analyzer.constants import ASSETS_ROOT, ROOT, DATA_ROOT
 from touch_rugby_analyzer import utils
-
+from typing import Tuple
 import pandas as pd
 import altair as alt
 from pathlib import Path
 
-def generate_html_from_df(df: pd.DataFrame, output_html_path: Path):
+def generate_html_from_df(df: pd.DataFrame, output_html_path: Path, team_names: Tuple = ('Team 1', 'Team 2')):
     # --- 1. Global Time Filter ---
     start_events = df[df['Name'] == 'Game Start']
     end_events = df[df['Name'] == 'Game End']
@@ -32,11 +30,11 @@ def generate_html_from_df(df: pd.DataFrame, output_html_path: Path):
 
     # Common visual properties
     chart_width = 800
-    team_colors = alt.Scale(domain=['Team 1', 'Team 2'], range=['#008000', '#FF0000'])  # Green, Red
+    team_colors = alt.Scale(domain=team_names, range=['#008000', '#FF0000'])  # Green, Red
 
     # --- 2. Tries Chart Data & Plot ---
     tries_data = []
-    for team in ['Team 1', 'Team 2']:
+    for team in team_names:
         # Start Point
         tries_data.append({
             'GameTime': global_start,
@@ -94,7 +92,7 @@ def generate_html_from_df(df: pd.DataFrame, output_html_path: Path):
 
     # --- 3. Penalties Chart Data & Plot ---
     penalties_data = []
-    for team in ['Team 1', 'Team 2']:
+    for team in team_names:
         # Start Point
         penalties_data.append({
             'GameTime': global_start,
@@ -208,8 +206,10 @@ def generate_html_from_df(df: pd.DataFrame, output_html_path: Path):
 
     poss_df = pd.DataFrame(possessions_final)
 
+    # Visualization
+    # Using specific colors to ensure visibility
     poss_domain = ['Try', 'Penalty', '6th Touch', 'Other']
-    poss_range = ['green', 'red', 'yellow', 'orange']
+    poss_range = ['Green', 'Red', 'Gold', 'Orange']
 
     poss_chart = alt.Chart(poss_df).mark_bar().encode(
         x=alt.X('Start:T', axis=alt.Axis(format='%H:%M:%S', title='Game Time')),
@@ -217,15 +217,22 @@ def generate_html_from_df(df: pd.DataFrame, output_html_path: Path):
         y=alt.Y('Team:N', title='Possession Owner'),
         color=alt.Color('Color_Category:N', scale=alt.Scale(domain=poss_domain, range=poss_range), title='Outcome'),
         href='Link:N',
-        tooltip=['Start:T', 'End:T', 'Team:N', 'End_Event:N', 'End_Type:N', 'Duration_Sec:Q']
+        tooltip=[
+            alt.Tooltip('Start:T', format='%H:%M:%S', title='Start'),
+            alt.Tooltip('End:T', format='%H:%M:%S', title='End'),
+            'Team:N',
+            'End_Event:N',
+            'End_Type:N',
+            alt.Tooltip('Duration_Sec:Q', format='.1f', title='Duration (s)')
+        ]
     ).properties(
         title='Possession Timeline',
         width=chart_width,
         height=200
-    ).interactive()
+    )
 
     # --- 5. Combine Charts ---
-    final_chart = alt.vconcat(tries_chart, pen_chart, poss_chart)
+    final_chart = alt.vconcat(tries_chart, pen_chart, poss_chart).resolve_scale(color='independent') # .resolve_scale(x='shared')
 
     # --- 6. Metrics Table ---
     metrics = []
