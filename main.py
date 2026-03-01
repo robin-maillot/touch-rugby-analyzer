@@ -1,4 +1,4 @@
-from touch_rugby_analyzer import gcloud_utils, generate_html
+from touch_rugby_analyzer import gcloud_utils, generate_html_v2
 from touch_rugby_analyzer.constants import DATA_ROOT
 import rich
 import subprocess
@@ -18,7 +18,7 @@ if __name__ == "__main__":
         _ = gcloud_utils.fetch_gsheet(sheet_id, sheet_tab, return_raw=False)
         _.to_csv(DATA_ROOT / csv_name, index=False)
 
-    generate_html.generate_html()
+    generate_html_v2.generate_html()
 
     for cmd in [
         ["git", "add", "-u"],
