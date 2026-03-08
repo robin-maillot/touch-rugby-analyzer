@@ -40,7 +40,7 @@
 38,2026-03-08 00:28:00,Turnover,6th Touch,,https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=1675,australia,2024,m30,worldcup,2024_m30_worldcup_australia_new zealand
 39,2026-03-08 00:28:19,Try,Other,??,https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=1694,new zealand,2024,m30,worldcup,2024_m30_worldcup_australia_new zealand
 40,2026-03-08 00:28:37,Try,Other,sweeper,https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=1712,australia,2024,m30,worldcup,2024_m30_worldcup_australia_new zealand
-41,2026-03-08 00:29:19,Game Event,Game End,,https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=1754,australia,2024,m30,worldcup,2024_m30_worldcup_australia_new zealand
+41,2026-03-08 00:29:19,Game Event,Game End,,https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=1754,new zealand,2024,m30,worldcup,2024_m30_worldcup_australia_new zealand
 42,2026-03-08 00:33:57,Game Event,Game Start,,https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=2032,new zealand,2024,m30,worldcup,2024_m30_worldcup_australia_new zealand
 43,2026-03-08 00:34:22,Turnover,6th Touch,,https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=2057,new zealand,2024,m30,worldcup,2024_m30_worldcup_australia_new zealand
 44,2026-03-08 00:34:41,Turnover,Ball Down,,https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=2076,australia,2024,m30,worldcup,2024_m30_worldcup_australia_new zealand
@@ -82,7 +82,7 @@
 80,2026-03-08 00:52:49,Turnover,6th Touch,,https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=3164,australia,2024,m30,worldcup,2024_m30_worldcup_australia_new zealand
 81,2026-03-08 00:53:17,Penalty,Delay of Play,,https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=3192,new zealand,2024,m30,worldcup,2024_m30_worldcup_australia_new zealand
 82,2026-03-08 00:53:44,Turnover,Ball Down,,https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=3219,australia,2024,m30,worldcup,2024_m30_worldcup_australia_new zealand
-83,2026-03-08 00:53:59,Game Event,Game End,,https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=3234,australia,2024,m30,worldcup,2024_m30_worldcup_australia_new zealand
+83,2026-03-08 00:53:59,Game Event,Game End,,https://www.youtube.com/watch?v=ZtHkRw5ZNnQ&t=3234,new zealand,2024,m30,worldcup,2024_m30_worldcup_australia_new zealand
 84,2026-03-08 00:00:00,Game Event,Game Start,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=-5,england,2025,m30,seniorscup,2025_m30_seniorscup_france_england
 85,2026-03-08 00:00:25,Turnover,Ball Down,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=20,england,2025,m30,seniorscup,2025_m30_seniorscup_france_england
 86,2026-03-08 00:00:34,Penalty,Offside,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=29,england,2025,m30,seniorscup,2025_m30_seniorscup_france_england
@@ -123,7 +123,7 @@
 121,2026-03-08 00:18:42,Turnover,6th Touch,Touch and Pass ?,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=1117,france,2025,m30,seniorscup,2025_m30_seniorscup_france_england
 122,2026-03-08 00:19:14,Turnover,Interception,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=1149,england,2025,m30,seniorscup,2025_m30_seniorscup_france_england
 123,2026-03-08 00:19:37,Try,Scoop,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=1172,france,2025,m30,seniorscup,2025_m30_seniorscup_france_england
-124,2026-03-08 00:20:05,Game Event,Game End,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=1200,france,2025,m30,seniorscup,2025_m30_seniorscup_france_england
+124,2026-03-08 00:20:05,Game Event,Game End,,https://youtu.be/QBGuR92a3dU?si=CNI-tmLU5PdLZN1W&t=1200,england,2025,m30,seniorscup,2025_m30_seniorscup_france_england
 125,2026-03-08 00:00:02,Game Event,Game Start,,https://www.youtube.com/watch?v=swCTy3CCMfc&t=-3,france,2025,m30,seniorscup,2025_m30_seniorscup_france_england
 126,2026-03-08 00:00:29,Turnover,Interception,,https://www.youtube.com/watch?v=swCTy3CCMfc&t=24,france,2025,m30,seniorscup,2025_m30_seniorscup_france_england
 127,2026-03-08 00:00:56,Turnover,Ball Down,,https://www.youtube.com/watch?v=swCTy3CCMfc&t=51,england,2025,m30,seniorscup,2025_m30_seniorscup_france_england
@@ -157,7 +157,7 @@
 155,2026-03-08 00:17:21,Turnover,Ball Down,,https://www.youtube.com/watch?v=swCTy3CCMfc&t=1036,england,2025,m30,seniorscup,2025_m30_seniorscup_france_england
 156,2026-03-08 00:17:59,Try,French Flair,,https://www.youtube.com/watch?v=swCTy3CCMfc&t=1074,france,2025,m30,seniorscup,2025_m30_seniorscup_france_england
 157,2026-03-08 00:18:33,Try,32 - Cut,,https://www.youtube.com/watch?v=swCTy3CCMfc&t=1108,england,2025,m30,seniorscup,2025_m30_seniorscup_france_england
-158,2026-03-08 00:20:03,Game Event,Game End,,https://www.youtube.com/watch?v=swCTy3CCMfc&t=1198,england,2025,m30,seniorscup,2025_m30_seniorscup_france_england
+158,2026-03-08 00:20:03,Game Event,Game End,,https://www.youtube.com/watch?v=swCTy3CCMfc&t=1198,france,2025,m30,seniorscup,2025_m30_seniorscup_france_england
 159,2026-03-08 00:02:14,Game Event,Game Start,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=129,pays-bas,2025,m30,seniorscup,2025_m30_seniorscup_france_pays-bas
 160,2026-03-08 00:02:45,Try,Try,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=160,pays-bas,2025,m30,seniorscup,2025_m30_seniorscup_france_pays-bas
 161,2026-03-08 00:03:54,Turnover,6th Touch,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=229,france,2025,m30,seniorscup,2025_m30_seniorscup_france_pays-bas
@@ -234,7 +234,7 @@
 232,2026-03-08 00:46:08,Try,Try,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2763,pays-bas,2025,m30,seniorscup,2025_m30_seniorscup_france_pays-bas
 233,2026-03-08 00:46:35,To Review,Other,Seems like the same as the shoulder against France above,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2790,france,2025,m30,seniorscup,2025_m30_seniorscup_france_pays-bas
 234,2026-03-08 00:46:58,Turnover,6th Touch,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2813,france,2025,m30,seniorscup,2025_m30_seniorscup_france_pays-bas
-235,2026-03-08 00:47:17,Game Event,Game End,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2832,france,2025,m30,seniorscup,2025_m30_seniorscup_france_pays-bas
+235,2026-03-08 00:47:17,Game Event,Game End,,https://youtu.be/OVdyq3oRq_w?si=UqAu1x62-mD_XZPv&t=2832,pays-bas,2025,m30,seniorscup,2025_m30_seniorscup_france_pays-bas
 236,2026-03-08 00:08:12,To Review,Other,Great Timing 7m roll,https://www.youtube.com/watch?v=YouwSdF3w7o&t=487,saxons,2025,mo,englishnationals,2025_mo_englishnationals_sharks_saxons
 237,2026-03-08 00:29:20,To Review,,Not over the ball ,https://www.youtube.com/watch?v=YouwSdF3w7o&t=1755,saxons,2025,mo,englishnationals,2025_mo_englishnationals_sharks_saxons
 238,2026-03-08 00:30:47,To Review,,Forward pass,https://www.youtube.com/watch?v=YouwSdF3w7o&t=1842,saxons,2025,mo,englishnationals,2025_mo_englishnationals_sharks_saxons
@@ -265,7 +265,7 @@
 263,2026-03-08 00:57:06,Try,33 Quicky,,https://www.youtube.com/watch?v=uQWDPyMTkkw&t=3421s,rcl,2026,mxo,supertouch,2026_mxo_supertouch_rcl_arrows
 264,2026-03-08 00:57:59,Turnover,Interception,,https://www.youtube.com/watch?v=uQWDPyMTkkw&t=3474s,arrows,2026,mxo,supertouch,2026_mxo_supertouch_rcl_arrows
 265,2026-03-08 00:58:30,Try,Other,,https://www.youtube.com/watch?v=uQWDPyMTkkw&t=3505s,rcl,2026,mxo,supertouch,2026_mxo_supertouch_rcl_arrows
-266,2026-03-08 00:59:02,Game Event,Game End,,https://www.youtube.com/watch?v=uQWDPyMTkkw&t=3537s,rcl,2026,mxo,supertouch,2026_mxo_supertouch_rcl_arrows
+266,2026-03-08 00:59:02,Game Event,Game End,,https://www.youtube.com/watch?v=uQWDPyMTkkw&t=3537s,arrows,2026,mxo,supertouch,2026_mxo_supertouch_rcl_arrows
 267,2026-03-08 01:03:56,Game Event,Game Start,,https://www.youtube.com/watch?v=uQWDPyMTkkw&t=3831s,arrows,2026,mxo,supertouch,2026_mxo_supertouch_rcl_arrows
 268,2026-03-08 01:04:34,Penalty,Forward Pass,,https://www.youtube.com/watch?v=uQWDPyMTkkw&t=3869s,arrows,2026,mxo,supertouch,2026_mxo_supertouch_rcl_arrows
 269,2026-03-08 01:05:15,Turnover,6th Touch,,https://www.youtube.com/watch?v=uQWDPyMTkkw&t=3910s,rcl,2026,mxo,supertouch,2026_mxo_supertouch_rcl_arrows
@@ -278,4 +278,4 @@
 276,2026-03-08 01:09:34,Turnover,Ball Down,,https://www.youtube.com/watch?v=uQWDPyMTkkw&t=4169s,rcl,2026,mxo,supertouch,2026_mxo_supertouch_rcl_arrows
 277,2026-03-08 01:10:07,Turnover,6th Touch,,https://www.youtube.com/watch?v=uQWDPyMTkkw&t=4202s,arrows,2026,mxo,supertouch,2026_mxo_supertouch_rcl_arrows
 278,2026-03-08 01:10:44,Penalty,Forward Pass,,https://www.youtube.com/watch?v=uQWDPyMTkkw&t=4239s,rcl,2026,mxo,supertouch,2026_mxo_supertouch_rcl_arrows
-279,2026-03-08 01:11:27,Game Event,Game End,,https://www.youtube.com/watch?v=uQWDPyMTkkw&t=4282s,rcl,2026,mxo,supertouch,2026_mxo_supertouch_rcl_arrows
+279,2026-03-08 01:11:27,Game Event,Game End,,https://www.youtube.com/watch?v=uQWDPyMTkkw&t=4282s,arrows,2026,mxo,supertouch,2026_mxo_supertouch_rcl_arrows
