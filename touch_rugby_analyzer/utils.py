@@ -112,7 +112,7 @@ def infer_action_owner(data_df: pd.DataFrame):
     data_df["Action Owner"] = action_owners
 
 
-def add_game_time(data_df: pd.DataFrame):
+def add_game_time(data_df: pd.DataFrame, game_stopage_time:int=60):
     game_start_events = data_df[data_df["Name"] == "Game Start"]
     game_end_events = data_df[data_df["Name"] == "Game End"]
 
@@ -122,14 +122,17 @@ def add_game_time(data_df: pd.DataFrame):
         data_df["GameTime"] = data_df["Time"]
     else:
         dt = game_start_events.iloc[0].Time
-        dt_end = dt
-        # dts = []
+        # half_id = 0
+        # ts = []
         # for i, row in data_df.iterrows():
-        #     if row["Name"] in ["Game Start", "Game End"]:
-        #         dt = row["Time"]
-        #     elif row["Name"] in ["Game Start", "Game End"]:
-        #         dt = row["Time"]
-        #     dts.append(dt)
+        #
+        #     if row["Name"] in ["Game Start"]:
+        #         if half_id = 0
+        #             dt = row["Time"]
+        #         else:
+        #             dt = row["Time"]
+        #         half_id += 1
+        #     ts.append(row["Time"] - dt)
         #     if row["Name"] == "Game End":
         #         dt = row["Time"]
         data_df["GameTime"] = datetime.datetime(1999, 1, 1) + (data_df["Time"] - dt)

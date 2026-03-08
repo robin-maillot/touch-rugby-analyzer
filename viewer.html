@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Touch Rugby Annotator</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: #0f1117; color: #e0e0e0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+  header { background: #1a1d27; padding: 10px 20px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #2a2d3a; flex-shrink: 0; }
+  header h1 { font-size: 1.1rem; font-weight: 600; color: #fff; }
+  header span { font-size: 0.75rem; color: #888; }
+  .yt-input { background: #0f1117; border: 1px solid #3a3d4a; border-radius: 5px; color: #ccc; padding: 4px 8px; font-size: 0.78rem; width: 260px; }
+  .yt-input::placeholder { color: #555; }
+  .yt-label { font-size: 0.75rem; color: #888; white-space: nowrap; }
+
+  .main { display: flex; flex-direction: column; flex: 1; overflow: hidden; padding: 10px 12px; gap: 8px; }
+
+  .video-wrapper { background: #000; border-radius: 8px; overflow: hidden; position: relative; flex-shrink: 0; display: flex; align-items: center; justify-content: center; height: 38vh; border: 1px solid #2a2d3a; }
+  video { max-width: 100%; max-height: 100%; display: block; }
+  .no-video { display: flex; flex-direction: column; align-items: center; gap: 10px; color: #555; }
+  .no-video svg { opacity: 0.3; }
+  .no-video p { font-size: 0.85rem; }
+
+  .controls { display: flex; align-items: center; gap: 8px; background: #1a1d27; border-radius: 8px; padding: 7px 12px; border: 1px solid #2a2d3a; flex-shrink: 0; flex-wrap: wrap; }
+  .btn { border: none; border-radius: 6px; padding: 5px 12px; font-size: 0.78rem; cursor: pointer; font-weight: 600; transition: all 0.15s; }
+  .btn-primary { background: #3b82f6; color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-ghost { background: #2a2d3a; color: #ccc; }
+  .btn-ghost:hover { background: #3a3d4a; }
+  .btn-ghost:disabled { opacity: 0.4; cursor: default; }
+  .btn-danger { background: #ef4444; color: #fff; }
+  .btn-danger:hover { background: #dc2626; }
+  .btn-export { background: #10b981; color: #fff; }
+  .btn-export:hover { background: #059669; }
+  .time-display { font-family: monospace; font-size: 0.88rem; color: #fff; background: #0f1117; padding: 4px 8px; border-radius: 5px; min-width: 75px; text-align: center; }
+  select { background: #2a2d3a; color: #ccc; border: 1px solid #3a3d4a; border-radius: 5px; padding: 4px 7px; font-size: 0.78rem; cursor: pointer; }
+
+  /* Tag buttons */
+  .tag-bar { display: flex; gap: 7px; flex-wrap: wrap; flex-shrink: 0; align-items: center; }
+  .tag-btn { border: none; border-radius: 8px; padding: 7px 14px; font-size: 0.8rem; font-weight: 700; cursor: pointer; transition: transform 0.1s, box-shadow 0.1s; display: flex; align-items: center; gap: 5px; }
+  .tag-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+  .tag-btn.active { outline: 3px solid #fff; outline-offset: 2px; }
+
+  /* Sub-menu */
+  .submenu { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; background: #1a1d27; border-radius: 8px; padding: 6px 10px; border: 1px solid #2a2d3a; flex-shrink: 0; min-height: 36px; }
+  .submenu-label { font-size: 0.72rem; color: #888; margin-right: 4px; }
+  .sub-btn { border: none; border-radius: 6px; padding: 4px 10px; font-size: 0.76rem; font-weight: 600; cursor: pointer; background: #2a2d3a; color: #ddd; transition: background 0.1s; display: flex; align-items: center; gap: 4px; }
+  .sub-btn:hover { background: #3a3d4a; }
+  .sub-btn .hotkey { font-size: 0.65rem; opacity: 0.55; background: rgba(255,255,255,0.1); padding: 1px 4px; border-radius: 3px; }
+  .submenu-empty { font-size: 0.75rem; color: #444; font-style: italic; }
+
+  /* Timeline */
+  .timeline-section { flex-shrink: 0; }
+  .timeline-label { font-size: 0.68rem; color: #666; margin-bottom: 3px; letter-spacing: 0.05em; text-transform: uppercase; }
+  .timeline-wrapper { position: relative; background: #1a1d27; border-radius: 8px; border: 1px solid #2a2d3a; padding: 8px 12px; }
+  .seekbar-container { position: relative; height: 6px; background: #2a2d3a; border-radius: 3px; cursor: pointer; margin-bottom: 7px; }
+  .seekbar-fill { height: 100%; background: #3b82f6; border-radius: 3px; pointer-events: none; }
+  .seekbar-thumb { position: absolute; top: 50%; transform: translate(-50%, -50%); width: 13px; height: 13px; background: #fff; border-radius: 50%; box-shadow: 0 0 4px rgba(0,0,0,0.5); pointer-events: none; }
+  .markers-track { position: relative; height: 26px; background: #0f1117; border-radius: 4px; overflow: visible; }
+  .marker { position: absolute; top: 2px; width: 4px; height: 22px; border-radius: 2px; transform: translateX(-50%); cursor: pointer; z-index: 2; }
+  .marker:hover { width: 6px; z-index: 10; }
+  .marker-tooltip { display: none; position: absolute; bottom: 130%; left: 50%; transform: translateX(-50%); background: #1a1d27; border: 1px solid #3a3d4a; border-radius: 5px; padding: 3px 7px; font-size: 0.68rem; white-space: nowrap; color: #fff; z-index: 20; }
+  .marker:hover .marker-tooltip { display: block; }
+  .legend { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 5px; }
+  .legend-item { display: flex; align-items: center; gap: 4px; font-size: 0.7rem; color: #aaa; }
+  .legend-dot { width: 9px; height: 9px; border-radius: 2px; }
+
+  /* List */
+  .list-section { flex: 1; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
+  .list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; flex-shrink: 0; }
+  .list-header h2 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #666; }
+  .annotations-list { overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 3px; padding-right: 2px; }
+  .annotation-row { display: grid; grid-template-columns: 55px 90px 90px 1fr auto; align-items: center; gap: 8px; background: #1a1d27; border-radius: 6px; padding: 5px 10px; border-left: 3px solid; font-size: 0.77rem; cursor: pointer; transition: background 0.1s; }
+  .annotation-row:hover { background: #22253a; }
+  .ann-time { font-family: monospace; color: #aaa; font-size: 0.73rem; }
+  .ann-type { font-weight: 700; }
+  .ann-name { color: #bbb; }
+  .ann-yt a { color: #3b82f6; font-size: 0.7rem; text-decoration: none; }
+  .ann-yt a:hover { text-decoration: underline; }
+  .ann-del { background: none; border: none; color: #555; cursor: pointer; font-size: 0.95rem; padding: 0 3px; }
+  .ann-del:hover { color: #ef4444; }
+  .empty-state { color: #444; font-size: 0.8rem; text-align: center; padding: 20px; }
+</style>
+</head>
+<body>
+
+<header>
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><path d="M2 12h20"/></svg>
+  <h1>Touch Rugby Annotator</h1>
+  <span class="yt-label">YouTube URL:</span>
+  <input class="yt-input" id="ytUrl" type="text" placeholder="https://www.youtube.com/watch?v=... (optional)">
+</header>
+
+<div class="main">
+
+  <div class="video-wrapper" id="videoWrapper">
+    <div class="no-video" id="noVideo">
+      <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="7" width="16" height="12" rx="2"/><path d="m18 10 4-2v8l-4-2"/></svg>
+      <p>Load a video file to begin</p>
+      <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">Open Video</button>
+      <input type="file" id="fileInput" accept="video/*" style="display:none" onchange="loadVideo(event)">
+    </div>
+    <video id="vid" style="display:none" onclick="togglePlay()"></video>
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-ghost" onclick="document.getElementById('fileInput').click()">📂 Open</button>
+    <button class="btn btn-primary" id="playBtn" onclick="togglePlay()" disabled>▶ Play</button>
+    <button class="btn btn-ghost" onclick="skip(-5)" disabled id="skipBk">−5s</button>
+    <button class="btn btn-ghost" onclick="skip(5)" disabled id="skipFw">+5s</button>
+    <button class="btn btn-ghost" onclick="gotoLastAnnotation()" id="lastAnnBtn" disabled title="Jump to last annotation">⏮ Last Tag</button>
+    <span class="time-display" id="timeCurrent">0:00:00</span>
+    <span style="color:#555">/</span>
+    <span class="time-display" id="timeDuration">0:00:00</span>
+    <span style="font-size:0.72rem;color:#888">Speed:</span>
+    <select id="speedSel" onchange="setSpeed()" disabled>
+      <option value="0.25">0.25×</option>
+      <option value="0.5">0.5×</option>
+      <option value="1" selected>1×</option>
+      <option value="1.5">1.5×</option>
+      <option value="2">2×</option>
+    </select>
+    <button class="btn btn-export" onclick="exportCSV()">⬇ Export CSV</button>
+    <button class="btn btn-ghost" onclick="document.getElementById('csvInput').click()">📂 Load CSV</button>
+    <input type="file" id="csvInput" accept=".csv" style="display:none" onchange="loadCSV(event)">
+  </div>
+
+  <!-- Action buttons -->
+  <div class="tag-bar" id="tagBar">
+    <span style="font-size:0.72rem;color:#666;margin-right:2px">ACTION:</span>
+    <button class="tag-btn" style="background:#f59e0b;color:#000" data-type="Try" onclick="selectType('Try')">Try <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.15);padding:1px 4px;border-radius:3px">T</kbd></button>
+    <button class="tag-btn" style="background:#ef4444;color:#fff" data-type="Turnover" onclick="selectType('Turnover')">Turnover <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">U</kbd></button>
+    <button class="tag-btn" style="background:#a855f7;color:#fff" data-type="Penalty" onclick="selectType('Penalty')">Penalty <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">P</kbd></button>
+    <button class="tag-btn" style="background:#10b981;color:#fff" data-type="Game Event" onclick="selectType('Game Event')">Game Event <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">G</kbd></button>
+    <button class="tag-btn" style="background:#f97316;color:#fff" data-type="To Review" onclick="selectType('To Review')">To Review <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">R</kbd></button>
+  </div>
+
+  <!-- Sub-action buttons -->
+  <div class="submenu" id="submenu">
+    <span class="submenu-empty">Select an action above — then choose a sub-type (or press 1–9)</span>
+  </div>
+
+  <!-- Timeline -->
+  <div class="timeline-section">
+    <div class="timeline-label">Timeline</div>
+    <div class="timeline-wrapper">
+      <div class="seekbar-container" id="seekbar" onmousedown="startSeek(event)">
+        <div class="seekbar-fill" id="seekFill" style="width:0%"></div>
+        <div class="seekbar-thumb" id="seekThumb" style="left:0%"></div>
+      </div>
+      <div class="markers-track" id="markersTrack"></div>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div>Try</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div>Turnover</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#a855f7"></div>Penalty</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#10b981"></div>Game Event</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#f97316"></div>To Review</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Annotations list -->
+  <div class="list-section">
+    <div class="list-header">
+      <h2>Annotations (<span id="annCount">0</span>)</h2>
+      <button class="btn btn-danger" onclick="clearAll()" style="font-size:0.72rem;padding:3px 9px">Clear All</button>
+    </div>
+    <div class="annotations-list" id="annList">
+      <div class="empty-state">No annotations yet — load a video and start tagging</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const COLORS = { 'Try':'#f59e0b', 'Turnover':'#ef4444', 'Penalty':'#a855f7', 'Game Event':'#10b981', 'To Review':'#f97316' };
+
+const MENU = {
+  "Penalty":    ["Offside","Touch and Pass","Forward Pass","Delay of Play","In the Ruck","Shoulder","Off the Mark","Not Moving Forward"],
+  "Turnover":   ["Ball Down","6th Touch","Dummy Touch","Bad Roll","6 Again","Interception"],
+  "Game Event": ["Game Start","Game End"],
+  "Try":        ["Scoop","Other","32 - Long","33 Quicky","33","32 Cut","French Flair"],
+  "To Review":  []
+};
+
+let annotations = [];
+let videoLoaded = false;
+let videoBaseName = 'touch_rugby_annotations';
+let selectedType = null;
+
+const vid = document.getElementById('vid');
+
+// ── Video loading ──────────────────────────────────────────────
+function loadVideo(e) {
+  const f = e.target.files[0];
+  if (!f) return;
+  videoBaseName = f.name.replace(/\.[^/.]+$/, '');
+  vid.src = URL.createObjectURL(f);
+  vid.style.display = 'block';
+  document.getElementById('noVideo').style.display = 'none';
+  vid.onloadedmetadata = () => {
+    document.getElementById('timeDuration').textContent = fmt(vid.duration);
+    videoLoaded = true;
+    ['playBtn','skipBk','skipFw','speedSel'].forEach(id => document.getElementById(id).removeAttribute('disabled'));
+    if (confirm(`Video loaded: "${f.name}"\n\nLoad a matching CSV file?\n(Look for "${videoBaseName}.csv" in the same folder)`))
+      document.getElementById('csvInput').click();
+  };
+  vid.ontimeupdate = updateProgress;
+  vid.onended = () => document.getElementById('playBtn').textContent = '▶ Play';
+}
+
+// ── Playback ───────────────────────────────────────────────────
+function fmt(s) {
+  if (!s || isNaN(s)) return '0:00:00';
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = Math.floor(s%60);
+  return `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+}
+function togglePlay() {
+  if (!videoLoaded) return;
+  if (vid.paused) { vid.play(); document.getElementById('playBtn').textContent = '⏸ Pause'; }
+  else { vid.pause(); document.getElementById('playBtn').textContent = '▶ Play'; }
+}
+function skip(s) { if (videoLoaded) vid.currentTime = Math.max(0, Math.min(vid.duration, vid.currentTime + s)); }
+function setSpeed() { if (videoLoaded) vid.playbackRate = parseFloat(document.getElementById('speedSel').value); }
+function updateProgress() {
+  const pct = vid.duration ? (vid.currentTime / vid.duration * 100) : 0;
+  document.getElementById('seekFill').style.width = pct + '%';
+  document.getElementById('seekThumb').style.left = pct + '%';
+  document.getElementById('timeCurrent').textContent = fmt(vid.currentTime);
+}
+function gotoLastAnnotation() {
+  if (!videoLoaded || annotations.length === 0) return;
+  vid.currentTime = annotations[annotations.length - 1].time;
+}
+
+// ── Seek bar ───────────────────────────────────────────────────
+let seeking = false;
+function startSeek(e) {
+  if (!videoLoaded) return;
+  seeking = true; doSeek(e);
+  document.addEventListener('mousemove', doSeekMove);
+  document.addEventListener('mouseup', endSeek);
+}
+function doSeekMove(e) { if (seeking) doSeek(e); }
+function endSeek() { seeking = false; document.removeEventListener('mousemove', doSeekMove); document.removeEventListener('mouseup', endSeek); }
+function doSeek(e) {
+  const r = document.getElementById('seekbar').getBoundingClientRect();
+  vid.currentTime = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * vid.duration;
+}
+
+// ── Type / sub-type selection ──────────────────────────────────
+function selectType(type) {
+  selectedType = type;
+  document.querySelectorAll('.tag-btn').forEach(b => b.classList.toggle('active', b.dataset.type === type));
+  renderSubmenu(type);
+  // If no sub-options, tag immediately
+  if (MENU[type].length === 0) tag(type, '');
+}
+
+function renderSubmenu(type) {
+  const el = document.getElementById('submenu');
+  const opts = MENU[type];
+  if (!opts || opts.length === 0) {
+    el.innerHTML = `<span class="submenu-empty" style="color:#666">Tagging <strong style="color:${COLORS[type]}">${type}</strong> — no sub-type needed</span>`;
+    return;
+  }
+  el.innerHTML = `<span class="submenu-label" style="color:${COLORS[type]}">${type}:</span>` +
+    opts.map((o, i) => `<button class="sub-btn" onclick="tag('${type}','${o.replace(/'/g,"\\'")}')">
+      <span class="hotkey">${i+1}</span>${o}
+    </button>`).join('');
+}
+
+// ── Tagging ────────────────────────────────────────────────────
+function tag(type, name) {
+  if (!videoLoaded) return;
+  const t = vid.currentTime;
+  annotations.push({ id: Date.now() + Math.random(), type, name, time: t, timeStr: fmt(t) });
+  annotations.sort((a,b) => a.time - b.time);
+  renderList();
+  renderMarkers();
+  flashType(type);
+  document.getElementById('lastAnnBtn').removeAttribute('disabled');
+  // Clear selection
+  selectedType = null;
+  document.querySelectorAll('.tag-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('submenu').innerHTML = '<span class="submenu-empty">Select an action above — then choose a sub-type (or press 1–9)</span>';
+}
+
+function flashType(type) {
+  const el = document.querySelector(`.tag-btn[data-type="${type}"]`);
+  if (!el) return;
+  el.style.transform = 'scale(1.09)';
+  setTimeout(() => el.style.transform = '', 200);
+}
+
+// ── Annotations rendering ──────────────────────────────────────
+function ytLink(timeSeconds) {
+  const url = document.getElementById('ytUrl').value.trim();
+  if (!url) return '';
+  // Extract video ID from various YouTube URL formats
+  const m = url.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/);
+  if (!m) return '';
+  const t = Math.max(0, Math.floor(timeSeconds) - 5);
+  return `https://www.youtube.com/watch?v=${m[1]}&t=${t}s`;
+}
+
+function renderList() {
+  const el = document.getElementById('annList');
+  document.getElementById('annCount').textContent = annotations.length;
+  if (annotations.length === 0) {
+    el.innerHTML = '<div class="empty-state">No annotations yet</div>';
+    return;
+  }
+  el.innerHTML = annotations.map(a => {
+    const yt = ytLink(a.time);
+    const ytCell = yt ? `<a href="${yt}" target="_blank" title="Open YouTube -5s">▶ YT</a>` : '<span style="color:#333">—</span>';
+    return `<div class="annotation-row" style="border-color:${COLORS[a.type]}" onclick="seekTo(${a.time})">
+      <span class="ann-time">${a.timeStr}</span>
+      <span class="ann-type" style="color:${COLORS[a.type]}">${a.type}</span>
+      <span class="ann-name">${a.name || '—'}</span>
+      <span class="ann-yt">${ytCell}</span>
+      <button class="ann-del" onclick="event.stopPropagation();deleteAnnotation(${a.id})" title="Delete">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function renderMarkers() {
+  const track = document.getElementById('markersTrack');
+  if (!vid.duration) { track.innerHTML = ''; return; }
+  track.innerHTML = annotations.map(a => {
+    const pct = (a.time / vid.duration * 100).toFixed(3);
+    return `<div class="marker" style="left:${pct}%;background:${COLORS[a.type]}" onclick="seekTo(${a.time})">
+      <div class="marker-tooltip">${a.type}${a.name ? ': '+a.name : ''} @ ${a.timeStr}</div>
+    </div>`;
+  }).join('');
+}
+
+function seekTo(t) { if (videoLoaded) vid.currentTime = t; }
+
+function deleteAnnotation(id) {
+  annotations = annotations.filter(a => a.id !== id);
+  renderList(); renderMarkers();
+  if (annotations.length === 0) document.getElementById('lastAnnBtn').setAttribute('disabled','');
+}
+
+function clearAll() {
+  if (!annotations.length) return;
+  if (confirm('Delete all annotations?')) {
+    annotations = [];
+    renderList(); renderMarkers();
+    document.getElementById('lastAnnBtn').setAttribute('disabled','');
+  }
+}
+
+// ── CSV export ─────────────────────────────────────────────────
+function exportCSV() {
+  if (annotations.length === 0) { alert('No annotations to export.'); return; }
+  const ytBase = document.getElementById('ytUrl').value.trim();
+  const m = ytBase.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/);
+  const vid_name = videoBaseName;
+  const rows = ['Time,Type,Name,Video Name,To Review,Comment,Youtube Link',
+    ...annotations.map(a => {
+      const yt = ytLink(a.time);
+      const toReview = a.type === 'To Review' ? 'Yes' : '';
+      return `${a.timeStr},${a.type},${a.name},${vid_name},${toReview},,${yt}`;
+    })
+  ];
+  const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `${videoBaseName}.csv`;
+  link.click(); URL.revokeObjectURL(link.href);
+}
+
+// ── CSV import ─────────────────────────────────────────────────
+function loadCSV(e) {
+  const f = e.target.files[0]; if (!f) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const lines = ev.target.result.trim().split('\n').slice(1).filter(l => l.trim());
+    const loaded = [];
+    for (const line of lines) {
+      const parts = line.split(',');
+      if (parts.length < 3) continue;
+      const timeStr = parts[0].trim();
+      const type = parts[1].trim();
+      const name = parts[2].trim();
+      if (!COLORS[type]) continue;
+      // Parse timeStr HH:MM:SS to seconds
+      const tp = timeStr.split(':').map(Number);
+      const time = tp.length === 3 ? tp[0]*3600+tp[1]*60+tp[2] : tp[0]*60+tp[1];
+      if (isNaN(time)) continue;
+      loaded.push({ id: Date.now()+Math.random(), type, name, time, timeStr });
+    }
+    if (!loaded.length) { alert('No valid annotations found in CSV.'); return; }
+    annotations = loaded.sort((a,b)=>a.time-b.time);
+    renderList(); renderMarkers();
+    if (annotations.length) document.getElementById('lastAnnBtn').removeAttribute('disabled');
+    alert(`Loaded ${loaded.length} annotation(s) from "${f.name}"`);
+  };
+  reader.readAsText(f);
+  e.target.value = '';
+}
+
+// ── Keyboard shortcuts ─────────────────────────────────────────
+const TYPE_KEYS = { 't':'Try', 'u':'Turnover', 'p':'Penalty', 'g':'Game Event', 'r':'To Review' };
+
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  const k = e.key.toLowerCase();
+
+  // Playback
+  if (k === ' ') { e.preventDefault(); togglePlay(); return; }
+  if (e.key === 'ArrowLeft') { skip(-5); return; }
+  if (e.key === 'ArrowRight') { skip(5); return; }
+  if (e.key === 'Escape') {
+    selectedType = null;
+    document.querySelectorAll('.tag-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('submenu').innerHTML = '<span class="submenu-empty">Select an action above — then choose a sub-type (or press 1–9)</span>';
+    return;
+  }
+
+  // Type selection
+  if (TYPE_KEYS[k]) { selectType(TYPE_KEYS[k]); return; }
+
+  // Sub-type by number
+  if (selectedType && /^[1-9]$/.test(e.key)) {
+    const opts = MENU[selectedType];
+    const idx = parseInt(e.key) - 1;
+    if (idx < opts.length) { e.preventDefault(); tag(selectedType, opts[idx]); }
+  }
+});
+</script>
+</body>
+</html>
