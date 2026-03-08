@@ -1,0 +1,878 @@
+
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+      <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
+      <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+      <style>
+        body { font-family: sans-serif; margin: 20px; }
+        .table {
+            font-family: Arial, Helvetica, sans-serif;
+            border-collapse: collapse;
+            width: 800px; /* Match chart width */
+            margin: 20px auto;
+        }
+        .table td, .table th {
+            border: 1px solid #ddd;
+            padding: 8px;
+        }
+        .table tr:nth-child(even){background-color: #f2f2f2;}
+        .table tr:hover {background-color: #ddd;}
+        .table th {
+            padding-top: 12px;
+            padding-bottom: 12px;
+            text-align: left;
+            background-color: #04AA6D;
+            color: white;
+        }
+        h2 { text-align: center; }
+        #vis { width: 100%; display: flex; justify-content: center; }
+      </style>
+    </head>
+    <body>
+      <div id="vis"></div>
+      <h2>Team Statistics</h2>
+      <table class="dataframe table">
+  <thead>
+    <tr style="text-align: right;">
+      <th>Team</th>
+      <th>Possessions</th>
+      <th>Tries</th>
+      <th>Success Rate (%)</th>
+      <th>Completions</th>
+      <th>Avg Time (s)</th>
+      <th>Total Time (s)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>arrows</td>
+      <td>14</td>
+      <td>4</td>
+      <td>28.6%</td>
+      <td>7</td>
+      <td>46.3</td>
+      <td>648.0</td>
+    </tr>
+    <tr>
+      <td>rcl</td>
+      <td>14</td>
+      <td>4</td>
+      <td>28.6%</td>
+      <td>7</td>
+      <td>39.3</td>
+      <td>550.0</td>
+    </tr>
+  </tbody>
+</table>
+      <script>
+        var spec = {
+  "$schema": "https://vega.github.io/schema/vega-lite/v6.1.0.json",
+  "config": {
+    "view": {
+      "continuousHeight": 300,
+      "continuousWidth": 300
+    }
+  },
+  "datasets": {
+    "data-2a7934c943e60683d2076127c499a0f2": [
+      {
+        "Count": 0,
+        "Event": "Game Start",
+        "GameTime": "1999-01-01T00:00:00",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=2790s",
+        "Team": "rcl"
+      },
+      {
+        "Count": 1,
+        "Event": "Touch and Pass",
+        "GameTime": "1999-01-01T00:04:28",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=3058s",
+        "Team": "rcl"
+      },
+      {
+        "Count": 2,
+        "Event": "Shoulder",
+        "GameTime": "1999-01-01T00:18:48",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=3918s",
+        "Team": "rcl"
+      },
+      {
+        "Count": 3,
+        "Event": "Forward Pass",
+        "GameTime": "1999-01-01T00:24:09",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=4239s",
+        "Team": "rcl"
+      },
+      {
+        "Count": 3,
+        "Event": "Game End",
+        "GameTime": "1999-01-01T00:24:52",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=4282s",
+        "Team": "rcl"
+      },
+      {
+        "Count": 0,
+        "Event": "Game Start",
+        "GameTime": "1999-01-01T00:00:00",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=2790s",
+        "Team": "arrows"
+      },
+      {
+        "Count": 1,
+        "Event": "Forward Pass",
+        "GameTime": "1999-01-01T00:02:37",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=2947s",
+        "Team": "arrows"
+      },
+      {
+        "Count": 2,
+        "Event": "Forward Pass",
+        "GameTime": "1999-01-01T00:03:47",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=3017s",
+        "Team": "arrows"
+      },
+      {
+        "Count": 3,
+        "Event": "Forward Pass",
+        "GameTime": "1999-01-01T00:17:59",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=3869s",
+        "Team": "arrows"
+      },
+      {
+        "Count": 4,
+        "Event": "Touch and Pass",
+        "GameTime": "1999-01-01T00:22:23",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=4133s",
+        "Team": "arrows"
+      },
+      {
+        "Count": 4,
+        "Event": "Game End",
+        "GameTime": "1999-01-01T00:24:52",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=4282s",
+        "Team": "arrows"
+      }
+    ],
+    "data-5daa117f582f0284321d4be349052ffd": [
+      {
+        "Count": 0,
+        "Event": "Game Start",
+        "GameTime": "1999-01-01T00:00:00",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=2790s",
+        "Team": "rcl"
+      },
+      {
+        "Count": 1,
+        "Event": "33",
+        "GameTime": "1999-01-01T00:00:05",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=2795s",
+        "Team": "rcl"
+      },
+      {
+        "Count": 2,
+        "Event": "32 - Long",
+        "GameTime": "1999-01-01T00:01:46",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=2896s",
+        "Team": "rcl"
+      },
+      {
+        "Count": 3,
+        "Event": "Scoop",
+        "GameTime": "1999-01-01T00:06:58",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=3208s",
+        "Team": "rcl"
+      },
+      {
+        "Count": 4,
+        "Event": "Other",
+        "GameTime": "1999-01-01T00:20:08",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=3998s",
+        "Team": "rcl"
+      },
+      {
+        "Count": 4,
+        "Event": "Game End",
+        "GameTime": "1999-01-01T00:24:52",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=4282s",
+        "Team": "rcl"
+      },
+      {
+        "Count": 0,
+        "Event": "Game Start",
+        "GameTime": "1999-01-01T00:00:00",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=2790s",
+        "Team": "arrows"
+      },
+      {
+        "Count": 1,
+        "Event": "33 Quicky",
+        "GameTime": "1999-01-01T00:00:58",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=2848s",
+        "Team": "arrows"
+      },
+      {
+        "Count": 2,
+        "Event": "33",
+        "GameTime": "1999-01-01T00:08:38",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=3308s",
+        "Team": "arrows"
+      },
+      {
+        "Count": 3,
+        "Event": "33 Quicky",
+        "GameTime": "1999-01-01T00:10:31",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=3421s",
+        "Team": "arrows"
+      },
+      {
+        "Count": 4,
+        "Event": "Other",
+        "GameTime": "1999-01-01T00:11:55",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=3505s",
+        "Team": "arrows"
+      },
+      {
+        "Count": 5,
+        "Event": "Scoop",
+        "GameTime": "1999-01-01T00:21:03",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=4053s",
+        "Team": "arrows"
+      },
+      {
+        "Count": 5,
+        "Event": "Game End",
+        "GameTime": "1999-01-01T00:24:52",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=4282s",
+        "Team": "arrows"
+      }
+    ],
+    "data-746f375fa7e23244d4375846362e8784": [
+      {
+        "Color_Category": "Try",
+        "Duration_Sec": 5.0,
+        "End": "1999-01-01T00:00:05",
+        "End_Event": "33",
+        "End_Type": "Try",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=2795s",
+        "Start": "1999-01-01T00:00:00",
+        "Team": "rcl"
+      },
+      {
+        "Color_Category": "Try",
+        "Duration_Sec": 53.0,
+        "End": "1999-01-01T00:00:58",
+        "End_Event": "33 Quicky",
+        "End_Type": "Try",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=2848s",
+        "Start": "1999-01-01T00:00:05",
+        "Team": "arrows"
+      },
+      {
+        "Color_Category": "Try",
+        "Duration_Sec": 48.0,
+        "End": "1999-01-01T00:01:46",
+        "End_Event": "32 - Long",
+        "End_Type": "Try",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=2896s",
+        "Start": "1999-01-01T00:00:58",
+        "Team": "rcl"
+      },
+      {
+        "Color_Category": "Penalty",
+        "Duration_Sec": 51.0,
+        "End": "1999-01-01T00:02:37",
+        "End_Event": "Forward Pass",
+        "End_Type": "Penalty",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=2947s",
+        "Start": "1999-01-01T00:01:46",
+        "Team": "arrows"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 30.0,
+        "End": "1999-01-01T00:03:07",
+        "End_Event": "Ball Down",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=2977s",
+        "Start": "1999-01-01T00:02:37",
+        "Team": "rcl"
+      },
+      {
+        "Color_Category": "Penalty",
+        "Duration_Sec": 40.0,
+        "End": "1999-01-01T00:03:47",
+        "End_Event": "Forward Pass",
+        "End_Type": "Penalty",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=3017s",
+        "Start": "1999-01-01T00:03:07",
+        "Team": "arrows"
+      },
+      {
+        "Color_Category": "Penalty",
+        "Duration_Sec": 41.0,
+        "End": "1999-01-01T00:04:28",
+        "End_Event": "Touch and Pass",
+        "End_Type": "Penalty",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=3058s",
+        "Start": "1999-01-01T00:03:47",
+        "Team": "rcl"
+      },
+      {
+        "Color_Category": "6th Touch",
+        "Duration_Sec": 32.0,
+        "End": "1999-01-01T00:05:00",
+        "End_Event": "6th Touch",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=3090s",
+        "Start": "1999-01-01T00:04:28",
+        "Team": "arrows"
+      },
+      {
+        "Color_Category": "6th Touch",
+        "Duration_Sec": 40.0,
+        "End": "1999-01-01T00:05:40",
+        "End_Event": "6th Touch",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=3130s",
+        "Start": "1999-01-01T00:05:00",
+        "Team": "rcl"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 40.0,
+        "End": "1999-01-01T00:06:20",
+        "End_Event": "Ball Down",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=3170s",
+        "Start": "1999-01-01T00:05:40",
+        "Team": "arrows"
+      },
+      {
+        "Color_Category": "Try",
+        "Duration_Sec": 38.0,
+        "End": "1999-01-01T00:06:58",
+        "End_Event": "Scoop",
+        "End_Type": "Try",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=3208s",
+        "Start": "1999-01-01T00:06:20",
+        "Team": "rcl"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 40.0,
+        "End": "1999-01-01T00:07:38",
+        "End_Event": "Ball Down",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=3248s",
+        "Start": "1999-01-01T00:06:58",
+        "Team": "arrows"
+      },
+      {
+        "Color_Category": "6th Touch",
+        "Duration_Sec": 26.0,
+        "End": "1999-01-01T00:08:04",
+        "End_Event": "6th Touch",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=3274s",
+        "Start": "1999-01-01T00:07:38",
+        "Team": "rcl"
+      },
+      {
+        "Color_Category": "Try",
+        "Duration_Sec": 34.0,
+        "End": "1999-01-01T00:08:38",
+        "End_Event": "33",
+        "End_Type": "Try",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=3308s",
+        "Start": "1999-01-01T00:08:04",
+        "Team": "arrows"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 40.0,
+        "End": "1999-01-01T00:09:18",
+        "End_Event": "Ball Down",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=3348s",
+        "Start": "1999-01-01T00:08:38",
+        "Team": "rcl"
+      },
+      {
+        "Color_Category": "Try",
+        "Duration_Sec": 73.0,
+        "End": "1999-01-01T00:10:31",
+        "End_Event": "33 Quicky",
+        "End_Type": "Try",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=3421s",
+        "Start": "1999-01-01T00:09:18",
+        "Team": "arrows"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 53.0,
+        "End": "1999-01-01T00:11:24",
+        "End_Event": "Interception",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=3474s",
+        "Start": "1999-01-01T00:10:31",
+        "Team": "rcl"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 63.0,
+        "End": "1999-01-01T00:12:27",
+        "End_Event": "Game End",
+        "End_Type": "Game Event",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=3537s",
+        "Start": "1999-01-01T00:11:24",
+        "Team": "arrows"
+      },
+      {
+        "Color_Category": "Penalty",
+        "Duration_Sec": 38.0,
+        "End": "1999-01-01T00:17:59",
+        "End_Event": "Forward Pass",
+        "End_Type": "Penalty",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=3869s",
+        "Start": "1999-01-01T00:17:21",
+        "Team": "arrows"
+      },
+      {
+        "Color_Category": "6th Touch",
+        "Duration_Sec": 41.0,
+        "End": "1999-01-01T00:18:40",
+        "End_Event": "6th Touch",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=3910s",
+        "Start": "1999-01-01T00:17:59",
+        "Team": "rcl"
+      },
+      {
+        "Color_Category": "6th Touch",
+        "Duration_Sec": 53.0,
+        "End": "1999-01-01T00:19:33",
+        "End_Event": "6th Touch",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=3963s",
+        "Start": "1999-01-01T00:18:40",
+        "Team": "arrows"
+      },
+      {
+        "Color_Category": "Try",
+        "Duration_Sec": 35.0,
+        "End": "1999-01-01T00:20:08",
+        "End_Event": "Other",
+        "End_Type": "Try",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=3998s",
+        "Start": "1999-01-01T00:19:33",
+        "Team": "rcl"
+      },
+      {
+        "Color_Category": "Try",
+        "Duration_Sec": 55.0,
+        "End": "1999-01-01T00:21:03",
+        "End_Event": "Scoop",
+        "End_Type": "Try",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=4053s",
+        "Start": "1999-01-01T00:20:08",
+        "Team": "arrows"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 37.0,
+        "End": "1999-01-01T00:21:40",
+        "End_Event": "Ball Down",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=4090s",
+        "Start": "1999-01-01T00:21:03",
+        "Team": "rcl"
+      },
+      {
+        "Color_Category": "Penalty",
+        "Duration_Sec": 43.0,
+        "End": "1999-01-01T00:22:23",
+        "End_Event": "Touch and Pass",
+        "End_Type": "Penalty",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=4133s",
+        "Start": "1999-01-01T00:21:40",
+        "Team": "arrows"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 36.0,
+        "End": "1999-01-01T00:22:59",
+        "End_Event": "Ball Down",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=4169s",
+        "Start": "1999-01-01T00:22:23",
+        "Team": "rcl"
+      },
+      {
+        "Color_Category": "6th Touch",
+        "Duration_Sec": 33.0,
+        "End": "1999-01-01T00:23:32",
+        "End_Event": "6th Touch",
+        "End_Type": "Turnover",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=4202s",
+        "Start": "1999-01-01T00:22:59",
+        "Team": "arrows"
+      },
+      {
+        "Color_Category": "Other",
+        "Duration_Sec": 80.0,
+        "End": "1999-01-01T00:24:52",
+        "End_Event": "Game End",
+        "End_Type": "Game Event",
+        "Link": "https://www.youtube.com/watch?v=uQWDPyMTkkw&t=4282s",
+        "Start": "1999-01-01T00:23:32",
+        "Team": "rcl"
+      }
+    ]
+  },
+  "params": [
+    {
+      "bind": "scales",
+      "name": "param_1e9efca18e7a2868",
+      "select": {
+        "encodings": [
+          "x",
+          "y"
+        ],
+        "type": "interval"
+      },
+      "views": [
+        "view_7d84a45c9649e98e_0",
+        "view_8a442c42e90a43c2_0"
+      ]
+    }
+  ],
+  "resolve": {
+    "scale": {
+      "color": "independent"
+    }
+  },
+  "vconcat": [
+    {
+      "data": {
+        "name": "data-5daa117f582f0284321d4be349052ffd"
+      },
+      "height": 200,
+      "layer": [
+        {
+          "encoding": {
+            "color": {
+              "field": "Team",
+              "scale": {
+                "domain": [
+                  "rcl",
+                  "arrows"
+                ],
+                "range": [
+                  "#008000",
+                  "#FF0000"
+                ]
+              },
+              "type": "nominal"
+            },
+            "order": {
+              "field": "GameTime",
+              "type": "temporal"
+            },
+            "x": {
+              "axis": {
+                "format": "%H:%M:%S",
+                "title": "Game Time"
+              },
+              "field": "GameTime",
+              "type": "temporal"
+            },
+            "y": {
+              "axis": {
+                "tickMinStep": 1
+              },
+              "field": "Count",
+              "title": "Cumulative Tries",
+              "type": "quantitative"
+            }
+          },
+          "mark": {
+            "interpolate": "step-after",
+            "type": "line"
+          },
+          "name": "view_7d84a45c9649e98e_0"
+        },
+        {
+          "encoding": {
+            "color": {
+              "field": "Team",
+              "scale": {
+                "domain": [
+                  "rcl",
+                  "arrows"
+                ],
+                "range": [
+                  "#008000",
+                  "#FF0000"
+                ]
+              },
+              "type": "nominal"
+            },
+            "href": {
+              "field": "Link",
+              "type": "nominal"
+            },
+            "tooltip": [
+              {
+                "field": "GameTime",
+                "type": "temporal"
+              },
+              {
+                "field": "Team",
+                "type": "nominal"
+              },
+              {
+                "field": "Event",
+                "type": "nominal"
+              },
+              {
+                "field": "Count",
+                "type": "quantitative"
+              }
+            ],
+            "x": {
+              "axis": {
+                "format": "%H:%M:%S",
+                "title": "Game Time"
+              },
+              "field": "GameTime",
+              "type": "temporal"
+            },
+            "y": {
+              "axis": {
+                "tickMinStep": 1
+              },
+              "field": "Count",
+              "title": "Cumulative Tries",
+              "type": "quantitative"
+            }
+          },
+          "mark": {
+            "size": 100,
+            "type": "circle"
+          },
+          "transform": [
+            {
+              "filter": "((datum.Event !== 'Game Start') && (datum.Event !== 'Game End'))"
+            }
+          ]
+        }
+      ],
+      "title": "Tries vs Time",
+      "width": 800
+    },
+    {
+      "data": {
+        "name": "data-2a7934c943e60683d2076127c499a0f2"
+      },
+      "height": 200,
+      "layer": [
+        {
+          "encoding": {
+            "color": {
+              "field": "Team",
+              "scale": {
+                "domain": [
+                  "rcl",
+                  "arrows"
+                ],
+                "range": [
+                  "#008000",
+                  "#FF0000"
+                ]
+              },
+              "type": "nominal"
+            },
+            "order": {
+              "field": "GameTime",
+              "type": "temporal"
+            },
+            "x": {
+              "axis": {
+                "format": "%H:%M:%S",
+                "title": "Game Time"
+              },
+              "field": "GameTime",
+              "type": "temporal"
+            },
+            "y": {
+              "axis": {
+                "tickMinStep": 1
+              },
+              "field": "Count",
+              "title": "Cumulative Penalties",
+              "type": "quantitative"
+            }
+          },
+          "mark": {
+            "interpolate": "step-after",
+            "type": "line"
+          },
+          "name": "view_8a442c42e90a43c2_0"
+        },
+        {
+          "encoding": {
+            "color": {
+              "field": "Team",
+              "scale": {
+                "domain": [
+                  "rcl",
+                  "arrows"
+                ],
+                "range": [
+                  "#008000",
+                  "#FF0000"
+                ]
+              },
+              "type": "nominal"
+            },
+            "href": {
+              "field": "Link",
+              "type": "nominal"
+            },
+            "tooltip": [
+              {
+                "field": "GameTime",
+                "type": "temporal"
+              },
+              {
+                "field": "Team",
+                "type": "nominal"
+              },
+              {
+                "field": "Event",
+                "type": "nominal"
+              },
+              {
+                "field": "Count",
+                "type": "quantitative"
+              }
+            ],
+            "x": {
+              "axis": {
+                "format": "%H:%M:%S",
+                "title": "Game Time"
+              },
+              "field": "GameTime",
+              "type": "temporal"
+            },
+            "y": {
+              "axis": {
+                "tickMinStep": 1
+              },
+              "field": "Count",
+              "title": "Cumulative Penalties",
+              "type": "quantitative"
+            }
+          },
+          "mark": {
+            "size": 100,
+            "type": "circle"
+          }
+        }
+      ],
+      "title": "Penalties vs Time",
+      "width": 800
+    },
+    {
+      "data": {
+        "name": "data-746f375fa7e23244d4375846362e8784"
+      },
+      "encoding": {
+        "color": {
+          "field": "Color_Category",
+          "scale": {
+            "domain": [
+              "Try",
+              "Penalty",
+              "6th Touch",
+              "Other"
+            ],
+            "range": [
+              "Green",
+              "Red",
+              "Gold",
+              "Orange"
+            ]
+          },
+          "title": "Outcome",
+          "type": "nominal"
+        },
+        "href": {
+          "field": "Link",
+          "type": "nominal"
+        },
+        "tooltip": [
+          {
+            "field": "Start",
+            "format": "%H:%M:%S",
+            "title": "Start",
+            "type": "temporal"
+          },
+          {
+            "field": "End",
+            "format": "%H:%M:%S",
+            "title": "End",
+            "type": "temporal"
+          },
+          {
+            "field": "Team",
+            "type": "nominal"
+          },
+          {
+            "field": "End_Event",
+            "type": "nominal"
+          },
+          {
+            "field": "End_Type",
+            "type": "nominal"
+          },
+          {
+            "field": "Duration_Sec",
+            "format": ".1f",
+            "title": "Duration (s)",
+            "type": "quantitative"
+          }
+        ],
+        "x": {
+          "axis": {
+            "format": "%H:%M:%S",
+            "title": "Game Time"
+          },
+          "field": "Start",
+          "type": "temporal"
+        },
+        "x2": {
+          "field": "End"
+        },
+        "y": {
+          "field": "Team",
+          "title": "Possession Owner",
+          "type": "nominal"
+        }
+      },
+      "height": 200,
+      "mark": {
+        "type": "bar"
+      },
+      "title": "Possession Timeline",
+      "width": 800
+    }
+  ]
+};
+        vegaEmbed('#vis', spec);
+      </script>
+    </body>
+    </html>
+    
