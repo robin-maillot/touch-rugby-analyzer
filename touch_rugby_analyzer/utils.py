@@ -82,9 +82,12 @@ def infer_possession_owner(data_df: pd.DataFrame):
             )
 
         if row.Type == "Game Event":
-            turnover = False
+            turnover = data_df.iloc[i - 1].Turnover
             if row.Name == "Game End":
-                possession_owner = new_possession_owners[-1]
+                if turnover:
+                    possession_owner = opponent(new_possession_owners[-1])
+                else:
+                    possession_owner = new_possession_owners[-1]
             else:
                 possession_owner = row_possession_owner
         elif row.Type == "To Review":
