@@ -368,6 +368,7 @@ def generate_htmls():
         full_data_df.append(simple_data_df)
 
     full_data_df = pd.concat(full_data_df, ignore_index=True, axis=0)
+    full_data_df.rename(columns={"Action Owner":"Team"}, inplace=True)
     full_data_df.to_csv(ASSETS_ROOT / "all_events.csv")
 
     # Delete all previous renders
