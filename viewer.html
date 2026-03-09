@@ -101,7 +101,8 @@
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><path d="M2 12h20"/></svg>
   <h1>Touch Rugby Annotator</h1>
   <span class="yt-label">YouTube URL:</span>
-  <input class="yt-input" id="ytUrl" type="text" placeholder="https://www.youtube.com/watch?v=... (optional)">
+  <input class="yt-input" id="ytUrl" type="text" placeholder="https://www.youtube.com/watch?v=..." onkeydown="if(event.key==='Enter')loadYouTube()">
+  <button class="btn btn-primary" onclick="loadYouTube()" style="padding:4px 10px;font-size:0.76rem">▶ Load YT</button>
 </header>
 
 <div class="main">
@@ -109,11 +110,15 @@
   <div class="video-wrapper" id="videoWrapper">
     <div class="no-video" id="noVideo">
       <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="7" width="16" height="12" rx="2"/><path d="m18 10 4-2v8l-4-2"/></svg>
-      <p>Load a video file to begin</p>
-      <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">Open Video</button>
+      <p>Load a local video file or paste a YouTube URL above</p>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">📂 Open Local Video</button>
+        <button class="btn btn-ghost" onclick="loadYouTube()">▶ Load YouTube URL</button>
+      </div>
       <input type="file" id="fileInput" accept="video/*" style="display:none" onchange="loadVideo(event)">
     </div>
     <video id="vid" style="display:none" onclick="togglePlay()"></video>
+    <div id="ytPlayerContainer" style="display:none;width:100%;height:100%"></div>
   </div>
 
   <div class="controls">
@@ -215,26 +220,101 @@ let selectedType = null;
 let pendingType = null;
 let pendingName = null;
 let wasPlaying = false;
+let videoMode = 'none'; // 'local' | 'youtube'
+let ytPlayer = null;
+let ytProgressInterval = null;
 
 const vid = document.getElementById('vid');
 
-// ── Video loading ──────────────────────────────────────────────
+// ── Video abstraction layer ────────────────────────────────────
+function getTime()     { return videoMode === 'youtube' ? (ytPlayer ? ytPlayer.getCurrentTime() : 0) : vid.currentTime; }
+function getDuration() { return videoMode === 'youtube' ? (ytPlayer ? ytPlayer.getDuration()    : 0) : vid.duration; }
+function isPaused()    { return videoMode === 'youtube' ? (!ytPlayer || ytPlayer.getPlayerState() !== YT.PlayerState.PLAYING) : vid.paused; }
+function doPlay()  { if (videoMode === 'youtube') { if (ytPlayer) ytPlayer.playVideo();  } else vid.play();  document.getElementById('playBtn').textContent = '⏸ Pause'; }
+function doPause() { if (videoMode === 'youtube') { if (ytPlayer) ytPlayer.pauseVideo(); } else vid.pause(); document.getElementById('playBtn').textContent = '▶ Play'; }
+function setCurrentTime(t) { if (videoMode === 'youtube') { if (ytPlayer) ytPlayer.seekTo(t, true); } else vid.currentTime = t; }
+function setRate(r)    { if (videoMode === 'youtube') { if (ytPlayer) ytPlayer.setPlaybackRate(r); } else vid.playbackRate = r; }
+
+function onVideoReady() {
+  videoLoaded = true;
+  document.getElementById('timeDuration').textContent = fmt(getDuration());
+  ['playBtn','skipBk','skipFw','speedSel'].forEach(id => document.getElementById(id).removeAttribute('disabled'));
+}
+
+// ── Local video loading ────────────────────────────────────────
 function loadVideo(e) {
   const f = e.target.files[0];
   if (!f) return;
   videoBaseName = f.name.replace(/\.[^/.]+$/, '');
+  // Tear down any active YouTube player
+  if (ytProgressInterval) { clearInterval(ytProgressInterval); ytProgressInterval = null; }
+  if (ytPlayer) { ytPlayer.destroy(); ytPlayer = null; }
+  document.getElementById('ytPlayerContainer').style.display = 'none';
+  videoMode = 'local';
   vid.src = URL.createObjectURL(f);
   vid.style.display = 'block';
   document.getElementById('noVideo').style.display = 'none';
   vid.onloadedmetadata = () => {
-    document.getElementById('timeDuration').textContent = fmt(vid.duration);
-    videoLoaded = true;
-    ['playBtn','skipBk','skipFw','speedSel'].forEach(id => document.getElementById(id).removeAttribute('disabled'));
+    onVideoReady();
     if (confirm(`Video loaded: "${f.name}"\n\nLoad a matching CSV file?\n(Look for "${videoBaseName}.csv" in the same folder)`))
       document.getElementById('csvInput').click();
   };
   vid.ontimeupdate = updateProgress;
   vid.onended = () => document.getElementById('playBtn').textContent = '▶ Play';
+}
+
+// ── YouTube loading ────────────────────────────────────────────
+function loadYouTube() {
+  const url = document.getElementById('ytUrl').value.trim();
+  const m = url.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/);
+  if (!m) { alert('Invalid YouTube URL — could not extract a video ID.'); return; }
+  const videoId = m[1];
+  videoBaseName = 'youtube_' + videoId;
+  // Tear down local video
+  vid.pause(); vid.src = ''; vid.style.display = 'none';
+  document.getElementById('noVideo').style.display = 'none';
+  document.getElementById('ytPlayerContainer').style.display = 'block';
+  if (ytProgressInterval) { clearInterval(ytProgressInterval); ytProgressInterval = null; }
+  videoMode = 'youtube';
+  if (window.YT && YT.Player) {
+    createYTPlayer(videoId);
+  } else {
+    window._ytPendingId = videoId;
+    if (!document.getElementById('ytApiScript')) {
+      const tag = document.createElement('script');
+      tag.id = 'ytApiScript';
+      tag.src = 'https://www.youtube.com/iframe_api';
+      document.head.appendChild(tag);
+    }
+  }
+}
+
+window.onYouTubeIframeAPIReady = function() {
+  if (window._ytPendingId) { createYTPlayer(window._ytPendingId); window._ytPendingId = null; }
+};
+
+function createYTPlayer(videoId) {
+  if (ytPlayer) { ytPlayer.destroy(); ytPlayer = null; }
+  // Replace container contents so YT.Player has a fresh target element
+  const container = document.getElementById('ytPlayerContainer');
+  container.innerHTML = '<div id="ytInner"></div>';
+  ytPlayer = new YT.Player('ytInner', {
+    videoId,
+    width: '100%',
+    height: '100%',
+    playerVars: { rel: 0, modestbranding: 1 },
+    events: {
+      onReady: () => {
+        onVideoReady();
+        ytProgressInterval = setInterval(updateProgress, 250);
+      },
+      onStateChange: ev => {
+        if      (ev.data === YT.PlayerState.PLAYING) document.getElementById('playBtn').textContent = '⏸ Pause';
+        else if (ev.data === YT.PlayerState.PAUSED ||
+                 ev.data === YT.PlayerState.ENDED)  document.getElementById('playBtn').textContent = '▶ Play';
+      }
+    }
+  });
 }
 
 // ── Playback ───────────────────────────────────────────────────
@@ -245,20 +325,20 @@ function fmt(s) {
 }
 function togglePlay() {
   if (!videoLoaded) return;
-  if (vid.paused) { vid.play(); document.getElementById('playBtn').textContent = '⏸ Pause'; }
-  else { vid.pause(); document.getElementById('playBtn').textContent = '▶ Play'; }
+  if (isPaused()) doPlay(); else doPause();
 }
-function skip(s) { if (videoLoaded) vid.currentTime = Math.max(0, Math.min(vid.duration, vid.currentTime + s)); }
-function setSpeed() { if (videoLoaded) vid.playbackRate = parseFloat(document.getElementById('speedSel').value); }
+function skip(s) { if (videoLoaded) setCurrentTime(Math.max(0, Math.min(getDuration(), getTime() + s))); }
+function setSpeed() { if (videoLoaded) setRate(parseFloat(document.getElementById('speedSel').value)); }
 function updateProgress() {
-  const pct = vid.duration ? (vid.currentTime / vid.duration * 100) : 0;
+  const dur = getDuration(), cur = getTime();
+  const pct = dur ? (cur / dur * 100) : 0;
   document.getElementById('seekFill').style.width = pct + '%';
   document.getElementById('seekThumb').style.left = pct + '%';
-  document.getElementById('timeCurrent').textContent = fmt(vid.currentTime);
+  document.getElementById('timeCurrent').textContent = fmt(cur);
 }
 function gotoLastAnnotation() {
   if (!videoLoaded || annotations.length === 0) return;
-  vid.currentTime = annotations[annotations.length - 1].time;
+  setCurrentTime(annotations[annotations.length - 1].time);
 }
 
 // ── Seek bar ───────────────────────────────────────────────────
@@ -273,24 +353,15 @@ function doSeekMove(e) { if (seeking) doSeek(e); }
 function endSeek() { seeking = false; document.removeEventListener('mousemove', doSeekMove); document.removeEventListener('mouseup', endSeek); }
 function doSeek(e) {
   const r = document.getElementById('seekbar').getBoundingClientRect();
-  vid.currentTime = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * vid.duration;
+  setCurrentTime(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * getDuration());
 }
 
 // ── Full Game Analysis helpers ─────────────────────────────────
 function isFullGame() { return document.getElementById('fullGameToggle').checked; }
-
-function needsTeamSelection(type) {
-  if (isFullGame()) return type === 'Game Event' || type === 'To Review';
-  return true;
-}
-
+function needsTeamSelection(type) { return isFullGame() ? (type === 'Game Event' || type === 'To Review') : true; }
 function showTeamMenu() { document.getElementById('teamMenu').style.display = 'flex'; }
 function hideTeamMenu() { document.getElementById('teamMenu').style.display = 'none'; }
-
-function selectTeam(team) {
-  if (pendingType === null) return;
-  tag(pendingType, pendingName, team);
-}
+function selectTeam(team) { if (pendingType !== null) tag(pendingType, pendingName, team); }
 
 // ── Type / sub-type selection ──────────────────────────────────
 function selectType(type) {
@@ -298,20 +369,13 @@ function selectType(type) {
   pendingType = null;
   pendingName = null;
   hideTeamMenu();
-  // Pause video while annotating
-  wasPlaying = !vid.paused;
-  if (wasPlaying) { vid.pause(); document.getElementById('playBtn').textContent = '▶ Play'; }
+  wasPlaying = !isPaused();
+  if (wasPlaying) doPause();
   document.querySelectorAll('.tag-btn').forEach(b => b.classList.toggle('active', b.dataset.type === type));
   renderSubmenu(type);
-  // If no sub-options, go straight to team selection or tag
   if (MENU[type].length === 0) {
-    if (needsTeamSelection(type)) {
-      pendingType = type;
-      pendingName = '';
-      showTeamMenu();
-    } else {
-      tag(type, '', '');
-    }
+    if (needsTeamSelection(type)) { pendingType = type; pendingName = ''; showTeamMenu(); }
+    else tag(type, '', '');
   }
 }
 
@@ -329,34 +393,25 @@ function renderSubmenu(type) {
 }
 
 function selectSubType(type, name) {
-  if (needsTeamSelection(type)) {
-    pendingType = type;
-    pendingName = name;
-    showTeamMenu();
-  } else {
-    tag(type, name, '');
-  }
+  if (needsTeamSelection(type)) { pendingType = type; pendingName = name; showTeamMenu(); }
+  else tag(type, name, '');
 }
 
 // ── Tagging ────────────────────────────────────────────────────
 function tag(type, name, possessionOwner) {
   if (!videoLoaded) return;
-  const t = vid.currentTime;
+  const t = getTime();
   annotations.push({ id: Date.now() + Math.random(), type, name, possessionOwner, time: t, timeStr: fmt(t) });
   annotations.sort((a,b) => a.time - b.time);
   renderList();
   renderMarkers();
   flashType(type);
   document.getElementById('lastAnnBtn').removeAttribute('disabled');
-  // Clear selection
-  selectedType = null;
-  pendingType = null;
-  pendingName = null;
+  selectedType = null; pendingType = null; pendingName = null;
   hideTeamMenu();
   document.querySelectorAll('.tag-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('submenu').innerHTML = '<span class="submenu-empty">Select an action above — then choose a sub-type (or press 1–9)</span>';
-  // Resume video if it was playing before
-  if (wasPlaying) { wasPlaying = false; vid.play(); document.getElementById('playBtn').textContent = '⏸ Pause'; }
+  if (wasPlaying) { wasPlaying = false; doPlay(); }
 }
 
 function flashType(type) {
@@ -370,7 +425,6 @@ function flashType(type) {
 function ytLink(timeSeconds) {
   const url = document.getElementById('ytUrl').value.trim();
   if (!url) return '';
-  // Extract video ID from various YouTube URL formats
   const m = url.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/);
   if (!m) return '';
   const t = Math.max(0, Math.floor(timeSeconds) - 5);
@@ -380,10 +434,7 @@ function ytLink(timeSeconds) {
 function renderList() {
   const el = document.getElementById('annList');
   document.getElementById('annCount').textContent = annotations.length;
-  if (annotations.length === 0) {
-    el.innerHTML = '<div class="empty-state">No annotations yet</div>';
-    return;
-  }
+  if (annotations.length === 0) { el.innerHTML = '<div class="empty-state">No annotations yet</div>'; return; }
   el.innerHTML = annotations.map(a => {
     const yt = ytLink(a.time);
     const ytCell = yt ? `<a href="${yt}" target="_blank" title="Open YouTube -5s">▶ YT</a>` : '<span style="color:#333">—</span>';
@@ -400,16 +451,17 @@ function renderList() {
 
 function renderMarkers() {
   const track = document.getElementById('markersTrack');
-  if (!vid.duration) { track.innerHTML = ''; return; }
+  const dur = getDuration();
+  if (!dur) { track.innerHTML = ''; return; }
   track.innerHTML = annotations.map(a => {
-    const pct = (a.time / vid.duration * 100).toFixed(3);
+    const pct = (a.time / dur * 100).toFixed(3);
     return `<div class="marker" style="left:${pct}%;background:${COLORS[a.type]}" onclick="seekTo(${a.time})">
       <div class="marker-tooltip">${a.type}${a.name ? ': '+a.name : ''} @ ${a.timeStr}</div>
     </div>`;
   }).join('');
 }
 
-function seekTo(t) { if (videoLoaded) vid.currentTime = t; }
+function seekTo(t) { if (videoLoaded) setCurrentTime(t); }
 
 function deleteAnnotation(id) {
   annotations = annotations.filter(a => a.id !== id);
@@ -429,14 +481,11 @@ function clearAll() {
 // ── CSV export ─────────────────────────────────────────────────
 function exportCSV() {
   if (annotations.length === 0) { alert('No annotations to export.'); return; }
-  const ytBase = document.getElementById('ytUrl').value.trim();
-  const m = ytBase.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/);
-  const vid_name = videoBaseName;
   const rows = ['Time,Type,Name,Possession Owner,Video Name,To Review,Comment,Youtube Link',
     ...annotations.map(a => {
       const yt = ytLink(a.time);
       const toReview = a.type === 'To Review' ? 'Yes' : '';
-      return `${a.timeStr},${a.type},${a.name},${a.possessionOwner || ''},${vid_name},${toReview},,${yt}`;
+      return `${a.timeStr},${a.type},${a.name},${a.possessionOwner || ''},${videoBaseName},${toReview},,${yt}`;
     })
   ];
   const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
@@ -456,12 +505,9 @@ function loadCSV(e) {
     for (const line of lines) {
       const parts = line.split(',');
       if (parts.length < 3) continue;
-      const timeStr = parts[0].trim();
-      const type = parts[1].trim();
-      const name = parts[2].trim();
+      const timeStr = parts[0].trim(), type = parts[1].trim(), name = parts[2].trim();
       const possessionOwner = parts[3] ? parts[3].trim() : '';
       if (!COLORS[type]) continue;
-      // Parse timeStr HH:MM:SS to seconds
       const tp = timeStr.split(':').map(Number);
       const time = tp.length === 3 ? tp[0]*3600+tp[1]*60+tp[2] : tp[0]*60+tp[1];
       if (isNaN(time)) continue;
@@ -483,32 +529,22 @@ const TYPE_KEYS = { 't':'Try', 'u':'Turnover', 'p':'Penalty', 'g':'Game Event', 
 document.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
   const k = e.key.toLowerCase();
-
-  // Playback
   if (k === ' ') { e.preventDefault(); togglePlay(); return; }
   if (e.key === 'ArrowLeft') { skip(-5); return; }
   if (e.key === 'ArrowRight') { skip(5); return; }
   if (e.key === 'Escape') {
-    selectedType = null;
-    pendingType = null;
-    pendingName = null;
+    selectedType = null; pendingType = null; pendingName = null;
     hideTeamMenu();
     document.querySelectorAll('.tag-btn').forEach(b => b.classList.remove('active'));
     document.getElementById('submenu').innerHTML = '<span class="submenu-empty">Select an action above — then choose a sub-type (or press 1–9)</span>';
-    if (wasPlaying) { wasPlaying = false; vid.play(); document.getElementById('playBtn').textContent = '⏸ Pause'; }
+    if (wasPlaying) { wasPlaying = false; doPlay(); }
     return;
   }
-
-  // Type selection
   if (TYPE_KEYS[k]) { selectType(TYPE_KEYS[k]); return; }
-
-  // Team selection by number (1 = Team 1, 2 = Team 2) when team menu is visible
+  // Team selection when team menu is showing
   if (pendingType !== null && (e.key === '1' || e.key === '2')) {
-    e.preventDefault();
-    selectTeam(e.key === '1' ? 'Team 1' : 'Team 2');
-    return;
+    e.preventDefault(); selectTeam(e.key === '1' ? 'Team 1' : 'Team 2'); return;
   }
-
   // Sub-type by number
   if (selectedType && /^[1-9]$/.test(e.key)) {
     const opts = MENU[selectedType];

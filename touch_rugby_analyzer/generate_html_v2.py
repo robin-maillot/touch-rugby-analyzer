@@ -11,6 +11,22 @@ from pathlib import Path
 def generate_html_from_df(
     df: pd.DataFrame, output_html_path: Path, team_names: Tuple = ("Team 1", "Team 2")
 ):
+    # GameTime is float seconds from game start (negative = before first Game Start).
+    # Vega-Lite labelExpr to render seconds as [sign]MM:SS on axes.
+    _MM_SS = (
+        "(datum.value < 0 ? '-' : '')"
+        " + floor(abs(datum.value) / 60)"
+        " + ':'"
+        " + (floor(abs(datum.value) % 60) < 10 ? '0' : '')"
+        " + floor(abs(datum.value) % 60)"
+    )
+
+    def game_time_axis(title="Game Time"):
+        return alt.Axis(labelExpr=_MM_SS, title=title)
+
+    def game_time_tooltip(title="Game Time"):
+        return alt.Tooltip("GameTime:Q", format=".0f", title=f"{title} (s)")
+
     # --- 1. Global Time Filter ---
     start_events = df[df["Name"] == "Game Start"]
     end_events = df[df["Name"] == "Game End"]
@@ -40,7 +56,6 @@ def generate_html_from_df(
     # --- 2. Tries Chart Data & Plot ---
     tries_data = []
     for team in team_names:
-        # Start Point
         tries_data.append(
             {
                 "GameTime": global_start,
@@ -51,7 +66,6 @@ def generate_html_from_df(
             }
         )
 
-        # Tries
         team_tries = df[
             (df["Type"] == "Try") & (df["Action Owner"] == team)
         ].sort_values("GameTime")
@@ -68,13 +82,12 @@ def generate_html_from_df(
                 }
             )
 
-        # End Point
         tries_data.append(
             {
                 "GameTime": global_end,
                 "Team": team,
                 "Event": "Game End",
-                "Count": count,  # Holds final score
+                "Count": count,
                 "Link": end_link,
             }
         )
@@ -82,23 +95,20 @@ def generate_html_from_df(
     tries_df = pd.DataFrame(tries_data)
 
     tries_base = alt.Chart(tries_df).encode(
-        x=alt.X("GameTime:T", axis=alt.Axis(format="%H:%M:%S", title="Game Time")),
+        x=alt.X("GameTime:Q", axis=game_time_axis()),
         y=alt.Y("Count:Q", axis=alt.Axis(tickMinStep=1), title="Cumulative Tries"),
         color=alt.Color("Team:N", scale=team_colors),
     )
     tries_lines = tries_base.mark_line(interpolate="step-after").encode(
-        order="GameTime:T"
+        order="GameTime:Q"
     )
     tries_points = (
         tries_base.transform_filter(
-            (alt.datum.Event != "Game Start")
-            & (alt.datum.Event != "Game End")
-            # Only clickable tries? Or all? Previous request said start/end too. Let's keep all clickable if link exists.
+            (alt.datum.Event != "Game Start") & (alt.datum.Event != "Game End")
         )
         .mark_circle(size=100)
-        .encode(href="Link:N", tooltip=["GameTime:T", "Team:N", "Event:N", "Count:Q"])
+        .encode(href="Link:N", tooltip=[game_time_tooltip(), "Team:N", "Event:N", "Count:Q"])
     )
-    # Actually, let's keep Start/End points but maybe smaller or just consistent. The user liked Start/End points before.
     tries_chart = (
         (tries_lines + tries_points)
         .properties(title="Tries vs Time", width=chart_width, height=200)
@@ -108,7 +118,6 @@ def generate_html_from_df(
     # --- 3. Penalties Chart Data & Plot ---
     penalties_data = []
     for team in team_names:
-        # Start Point
         penalties_data.append(
             {
                 "GameTime": global_start,
@@ -119,11 +128,6 @@ def generate_html_from_df(
             }
         )
 
-        # Penalties
-        # Note: 'Action Owner' is the one committing the penalty usually?
-        # Or is it the beneficiary?
-        # In standard rugby data, "Penalty - Forward Pass - Team 1" usually means Team 1 committed it.
-        # The user input has "Action Owner". Let's assume Action Owner is the team getting the penalty count.
         team_penalties = df[
             (df["Type"] == "Penalty") & (df["Action Owner"] == team)
         ].sort_values("GameTime")
@@ -140,7 +144,6 @@ def generate_html_from_df(
                 }
             )
 
-        # End Point
         penalties_data.append(
             {
                 "GameTime": global_end,
@@ -154,13 +157,13 @@ def generate_html_from_df(
     pen_df = pd.DataFrame(penalties_data)
 
     pen_base = alt.Chart(pen_df).encode(
-        x=alt.X("GameTime:T", axis=alt.Axis(format="%H:%M:%S", title="Game Time")),
+        x=alt.X("GameTime:Q", axis=game_time_axis()),
         y=alt.Y("Count:Q", axis=alt.Axis(tickMinStep=1), title="Cumulative Penalties"),
         color=alt.Color("Team:N", scale=team_colors),
     )
-    pen_lines = pen_base.mark_line(interpolate="step-after").encode(order="GameTime:T")
+    pen_lines = pen_base.mark_line(interpolate="step-after").encode(order="GameTime:Q")
     pen_points = pen_base.mark_circle(size=100).encode(
-        href="Link:N", tooltip=["GameTime:T", "Team:N", "Event:N", "Count:Q"]
+        href="Link:N", tooltip=[game_time_tooltip(), "Team:N", "Event:N", "Count:Q"]
     )
 
     pen_chart = (
@@ -170,7 +173,6 @@ def generate_html_from_df(
     )
 
     # --- 4. Possession Chart Data & Plot ---
-    # Logic from previous step
     df["Owner_Change"] = df["Possession Owner"] != df["Possession Owner"].shift(1)
     df["Is_Start"] = df["Name"] == "Game Start"
     df["Prev_Is_End"] = df["Name"].shift(1) == "Game End"
@@ -220,7 +222,7 @@ def generate_html_from_df(
                 "Team": p["Team"],
                 "Start": start_time,
                 "End": end_time,
-                "Duration_Sec": (end_time - start_time).total_seconds(),
+                "Duration_Sec": end_time - start_time,
                 "End_Type": p["End_Type"],
                 "End_Event": p["End_Event"],
                 "Color_Category": cat,
@@ -230,8 +232,6 @@ def generate_html_from_df(
 
     poss_df = pd.DataFrame(possessions_final)
 
-    # Visualization
-    # Using specific colors to ensure visibility
     poss_domain = ["Try", "Penalty", "6th Touch", "Other"]
     poss_range = ["Green", "Red", "Gold", "Orange"]
 
@@ -239,8 +239,8 @@ def generate_html_from_df(
         alt.Chart(poss_df)
         .mark_bar()
         .encode(
-            x=alt.X("Start:T", axis=alt.Axis(format="%H:%M:%S", title="Game Time")),
-            x2="End:T",
+            x=alt.X("Start:Q", axis=game_time_axis()),
+            x2="End:Q",
             y=alt.Y("Team:N", title="Possession Owner"),
             color=alt.Color(
                 "Color_Category:N",
@@ -249,8 +249,8 @@ def generate_html_from_df(
             ),
             href="Link:N",
             tooltip=[
-                alt.Tooltip("Start:T", format="%H:%M:%S", title="Start"),
-                alt.Tooltip("End:T", format="%H:%M:%S", title="End"),
+                alt.Tooltip("Start:Q", format=".0f", title="Start (s)"),
+                alt.Tooltip("End:Q", format=".0f", title="End (s)"),
                 "Team:N",
                 "End_Event:N",
                 "End_Type:N",

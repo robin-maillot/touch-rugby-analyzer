@@ -8,7 +8,6 @@ from collections import defaultdict
 import json
 from typing import Tuple, Dict
 from touch_rugby_analyzer.constants import DATA_ROOT
-import datetime
 
 output_data_root = DATA_ROOT / "output"
 output_data_root.mkdir(parents=True, exist_ok=True)
@@ -115,31 +114,35 @@ def infer_action_owner(data_df: pd.DataFrame):
     data_df["Action Owner"] = action_owners
 
 
-def add_game_time(data_df: pd.DataFrame, game_stopage_time:int=60):
-    game_start_events = data_df[data_df["Name"] == "Game Start"]
-    game_end_events = data_df[data_df["Name"] == "Game End"]
+def add_game_time(data_df: pd.DataFrame, game_stopage_time: int = 300):
+    """Add a GameTime column (seconds) handling multiple halves/periods.
 
-    # assert len(game_start_events) == len(game_end_events), f"{game_start_events} {game_end_events}"
+    - GameTime = 0 at the first Game Start (or first event if no Game Start exists).
+    - Rows before the first Game Start get negative GameTime.
+    - Each subsequent Game Start picks up at (previous Game End game time + game_stopage_time).
+    """
+    game_start_times = data_df[data_df["Name"] == "Game Start"]["Time"]
+    # Anchor: first Game Start, or first event if none
+    anchor_dt = game_start_times.iloc[0] if len(game_start_times) > 0 else data_df["Time"].iloc[0]
 
-    if len(game_start_events) == 0:
-        data_df["GameTime"] = data_df["Time"]
-    else:
-        dt = game_start_events.iloc[0].Time
-        # half_id = 0
-        # ts = []
-        # for i, row in data_df.iterrows():
-        #
-        #     if row["Name"] in ["Game Start"]:
-        #         if half_id = 0
-        #             dt = row["Time"]
-        #         else:
-        #             dt = row["Time"]
-        #         half_id += 1
-        #     ts.append(row["Time"] - dt)
-        #     if row["Name"] == "Game End":
-        #         dt = row["Time"]
-        data_df["GameTime"] = datetime.datetime(1999, 1, 1) + (data_df["Time"] - dt)
-        # data_df["GameTime"] = datetime.datetime(1999, 1, 1) + (data_df["Time"] - np.array(dts))
+    game_times = []
+    time_offset = 0.0
+    last_end_game_time = 0.0
+    current_segment_dt = anchor_dt  # wall-clock reference for the current segment
+
+    for _, row in data_df.iterrows():
+        if row["Name"] == "Game Start" and row["Time"] != anchor_dt:
+            # Subsequent Game Start: continue from last Game End + stoppage
+            current_segment_dt = row["Time"]
+            time_offset = last_end_game_time + game_stopage_time
+
+        game_time = (row["Time"] - current_segment_dt).total_seconds() + time_offset
+        game_times.append(game_time)
+
+        if row["Name"] == "Game End":
+            last_end_game_time = game_time
+
+    data_df["GameTime"] = game_times
 
 
 def replace_team_names(data_df: pd.DataFrame, mapping: Dict[str, str]):
