@@ -150,6 +150,10 @@
       <input type="checkbox" id="fullGameToggle" checked>
       Full Game Analysis
     </label>
+    <label class="full-game-toggle">
+      <input type="checkbox" id="defaultOtherToggle">
+      Simple Mode
+    </label>
     <span style="width:1px;height:20px;background:#2a2d3a;margin:0 4px;flex-shrink:0"></span>
     <button class="tag-btn" style="background:#f59e0b;color:#000" data-type="Try" onclick="selectType('Try')">Try <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.15);padding:1px 4px;border-radius:3px">T</kbd></button>
     <button class="tag-btn" style="background:#ef4444;color:#fff" data-type="Turnover" onclick="selectType('Turnover')">Turnover <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">U</kbd></button>
@@ -206,12 +210,13 @@
 const COLORS = { 'Try':'#f59e0b', 'Turnover':'#ef4444', 'Penalty':'#a855f7', 'Game Event':'#10b981', 'To Review':'#f97316' };
 
 const MENU = {
-  "Penalty":    ["Offside","Touch and Pass","Forward Pass","Delay of Play","In the Ruck","Shoulder","Off the Mark","Not Moving Forward"],
-  "Turnover":   ["Ball Down","6th Touch","Dummy Touch","Bad Roll","6 Again","Interception"],
+  "Penalty":    ["Offside","Touch and Pass","Forward Pass","Delay of Play","In the Ruck","Shoulder","Off the Mark","Not Moving Forward","Other"],
+  "Turnover":   ["Ball Down","6th Touch","Dummy Touch","Bad Roll","6 Again","Interception","Other"],
   "Game Event": ["Game Start","Game End"],
   "Try":        ["Scoop","Other","32 - Long","33 Quicky","33","32 Cut","French Flair"],
   "To Review":  []
 };
+const DEFAULT_OTHER_TYPES = new Set(["Try","Turnover","Penalty"]);
 
 let annotations = [];
 let videoLoaded = false;
@@ -364,6 +369,8 @@ function hideTeamMenu() { document.getElementById('teamMenu').style.display = 'n
 function selectTeam(team) { if (pendingType !== null) tag(pendingType, pendingName, team); }
 
 // ── Type / sub-type selection ──────────────────────────────────
+function isDefaultOther() { return document.getElementById('defaultOtherToggle').checked; }
+
 function selectType(type) {
   selectedType = type;
   pendingType = null;
@@ -372,6 +379,10 @@ function selectType(type) {
   wasPlaying = !isPaused();
   if (wasPlaying) doPause();
   document.querySelectorAll('.tag-btn').forEach(b => b.classList.toggle('active', b.dataset.type === type));
+  if (isDefaultOther() && DEFAULT_OTHER_TYPES.has(type)) {
+    selectSubType(type, 'Other');
+    return;
+  }
   renderSubmenu(type);
   if (MENU[type].length === 0) {
     if (needsTeamSelection(type)) { pendingType = type; pendingName = ''; showTeamMenu(); }
