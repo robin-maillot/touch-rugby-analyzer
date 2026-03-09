@@ -72,16 +72,27 @@
   .list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; flex-shrink: 0; }
   .list-header h2 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #666; }
   .annotations-list { overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 3px; padding-right: 2px; }
-  .annotation-row { display: grid; grid-template-columns: 55px 90px 90px 1fr auto; align-items: center; gap: 8px; background: #1a1d27; border-radius: 6px; padding: 5px 10px; border-left: 3px solid; font-size: 0.77rem; cursor: pointer; transition: background 0.1s; }
+  .annotation-row { display: grid; grid-template-columns: 55px 90px 90px 65px 1fr auto; align-items: center; gap: 8px; background: #1a1d27; border-radius: 6px; padding: 5px 10px; border-left: 3px solid; font-size: 0.77rem; cursor: pointer; transition: background 0.1s; }
   .annotation-row:hover { background: #22253a; }
   .ann-time { font-family: monospace; color: #aaa; font-size: 0.73rem; }
   .ann-type { font-weight: 700; }
   .ann-name { color: #bbb; }
   .ann-yt a { color: #3b82f6; font-size: 0.7rem; text-decoration: none; }
   .ann-yt a:hover { text-decoration: underline; }
+  .ann-possession { font-size: 0.72rem; color: #888; }
   .ann-del { background: none; border: none; color: #555; cursor: pointer; font-size: 0.95rem; padding: 0 3px; }
   .ann-del:hover { color: #ef4444; }
   .empty-state { color: #444; font-size: 0.8rem; text-align: center; padding: 20px; }
+
+  /* Full game toggle */
+  .full-game-toggle { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; color: #ccc; cursor: pointer; background: #1a1d27; border: 1px solid #2a2d3a; border-radius: 8px; padding: 6px 12px; flex-shrink: 0; white-space: nowrap; }
+  .full-game-toggle input[type=checkbox] { accent-color: #3b82f6; width: 14px; height: 14px; cursor: pointer; }
+
+  /* Team menu */
+  .team-menu { display: flex; gap: 8px; align-items: center; background: #1a1d27; border-radius: 8px; padding: 6px 10px; border: 1px solid #3b82f6; flex-shrink: 0; min-height: 36px; }
+  .team-label { font-size: 0.72rem; color: #3b82f6; margin-right: 4px; }
+  .team-btn { border: none; border-radius: 6px; padding: 5px 16px; font-size: 0.78rem; font-weight: 700; cursor: pointer; transition: all 0.15s; }
+  .team-btn:hover { filter: brightness(1.15); transform: translateY(-1px); }
 </style>
 </head>
 <body>
@@ -130,6 +141,11 @@
   <!-- Action buttons -->
   <div class="tag-bar" id="tagBar">
     <span style="font-size:0.72rem;color:#666;margin-right:2px">ACTION:</span>
+    <label class="full-game-toggle">
+      <input type="checkbox" id="fullGameToggle" checked>
+      Full Game Analysis
+    </label>
+    <span style="width:1px;height:20px;background:#2a2d3a;margin:0 4px;flex-shrink:0"></span>
     <button class="tag-btn" style="background:#f59e0b;color:#000" data-type="Try" onclick="selectType('Try')">Try <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.15);padding:1px 4px;border-radius:3px">T</kbd></button>
     <button class="tag-btn" style="background:#ef4444;color:#fff" data-type="Turnover" onclick="selectType('Turnover')">Turnover <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">U</kbd></button>
     <button class="tag-btn" style="background:#a855f7;color:#fff" data-type="Penalty" onclick="selectType('Penalty')">Penalty <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">P</kbd></button>
@@ -140,6 +156,13 @@
   <!-- Sub-action buttons -->
   <div class="submenu" id="submenu">
     <span class="submenu-empty">Select an action above — then choose a sub-type (or press 1–9)</span>
+  </div>
+
+  <!-- Team / Possession Owner menu -->
+  <div class="team-menu" id="teamMenu" style="display:none">
+    <span class="team-label">POSSESSION OWNER:</span>
+    <button class="team-btn" style="background:#3b82f6;color:#fff" onclick="selectTeam('Team 1')">Team 1</button>
+    <button class="team-btn" style="background:#ef4444;color:#fff" onclick="selectTeam('Team 2')">Team 2</button>
   </div>
 
   <!-- Timeline -->
@@ -189,6 +212,9 @@ let annotations = [];
 let videoLoaded = false;
 let videoBaseName = 'touch_rugby_annotations';
 let selectedType = null;
+let pendingType = null;
+let pendingName = null;
+let wasPlaying = false;
 
 const vid = document.getElementById('vid');
 
@@ -250,13 +276,43 @@ function doSeek(e) {
   vid.currentTime = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * vid.duration;
 }
 
+// ── Full Game Analysis helpers ─────────────────────────────────
+function isFullGame() { return document.getElementById('fullGameToggle').checked; }
+
+function needsTeamSelection(type) {
+  if (isFullGame()) return type === 'Game Event' || type === 'To Review';
+  return true;
+}
+
+function showTeamMenu() { document.getElementById('teamMenu').style.display = 'flex'; }
+function hideTeamMenu() { document.getElementById('teamMenu').style.display = 'none'; }
+
+function selectTeam(team) {
+  if (pendingType === null) return;
+  tag(pendingType, pendingName, team);
+}
+
 // ── Type / sub-type selection ──────────────────────────────────
 function selectType(type) {
   selectedType = type;
+  pendingType = null;
+  pendingName = null;
+  hideTeamMenu();
+  // Pause video while annotating
+  wasPlaying = !vid.paused;
+  if (wasPlaying) { vid.pause(); document.getElementById('playBtn').textContent = '▶ Play'; }
   document.querySelectorAll('.tag-btn').forEach(b => b.classList.toggle('active', b.dataset.type === type));
   renderSubmenu(type);
-  // If no sub-options, tag immediately
-  if (MENU[type].length === 0) tag(type, '');
+  // If no sub-options, go straight to team selection or tag
+  if (MENU[type].length === 0) {
+    if (needsTeamSelection(type)) {
+      pendingType = type;
+      pendingName = '';
+      showTeamMenu();
+    } else {
+      tag(type, '', '');
+    }
+  }
 }
 
 function renderSubmenu(type) {
@@ -267,16 +323,26 @@ function renderSubmenu(type) {
     return;
   }
   el.innerHTML = `<span class="submenu-label" style="color:${COLORS[type]}">${type}:</span>` +
-    opts.map((o, i) => `<button class="sub-btn" onclick="tag('${type}','${o.replace(/'/g,"\\'")}')">
+    opts.map((o, i) => `<button class="sub-btn" onclick="selectSubType('${type}','${o.replace(/'/g,"\\'")}')">
       <span class="hotkey">${i+1}</span>${o}
     </button>`).join('');
 }
 
+function selectSubType(type, name) {
+  if (needsTeamSelection(type)) {
+    pendingType = type;
+    pendingName = name;
+    showTeamMenu();
+  } else {
+    tag(type, name, '');
+  }
+}
+
 // ── Tagging ────────────────────────────────────────────────────
-function tag(type, name) {
+function tag(type, name, possessionOwner) {
   if (!videoLoaded) return;
   const t = vid.currentTime;
-  annotations.push({ id: Date.now() + Math.random(), type, name, time: t, timeStr: fmt(t) });
+  annotations.push({ id: Date.now() + Math.random(), type, name, possessionOwner, time: t, timeStr: fmt(t) });
   annotations.sort((a,b) => a.time - b.time);
   renderList();
   renderMarkers();
@@ -284,8 +350,13 @@ function tag(type, name) {
   document.getElementById('lastAnnBtn').removeAttribute('disabled');
   // Clear selection
   selectedType = null;
+  pendingType = null;
+  pendingName = null;
+  hideTeamMenu();
   document.querySelectorAll('.tag-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('submenu').innerHTML = '<span class="submenu-empty">Select an action above — then choose a sub-type (or press 1–9)</span>';
+  // Resume video if it was playing before
+  if (wasPlaying) { wasPlaying = false; vid.play(); document.getElementById('playBtn').textContent = '⏸ Pause'; }
 }
 
 function flashType(type) {
@@ -320,6 +391,7 @@ function renderList() {
       <span class="ann-time">${a.timeStr}</span>
       <span class="ann-type" style="color:${COLORS[a.type]}">${a.type}</span>
       <span class="ann-name">${a.name || '—'}</span>
+      <span class="ann-possession">${a.possessionOwner || '—'}</span>
       <span class="ann-yt">${ytCell}</span>
       <button class="ann-del" onclick="event.stopPropagation();deleteAnnotation(${a.id})" title="Delete">✕</button>
     </div>`;
@@ -360,11 +432,11 @@ function exportCSV() {
   const ytBase = document.getElementById('ytUrl').value.trim();
   const m = ytBase.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/);
   const vid_name = videoBaseName;
-  const rows = ['Time,Type,Name,Video Name,To Review,Comment,Youtube Link',
+  const rows = ['Time,Type,Name,Possession Owner,Video Name,To Review,Comment,Youtube Link',
     ...annotations.map(a => {
       const yt = ytLink(a.time);
       const toReview = a.type === 'To Review' ? 'Yes' : '';
-      return `${a.timeStr},${a.type},${a.name},${vid_name},${toReview},,${yt}`;
+      return `${a.timeStr},${a.type},${a.name},${a.possessionOwner || ''},${vid_name},${toReview},,${yt}`;
     })
   ];
   const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
@@ -387,12 +459,13 @@ function loadCSV(e) {
       const timeStr = parts[0].trim();
       const type = parts[1].trim();
       const name = parts[2].trim();
+      const possessionOwner = parts[3] ? parts[3].trim() : '';
       if (!COLORS[type]) continue;
       // Parse timeStr HH:MM:SS to seconds
       const tp = timeStr.split(':').map(Number);
       const time = tp.length === 3 ? tp[0]*3600+tp[1]*60+tp[2] : tp[0]*60+tp[1];
       if (isNaN(time)) continue;
-      loaded.push({ id: Date.now()+Math.random(), type, name, time, timeStr });
+      loaded.push({ id: Date.now()+Math.random(), type, name, possessionOwner, time, timeStr });
     }
     if (!loaded.length) { alert('No valid annotations found in CSV.'); return; }
     annotations = loaded.sort((a,b)=>a.time-b.time);
@@ -417,19 +490,30 @@ document.addEventListener('keydown', e => {
   if (e.key === 'ArrowRight') { skip(5); return; }
   if (e.key === 'Escape') {
     selectedType = null;
+    pendingType = null;
+    pendingName = null;
+    hideTeamMenu();
     document.querySelectorAll('.tag-btn').forEach(b => b.classList.remove('active'));
     document.getElementById('submenu').innerHTML = '<span class="submenu-empty">Select an action above — then choose a sub-type (or press 1–9)</span>';
+    if (wasPlaying) { wasPlaying = false; vid.play(); document.getElementById('playBtn').textContent = '⏸ Pause'; }
     return;
   }
 
   // Type selection
   if (TYPE_KEYS[k]) { selectType(TYPE_KEYS[k]); return; }
 
+  // Team selection by number (1 = Team 1, 2 = Team 2) when team menu is visible
+  if (pendingType !== null && (e.key === '1' || e.key === '2')) {
+    e.preventDefault();
+    selectTeam(e.key === '1' ? 'Team 1' : 'Team 2');
+    return;
+  }
+
   // Sub-type by number
   if (selectedType && /^[1-9]$/.test(e.key)) {
     const opts = MENU[selectedType];
     const idx = parseInt(e.key) - 1;
-    if (idx < opts.length) { e.preventDefault(); tag(selectedType, opts[idx]); }
+    if (idx < opts.length) { e.preventDefault(); selectSubType(selectedType, opts[idx]); }
   }
 });
 </script>
