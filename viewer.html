@@ -368,6 +368,28 @@ function showTeamMenu() { document.getElementById('teamMenu').style.display = 'f
 function hideTeamMenu() { document.getElementById('teamMenu').style.display = 'none'; }
 function selectTeam(team) { if (pendingType !== null) tag(pendingType, pendingName, team); }
 
+function isJsTurnover(type, name) {
+  if (type === 'Try') return true;
+  if (type === 'Penalty' && !['Offside', 'Not Moving Forward', 'Shoulder'].includes(name)) return true;
+  if (type === 'Turnover' && name !== '6 Again') return true;
+  return false;
+}
+
+function inferPossessionOwner() {
+  // Walk back through annotations (skip To Review) to find the last possession anchor,
+  // then apply turnover logic to determine the next owner.
+  for (let i = annotations.length - 1; i >= 0; i--) {
+    const ann = annotations[i];
+    if (ann.type === 'To Review') continue;
+    if (!ann.possessionOwner) continue;
+    const wasTurnover = isJsTurnover(ann.type, ann.name);
+    return wasTurnover
+      ? (ann.possessionOwner === 'Team 1' ? 'Team 2' : 'Team 1')
+      : ann.possessionOwner;
+  }
+  return '';
+}
+
 // ── Type / sub-type selection ──────────────────────────────────
 function isDefaultOther() { return document.getElementById('defaultOtherToggle').checked; }
 
@@ -405,7 +427,7 @@ function renderSubmenu(type) {
 
 function selectSubType(type, name) {
   if (needsTeamSelection(type)) { pendingType = type; pendingName = name; showTeamMenu(); }
-  else tag(type, name, '');
+  else tag(type, name, isFullGame() ? inferPossessionOwner() : '');
 }
 
 // ── Tagging ────────────────────────────────────────────────────
@@ -492,11 +514,18 @@ function clearAll() {
 // ── CSV export ─────────────────────────────────────────────────
 function exportCSV() {
   if (annotations.length === 0) { alert('No annotations to export.'); return; }
-  const rows = ['Time,Type,Name,Possession Owner,Video Name,To Review,Comment,Youtube Link',
+  const fullGame = isFullGame();
+  const headers = ['Time','Type','Name','Possession Owner'];
+  if (fullGame) headers.push('Turnover');
+  headers.push('Video Name','To Review','Comment','Youtube Link');
+  const rows = [headers.join(','),
     ...annotations.map(a => {
       const yt = ytLink(a.time);
       const toReview = a.type === 'To Review' ? 'Yes' : '';
-      return `${a.timeStr},${a.type},${a.name},${a.possessionOwner || ''},${videoBaseName},${toReview},,${yt}`;
+      const cols = [a.timeStr, a.type, a.name, a.possessionOwner || ''];
+      if (fullGame) cols.push(isJsTurnover(a.type, a.name) ? 'Yes' : '');
+      cols.push(videoBaseName, toReview, '', yt);
+      return cols.join(',');
     })
   ];
   const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
@@ -511,14 +540,19 @@ function loadCSV(e) {
   const f = e.target.files[0]; if (!f) return;
   const reader = new FileReader();
   reader.onload = ev => {
-    const lines = ev.target.result.trim().split('\n').slice(1).filter(l => l.trim());
+    const allLines = ev.target.result.trim().split('\n').filter(l => l.trim());
+    if (allLines.length < 2) { alert('No valid annotations found in CSV.'); return; }
+    const headers = allLines[0].split(',').map(h => h.trim().toLowerCase());
+    const col = name => headers.indexOf(name.toLowerCase());
+    const timeIdx = col('time'), typeIdx = col('type'), nameIdx = col('name');
+    const possessionIdx = col('possession owner');
+    if (timeIdx < 0 || typeIdx < 0 || nameIdx < 0) { alert('CSV missing required columns (Time, Type, Name).'); return; }
     const loaded = [];
-    for (const line of lines) {
+    for (const line of allLines.slice(1)) {
       const parts = line.split(',');
-      if (parts.length < 3) continue;
-      const timeStr = parts[0].trim(), type = parts[1].trim(), name = parts[2].trim();
-      const possessionOwner = parts[3] ? parts[3].trim() : '';
-      if (!COLORS[type]) continue;
+      const timeStr = parts[timeIdx]?.trim(), type = parts[typeIdx]?.trim(), name = parts[nameIdx]?.trim() || '';
+      const possessionOwner = possessionIdx >= 0 && parts[possessionIdx] ? parts[possessionIdx].trim() : '';
+      if (!timeStr || !COLORS[type]) continue;
       const tp = timeStr.split(':').map(Number);
       const time = tp.length === 3 ? tp[0]*3600+tp[1]*60+tp[2] : tp[0]*60+tp[1];
       if (isNaN(time)) continue;
