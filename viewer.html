@@ -17,7 +17,7 @@
 
   .main { display: flex; flex-direction: column; flex: 1; overflow: hidden; padding: 10px 12px; gap: 8px; }
 
-  .video-wrapper { background: #000; border-radius: 8px; overflow: hidden; position: relative; flex-shrink: 0; display: flex; align-items: center; justify-content: center; height: 38vh; border: 1px solid #2a2d3a; }
+  .video-wrapper { background: #000; border-radius: 8px; overflow: hidden; position: relative; flex-shrink: 0; display: flex; align-items: center; justify-content: center; height: var(--video-h, 38vh); border: 1px solid #2a2d3a; }
   video { max-width: 100%; max-height: 100%; display: block; }
   .no-video { display: flex; flex-direction: column; align-items: center; gap: 10px; color: #555; }
   .no-video svg { opacity: 0.3; }
@@ -141,6 +141,7 @@
     <button class="btn btn-export" onclick="exportCSV()">⬇ Export CSV</button>
     <button class="btn btn-ghost" onclick="document.getElementById('csvInput').click()">📂 Load CSV</button>
     <input type="file" id="csvInput" accept=".csv" style="display:none" onchange="loadCSV(event)">
+    <button class="btn btn-ghost" id="videoSizeBtn" onclick="cycleVideoSize()" title="Cycle video size">⬜ S</button>
   </div>
 
   <!-- Action buttons -->
@@ -244,6 +245,16 @@ function onVideoReady() {
   videoLoaded = true;
   document.getElementById('timeDuration').textContent = fmt(getDuration());
   ['playBtn','skipBk','skipFw','speedSel'].forEach(id => document.getElementById(id).removeAttribute('disabled'));
+}
+
+// ── Video size cycle ───────────────────────────────────────────
+const VIDEO_SIZES = [['S','38vh'],['M','52vh'],['L','68vh']];
+let videoSizeIdx = 0;
+function cycleVideoSize() {
+  videoSizeIdx = (videoSizeIdx + 1) % VIDEO_SIZES.length;
+  const [label, h] = VIDEO_SIZES[videoSizeIdx];
+  document.documentElement.style.setProperty('--video-h', h);
+  document.getElementById('videoSizeBtn').textContent = `⬜ ${label}`;
 }
 
 // ── Local video loading ────────────────────────────────────────
