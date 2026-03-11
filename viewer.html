@@ -406,14 +406,27 @@ function selectType(type) {
     return;
   }
   renderSubmenu(type);
-  if (MENU[type].length === 0) {
+  if (type !== 'To Review' && MENU[type].length === 0) {
     if (needsTeamSelection(type)) { pendingType = type; pendingName = ''; showTeamMenu(); }
     else tag(type, '', '');
   }
 }
 
+function confirmFreeText() {
+  const input = document.getElementById('freeTextInput');
+  const note = input ? input.value.trim() : '';
+  selectSubType('To Review', note);
+}
+
 function renderSubmenu(type) {
   const el = document.getElementById('submenu');
+  if (type === 'To Review') {
+    el.innerHTML = `<span class="submenu-label" style="color:${COLORS[type]}">Note:</span>` +
+      `<input type="text" id="freeTextInput" class="yt-input" placeholder="Add a note (optional)…" style="width:220px" onkeydown="if(event.key==='Enter'){event.preventDefault();confirmFreeText()}">` +
+      `<button class="sub-btn" onclick="confirmFreeText()">✓ Confirm</button>`;
+    setTimeout(() => document.getElementById('freeTextInput')?.focus(), 0);
+    return;
+  }
   const opts = MENU[type];
   if (!opts || opts.length === 0) {
     el.innerHTML = `<span class="submenu-empty" style="color:#666">Tagging <strong style="color:${COLORS[type]}">${type}</strong> — no sub-type needed</span>`;
