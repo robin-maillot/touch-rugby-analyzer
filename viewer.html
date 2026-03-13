@@ -17,7 +17,7 @@
 
   .main { display: flex; flex-direction: column; flex: 1; overflow: hidden; padding: 10px 12px; gap: 8px; }
 
-  .video-wrapper { background: #000; border-radius: 8px; overflow: hidden; position: relative; flex-shrink: 0; display: flex; align-items: center; justify-content: center; height: var(--video-h, 38vh); border: 1px solid #2a2d3a; }
+  .video-wrapper { background: #000; border-radius: 8px; overflow: hidden; position: relative; flex-shrink: 0; display: flex; align-items: center; justify-content: center; height: var(--video-h, 52vh); border: 1px solid #2a2d3a; }
   video { max-width: 100%; max-height: 100%; display: block; }
   .no-video { display: flex; flex-direction: column; align-items: center; gap: 10px; color: #555; }
   .no-video svg { opacity: 0.3; }
@@ -94,6 +94,12 @@
   .full-game-toggle { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; color: #ccc; cursor: pointer; background: #1a1d27; border: 1px solid #2a2d3a; border-radius: 8px; padding: 6px 12px; flex-shrink: 0; white-space: nowrap; }
   .full-game-toggle input[type=checkbox] { accent-color: #3b82f6; width: 14px; height: 14px; cursor: pointer; }
 
+  /* Meta bar */
+  .meta-bar { display: flex; gap: 8px; align-items: center; background: #1a1d27; border-radius: 8px; padding: 6px 10px; border: 1px solid #2a2d3a; flex-shrink: 0; flex-wrap: wrap; }
+  .meta-label { font-size: 0.72rem; color: #888; white-space: nowrap; }
+  .meta-sep { font-size: 0.78rem; color: #555; }
+  .meta-input { width: 110px !important; }
+
   /* Team menu */
   .team-menu { display: flex; gap: 8px; align-items: center; background: #1a1d27; border-radius: 8px; padding: 6px 10px; border: 1px solid #3b82f6; flex-shrink: 0; min-height: 36px; }
   .team-label { font-size: 0.72rem; color: #3b82f6; margin-right: 4px; }
@@ -155,14 +161,27 @@
     </select>
     <button class="btn btn-export" onclick="exportCSV()">⬇ Export CSV</button>
     <button class="btn btn-ghost" onclick="document.getElementById('csvInput').click()">📂 Load CSV</button>
-    <span class="yt-label">Sheet tab:</span>
-    <input class="yt-input" id="sheetName" type="text" placeholder="2026_mxo_supertouch_canut_usar" style="width:220px">
+    <select id="sheetSelect" style="min-width:220px"><option value="">Loading games…</option></select>
     <button class="btn btn-load" id="loadSheetBtn" onclick="loadFromSheet()">⬇ Load from Sheet</button>
     <button class="btn btn-push" id="pushBtn" onclick="pushToSheet()">⬆ Push to Sheet</button>
     <input class="yt-input" id="overridePass" type="password" placeholder="Override password (admin only)" style="width:200px;display:none">
     <button class="btn btn-danger" id="overrideBtn" style="display:none" onclick="pushToSheet(true)">⚠ Override Tab</button>
     <input type="file" id="csvInput" accept=".csv" style="display:none" onchange="loadCSV(event)">
-    <button class="btn btn-ghost" id="videoSizeBtn" onclick="cycleVideoSize()" title="Cycle video size">⬜ S</button>
+    <button class="btn btn-ghost" id="videoSizeBtn" onclick="cycleVideoSize()" title="Cycle video size">⬜ M</button>
+  </div>
+
+  <!-- Metadata bar -->
+  <div class="meta-bar">
+    <span class="meta-label">METADATA:</span>
+    <input class="yt-input meta-input" id="metaTeam1" placeholder="Team 1" oninput="updateSheetPreview()">
+    <span class="meta-sep">vs</span>
+    <input class="yt-input meta-input" id="metaTeam2" placeholder="Team 2" oninput="updateSheetPreview()">
+    <span class="meta-sep">|</span>
+    <input class="yt-input meta-input" id="metaYear" placeholder="Year" style="width:70px !important" oninput="updateSheetPreview()">
+    <input class="yt-input meta-input" id="metaDivision" placeholder="Division" style="width:80px !important" oninput="updateSheetPreview()">
+    <input class="yt-input meta-input" id="metaCompetition" placeholder="Competition" oninput="updateSheetPreview()">
+    <span class="meta-sep">→</span>
+    <span id="sheetPreview" style="font-family:monospace;font-size:0.72rem;color:#555;white-space:nowrap">fill metadata to generate tab name</span>
   </div>
 
   <!-- Action buttons -->
@@ -233,12 +252,52 @@
 if (sessionStorage.getItem('accessLevel') !== 'staff') {
   window.location.replace('index.html');
 }
+
+// ── Status bar helper ──────────────────────────────────────────
+function setStatus(msg, isError = false) {
+  let el = document.getElementById('viewerStatus');
+  if (!el) {
+    el = document.createElement('span');
+    el.id = 'viewerStatus';
+    el.style.cssText = 'font-size:0.75rem;margin-left:4px;transition:opacity 0.4s';
+    document.querySelector('.controls').appendChild(el);
+  }
+  el.style.color = isError ? '#ef4444' : '#10b981';
+  el.style.opacity = '1';
+  el.textContent = msg;
+  if (msg) setTimeout(() => { el.style.opacity = '0'; }, 3000);
+}
 // ── Apps Script config ─────────────────────────────────────────
 // Set these after deploying apps_script/Code.gs as a Web App
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzhMw4nQr2nVW0MLfPWVXRPXsvImerpzshQ5GnJ3873qQkGMz0bcJQdmTRXCxwygfFm/exec';
 const APPS_SCRIPT_SECRET = 'm30-test-key';  // must match Code.gs
 
 const COLORS = { 'Try':'#f59e0b', 'Turnover':'#ef4444', 'Penalty':'#a855f7', 'Game Event':'#10b981', 'To Review':'#f97316' };
+
+// ── Fetch game list into sheet select ──────────────────────────
+async function fetchGameList() {
+  const sel = document.getElementById('sheetSelect');
+  try {
+    const resp   = await fetch(`${APPS_SCRIPT_URL}?secret=${encodeURIComponent(APPS_SCRIPT_SECRET)}&action=list`);
+    const result = await resp.json();
+    if (!result.ok) throw new Error(result.error);
+    sel.innerHTML = '<option value="">— Select a game —</option>';
+    result.sheets.forEach(entry => {
+      const t1   = entry.team1, t2 = entry.team2;
+      const comp = [entry.year, entry.division, entry.competition].filter(Boolean).join(' ');
+      let label;
+      if (t1 && t2) label = `${t1} vs ${t2}${comp ? '  (' + comp + ')' : ''}`;
+      else          label = entry.name;
+      const opt = document.createElement('option');
+      opt.value = entry.name;
+      opt.textContent = label;
+      sel.appendChild(opt);
+    });
+  } catch (err) {
+    sel.innerHTML = '<option value="">Could not load games</option>';
+  }
+}
+window.addEventListener('DOMContentLoaded', fetchGameList);
 
 const MENU = {
   "Penalty":    ["Offside","Touch and Pass","Forward Pass","Delay of Play","In the Ruck","Shoulder","Off the Mark","Not Moving Forward","Other"],
@@ -279,7 +338,7 @@ function onVideoReady() {
 
 // ── Video size cycle ───────────────────────────────────────────
 const VIDEO_SIZES = [['S','38vh'],['M','52vh'],['L','68vh']];
-let videoSizeIdx = 0;
+let videoSizeIdx = 1;
 function cycleVideoSize() {
   videoSizeIdx = (videoSizeIdx + 1) % VIDEO_SIZES.length;
   const [label, h] = VIDEO_SIZES[videoSizeIdx];
@@ -567,8 +626,8 @@ function clearAll() {
 
 // ── Load from Google Sheet ─────────────────────────────────────
 async function loadFromSheet() {
-  const sheetName = document.getElementById('sheetName').value.trim();
-  if (!sheetName) { alert('Enter the sheet tab name first.'); return; }
+  const sheetName = document.getElementById('sheetSelect').value;
+  if (!sheetName) { alert('Select a game first.'); return; }
   if (APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_URL_HERE') { alert('APPS_SCRIPT_URL is not configured in viewer.html.'); return; }
 
   const btn = document.getElementById('loadSheetBtn');
@@ -600,6 +659,15 @@ async function loadFromSheet() {
     annotations = loaded.sort((a, b) => a.time - b.time);
     renderList(); renderMarkers();
 
+    // Populate metadata fields
+    const m = result.meta || {};
+    document.getElementById('metaTeam1').value       = m.team1       || '';
+    document.getElementById('metaTeam2').value       = m.team2       || '';
+    document.getElementById('metaYear').value        = m.year        || '';
+    document.getElementById('metaDivision').value    = m.division    || '';
+    document.getElementById('metaCompetition').value = m.competition || '';
+    updateSheetPreview();
+
     // Auto-load YouTube video after annotations are rendered
     if (ytIdx >= 0) {
       const firstYtUrl = result.rows.slice(1).map(r => r[ytIdx]).find(v => v && String(v).includes('youtu'));
@@ -622,10 +690,27 @@ async function loadFromSheet() {
 }
 
 // ── Push to Google Sheet ───────────────────────────────────────
+function metaToSheetName() {
+  const slug = s => s.trim().toLowerCase().replace(/\s+/g, '-');
+  const year  = slug(document.getElementById('metaYear').value);
+  const div   = slug(document.getElementById('metaDivision').value);
+  const comp  = slug(document.getElementById('metaCompetition').value);
+  const t1    = slug(document.getElementById('metaTeam1').value);
+  const t2    = slug(document.getElementById('metaTeam2').value);
+  return [year, div, comp, t1, t2].filter(Boolean).join('_');
+}
+
+function updateSheetPreview() {
+  const name = metaToSheetName();
+  const el = document.getElementById('sheetPreview');
+  el.textContent = name || 'fill metadata to generate tab name';
+  el.style.color = name ? '#3b82f6' : '#555';
+}
+
 async function pushToSheet(override = false) {
   if (annotations.length === 0) { alert('No annotations to push.'); return; }
-  const sheetName = document.getElementById('sheetName').value.trim();
-  if (!sheetName) { alert('Enter the sheet tab name first (e.g. 2026_mxo_supertouch_canut_usar).'); return; }
+  const sheetName = metaToSheetName();
+  if (!sheetName) { alert('Fill in the metadata fields — the sheet tab name is derived from them.'); return; }
   if (APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_URL_HERE') { alert('APPS_SCRIPT_URL is not configured in viewer.html.'); return; }
 
   const overridePassword = override ? document.getElementById('overridePass').value.trim() : '';
@@ -648,7 +733,16 @@ async function pushToSheet(override = false) {
   ]);
 
   try {
-    const body = { secret: APPS_SCRIPT_SECRET, sheetName, rows };
+    const body = {
+      secret: APPS_SCRIPT_SECRET, sheetName, rows,
+      meta: {
+        team1:       document.getElementById('metaTeam1').value.trim(),
+        team2:       document.getElementById('metaTeam2').value.trim(),
+        year:        document.getElementById('metaYear').value.trim(),
+        division:    document.getElementById('metaDivision').value.trim(),
+        competition: document.getElementById('metaCompetition').value.trim(),
+      },
+    };
     if (override) body.overridePassword = overridePassword;
 
     const resp = await fetch(APPS_SCRIPT_URL, {
@@ -738,7 +832,7 @@ function loadCSV(e) {
     annotations = loaded.sort((a,b)=>a.time-b.time);
     renderList(); renderMarkers();
     if (annotations.length) document.getElementById('lastAnnBtn').removeAttribute('disabled');
-    alert(`Loaded ${loaded.length} annotation(s) from "${f.name}"`);
+    setStatus(`✓ Loaded ${loaded.length} annotations from CSV`);
   };
   reader.readAsText(f);
   e.target.value = '';
