@@ -130,10 +130,58 @@ function doPost(e) {
               .setValues(rows);
     }
 
+    if (data.meta) writeMeta(data.sheetName, data.meta);
+
     return json({ ok: true, appended: rows ? rows.length : 0 });
 
   } catch (err) {
     return json({ ok: false, error: err.toString() });
+  }
+}
+
+// ── Write / upsert a row in _metadata ──────────────────────────
+// If a row for sheetName already exists → overwrite it.
+// If not → append to the bottom. No extra password needed here
+// because the caller has already passed the override check above.
+function writeMeta(sheetName, meta) {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  let sheet = ss.getSheetByName(METADATA_SHEET);
+  if (!sheet) {
+    sheet = ss.insertSheet(METADATA_SHEET);
+    sheet.appendRow(['Team 1', 'Team 2', 'Competition', 'Year', 'Division', 'Sheet Name']);
+  }
+
+  const values  = sheet.getDataRange().getValues();
+  const headers = values[0].map(h => String(h).toLowerCase().trim());
+  const col     = name => headers.indexOf(name); // returns -1 if missing
+
+  const ni   = col('sheet name');
+  const t1i  = col('team 1');
+  const t2i  = col('team 2');
+  const ci   = col('competition');
+  const yi   = col('year');
+  const di   = col('division');
+
+  // Build a row the same width as the header, filling known columns by position
+  const numCols = headers.length;
+  const makeRow = () => Array(numCols).fill('');
+  const row = makeRow();
+  if (ni  >= 0) row[ni]  = sheetName;
+  if (t1i >= 0) row[t1i] = meta.team1       || '';
+  if (t2i >= 0) row[t2i] = meta.team2       || '';
+  if (ci  >= 0) row[ci]  = meta.competition || '';
+  if (yi  >= 0) row[yi]  = meta.year        || '';
+  if (di  >= 0) row[di]  = meta.division    || '';
+
+  let existingRow = -1;
+  for (let i = 1; i < values.length; i++) {
+    if (ni >= 0 && values[i][ni] === sheetName) { existingRow = i + 1; break; } // 1-indexed
+  }
+
+  if (existingRow > 0) {
+    sheet.getRange(existingRow, 1, 1, numCols).setValues([row]);
+  } else {
+    sheet.appendRow(row);
   }
 }
 
