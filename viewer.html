@@ -104,11 +104,20 @@
 <body>
 
 <header>
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><path d="M2 12h20"/></svg>
-  <h1>Touch Rugby Annotator</h1>
+  <a href="index.html" style="display:flex;align-items:center;gap:7px;text-decoration:none;flex-shrink:0">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><path d="M2 12h20"/></svg>
+    <span style="font-size:0.95rem;font-weight:600;color:#fff">Touch Rugby Analyzer</span>
+  </a>
+  <span style="width:1px;height:18px;background:#2a2d3a;flex-shrink:0"></span>
+  <h1>Annotator</h1>
   <span class="yt-label">YouTube URL:</span>
   <input class="yt-input" id="ytUrl" type="text" placeholder="https://www.youtube.com/watch?v=..." onkeydown="if(event.key==='Enter')loadYouTube()">
   <button class="btn btn-primary" onclick="loadYouTube()" style="padding:4px 10px;font-size:0.76rem">▶ Load YT</button>
+  <nav style="display:flex;gap:4px;margin-left:auto">
+    <a href="games.html" style="color:#888;text-decoration:none;font-size:0.8rem;padding:5px 10px;border-radius:6px;transition:background 0.15s" onmouseover="this.style.background='#22253a';this.style.color='#e0e0e0'" onmouseout="this.style.background='';this.style.color='#888'">Games</a>
+    <a href="event_table.html" style="color:#888;text-decoration:none;font-size:0.8rem;padding:5px 10px;border-radius:6px;transition:background 0.15s" onmouseover="this.style.background='#22253a';this.style.color='#e0e0e0'" onmouseout="this.style.background='';this.style.color='#888'">Events</a>
+    <a href="viewer.html" style="background:#22253a;color:#3b82f6;text-decoration:none;font-size:0.8rem;padding:5px 10px;border-radius:6px">Annotator</a>
+  </nav>
 </header>
 
 <div class="main">
@@ -220,6 +229,10 @@
 </div>
 
 <script>
+// ── Access gate ────────────────────────────────────────────────
+if (sessionStorage.getItem('accessLevel') !== 'staff') {
+  window.location.replace('index.html');
+}
 // ── Apps Script config ─────────────────────────────────────────
 // Set these after deploying apps_script/Code.gs as a Web App
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzhMw4nQr2nVW0MLfPWVXRPXsvImerpzshQ5GnJ3873qQkGMz0bcJQdmTRXCxwygfFm/exec';
@@ -251,7 +264,7 @@ const vid = document.getElementById('vid');
 
 // ── Video abstraction layer ────────────────────────────────────
 function getTime()     { return videoMode === 'youtube' ? (ytPlayer ? ytPlayer.getCurrentTime() : 0) : vid.currentTime; }
-function getDuration() { return videoMode === 'youtube' ? (ytPlayer ? ytPlayer.getDuration()    : 0) : vid.duration; }
+function getDuration() { return videoMode === 'youtube' ? (ytPlayer && typeof ytPlayer.getDuration === 'function' ? ytPlayer.getDuration() : 0) : vid.duration; }
 function isPaused()    { return videoMode === 'youtube' ? (!ytPlayer || ytPlayer.getPlayerState() !== YT.PlayerState.PLAYING) : vid.paused; }
 function doPlay()  { if (videoMode === 'youtube') { if (ytPlayer) ytPlayer.playVideo();  } else vid.play();  document.getElementById('playBtn').textContent = '⏸ Pause'; }
 function doPause() { if (videoMode === 'youtube') { if (ytPlayer) ytPlayer.pauseVideo(); } else vid.pause(); document.getElementById('playBtn').textContent = '▶ Play'; }
@@ -583,7 +596,11 @@ async function loadFromSheet() {
                possessionOwner: possIdx >= 0 ? (r[possIdx] || '') : '', time, timeStr };
     }).filter(a => a.type && COLORS[a.type]);
 
-    // Auto-load YouTube video from the first link found in the sheet
+    if (!loaded.length) { alert('No valid annotations found in this tab.'); return; }
+    annotations = loaded.sort((a, b) => a.time - b.time);
+    renderList(); renderMarkers();
+
+    // Auto-load YouTube video after annotations are rendered
     if (ytIdx >= 0) {
       const firstYtUrl = result.rows.slice(1).map(r => r[ytIdx]).find(v => v && String(v).includes('youtu'));
       if (firstYtUrl) {
@@ -594,10 +611,6 @@ async function loadFromSheet() {
         }
       }
     }
-
-    if (!loaded.length) { alert('No valid annotations found in this tab.'); return; }
-    annotations = loaded.sort((a, b) => a.time - b.time);
-    renderList(); renderMarkers();
     document.getElementById('lastAnnBtn').removeAttribute('disabled');
     btn.textContent = `✓ Loaded ${loaded.length}`;
     setTimeout(() => { btn.disabled = false; btn.textContent = '⬇ Load from Sheet'; }, 2500);

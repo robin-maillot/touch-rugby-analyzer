@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Touch Rugby Analyzer</title>
+  <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', sans-serif; background: #0f1117; color: #e0e0e0; min-height: 100vh; }
+
+    header { background: #1a1d27; padding: 10px 20px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #2a2d3a; flex-wrap: wrap; }
+    .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
+    .logo span { font-size: 1rem; font-weight: 600; color: #fff; white-space: nowrap; }
+    .header-nav { display: flex; gap: 4px; }
+    .header-nav a { color: #888; text-decoration: none; font-size: 0.8rem; padding: 5px 10px; border-radius: 6px; transition: background 0.15s, color 0.15s; }
+    .header-nav a:hover { background: #22253a; color: #e0e0e0; }
+    .header-nav a.active { background: #22253a; color: #3b82f6; }
+    .header-sep { width: 1px; height: 20px; background: #2a2d3a; margin: 0 4px; align-self: center; }
+    select { background: #2a2d3a; color: #ccc; border: 1px solid #3a3d4a; border-radius: 5px; padding: 5px 10px; font-size: 0.82rem; cursor: pointer; min-width: 280px; }
+    #status { font-size: 0.78rem; color: #888; }
+
+    main { padding: 20px 24px; max-width: 960px; margin: 0 auto; }
+
+    .card { background: #1a1d27; border: 1px solid #2a2d3a; border-radius: 10px; padding: 16px 20px; margin-bottom: 14px; }
+    .card-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: #555; margin-bottom: 10px; }
+
+    #gameTitle    { font-size: 1.15rem; font-weight: 700; color: #fff; }
+    #gameSubtitle { font-size: 0.78rem; color: #777; margin-top: 3px; }
+
+    .chart-wrap { overflow-x: auto; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    th { background: #0f1117; color: #aaa; padding: 8px 12px; text-align: left; font-weight: 600; border-bottom: 1px solid #2a2d3a; }
+    td { padding: 8px 12px; border-bottom: 1px solid #1f2230; color: #ddd; }
+    tr:last-child td { border-bottom: none; }
+
+    #loading      { text-align: center; padding: 48px; color: #555; font-size: 0.88rem; display: none; }
+    #errMsg       { color: #ef4444; font-size: 0.82rem; padding: 12px 0; display: none; }
+    #notAnalysable { display: none; text-align: center; padding: 80px 24px; }
+    #notAnalysable p { font-size: 1.5rem; font-weight: 600; color: #888; }
+    #gameContent { display: none; }
+  </style>
+</head>
+<body>
+
+<header>
+  <a class="logo" href="index.html">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2">
+      <circle cx="12" cy="12" r="10"/>
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+      <path d="M2 12h20"/>
+    </svg>
+    <span>Touch Rugby Analyzer</span>
+  </a>
+  <div class="header-sep"></div>
+  <select id="gameSelect" onchange="loadGame()"><option value="">Loading games…</option></select>
+  <span id="status"></span>
+  <nav class="header-nav" style="margin-left:auto">
+    <a href="games.html" class="active">Games</a>
+    <a href="event_table.html">Events</a>
+    <a href="viewer.html" id="annotatorLink" style="display:none">Annotator</a>
+  </nav>
+</header>
+<script>if (sessionStorage.getItem('accessLevel') === 'staff') document.getElementById('annotatorLink').style.display = '';</script>
+
+<main>
+  <div id="loading">⏳ Loading game data…</div>
+  <div id="errMsg"></div>
+  <div id="notAnalysable"><p>Game not yet fully analysed</p></div>
+
+  <div id="gameContent">
+    <div class="card">
+      <div id="gameTitle"></div>
+      <div id="gameSubtitle"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Tries</div>
+      <div class="chart-wrap" id="vis-tries"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Penalties</div>
+      <div class="chart-wrap" id="vis-penalties"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Possession Timeline</div>
+      <div class="chart-wrap" id="vis-possession"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Team Statistics</div>
+      <div id="metricsTable"></div>
+    </div>
+  </div>
+</main>
+
+<script>
+// ── Config ─────────────────────────────────────────────────────
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzhMw4nQr2nVW0MLfPWVXRPXsvImerpzshQ5GnJ3873qQkGMz0bcJQdmTRXCxwygfFm/exec';
+const APPS_SCRIPT_SECRET = 'm30-test-key';
+
+const CHART_WIDTH = 840;
+
+// MM:SS axis label expression (mirrors Python _MM_SS in generate_html_v2.py)
+const MM_SS = "(datum.value < 0 ? '-' : '') + floor(abs(datum.value) / 60) + ':' + (floor(abs(datum.value) % 60) < 10 ? '0' : '') + floor(abs(datum.value) % 60)";
+
+const VEGA_CONFIG = {
+  background: '#1a1d27',
+  title:  { color: '#ccc', fontSize: 13, font: 'Segoe UI' },
+  axis:   { gridColor: '#2a2d3a', labelColor: '#aaa', titleColor: '#888', tickColor: '#2a2d3a', domainColor: '#2a2d3a', labelFont: 'Segoe UI' },
+  legend: { labelColor: '#ccc', titleColor: '#888', labelFont: 'Segoe UI' },
+  view:   { stroke: '#2a2d3a' },
+};
+
+// ── Bootstrap ──────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', fetchGameList);
+
+// Keyed by sheet tab name, populated in fetchGameList
+const gamesMeta = {};
+
+async function fetchGameList() {
+  setStatus('Fetching game list…');
+  try {
+    const resp   = await fetch(`${APPS_SCRIPT_URL}?secret=${enc(APPS_SCRIPT_SECRET)}&action=list`);
+    const result = await resp.json();
+    if (!result.ok) throw new Error(result.error);
+
+    const sel = document.getElementById('gameSelect');
+    sel.innerHTML = '<option value="">— Select a game —</option>';
+    result.sheets.forEach(entry => {
+      // entry is { name, team1, team2, competition, year, division }
+      gamesMeta[entry.name] = entry;
+      const opt = document.createElement('option');
+      opt.value = entry.name;
+      opt.textContent = sheetNameToLabel(entry);
+      sel.appendChild(opt);
+    });
+    setStatus('');
+  } catch (err) {
+    setStatus('Could not load game list: ' + err.message);
+  }
+}
+
+// Build a human-readable label, preferring metadata over tab name parsing
+function sheetNameToLabel(entry) {
+  const t1   = entry.team1;
+  const t2   = entry.team2;
+  const comp = [entry.year, entry.division, entry.competition].filter(Boolean).join(' ');
+  if (t1 && t2) return `${t1} vs ${t2}${comp ? '  (' + comp + ')' : ''}`;
+  // Fallback: parse from tab name
+  const parts = entry.name.split('_');
+  if (parts.length < 5) return entry.name;
+  return `${parts[parts.length - 2]} vs ${parts[parts.length - 1]}  (${parts.slice(0, -2).join(' ')})`;
+}
+
+// ── Load & render a game ───────────────────────────────────────
+async function loadGame() {
+  const sheetName = document.getElementById('gameSelect').value;
+  if (!sheetName) return;
+
+  document.getElementById('gameContent').style.display   = 'none';
+  document.getElementById('errMsg').style.display        = 'none';
+  document.getElementById('notAnalysable').style.display = 'none';
+  document.getElementById('loading').style.display       = 'block';
+  setStatus('');
+
+  try {
+    const url    = `${APPS_SCRIPT_URL}?secret=${enc(APPS_SCRIPT_SECRET)}&sheetName=${enc(sheetName)}`;
+    const resp   = await fetch(url);
+    const result = await resp.json();
+    if (!result.ok) throw new Error(result.error);
+
+    // Prefer metadata from gamesMeta (populated via action=list),
+    // then fall back to meta returned with this sheet fetch, then tab name parsing.
+    const m = gamesMeta[sheetName] || result.meta || {};
+    const fallback = getTeamNames(sheetName);
+    const team1 = m.team1 || fallback[0];
+    const team2 = m.team2 || fallback[1];
+    const metaSubtitle = [m.year, m.division, m.competition].filter(Boolean).join(' · ').toUpperCase();
+    const subtitle = metaSubtitle || sheetName.split('_').slice(0, -2).join(' · ').toUpperCase();
+
+    const events = parseSheet(result.rows);
+    processEvents(events, team1, team2);
+    renderGame(events, team1, team2, subtitle);
+
+  } catch (err) {
+    document.getElementById('loading').style.display = 'none';
+    showErr('Error loading game: ' + err.message);
+  }
+}
+
+// ── Sheet parsing ──────────────────────────────────────────────
+function parseSheet(rows) {
+  if (!rows || rows.length < 2) return [];
+  const headers = rows[0].map(h => h.trim().toLowerCase());
+  const col = name => headers.indexOf(name);
+
+  const ti = col('time'), ty = col('type'), ni = col('name');
+  const pi = col('possession owner'), yi = col('youtube link');
+
+  return rows.slice(1).map(r => ({
+    Time:               r[ti]  || '',
+    Type:               r[ty]  || '',
+    Name:               r[ni]  || '',
+    'Possession Owner': pi >= 0 ? (r[pi] || '') : '',
+    'Youtube Link':     yi >= 0 ? (r[yi] || '') : '',
+  })).filter(e => e.Type);
+}
+
+function getTeamNames(sheetName) {
+  const p = sheetName.split('_');
+  return [p[p.length - 2], p[p.length - 1]];
+}
+
+// ── Data processing — mirrors Python utils.py ─────────────────
+function parseTimeStr(str) {
+  const p = (str || '').split(':').map(Number);
+  if (p.length === 3) return p[0] * 3600 + p[1] * 60 + p[2];
+  if (p.length === 2) return p[0] * 60 + p[1];
+  return 0;
+}
+
+function isTurnover(type, name) {
+  if (type === 'Try') return true;
+  if (type === 'Penalty' && !['Offside', 'Not Moving Forward', 'Shoulder'].includes(name)) return true;
+  if (type === 'Turnover' && name !== '6 Again') return true;
+  return false;
+}
+
+// Mirrors add_game_time() — converts wall-clock times to seconds from first Game Start
+function addGameTime(events) {
+  events.forEach(e => { e._raw = parseTimeStr(e.Time); });
+
+  const starts = events.filter(e => e.Type === 'Game Event' && e.Name === 'Game Start');
+  const ends   = events.filter(e => e.Type === 'Game Event' && e.Name === 'Game End');
+
+  if (!starts.length) {
+    const t0 = events[0]?._raw || 0;
+    events.forEach(e => e.GameTime = e._raw - t0);
+    return;
+  }
+
+  // Build a time offset per half so GameTime resets correctly across halves
+  const STOPPAGE = 300; // 5 min between halves, same default as Python
+  const offsets  = [];
+  for (let i = 0; i < starts.length; i++) {
+    if (i === 0) {
+      offsets.push(-starts[0]._raw);
+    } else {
+      const prevEndRaw    = ends[i - 1]?._raw ?? starts[i]._raw;
+      const prevEndAdjusted = prevEndRaw + offsets[i - 1];
+      offsets.push(-starts[i]._raw + prevEndAdjusted + STOPPAGE);
+    }
+  }
+
+  events.forEach(e => {
+    let offset = offsets[offsets.length - 1];
+    for (let i = 0; i < starts.length - 1; i++) {
+      if (e._raw < starts[i + 1]._raw) { offset = offsets[i]; break; }
+    }
+    e.GameTime = e._raw + offset;
+  });
+}
+
+// Replace 'Team 1' / 'Team 2' placeholders with real names
+function replacePossessionNames(events, team1, team2) {
+  events.forEach(e => {
+    if (e['Possession Owner'] === 'Team 1') e['Possession Owner'] = team1;
+    else if (e['Possession Owner'] === 'Team 2') e['Possession Owner'] = team2;
+  });
+}
+
+// Forward-fill blank possession owner cells (mirrors infer_possession_owner)
+function fillPossessionOwner(events) {
+  let current = '';
+  events.forEach(e => {
+    if (e.Type === 'To Review') { e['Possession Owner'] = current; return; }
+    if (e['Possession Owner']) current = e['Possession Owner'];
+    else e['Possession Owner'] = current;
+  });
+}
+
+// Mirrors infer_action_owner: non-turnover penalties/turnovers belong to the opponent
+function addActionOwner(events, team1, team2) {
+  events.forEach(e => {
+    const opponent = e['Possession Owner'] === team1 ? team2 : team1;
+    const turnover = isTurnover(e.Type, e.Name);
+    e['Action Owner'] = (!turnover && (e.Type === 'Penalty' || e.Type === 'Turnover'))
+      ? opponent
+      : e['Possession Owner'];
+  });
+}
+
+function processEvents(events, team1, team2) {
+  addGameTime(events);
+  replacePossessionNames(events, team1, team2);
+  fillPossessionOwner(events);
+  addActionOwner(events, team1, team2);
+}
+
+function isFullyAnalysable(events) {
+  const starts = events.filter(e => e.Name === 'Game Start').length;
+  const ends   = events.filter(e => e.Name === 'Game End').length;
+  return starts > 0 && starts === ends;
+}
+
+// ── Chart data builders — mirror generate_html_v2.py ──────────
+function buildCumulativeData(events, type, teamNames, globalStart, globalEnd, startLink, endLink) {
+  const data = [];
+  for (const team of teamNames) {
+    data.push({ GameTime: globalStart, Team: team, Event: 'Game Start', Count: 0, Link: startLink });
+    let count = 0;
+    events
+      .filter(e => e.Type === type && e['Action Owner'] === team)
+      .sort((a, b) => a.GameTime - b.GameTime)
+      .forEach(e => {
+        count++;
+        data.push({ GameTime: e.GameTime, Team: team, Event: e.Name, Count: count, Link: e['Youtube Link'] });
+      });
+    data.push({ GameTime: globalEnd, Team: team, Event: 'Game End', Count: count, Link: endLink });
+  }
+  return data;
+}
+
+function buildPossessionData(events) {
+  let prevOwner = null, pid = 0;
+  events.forEach((e, i) => {
+    const newPoss = e['Possession Owner'] !== prevOwner || e.Name === 'Game Start' || (i > 0 && events[i-1].Name === 'Game End');
+    if (i === 0 || newPoss) pid++;
+    e._pid = pid;
+    prevOwner = e['Possession Owner'];
+  });
+
+  const byPid = {};
+  events.forEach(e => { (byPid[e._pid] = byPid[e._pid] || []).push(e); });
+
+  const raw = Object.values(byPid).map(g => ({
+    pid:        g[0]._pid,
+    Team:       g[0]['Possession Owner'],
+    rawStart:   Math.min(...g.map(e => e.GameTime)),
+    rawEnd:     Math.max(...g.map(e => e.GameTime)),
+    endType:    g[g.length - 1].Type,
+    endEvent:   g[g.length - 1].Name,
+    Link:       g[g.length - 1]['Youtube Link'],
+  }));
+
+  return raw.map((p, i) => {
+    const start = i === 0 ? p.rawStart : (raw[i-1].endEvent === 'Game End' ? p.rawStart : raw[i-1].rawEnd);
+    let cat;
+    if      (p.endType  === 'Try')      cat = 'Try';
+    else if (p.endType  === 'Penalty')  cat = 'Penalty';
+    else if (p.endEvent === '6th Touch') cat = '6th Touch';
+    else                                cat = 'Other';
+    return { Team: p.Team, Start: start, End: p.rawEnd,
+             Duration_Sec: p.rawEnd - start, End_Type: p.endType,
+             End_Event: p.endEvent, Color_Category: cat, Link: p.Link };
+  });
+}
+
+function buildMetrics(possessions, teamNames) {
+  return teamNames.map(team => {
+    const g     = possessions.filter(p => p.Team === team);
+    const tries = g.filter(p => p.End_Type === 'Try').length;
+    const comps = g.filter(p => p.End_Type === 'Try' || p.End_Event === '6th Touch').length;
+    const avg   = g.length ? g.reduce((s, p) => s + p.Duration_Sec, 0) / g.length : 0;
+    const total = g.reduce((s, p) => s + p.Duration_Sec, 0);
+    return {
+      Team: team, Possessions: g.length, Tries: tries,
+      'Success Rate': g.length ? `${(tries / g.length * 100).toFixed(1)}%` : '—',
+      Completions: comps, 'Avg Time (s)': avg.toFixed(1), 'Total Time (s)': total.toFixed(1),
+    };
+  });
+}
+
+// ── Vega-Lite spec builders ────────────────────────────────────
+const timeEnc = {
+  field: 'GameTime', type: 'quantitative',
+  axis: { labelExpr: MM_SS, title: 'Game Time' },
+};
+
+function teamColorScale(teamNames) {
+  return { field: 'Team', type: 'nominal',
+           scale: { domain: teamNames, range: ['#00c853', '#f44336'] } };
+}
+
+function cumulativeSpec(data, title, yTitle, teamNames) {
+  const color = teamColorScale(teamNames);
+  return {
+    $schema: 'https://vega.github.io/schema/vega-lite/v5.json',
+    width: CHART_WIDTH, height: 200, title,
+    data: { values: data },
+    layer: [
+      {
+        mark: { type: 'line', interpolate: 'step-after' },
+        encoding: {
+          x: timeEnc,
+          y: { field: 'Count', type: 'quantitative', axis: { tickMinStep: 1 }, title: yTitle },
+          color,
+          order: { field: 'GameTime' },
+        },
+      },
+      {
+        transform: [{ filter: "datum.Event !== 'Game Start' && datum.Event !== 'Game End'" }],
+        mark: { type: 'circle', size: 100 },
+        encoding: {
+          x: timeEnc,
+          y: { field: 'Count', type: 'quantitative' },
+          color,
+          href:    { field: 'Link' },
+          tooltip: [
+            { field: 'GameTime', type: 'quantitative', format: '.0f', title: 'Game Time (s)' },
+            { field: 'Team',  type: 'nominal' },
+            { field: 'Event', type: 'nominal' },
+            { field: 'Count', type: 'quantitative' },
+          ],
+        },
+      },
+    ],
+  };
+}
+
+function possessionSpec(data, teamNames) {
+  return {
+    $schema: 'https://vega.github.io/schema/vega-lite/v5.json',
+    width: CHART_WIDTH, height: 140, title: 'Possession Timeline',
+    data: { values: data },
+    mark: 'bar',
+    encoding: {
+      x:     { field: 'Start', type: 'quantitative', axis: { labelExpr: MM_SS, title: 'Game Time' } },
+      x2:    { field: 'End' },
+      y:     { field: 'Team', type: 'nominal', title: 'Possession Owner', sort: teamNames },
+      color: {
+        field: 'Color_Category', type: 'nominal', title: 'Outcome',
+        scale: { domain: ['Try', 'Penalty', '6th Touch', 'Other'],
+                 range:  ['#00c853', '#f44336', '#ffd600', '#ff9800'] },
+      },
+      href: { field: 'Link' },
+      tooltip: [
+        { field: 'Start',        type: 'quantitative', format: '.0f', title: 'Start (s)' },
+        { field: 'End',          type: 'quantitative', format: '.0f', title: 'End (s)' },
+        { field: 'Team',         type: 'nominal' },
+        { field: 'End_Event',    type: 'nominal' },
+        { field: 'End_Type',     type: 'nominal' },
+        { field: 'Duration_Sec', type: 'quantitative', format: '.1f', title: 'Duration (s)' },
+      ],
+    },
+  };
+}
+
+// ── Render ─────────────────────────────────────────────────────
+async function renderGame(events, team1, team2, subtitle) {
+  document.getElementById('loading').style.display = 'none';
+
+  if (!isFullyAnalysable(events)) {
+    document.getElementById('notAnalysable').style.display = 'block';
+    return;
+  }
+
+  const startEvent  = events.find(e => e.Name === 'Game Start');
+  const lastEnd     = [...events].reverse().find(e => e.Name === 'Game End');
+  const globalStart = startEvent.GameTime;
+  const globalEnd   = lastEnd.GameTime;
+  const startLink   = startEvent['Youtube Link'] || '';
+  const endLink     = lastEnd['Youtube Link']    || '';
+
+  const filtered      = events.filter(e => e.GameTime >= globalStart && e.GameTime <= globalEnd);
+  const teamNames     = [team1, team2];
+  const triesData     = buildCumulativeData(filtered, 'Try',     teamNames, globalStart, globalEnd, startLink, endLink);
+  const penData       = buildCumulativeData(filtered, 'Penalty', teamNames, globalStart, globalEnd, startLink, endLink);
+  const possData      = buildPossessionData(filtered);
+  const metrics       = buildMetrics(possData, teamNames);
+
+  const opts = { config: VEGA_CONFIG, actions: false };
+  await vegaEmbed('#vis-tries',      cumulativeSpec(triesData, 'Tries vs Time',     'Cumulative Tries',     teamNames), opts);
+  await vegaEmbed('#vis-penalties',  cumulativeSpec(penData,   'Penalties vs Time', 'Cumulative Penalties', teamNames), opts);
+  await vegaEmbed('#vis-possession', possessionSpec(possData, teamNames), opts);
+
+  // Metrics table
+  const cols = ['Team', 'Possessions', 'Tries', 'Success Rate', 'Completions', 'Avg Time (s)', 'Total Time (s)'];
+  document.getElementById('metricsTable').innerHTML =
+    `<table>
+       <thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead>
+       <tbody>${metrics.map(m => `<tr>${cols.map(c => `<td>${m[c]}</td>`).join('')}</tr>`).join('')}</tbody>
+     </table>`;
+
+  // Header info
+  document.getElementById('gameTitle').textContent    = `${team1} vs ${team2}`;
+  document.getElementById('gameSubtitle').textContent = subtitle;
+
+  document.getElementById('gameContent').style.display = 'block';
+}
+
+// ── Helpers ────────────────────────────────────────────────────
+function setStatus(msg) { document.getElementById('status').textContent = msg; }
+function showErr(msg)   { const el = document.getElementById('errMsg'); el.textContent = msg; el.style.display = 'block'; }
+function enc(s)         { return encodeURIComponent(s); }
+</script>
+</body>
+</html>
