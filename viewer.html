@@ -34,6 +34,9 @@
   .btn-danger:hover { background: #dc2626; }
   .btn-export { background: #10b981; color: #fff; }
   .btn-export:hover { background: #059669; }
+  .btn-push { background: #6366f1; color: #fff; }
+  .btn-push:hover { background: #4f46e5; }
+  .btn-push:disabled { opacity: 0.5; cursor: default; }
   .time-display { font-family: monospace; font-size: 0.88rem; color: #fff; background: #0f1117; padding: 4px 8px; border-radius: 5px; min-width: 75px; text-align: center; }
   select { background: #2a2d3a; color: #ccc; border: 1px solid #3a3d4a; border-radius: 5px; padding: 4px 7px; font-size: 0.78rem; cursor: pointer; }
 
@@ -140,6 +143,9 @@
     </select>
     <button class="btn btn-export" onclick="exportCSV()">⬇ Export CSV</button>
     <button class="btn btn-ghost" onclick="document.getElementById('csvInput').click()">📂 Load CSV</button>
+    <span class="yt-label">Sheet tab:</span>
+    <input class="yt-input" id="sheetName" type="text" placeholder="2026_mxo_supertouch_canut_usar" style="width:220px">
+    <button class="btn btn-push" id="pushBtn" onclick="pushToSheet()">⬆ Push to Sheet</button>
     <input type="file" id="csvInput" accept=".csv" style="display:none" onchange="loadCSV(event)">
     <button class="btn btn-ghost" id="videoSizeBtn" onclick="cycleVideoSize()" title="Cycle video size">⬜ S</button>
   </div>
@@ -208,6 +214,11 @@
 </div>
 
 <script>
+// ── Apps Script config ─────────────────────────────────────────
+// Set these after deploying apps_script/Code.gs as a Web App
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzhMw4nQr2nVW0MLfPWVXRPXsvImerpzshQ5GnJ3873qQkGMz0bcJQdmTRXCxwygfFm/exec';
+const APPS_SCRIPT_SECRET = 'm30-test-key';  // must match Code.gs
+
 const COLORS = { 'Try':'#f59e0b', 'Turnover':'#ef4444', 'Penalty':'#a855f7', 'Game Event':'#10b981', 'To Review':'#f97316' };
 
 const MENU = {
@@ -532,6 +543,52 @@ function clearAll() {
     annotations = [];
     renderList(); renderMarkers();
     document.getElementById('lastAnnBtn').setAttribute('disabled','');
+  }
+}
+
+// ── Push to Google Sheet ───────────────────────────────────────
+async function pushToSheet() {
+  if (annotations.length === 0) { alert('No annotations to push.'); return; }
+  const sheetName = document.getElementById('sheetName').value.trim();
+  if (!sheetName) { alert('Enter the sheet tab name first (e.g. 2026_mxo_supertouch_canut_usar).'); return; }
+  if (APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_URL_HERE') { alert('APPS_SCRIPT_URL is not configured in viewer.html.'); return; }
+
+  const btn = document.getElementById('pushBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Pushing…';
+
+  // Column order must match Python pipeline: Time, Possession Owner, Type, Name, Video Name, To Review, Comment, Youtube Link
+  const rows = annotations.map(a => [
+    a.timeStr,
+    a.possessionOwner || '',
+    a.type,
+    a.name || '',
+    videoBaseName,
+    a.type === 'To Review' ? 'Yes' : '',
+    a.type === 'To Review' ? (a.name || '') : '',  // Comment — free-text note for To Review entries
+    ytLink(a.time)
+  ]);
+
+  try {
+    const resp = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      // Content-Type text/plain avoids a CORS preflight while still allowing us to read the response
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ secret: APPS_SCRIPT_SECRET, sheetName, rows })
+    });
+    const result = await resp.json();
+    if (!result.ok) {
+      alert('Error: ' + result.error);
+      btn.disabled = false;
+      btn.textContent = '⬆ Push to Sheet';
+      return;
+    }
+    btn.textContent = `✓ Pushed ${result.appended} rows!`;
+    setTimeout(() => { btn.disabled = false; btn.textContent = '⬆ Push to Sheet'; }, 2500);
+  } catch (err) {
+    alert('Network error: ' + err.message);
+    btn.disabled = false;
+    btn.textContent = '⬆ Push to Sheet';
   }
 }
 
