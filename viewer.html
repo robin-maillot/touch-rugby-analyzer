@@ -37,6 +37,9 @@
   .btn-push { background: #6366f1; color: #fff; }
   .btn-push:hover { background: #4f46e5; }
   .btn-push:disabled { opacity: 0.5; cursor: default; }
+  .btn-load { background: #0ea5e9; color: #fff; }
+  .btn-load:hover { background: #0284c7; }
+  .btn-load:disabled { opacity: 0.5; cursor: default; }
   .time-display { font-family: monospace; font-size: 0.88rem; color: #fff; background: #0f1117; padding: 4px 8px; border-radius: 5px; min-width: 75px; text-align: center; }
   select { background: #2a2d3a; color: #ccc; border: 1px solid #3a3d4a; border-radius: 5px; padding: 4px 7px; font-size: 0.78rem; cursor: pointer; }
 
@@ -145,7 +148,10 @@
     <button class="btn btn-ghost" onclick="document.getElementById('csvInput').click()">📂 Load CSV</button>
     <span class="yt-label">Sheet tab:</span>
     <input class="yt-input" id="sheetName" type="text" placeholder="2026_mxo_supertouch_canut_usar" style="width:220px">
+    <button class="btn btn-load" id="loadSheetBtn" onclick="loadFromSheet()">⬇ Load from Sheet</button>
     <button class="btn btn-push" id="pushBtn" onclick="pushToSheet()">⬆ Push to Sheet</button>
+    <input class="yt-input" id="overridePass" type="password" placeholder="Override password (admin only)" style="width:200px;display:none">
+    <button class="btn btn-danger" id="overrideBtn" style="display:none" onclick="pushToSheet(true)">⚠ Override Tab</button>
     <input type="file" id="csvInput" accept=".csv" style="display:none" onchange="loadCSV(event)">
     <button class="btn btn-ghost" id="videoSizeBtn" onclick="cycleVideoSize()" title="Cycle video size">⬜ S</button>
   </div>
@@ -546,14 +552,61 @@ function clearAll() {
   }
 }
 
+// ── Load from Google Sheet ─────────────────────────────────────
+async function loadFromSheet() {
+  const sheetName = document.getElementById('sheetName').value.trim();
+  if (!sheetName) { alert('Enter the sheet tab name first.'); return; }
+  if (APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_URL_HERE') { alert('APPS_SCRIPT_URL is not configured in viewer.html.'); return; }
+
+  const btn = document.getElementById('loadSheetBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Loading…';
+
+  try {
+    const url = `${APPS_SCRIPT_URL}?secret=${encodeURIComponent(APPS_SCRIPT_SECRET)}&sheetName=${encodeURIComponent(sheetName)}`;
+    const resp = await fetch(url);
+    const result = await resp.json();
+
+    if (!result.ok) { alert('Error: ' + result.error); return; }
+
+    // rows[0] is the header row — skip it
+    const headers = result.rows[0].map(h => h.toLowerCase());
+    const col = name => headers.indexOf(name);
+    const timeIdx  = col('time'), typeIdx = col('type'), nameIdx = col('name');
+    const possIdx  = col('possession owner');
+
+    const loaded = result.rows.slice(1).map(r => {
+      const timeStr = r[timeIdx] || '';
+      const parts   = timeStr.split(':').map(Number);
+      const time    = parts.length === 3 ? parts[0]*3600 + parts[1]*60 + parts[2] : 0;
+      return { id: Date.now() + Math.random(), type: r[typeIdx], name: r[nameIdx] || '',
+               possessionOwner: possIdx >= 0 ? (r[possIdx] || '') : '', time, timeStr };
+    }).filter(a => a.type && COLORS[a.type]);
+
+    if (!loaded.length) { alert('No valid annotations found in this tab.'); return; }
+    annotations = loaded.sort((a, b) => a.time - b.time);
+    renderList(); renderMarkers();
+    document.getElementById('lastAnnBtn').removeAttribute('disabled');
+    btn.textContent = `✓ Loaded ${loaded.length}`;
+    setTimeout(() => { btn.disabled = false; btn.textContent = '⬇ Load from Sheet'; }, 2500);
+  } catch (err) {
+    alert('Network error: ' + err.message);
+    btn.disabled = false;
+    btn.textContent = '⬇ Load from Sheet';
+  }
+}
+
 // ── Push to Google Sheet ───────────────────────────────────────
-async function pushToSheet() {
+async function pushToSheet(override = false) {
   if (annotations.length === 0) { alert('No annotations to push.'); return; }
   const sheetName = document.getElementById('sheetName').value.trim();
   if (!sheetName) { alert('Enter the sheet tab name first (e.g. 2026_mxo_supertouch_canut_usar).'); return; }
   if (APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_URL_HERE') { alert('APPS_SCRIPT_URL is not configured in viewer.html.'); return; }
 
-  const btn = document.getElementById('pushBtn');
+  const overridePassword = override ? document.getElementById('overridePass').value.trim() : '';
+  if (override && !overridePassword) { alert('Enter the override password first.'); return; }
+
+  const btn = override ? document.getElementById('overrideBtn') : document.getElementById('pushBtn');
   btn.disabled = true;
   btn.textContent = '⏳ Pushing…';
 
@@ -565,30 +618,47 @@ async function pushToSheet() {
     a.name || '',
     videoBaseName,
     a.type === 'To Review' ? 'Yes' : '',
-    a.type === 'To Review' ? (a.name || '') : '',  // Comment — free-text note for To Review entries
+    a.type === 'To Review' ? (a.name || '') : '',
     ytLink(a.time)
   ]);
 
   try {
+    const body = { secret: APPS_SCRIPT_SECRET, sheetName, rows };
+    if (override) body.overridePassword = overridePassword;
+
     const resp = await fetch(APPS_SCRIPT_URL, {
       method: 'POST',
-      // Content-Type text/plain avoids a CORS preflight while still allowing us to read the response
       headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ secret: APPS_SCRIPT_SECRET, sheetName, rows })
+      body: JSON.stringify(body)
     });
     const result = await resp.json();
+
     if (!result.ok) {
+      // Tab exists and no override attempted — reveal the override controls
+      if (result.tabExists && !override) {
+        document.getElementById('overridePass').style.display = '';
+        document.getElementById('overrideBtn').style.display = '';
+        alert(`Tab "${sheetName}" already exists.\nEnter the admin password and click ⚠ Override Tab to replace it.`);
+        btn.disabled = false;
+        btn.textContent = '⬆ Push to Sheet';
+        return;
+      }
       alert('Error: ' + result.error);
       btn.disabled = false;
-      btn.textContent = '⬆ Push to Sheet';
+      btn.textContent = override ? '⚠ Override Tab' : '⬆ Push to Sheet';
       return;
     }
+
+    // Success — hide override controls and reset
+    document.getElementById('overridePass').style.display = 'none';
+    document.getElementById('overridePass').value = '';
+    document.getElementById('overrideBtn').style.display = 'none';
     btn.textContent = `✓ Pushed ${result.appended} rows!`;
-    setTimeout(() => { btn.disabled = false; btn.textContent = '⬆ Push to Sheet'; }, 2500);
+    setTimeout(() => { btn.disabled = false; btn.textContent = override ? '⚠ Override Tab' : '⬆ Push to Sheet'; }, 2500);
   } catch (err) {
     alert('Network error: ' + err.message);
     btn.disabled = false;
-    btn.textContent = '⬆ Push to Sheet';
+    btn.textContent = override ? '⚠ Override Tab' : '⬆ Push to Sheet';
   }
 }
 
