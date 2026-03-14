@@ -94,8 +94,12 @@
     .game-tag { font-size: 0.72rem; color: var(--text-muted); background: var(--surface-2); padding: 2px 7px; border-radius: 4px; border: 1px solid var(--border); }
 
     .empty { text-align: center; padding: 48px; color: var(--text-dim); font-size: 0.88rem; }
-    #loadingMsg { text-align: center; padding: 48px; color: var(--text-dim); font-size: 0.88rem; display: none; }
+    #loadingMsg { text-align: center; padding: 60px 24px; color: #888; font-size: 0.9rem; display: none; }
+    #loadingMsg .hint { font-size: 0.78rem; color: #555; margin-top: 8px; display: none; }
     #errorMsg   { color: #ef4444; font-size: 0.82rem; padding: 10px 16px; display: none; }
+
+    .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid #2a2d3a; border-top-color: #3b82f6; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 8px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
     /* ── Pagination ───────────────────────────────────────────── */
     .pagination { display: flex; justify-content: space-between; align-items: center; padding: 9px 16px; background: var(--surface); border-top: 1px solid var(--border); flex-shrink: 0; flex-wrap: wrap; gap: 8px; }
@@ -119,6 +123,7 @@
   <span id="rowCount"></span>
   <nav class="header-nav">
     <a href="games.html">Games</a>
+    <a href="dashboard.html">Dashboard</a>
     <a href="event_table.html" class="active">Events</a>
     <a href="viewer.html" id="annotatorLink" style="display:none">Annotator</a>
   </nav>
@@ -126,7 +131,10 @@
 </header>
 
 <div id="errorMsg"></div>
-<div id="loadingMsg">⏳ Loading events…</div>
+<div id="loadingMsg">
+  <span class="spinner"></span>Loading events…
+  <div class="hint" id="slowHint">This may take a moment — fetching all game data…</div>
+</div>
 
 <div class="controls" id="controls" style="display:none">
   <div class="top-row">
@@ -171,6 +179,12 @@
 const APPS_SCRIPT_URL    = 'https://script.google.com/macros/s/AKfycbzhMw4nQr2nVW0MLfPWVXRPXsvImerpzshQ5GnJ3873qQkGMz0bcJQdmTRXCxwygfFm/exec';
 const APPS_SCRIPT_SECRET = 'm30-test-key';
 
+// ── localStorage cache (stale-while-revalidate) ─────────────────
+const LS = {
+  get(k)    { try { return JSON.parse(localStorage.getItem('trl_' + k)); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem('trl_' + k, JSON.stringify(v)); } catch {} },
+};
+
 const FILTERABLE = ['Type', 'Name', 'Possession Owner', 'Action Owner', 'Game'];
 const HIDDEN_COLS = new Set(['Team 1', 'Team 2', 'Video Name']);
 
@@ -188,17 +202,34 @@ let activeFilters = {};
 window.addEventListener('DOMContentLoaded', fetchAll);
 
 async function fetchAll() {
-  document.getElementById('loadingMsg').style.display = 'block';
+  // Stale-while-revalidate: show cached rows immediately, always refresh in background
+  const cached = LS.get('all');
+  if (cached) {
+    processRows(cached.rows);
+  } else {
+    document.getElementById('loadingMsg').style.display = 'block';
+  }
+
+  const slowTimer = !cached ? setTimeout(() => {
+    const hint = document.getElementById('slowHint');
+    if (hint) hint.style.display = 'block';
+  }, 3000) : null;
+
   try {
     const resp   = await fetch(`${APPS_SCRIPT_URL}?secret=${enc(APPS_SCRIPT_SECRET)}&action=all`);
     const result = await resp.json();
     if (!result.ok) throw new Error(result.error);
+    if (slowTimer) clearTimeout(slowTimer);
+    LS.set('all', result);
     processRows(result.rows);
   } catch (err) {
-    document.getElementById('loadingMsg').style.display = 'none';
-    const el = document.getElementById('errorMsg');
-    el.textContent = 'Failed to load events: ' + err.message;
-    el.style.display = 'block';
+    if (slowTimer) clearTimeout(slowTimer);
+    if (!cached) {
+      document.getElementById('loadingMsg').style.display = 'none';
+      const el = document.getElementById('errorMsg');
+      el.textContent = 'Failed to load events: ' + err.message;
+      el.style.display = 'block';
+    }
   }
 }
 

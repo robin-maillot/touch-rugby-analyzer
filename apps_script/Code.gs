@@ -41,6 +41,28 @@ function getMetadata() {
   return meta;
 }
 
+// ── Cache helpers ───────────────────────────────────────────────
+const CACHE_TTL = 300; // seconds (5 min)
+
+function cacheGet(key) {
+  try { return CacheService.getScriptCache().get(key); } catch(e) { return null; }
+}
+
+function cachePut(key, str) {
+  try {
+    // CacheService limit is 100 KB per entry
+    if (str && str.length < 95000) CacheService.getScriptCache().put(key, str, CACHE_TTL);
+  } catch(e) {}
+}
+
+function cacheClear() {
+  try { CacheService.getScriptCache().removeAll(['list', 'all']); } catch(e) {}
+}
+
+function rawJson(str) {
+  return ContentService.createTextOutput(str).setMimeType(ContentService.MimeType.JSON);
+}
+
 // ── GET — list sheets or fetch rows from a tab ─────────────────
 function doGet(e) {
   try {
@@ -50,15 +72,20 @@ function doGet(e) {
 
     // action=list → sheet names + metadata for each game
     if (e.parameter.action === 'list') {
+      const hit = cacheGet('list');
+      if (hit) return rawJson(hit);
+
       const meta   = getMetadata();
-      const sheets = SpreadsheetApp.openById(SHEET_ID).getSheets()
-        .map(s => s.getName())
-        .filter(n => n !== METADATA_SHEET);
-      return json({ ok: true, sheets: sheets.map(name => ({ name, ...(meta[name] || {}) })) });
+      const result = JSON.stringify({ ok: true, sheets: Object.entries(meta).map(([name, m]) => ({ name, ...m })) });
+      cachePut('list', result);
+      return rawJson(result);
     }
 
     // action=all → every row from every game sheet listed in _metadata, metadata columns appended
     if (e.parameter.action === 'all') {
+      const hit = cacheGet('all');
+      if (hit) return rawJson(hit);
+
       const meta   = getMetadata();
       const ss     = SpreadsheetApp.openById(SHEET_ID);
       const metaNames = new Set(Object.keys(meta));
@@ -79,7 +106,9 @@ function doGet(e) {
         values.slice(1).forEach(row => allRows.push([...row, name, ...metaValues]));
       }
 
-      return json({ ok: true, rows: allRows });
+      const result = JSON.stringify({ ok: true, rows: allRows });
+      cachePut('all', result);
+      return rawJson(result);
     }
 
     const sheetName = e.parameter.sheetName;
@@ -134,6 +163,8 @@ function doPost(e) {
     }
 
     if (data.meta) writeMeta(data.sheetName, data.meta);
+
+    cacheClear(); // invalidate list + all caches after any write
 
     return json({ ok: true, appended: rows ? rows.length : 0 });
 

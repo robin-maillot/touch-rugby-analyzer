@@ -7,7 +7,7 @@
   <style>
     body {
       font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-      background: #f5f5f5;
+      background: #0f1117;
       margin: 0;
       padding: 0;
     }
@@ -15,56 +15,54 @@
     /* --- Login Screen Styles --- */
     #login-screen {
       position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: #2c3e50;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: #0f1117;
+      display: flex; flex-direction: column;
+      justify-content: center; align-items: center;
       z-index: 1000;
-      color: white;
     }
+    .login-logo {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 28px; text-decoration: none;
+    }
+    .login-logo span { font-size: 1.1rem; font-weight: 700; color: #fff; }
     #login-box {
-      background: white;
-      padding: 30px;
-      border-radius: 8px;
+      background: #1a1d27;
+      border: 1px solid #2a2d3a;
+      padding: 32px 36px;
+      border-radius: 10px;
       text-align: center;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
       max-width: 90%;
-      width: 300px;
+      width: 320px;
     }
     #login-box h2 {
-      margin-top: 0;
-      color: #333;
+      margin-top: 0; margin-bottom: 4px;
+      color: #fff; font-size: 1rem; font-weight: 600;
     }
+    #login-box p { color: #666; font-size: 0.78rem; margin-bottom: 20px; }
     #password-input {
-      width: 100%;
-      padding: 10px;
-      margin: 15px 0;
-      border: 1px solid #ccc;
-      border-radius: 4px;
+      width: 100%; padding: 10px 12px;
+      margin: 0 0 12px;
+      background: #0f1117; border: 1px solid #2a2d3a;
+      border-radius: 6px; color: #e0e0e0;
+      font-size: 15px; outline: none;
+      transition: border-color 0.15s;
       box-sizing: border-box;
-      font-size: 16px;
     }
+    #password-input:focus { border-color: #3b82f6; }
+    #password-input::placeholder { color: #444; }
     #login-btn {
-      width: 100%;
-      padding: 10px;
-      background: #3498db;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      font-size: 16px;
-      cursor: pointer;
+      width: 100%; padding: 10px;
+      background: #3b82f6; color: white;
+      border: none; border-radius: 6px;
+      font-size: 0.9rem; font-weight: 600; cursor: pointer;
+      transition: background 0.15s;
     }
-    #login-btn:hover { background: #2980b9; }
+    #login-btn:hover { background: #2563eb; }
     #error-msg {
-      color: #e74c3c;
-      margin-top: 10px;
-      display: none;
-      font-size: 14px;
+      color: #ef4444; margin-top: 12px;
+      display: none; font-size: 0.8rem;
     }
 
     /* --- Main Content (Hidden Initially) --- */
@@ -85,11 +83,20 @@
 <body>
 
   <div id="login-screen">
+    <div class="login-logo">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+        <path d="M2 12h20"/>
+      </svg>
+      <span>Touch Rugby Analyzer</span>
+    </div>
     <div id="login-box">
       <h2>Restricted Access</h2>
-      <input type="password" id="password-input" placeholder="Enter Password" />
+      <p>Enter your access password to continue</p>
+      <input type="password" id="password-input" placeholder="Password" />
       <button id="login-btn">Login</button>
-      <div id="error-msg">Incorrect Password</div>
+      <div id="error-msg">Incorrect password</div>
     </div>
   </div>
 
@@ -109,6 +116,11 @@
         <div class="card-icon">📊</div>
         <div class="card-title">Game Analysis</div>
         <div class="card-desc">Charts &amp; stats per game</div>
+      </a>
+      <a class="nav-card" href="dashboard.html">
+        <div class="card-icon">🏆</div>
+        <div class="card-title">Dashboard</div>
+        <div class="card-desc">Team rankings &amp; comparisons</div>
       </a>
       <a class="nav-card" href="event_table.html">
         <div class="card-icon">📋</div>

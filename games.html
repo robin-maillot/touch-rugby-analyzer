@@ -25,23 +25,29 @@
     main { padding: 20px 24px; max-width: 960px; margin: 0 auto; }
 
     .card { background: #1a1d27; border: 1px solid #2a2d3a; border-radius: 10px; padding: 16px 20px; margin-bottom: 14px; }
-    .card-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: #555; margin-bottom: 10px; }
 
     #gameTitle    { font-size: 1.15rem; font-weight: 700; color: #fff; }
     #gameSubtitle { font-size: 0.78rem; color: #777; margin-top: 3px; }
-
-    .chart-wrap { overflow-x: auto; }
 
     table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
     th { background: #0f1117; color: #aaa; padding: 8px 12px; text-align: left; font-weight: 600; border-bottom: 1px solid #2a2d3a; }
     td { padding: 8px 12px; border-bottom: 1px solid #1f2230; color: #ddd; }
     tr:last-child td { border-bottom: none; }
 
-    #loading      { text-align: center; padding: 48px; color: #555; font-size: 0.88rem; display: none; }
+    #loading      { text-align: center; padding: 60px 24px; color: #888; font-size: 0.9rem; display: none; }
     #errMsg       { color: #ef4444; font-size: 0.82rem; padding: 12px 0; display: none; }
     #notAnalysable { display: none; text-align: center; padding: 80px 24px; }
-    #notAnalysable p { font-size: 1.5rem; font-weight: 600; color: #888; }
+    #notAnalysable p { font-size: 1.1rem; font-weight: 600; color: #888; }
+    #notAnalysable .hint { font-size: 0.8rem; color: #555; margin-top: 8px; }
     #gameContent { display: none; }
+    #selectPrompt { text-align: center; padding: 80px 24px; color: #555; font-size: 0.9rem; }
+
+    .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid #2a2d3a; border-top-color: #3b82f6; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 8px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .chart-wrap { overflow-x: auto; width: 100%; }
+    .vega-embed { width: 100% !important; }
+    .card-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: #666; margin-bottom: 10px; }
   </style>
 </head>
 <body>
@@ -60,6 +66,7 @@
   <span id="status"></span>
   <nav class="header-nav" style="margin-left:auto">
     <a href="games.html" class="active">Games</a>
+    <a href="dashboard.html">Dashboard</a>
     <a href="event_table.html">Events</a>
     <a href="viewer.html" id="annotatorLink" style="display:none">Annotator</a>
   </nav>
@@ -67,9 +74,13 @@
 <script>if (sessionStorage.getItem('accessLevel') === 'staff') document.getElementById('annotatorLink').style.display = '';</script>
 
 <main>
-  <div id="loading">⏳ Loading game data…</div>
+  <div id="selectPrompt">← Select a game from the dropdown above</div>
+  <div id="loading"><span class="spinner"></span>Loading game data…</div>
   <div id="errMsg"></div>
-  <div id="notAnalysable"><p>Game not yet fully analysed</p></div>
+  <div id="notAnalysable">
+    <p>Game not yet fully analysed</p>
+    <div class="hint">Missing Game Start or Game End event — analysis unavailable for this game.</div>
+  </div>
 
   <div id="gameContent">
     <div class="card">
@@ -104,7 +115,13 @@
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzhMw4nQr2nVW0MLfPWVXRPXsvImerpzshQ5GnJ3873qQkGMz0bcJQdmTRXCxwygfFm/exec';
 const APPS_SCRIPT_SECRET = 'm30-test-key';
 
-const CHART_WIDTH = 840;
+// ── localStorage cache (stale-while-revalidate) ─────────────────
+const LS = {
+  get(k)    { try { return JSON.parse(localStorage.getItem('trl_' + k)); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem('trl_' + k, JSON.stringify(v)); } catch {} },
+};
+
+// Charts use container width (responsive)
 
 // MM:SS axis label expression (mirrors Python _MM_SS in generate_html_v2.py)
 const MM_SS = "(datum.value < 0 ? '-' : '') + floor(abs(datum.value) / 60) + ':' + (floor(abs(datum.value) % 60) < 10 ? '0' : '') + floor(abs(datum.value) % 60)";
@@ -123,26 +140,35 @@ window.addEventListener('DOMContentLoaded', fetchGameList);
 // Keyed by sheet tab name, populated in fetchGameList
 const gamesMeta = {};
 
+function applyGameList(result) {
+  const sel = document.getElementById('gameSelect');
+  sel.innerHTML = '<option value="">— Select a game —</option>';
+  result.sheets.forEach(entry => {
+    gamesMeta[entry.name] = entry;
+    const opt = document.createElement('option');
+    opt.value = entry.name;
+    opt.textContent = sheetNameToLabel(entry);
+    sel.appendChild(opt);
+  });
+  setStatus(`${result.sheets.length} game${result.sheets.length !== 1 ? 's' : ''}`);
+}
+
 async function fetchGameList() {
-  setStatus('Fetching game list…');
+  const cached = LS.get('list');
+  if (cached) {
+    applyGameList(cached);
+  } else {
+    document.getElementById('status').innerHTML = '<span class="spinner" style="border-top-color:#3b82f6;width:12px;height:12px;border-width:1.5px"></span>';
+  }
+
   try {
     const resp   = await fetch(`${APPS_SCRIPT_URL}?secret=${enc(APPS_SCRIPT_SECRET)}&action=list`);
     const result = await resp.json();
     if (!result.ok) throw new Error(result.error);
-
-    const sel = document.getElementById('gameSelect');
-    sel.innerHTML = '<option value="">— Select a game —</option>';
-    result.sheets.forEach(entry => {
-      // entry is { name, team1, team2, competition, year, division }
-      gamesMeta[entry.name] = entry;
-      const opt = document.createElement('option');
-      opt.value = entry.name;
-      opt.textContent = sheetNameToLabel(entry);
-      sel.appendChild(opt);
-    });
-    setStatus('');
+    LS.set('list', result);
+    applyGameList(result);
   } catch (err) {
-    setStatus('Could not load game list: ' + err.message);
+    if (!cached) setStatus('Could not load game list: ' + err.message);
   }
 }
 
@@ -166,24 +192,17 @@ async function loadGame() {
   document.getElementById('gameContent').style.display   = 'none';
   document.getElementById('errMsg').style.display        = 'none';
   document.getElementById('notAnalysable').style.display = 'none';
+  document.getElementById('selectPrompt').style.display  = 'none';
   document.getElementById('loading').style.display       = 'block';
   setStatus('');
 
-  try {
-    const url    = `${APPS_SCRIPT_URL}?secret=${enc(APPS_SCRIPT_SECRET)}&sheetName=${enc(sheetName)}`;
-    const resp   = await fetch(url);
-    const result = await resp.json();
-    if (!result.ok) throw new Error(result.error);
-
-    // Prefer metadata from gamesMeta (populated via action=list),
-    // then fall back to meta returned with this sheet fetch, then tab name parsing.
+  function applyGame(result) {
     const m = gamesMeta[sheetName] || result.meta || {};
     const fallback = getTeamNames(sheetName);
     const team1 = m.team1 || fallback[0];
     const team2 = m.team2 || fallback[1];
     const metaSubtitle = [m.year, m.division, m.competition].filter(Boolean).join(' · ').toUpperCase();
     const subtitle = metaSubtitle || sheetName.split('_').slice(0, -2).join(' · ').toUpperCase();
-
     const events = parseSheet(result.rows);
     processEvents(events);
     events.forEach(e => {
@@ -193,10 +212,26 @@ async function loadGame() {
       }
     });
     renderGame(events, team1, team2, subtitle);
+  }
+
+  const cachedGame = LS.get('game_' + sheetName);
+  if (cachedGame) {
+    applyGame(cachedGame);
+  }
+
+  try {
+    const url    = `${APPS_SCRIPT_URL}?secret=${enc(APPS_SCRIPT_SECRET)}&sheetName=${enc(sheetName)}`;
+    const resp   = await fetch(url);
+    const result = await resp.json();
+    if (!result.ok) throw new Error(result.error);
+    LS.set('game_' + sheetName, result);
+    applyGame(result);
 
   } catch (err) {
-    document.getElementById('loading').style.display = 'none';
-    showErr('Error loading game: ' + err.message);
+    if (!cachedGame) {
+      document.getElementById('loading').style.display = 'none';
+      showErr('Error loading game: ' + err.message);
+    }
   }
 }
 
@@ -360,7 +395,8 @@ function cumulativeSpec(data, title, yTitle, teamNames) {
   const color = teamColorScale(teamNames);
   return {
     $schema: 'https://vega.github.io/schema/vega-lite/v5.json',
-    width: CHART_WIDTH, height: 200, title,
+    width: 'container', height: 200, title,
+    autosize: { type: 'fit', contains: 'padding' },
     data: { values: data },
     layer: [
       {
@@ -395,7 +431,8 @@ function cumulativeSpec(data, title, yTitle, teamNames) {
 function possessionSpec(data, teamNames) {
   return {
     $schema: 'https://vega.github.io/schema/vega-lite/v5.json',
-    width: CHART_WIDTH, height: 140, title: 'Possession Timeline',
+    width: 'container', height: 140, title: 'Possession Timeline',
+    autosize: { type: 'fit', contains: 'padding' },
     data: { values: data },
     mark: 'bar',
     encoding: {
@@ -443,6 +480,11 @@ async function renderGame(events, team1, team2, subtitle) {
   const possData      = buildPossessionData(filtered);
   const metrics       = buildMetrics(possData, teamNames);
 
+  // Show container first — vegaEmbed with width:"container" needs a visible element to measure
+  document.getElementById('gameTitle').textContent    = `${team1} vs ${team2}`;
+  document.getElementById('gameSubtitle').textContent = subtitle;
+  document.getElementById('gameContent').style.display = 'block';
+
   const opts = { config: VEGA_CONFIG, actions: false };
   await vegaEmbed('#vis-tries',      cumulativeSpec(triesData, 'Tries vs Time',     'Cumulative Tries',     teamNames), opts);
   await vegaEmbed('#vis-penalties',  cumulativeSpec(penData,   'Penalties vs Time', 'Cumulative Penalties', teamNames), opts);
@@ -455,12 +497,6 @@ async function renderGame(events, team1, team2, subtitle) {
        <thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead>
        <tbody>${metrics.map(m => `<tr>${cols.map(c => `<td>${m[c]}</td>`).join('')}</tr>`).join('')}</tbody>
      </table>`;
-
-  // Header info
-  document.getElementById('gameTitle').textContent    = `${team1} vs ${team2}`;
-  document.getElementById('gameSubtitle').textContent = subtitle;
-
-  document.getElementById('gameContent').style.display = 'block';
 }
 
 // ── Helpers ────────────────────────────────────────────────────

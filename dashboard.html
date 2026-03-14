@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — Touch Rugby Analyzer</title>
+  <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+  <style>
+    :root {
+      --bg:        #0f1117;
+      --surface:   #1a1d27;
+      --surface-2: #22253a;
+      --border:    #2a2d3a;
+      --border-l:  #1c1f2e;
+      --text:      #e0e0e0;
+      --muted:     #888;
+      --dim:       #555;
+      --accent:    #3b82f6;
+      --green:     #00c853;
+      --red:       #f44336;
+      --orange:    #ff9800;
+      --yellow:    #ffd600;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* ── Header ─────────────────────────────────────────────── */
+    header { background: var(--surface); padding: 10px 20px; display: flex; align-items: center; gap: 14px; border-bottom: 1px solid var(--border); }
+    .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
+    .logo span { font-size: 1rem; font-weight: 600; color: #fff; white-space: nowrap; }
+    .header-sep { width: 1px; height: 20px; background: var(--border); align-self: center; }
+    .header-nav { display: flex; gap: 4px; margin-left: auto; }
+    .header-nav a { color: var(--muted); text-decoration: none; font-size: 0.8rem; padding: 5px 10px; border-radius: 6px; transition: background 0.15s, color 0.15s; }
+    .header-nav a:hover { background: var(--surface-2); color: var(--text); }
+    .header-nav a.active { background: var(--surface-2); color: var(--accent); }
+
+    /* ── Layout ─────────────────────────────────────────────── */
+    main { padding: 20px 24px; max-width: 1120px; margin: 0 auto; }
+    .section { margin-bottom: 28px; }
+    .section-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.09em; color: var(--dim); font-weight: 700; margin-bottom: 12px; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; }
+    .two-col { display: grid; grid-template-columns: 3fr 2fr; gap: 16px; }
+
+    /* ── Loading ────────────────────────────────────────────── */
+    #loadingArea { text-align: center; padding: 80px; color: var(--muted); font-size: 0.9rem; }
+    #errorMsg    { color: var(--red); padding: 20px 0; font-size: 0.85rem; display: none; }
+    #dashboard   { display: none; }
+    .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 8px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── KPI strip ──────────────────────────────────────────── */
+    .kpi-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+    .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+    .kpi-card.warn { border-color: rgba(255,152,0,.5); background: rgba(255,152,0,.04); }
+    .kpi-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin-bottom: 6px; }
+    .kpi-value { font-size: 1.6rem; font-weight: 800; color: #fff; line-height: 1; }
+    .kpi-value.accent { color: var(--accent); }
+    .kpi-value.green  { color: var(--green); }
+    .kpi-value.orange { color: var(--orange); }
+    .kpi-sub  { font-size: 0.68rem; color: var(--dim); margin-top: 5px; }
+    .kpi-lead { font-size: 0.72rem; color: var(--muted); margin-top: 4px; }
+    .kpi-lead strong { color: var(--text); }
+
+    /* ── Rankings table ─────────────────────────────────────── */
+    .rtable { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    .rtable th {
+      padding: 7px 10px; text-align: right; color: var(--muted); font-weight: 600;
+      border-bottom: 1px solid var(--border); cursor: pointer; user-select: none;
+      white-space: nowrap; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .rtable th:first-child { text-align: left; padding-left: 0; }
+    .rtable th:hover { color: var(--text); }
+    .rtable th.sort-asc::after  { content: ' ▲'; font-size: 0.6em; color: var(--accent); }
+    .rtable th.sort-desc::after { content: ' ▼'; font-size: 0.6em; color: var(--accent); }
+    .rtable td { padding: 9px 10px; text-align: right; border-bottom: 1px solid var(--border-l); }
+    .rtable td:first-child { text-align: left; padding-left: 0; }
+    .rtable tr:last-child td { border-bottom: none; }
+    .rtable tbody tr:hover td { background: var(--surface-2); }
+
+    .rank-num { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; font-size: 0.65rem; font-weight: 700; margin-right: 8px; background: var(--surface-2); color: var(--muted); flex-shrink: 0; }
+    .r1 { background: rgba(255,214,0,.18); color: #ffd600; }
+    .r2 { background: rgba(192,192,192,.12); color: #c0c0c0; }
+    .r3 { background: rgba(205,127,50,.12); color: #cd7f32; }
+    .team-name-cell { font-weight: 600; }
+    .pos { color: var(--green); } .neg { color: var(--red); } .neutral { color: var(--muted); }
+    .w-val { color: var(--green); font-weight: 700; }
+    .l-val { color: var(--red); }
+
+    /* ── Vega charts ────────────────────────────────────────── */
+    .chart-wrap { width: 100%; }
+    .vega-embed { width: 100% !important; }
+    .chart-sublabel { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--dim); font-weight: 700; margin-bottom: 8px; }
+
+    /* ── Head-to-Head ───────────────────────────────────────── */
+    .h2h-controls { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+    .h2h-controls select {
+      background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
+      border-radius: 6px; padding: 7px 12px; font-size: 0.85rem; cursor: pointer; outline: none; min-width: 150px;
+    }
+    .h2h-controls select:focus { border-color: var(--accent); }
+    .h2h-vs { font-size: 0.72rem; color: var(--dim); font-weight: 700; }
+
+    /* 3-column symmetric comparison table */
+    .h2h-table { width: 100%; }
+    .h2h-header-row { display: grid; grid-template-columns: 1fr 160px 1fr; padding-bottom: 10px; border-bottom: 1px solid var(--border); margin-bottom: 2px; }
+    .h2h-data-row   { display: grid; grid-template-columns: 1fr 160px 1fr; border-bottom: 1px solid var(--border-l); }
+    .h2h-data-row:last-child { border-bottom: none; }
+    .h2h-divider { grid-column: 1/-1; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--dim); padding: 10px 0 4px; }
+
+    .h2h-a-head { font-size: 1rem; font-weight: 800; color: var(--green); }
+    .h2h-b-head { font-size: 1rem; font-weight: 800; color: var(--red); text-align: right; }
+    .h2h-mid-head { text-align: center; font-size: 0.65rem; color: var(--dim); text-transform: uppercase; letter-spacing: 0.06em; display: flex; align-items: center; justify-content: center; }
+
+    .h2h-va { padding: 8px 0; font-weight: 700; font-size: 0.9rem; color: var(--green); }
+    .h2h-vb { padding: 8px 0; font-weight: 700; font-size: 0.9rem; color: var(--red); text-align: right; }
+    .h2h-mid-label { padding: 8px 12px; text-align: center; font-size: 0.68rem; color: var(--muted); display: flex; align-items: center; justify-content: center; }
+    .h2h-va.dim, .h2h-vb.dim { color: var(--dim) !important; font-weight: 400; }
+    .h2h-va.win, .h2h-vb.win { font-size: 1rem; }
+
+    .h2h-empty { text-align: center; color: var(--dim); font-size: 0.82rem; padding: 24px; }
+
+    /* Mini bar for relative comparison */
+    .h2h-bar-row { display: grid; grid-template-columns: 1fr 160px 1fr; }
+    .bar-a-wrap { display: flex; justify-content: flex-end; padding: 0 0 8px; }
+    .bar-b-wrap { display: flex; justify-content: flex-start; padding: 0 0 8px; }
+    .bar-a { height: 3px; border-radius: 2px; background: var(--green); opacity: 0.5; max-width: 100%; }
+    .bar-b { height: 3px; border-radius: 2px; background: var(--red);   opacity: 0.5; max-width: 100%; }
+    .bar-mid { } /* spacer */
+
+    /* ── Game results ───────────────────────────────────────── */
+    .results-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+    .result-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; transition: border-color 0.12s; }
+    .result-card:hover { border-color: #3a3d4a; }
+    .result-teams { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; }
+    .rt { flex: 1; }
+    .rt.home { text-align: left; }
+    .rt.away { text-align: right; }
+    .rt-name { font-size: 0.85rem; font-weight: 700; color: var(--muted); }
+    .rt-name.win { color: var(--green); }
+    .rt-name.draw { color: var(--muted); }
+    .score-mid { font-size: 1.4rem; font-weight: 800; color: #fff; padding: 0 10px; letter-spacing: 0.04em; white-space: nowrap; }
+    .result-footer { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+    .meta-chip { font-size: 0.66rem; color: var(--dim); background: var(--surface-2); border-radius: 3px; padding: 2px 6px; }
+    .partial-chip { font-size: 0.66rem; color: var(--orange); background: rgba(255,152,0,.1); border-radius: 3px; padding: 2px 6px; }
+
+    /* ── Responsive ─────────────────────────────────────────── */
+    @media (max-width: 900px) {
+      .kpi-strip { grid-template-columns: repeat(3, 1fr); }
+      .two-col   { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 560px) {
+      .kpi-strip { grid-template-columns: repeat(2, 1fr); }
+      .h2h-header-row, .h2h-data-row, .h2h-bar-row { grid-template-columns: 1fr 120px 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <a class="logo" href="index.html">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2">
+      <circle cx="12" cy="12" r="10"/>
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+      <path d="M2 12h20"/>
+    </svg>
+    <span>Touch Rugby Analyzer</span>
+  </a>
+  <div class="header-sep"></div>
+  <nav class="header-nav">
+    <a href="games.html">Games</a>
+    <a href="dashboard.html" class="active">Dashboard</a>
+    <a href="event_table.html">Events</a>
+    <a href="viewer.html" id="annotatorLink" style="display:none">Annotator</a>
+  </nav>
+</header>
+<script>if (sessionStorage.getItem('accessLevel') === 'staff') document.getElementById('annotatorLink').style.display = '';</script>
+
+<main>
+  <div id="loadingArea"><span class="spinner"></span>Loading dashboard data…<div style="font-size:0.75rem;color:var(--dim);margin-top:8px" id="loadHint"></div></div>
+  <div id="errorMsg"></div>
+
+  <div id="dashboard">
+
+    <!-- KPI strip -->
+    <div class="section">
+      <div class="section-label">Overview</div>
+      <div class="kpi-strip">
+        <div class="kpi-card" id="kpi-partial-card">
+          <div class="kpi-label">Not Analysed</div>
+          <div class="kpi-value orange" id="kpi-partial">—</div>
+          <div class="kpi-sub"  id="kpi-partial-sub"></div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Analysed</div>
+          <div class="kpi-value accent" id="kpi-games">—</div>
+          <div class="kpi-sub"   id="kpi-games-sub"></div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Teams</div>
+          <div class="kpi-value" id="kpi-teams">—</div>
+          <div class="kpi-sub"   id="kpi-comps"></div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Total Tries</div>
+          <div class="kpi-value green" id="kpi-tries">—</div>
+          <div class="kpi-sub"   id="kpi-tries-pg">— / game</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Total Penalties</div>
+          <div class="kpi-value orange" id="kpi-pens">—</div>
+          <div class="kpi-sub"   id="kpi-pens-pg">— / game</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Best Attack</div>
+          <div class="kpi-value green" id="kpi-atk-val">—</div>
+          <div class="kpi-lead" id="kpi-atk-team"></div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Best Defence</div>
+          <div class="kpi-value" id="kpi-def-val">—</div>
+          <div class="kpi-lead" id="kpi-def-team"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Rankings + Charts -->
+    <div class="section">
+      <div class="section-label">Team Rankings</div>
+      <div class="two-col">
+        <div class="card">
+          <table class="rtable" id="rankTable">
+            <thead></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="card" style="display:flex;flex-direction:column;gap:20px">
+          <div>
+            <div class="chart-sublabel">Avg tries per game</div>
+            <div class="chart-wrap" id="vis-tries"></div>
+          </div>
+          <div>
+            <div class="chart-sublabel">Avg penalties per game</div>
+            <div class="chart-wrap" id="vis-pens"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Head-to-Head -->
+    <div class="section">
+      <div class="section-label">Head-to-Head Comparison</div>
+      <div class="card">
+        <div class="h2h-controls">
+          <select id="h2h-a" onchange="renderH2H()"><option value="">Select team…</option></select>
+          <span class="h2h-vs">vs</span>
+          <select id="h2h-b" onchange="renderH2H()"><option value="">Select team…</option></select>
+        </div>
+        <div id="h2h-body"></div>
+      </div>
+    </div>
+
+    <!-- Game Results -->
+    <div class="section">
+      <div class="section-label">Results</div>
+      <div class="results-grid" id="resultsGrid"></div>
+    </div>
+
+  </div><!-- #dashboard -->
+</main>
+
+<script>
+// ── Config ──────────────────────────────────────────────────────
+const APPS_SCRIPT_URL    = 'https://script.google.com/macros/s/AKfycbzhMw4nQr2nVW0MLfPWVXRPXsvImerpzshQ5GnJ3873qQkGMz0bcJQdmTRXCxwygfFm/exec';
+const APPS_SCRIPT_SECRET = 'm30-test-key';
+const VEGA_CONFIG = {
+  background: '#1a1d27',
+  title:  { color: '#ccc', fontSize: 12, font: 'Segoe UI' },
+  axis:   { gridColor: '#2a2d3a', labelColor: '#aaa', titleColor: '#888', tickColor: '#2a2d3a', domainColor: '#2a2d3a', labelFont: 'Segoe UI', labelFontSize: 11 },
+  legend: { labelColor: '#ccc', titleColor: '#888', labelFont: 'Segoe UI', labelFontSize: 11 },
+  view:   { stroke: 'transparent' },
+};
+const VEGA_OPTS = { config: VEGA_CONFIG, actions: false };
+
+// ── localStorage cache (stale-while-revalidate) ─────────────────
+const LS = {
+  get(k)    { try { return JSON.parse(localStorage.getItem('trl_' + k)); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem('trl_' + k, JSON.stringify(v)); } catch {} },
+};
+
+// ── State ───────────────────────────────────────────────────────
+let allGameStats = [];  // all games including partial (used for results grid)
+let gameStats    = [];  // analysed only (used for all stats/charts)
+let teamStats    = [];
+
+// ── Bootstrap ───────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  setTimeout(() => {
+    if (document.getElementById('loadingArea').style.display !== 'none')
+      document.getElementById('loadHint').textContent = 'This may take a moment — fetching all game data…';
+  }, 3000);
+  init();
+});
+
+async function init() {
+  // Stale-while-revalidate: render cached data immediately, then refresh in background
+  const cached = LS.get('all');
+  if (cached) applyData(cached);
+
+  try {
+    const resp   = await fetch(`${APPS_SCRIPT_URL}?secret=${enc(APPS_SCRIPT_SECRET)}&action=all`);
+    const result = await resp.json();
+    if (!result.ok) throw new Error(result.error);
+    LS.set('all', result);
+    applyData(result);
+  } catch (err) {
+    if (!cached) {
+      document.getElementById('loadingArea').style.display = 'none';
+      const el = document.getElementById('errorMsg');
+      el.textContent = 'Failed to load data: ' + err.message;
+      el.style.display = 'block';
+    }
+    // If cache was shown, silently keep it — user already has data
+  }
+}
+
+function applyData(result) {
+  allGameStats = processData(result.rows);
+  gameStats    = allGameStats.filter(g => g.analysed);
+  teamStats    = aggregateTeams(gameStats);
+  document.getElementById('loadingArea').style.display = 'none';
+  document.getElementById('dashboard').style.display   = 'block';
+  renderDashboard();
+}
+
+// ── Data processing ─────────────────────────────────────────────
+function processData(rows) {
+  if (!rows || rows.length < 2) return [];
+  const H = rows[0].map(h => h.trim().toLowerCase());
+  const col = name => H.findIndex(h => h === name);
+
+  const TYI = col('type'), NAI = col('name'), POI = col('possession owner');
+  const AOI = col('action owner'), GI = col('game');
+  const T1I = col('team 1'), T2I = col('team 2');
+  const COMPI = col('competition'), YEARI = col('year'), DIVI = col('division');
+
+  const byGame = {};
+  rows.slice(1).forEach(row => {
+    const g = row[GI];
+    if (g) (byGame[g] = byGame[g] || []).push(row);
+  });
+
+  return Object.entries(byGame).map(([id, gRows]) => {
+    const f  = gRows[0];
+    const t1 = (f[T1I] || '').toLowerCase().trim();
+    const t2 = (f[T2I] || '').toLowerCase().trim();
+    if (!t1 || !t2) return null;
+
+    const res = v => {
+      const s = (v || '').trim();
+      return s === 'Team 1' ? t1 : s === 'Team 2' ? t2 : s.toLowerCase();
+    };
+
+    const tries  = { [t1]: 0, [t2]: 0 };
+    const pens   = { [t1]: 0, [t2]: 0 };
+    const turns  = { [t1]: 0, [t2]: 0 };
+    const poss   = { [t1]: 0, [t2]: 0 };
+    const penTypes  = {};
+    const turnTypes = {};
+    const tryTypes  = {};
+    let prevOwner = null, hasStart = false, hasEnd = false;
+
+    gRows.forEach(row => {
+      const type   = (row[TYI] || '').trim();
+      const name   = (row[NAI] || '').trim();
+      const action = res(row[AOI]);
+      const owner  = res(row[POI]);
+
+      if (type === 'Game Event' && name === 'Game Start') { hasStart = true; prevOwner = null; }
+      if (type === 'Game Event' && name === 'Game End')   { hasEnd   = true; }
+
+      if (type === 'Try' && tries[action] !== undefined) {
+        tries[action]++;
+        if (name) tryTypes[name] = (tryTypes[name] || 0) + 1;
+      }
+      if (type === 'Penalty' && pens[action] !== undefined) {
+        pens[action]++;
+        if (name) penTypes[name] = (penTypes[name] || 0) + 1;
+      }
+      if (type === 'Turnover' && turns[action] !== undefined) {
+        turns[action]++;
+        if (name) turnTypes[name] = (turnTypes[name] || 0) + 1;
+      }
+      if (type !== 'Game Event' && owner && poss[owner] !== undefined) {
+        if (owner !== prevOwner) { poss[owner]++; prevOwner = owner; }
+      }
+    });
+
+    const s1 = tries[t1], s2 = tries[t2];
+    return {
+      id, t1, t2,
+      competition: (f[COMPI] || '').trim(),
+      year: (f[YEARI] || '').trim(),
+      division: (f[DIVI] || '').trim().toUpperCase(),
+      tries, pens, turns, poss,
+      penTypes, turnTypes, tryTypes,
+      winner: s1 > s2 ? t1 : s2 > s1 ? t2 : null,
+      analysed: hasStart && hasEnd,
+    };
+  }).filter(Boolean);
+}
+
+function aggregateTeams(games) {
+  const map = {};
+  games.forEach(g => {
+    [g.t1, g.t2].forEach(team => {
+      if (!map[team]) map[team] = {
+        name: team, games: 0, wins: 0, losses: 0, draws: 0,
+        triesFor: 0, triesAgt: 0, pens: 0, turns: 0, poss: 0,
+      };
+      const opp = team === g.t1 ? g.t2 : g.t1;
+      const t = map[team];
+      t.games++;
+      t.triesFor += g.tries[team] || 0;
+      t.triesAgt += g.tries[opp]  || 0;
+      t.pens     += g.pens[team]  || 0;
+      t.turns    += g.turns[team] || 0;
+      t.poss     += g.poss[team]  || 0;
+      if      (g.winner === team) t.wins++;
+      else if (g.winner === opp)  t.losses++;
+      else if (g.analysed)        t.draws++;
+    });
+  });
+
+  return Object.values(map).map(t => ({
+    ...t,
+    tryDiff:  t.triesFor - t.triesAgt,
+    avgFor:   t.games ? t.triesFor / t.games : 0,
+    avgAgt:   t.games ? t.triesAgt / t.games : 0,
+    avgPens:  t.games ? t.pens  / t.games : 0,
+    avgTurns: t.games ? t.turns / t.games : 0,
+    avgPoss:  t.games ? t.poss  / t.games : 0,
+  })).sort((a, b) => b.wins - a.wins || b.tryDiff - a.tryDiff || b.avgFor - a.avgFor);
+}
+
+// ── Render coordinator ───────────────────────────────────────────
+function renderDashboard() {
+  renderKPIs();
+  renderRankings();
+  renderCharts();
+  populateH2H();
+  renderH2H();
+  renderResults();
+}
+
+// ── KPIs ─────────────────────────────────────────────────────────
+function renderKPIs() {
+  const partialCount = allGameStats.filter(g => !g.analysed).length;
+  const totalGames   = gameStats.length;  // analysed only
+  const uniqueComps  = [...new Set(allGameStats.map(g => [g.year, g.division, g.competition].filter(Boolean).join(' ')))];
+  const totalTries   = gameStats.reduce((s, g) => s + Object.values(g.tries).reduce((a, b) => a + b, 0), 0);
+  const totalPens    = gameStats.reduce((s, g) => s + Object.values(g.pens).reduce((a, b) => a + b, 0), 0);
+
+  const bestAtk = teamStats.slice().sort((a, b) => b.avgFor - a.avgFor)[0];
+  const bestDef = teamStats.slice().sort((a, b) => a.avgAgt - b.avgAgt)[0];
+
+  // Partial games card — highlight in amber if any exist
+  set('kpi-partial', partialCount);
+  set('kpi-partial-sub', partialCount ? 'excluded from stats' : 'all games analysed');
+  const partialCard = document.getElementById('kpi-partial-card');
+  if (partialCount > 0) partialCard.classList.add('warn');
+  if (partialCount === 0) document.getElementById('kpi-partial').classList.replace('orange', 'green');
+
+  set('kpi-games',     totalGames);
+  set('kpi-games-sub', `${uniqueComps.length} competition${uniqueComps.length !== 1 ? 's' : ''}`);
+  set('kpi-teams',    teamStats.length);
+  set('kpi-comps',    teamStats.length ? `across ${uniqueComps.length} competition${uniqueComps.length !== 1 ? 's' : ''}` : '');
+  set('kpi-tries',    totalTries);
+  set('kpi-tries-pg', totalGames ? `${f1(totalTries / totalGames)} per game` : '');
+  set('kpi-pens',     totalPens);
+  set('kpi-pens-pg',  totalGames ? `${f1(totalPens / totalGames)} per game` : '');
+
+  if (bestAtk) {
+    set('kpi-atk-val',  f1(bestAtk.avgFor));
+    document.getElementById('kpi-atk-team').innerHTML = `tries/g &mdash; <strong>${cap(bestAtk.name)}</strong>`;
+  }
+  if (bestDef) {
+    set('kpi-def-val',  f1(bestDef.avgAgt));
+    document.getElementById('kpi-def-team').innerHTML = `conceded/g &mdash; <strong>${cap(bestDef.name)}</strong>`;
+  }
+}
+
+// ── Rankings table ───────────────────────────────────────────────
+const COLS = [
+  { key: 'name',     label: 'Team',     left: true, fmt: (v, r, ri) => {
+    const cls = ri === 0 ? 'r1' : ri === 1 ? 'r2' : ri === 2 ? 'r3' : '';
+    return `<span class="rank-num ${cls}">${ri + 1}</span><span class="team-name-cell">${cap(v)}</span>`;
+  }},
+  { key: 'games',    label: 'GP',  fmt: v => v },
+  { key: 'wins',     label: 'W',   fmt: v => `<span class="w-val">${v}</span>` },
+  { key: 'losses',   label: 'L',   fmt: v => `<span class="l-val">${v}</span>` },
+  { key: 'triesFor', label: 'F',   fmt: v => v },
+  { key: 'triesAgt', label: 'A',   fmt: v => v },
+  { key: 'tryDiff',  label: '+/−', fmt: v => `<span class="${v > 0 ? 'pos' : v < 0 ? 'neg' : 'neutral'}">${v > 0 ? '+' : ''}${v}</span>` },
+  { key: 'avgFor',   label: 'Tries/G', fmt: v => f1(v) },
+  { key: 'avgPens',  label: 'Pen/G',   fmt: v => f1(v) },
+];
+
+let sortKey = 'wins', sortDir = -1, sortedRows = [];
+
+function renderRankings() {
+  sortedRows = [...teamStats].sort((a, b) => {
+    const va = a[sortKey], vb = b[sortKey];
+    if (sortKey === 'name') return sortDir * String(va).localeCompare(String(vb));
+    return sortDir * (vb - va);
+  });
+
+  const thead = document.querySelector('#rankTable thead');
+  const tbody = document.querySelector('#rankTable tbody');
+
+  thead.innerHTML = `<tr>${COLS.map((c, ci) => {
+    const cls = c.key === sortKey ? (sortDir < 0 ? 'sort-desc' : 'sort-asc') : '';
+    return `<th class="${cls}" data-ci="${ci}">${c.label}</th>`;
+  }).join('')}</tr>`;
+
+  tbody.innerHTML = sortedRows.map((row, ri) =>
+    `<tr>${COLS.map(c => `<td>${c.fmt(row[c.key], row, ri)}</td>`).join('')}</tr>`
+  ).join('');
+
+  document.querySelectorAll('#rankTable th').forEach(th => {
+    th.addEventListener('click', () => {
+      const key = COLS[+th.dataset.ci].key;
+      sortDir = (sortKey === key) ? sortDir * -1 : (key === 'avgPens' || key === 'name' ? 1 : -1);
+      sortKey = key;
+      renderRankings();
+    });
+  });
+}
+
+// ── Charts ───────────────────────────────────────────────────────
+async function renderCharts() {
+  if (!teamStats.length) return;
+
+  const triesOrder = [...teamStats].sort((a, b) => b.avgFor - a.avgFor).map(t => cap(t.name));
+  const pensOrder  = [...teamStats].sort((a, b) => a.avgPens - b.avgPens).map(t => cap(t.name));
+
+  // Grouped bar: scored + conceded
+  const triesData = teamStats.flatMap(t => [
+    { team: cap(t.name), metric: 'Scored',   value: +f1(t.avgFor) },
+    { team: cap(t.name), metric: 'Conceded', value: +f1(t.avgAgt) },
+  ]);
+
+  const pensData = teamStats.map(t => ({
+    team: cap(t.name), value: +f1(t.avgPens),
+  }));
+
+  const base = { $schema: 'https://vega.github.io/schema/vega-lite/v5.json', width: 'container', autosize: { type: 'fit', contains: 'padding' } };
+
+  await vegaEmbed('#vis-tries', {
+    ...base, height: { step: 18 },
+    data: { values: triesData },
+    mark: { type: 'bar', cornerRadiusEnd: 2 },
+    encoding: {
+      y:       { field: 'team', type: 'nominal', sort: triesOrder, title: null, axis: { labelLimit: 110 } },
+      yOffset: { field: 'metric', type: 'nominal', sort: ['Scored', 'Conceded'] },
+      x:       { field: 'value', type: 'quantitative', title: null, axis: { tickMinStep: 1, grid: true } },
+      color: {
+        field: 'metric', type: 'nominal',
+        scale: { domain: ['Scored', 'Conceded'], range: ['#00c853', '#f44336'] },
+        legend: { orient: 'bottom', padding: 2, labelFontSize: 10, symbolSize: 60 },
+      },
+      tooltip: [
+        { field: 'team', title: 'Team' },
+        { field: 'metric', title: 'Metric' },
+        { field: 'value', title: 'Avg / game' },
+      ],
+    },
+  }, VEGA_OPTS);
+
+  await vegaEmbed('#vis-pens', {
+    ...base, height: { step: 18 },
+    data: { values: pensData },
+    mark: { type: 'bar', cornerRadiusEnd: 2, color: '#ff9800' },
+    encoding: {
+      y:    { field: 'team', type: 'nominal', sort: pensOrder, title: null, axis: { labelLimit: 110 } },
+      x:    { field: 'value', type: 'quantitative', title: null, axis: { grid: true } },
+      tooltip: [{ field: 'team', title: 'Team' }, { field: 'value', title: 'Avg pen / game' }],
+    },
+  }, VEGA_OPTS);
+}
+
+// ── Head-to-Head ─────────────────────────────────────────────────
+function populateH2H() {
+  ['h2h-a', 'h2h-b'].forEach(id => {
+    const sel = document.getElementById(id);
+    teamStats.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t.name; opt.textContent = cap(t.name);
+      sel.appendChild(opt);
+    });
+  });
+  if (teamStats.length >= 2) {
+    document.getElementById('h2h-a').value = teamStats[0].name;
+    document.getElementById('h2h-b').value = teamStats[1].name;
+  }
+}
+
+function renderH2H() {
+  const a  = document.getElementById('h2h-a').value;
+  const b  = document.getElementById('h2h-b').value;
+  const el = document.getElementById('h2h-body');
+
+  if (!a || !b || a === b) {
+    el.innerHTML = '<div class="h2h-empty">Select two different teams to compare.</div>';
+    return;
+  }
+  const ta = teamStats.find(t => t.name === a);
+  const tb = teamStats.find(t => t.name === b);
+  if (!ta || !tb) return;
+
+  const h2hGames = gameStats.filter(g => (g.t1 === a && g.t2 === b) || (g.t1 === b && g.t2 === a));
+  const aH2HWins = h2hGames.filter(g => g.winner === a).length;
+  const bH2HWins = h2hGames.filter(g => g.winner === b).length;
+
+  // Stat definitions: label, a-value, b-value, highlight direction
+  const statDefs = [
+    { label: 'Games played',       aRaw: ta.games,    bRaw: tb.games,    fmtA: ta.games,    fmtB: tb.games,    dir: null },
+    { label: 'Wins / Losses',      aRaw: ta.wins,     bRaw: tb.wins,     fmtA: `${ta.wins}W · ${ta.losses}L`, fmtB: `${tb.wins}W · ${tb.losses}L`, dir: 'higher' },
+    { label: 'Tries scored',       aRaw: ta.triesFor, bRaw: tb.triesFor, fmtA: ta.triesFor, fmtB: tb.triesFor, dir: 'higher' },
+    { label: 'Tries conceded',     aRaw: ta.triesAgt, bRaw: tb.triesAgt, fmtA: ta.triesAgt, fmtB: tb.triesAgt, dir: 'lower' },
+    { label: 'Avg tries / game',   aRaw: ta.avgFor,   bRaw: tb.avgFor,   fmtA: f1(ta.avgFor), fmtB: f1(tb.avgFor), dir: 'higher' },
+    { label: 'Avg conceded / game',aRaw: ta.avgAgt,   bRaw: tb.avgAgt,   fmtA: f1(ta.avgAgt), fmtB: f1(tb.avgAgt), dir: 'lower' },
+    { label: 'Try differential',   aRaw: ta.tryDiff,  bRaw: tb.tryDiff,  fmtA: (ta.tryDiff >= 0 ? '+' : '') + ta.tryDiff, fmtB: (tb.tryDiff >= 0 ? '+' : '') + tb.tryDiff, dir: 'higher' },
+    { label: 'Avg penalties / game',aRaw: ta.avgPens, bRaw: tb.avgPens,  fmtA: f1(ta.avgPens), fmtB: f1(tb.avgPens), dir: 'lower' },
+    { label: 'Avg turnovers / game',aRaw: ta.avgTurns,bRaw: tb.avgTurns, fmtA: f1(ta.avgTurns),fmtB: f1(tb.avgTurns),dir: 'lower' },
+    { label: 'Avg possessions / game',aRaw: ta.avgPoss,bRaw: tb.avgPoss, fmtA: f1(ta.avgPoss), fmtB: f1(tb.avgPoss), dir: null },
+  ];
+
+  function dimClasses(s) {
+    if (!s.dir) return ['', ''];
+    if (s.aRaw === s.bRaw) return ['', ''];
+    const aBetter = s.dir === 'higher' ? s.aRaw > s.bRaw : s.aRaw < s.bRaw;
+    return aBetter ? ['', 'dim'] : ['dim', ''];
+  }
+
+  // For numeric stats, compute bar widths (proportional)
+  function barWidths(s) {
+    if (!s.dir || typeof s.aRaw !== 'number') return ['0%', '0%'];
+    const mx = Math.max(Math.abs(s.aRaw), Math.abs(s.bRaw));
+    if (!mx) return ['0%', '0%'];
+    return [`${Math.round(Math.abs(s.aRaw) / mx * 100)}%`, `${Math.round(Math.abs(s.bRaw) / mx * 100)}%`];
+  }
+
+  const dataRows = statDefs.map(s => {
+    const [ca, cb] = dimClasses(s);
+    const [wa, wb] = barWidths(s);
+    return `
+      <div class="h2h-data-row">
+        <div class="h2h-va ${ca}">${s.fmtA}</div>
+        <div class="h2h-mid-label">${s.label}</div>
+        <div class="h2h-vb ${cb}">${s.fmtB}</div>
+      </div>
+      <div class="h2h-bar-row">
+        <div class="bar-a-wrap"><div class="bar-a" style="width:${wa}"></div></div>
+        <div class="bar-mid"></div>
+        <div class="bar-b-wrap"><div class="bar-b" style="width:${wb}"></div></div>
+      </div>`;
+  }).join('');
+
+  const h2hSection = h2hGames.length > 0 ? `
+    <div class="h2h-data-row" style="margin-top:4px">
+      <div class="h2h-va ${aH2HWins > bH2HWins ? 'win' : aH2HWins < bH2HWins ? 'dim' : ''}">${aH2HWins}</div>
+      <div class="h2h-mid-label" style="font-weight:600;color:var(--muted)">Head-to-Head (${h2hGames.length} game${h2hGames.length !== 1 ? 's' : ''})</div>
+      <div class="h2h-vb ${bH2HWins > aH2HWins ? 'win' : bH2HWins < aH2HWins ? 'dim' : ''}">${bH2HWins}</div>
+    </div>` : `
+    <div class="h2h-data-row" style="margin-top:4px">
+      <div class="h2h-va dim">—</div>
+      <div class="h2h-mid-label">No direct matchups yet</div>
+      <div class="h2h-vb dim">—</div>
+    </div>`;
+
+  el.innerHTML = `
+    <div class="h2h-table">
+      <div class="h2h-header-row">
+        <div class="h2h-a-head">${cap(a)}</div>
+        <div class="h2h-mid-head">vs</div>
+        <div class="h2h-b-head">${cap(b)}</div>
+      </div>
+      ${dataRows}
+      <div class="h2h-data-row"><div style="grid-column:1/-1;padding:8px 0 2px"><div class="h2h-divider" style="padding:0">Direct Matchup</div></div></div>
+      ${h2hSection}
+    </div>`;
+}
+
+// ── Results grid ─────────────────────────────────────────────────
+function renderResults() {
+  const sorted = [...allGameStats].sort((a, b) => {
+    const ya = parseInt(a.year) || 0, yb = parseInt(b.year) || 0;
+    return ya !== yb ? yb - ya : a.id.localeCompare(b.id);
+  });
+
+  document.getElementById('resultsGrid').innerHTML = sorted.map(g => {
+    const s1 = g.tries[g.t1] ?? 0;
+    const s2 = g.tries[g.t2] ?? 0;
+    const t1Win = g.winner === g.t1;
+    const t2Win = g.winner === g.t2;
+    const meta = [g.year, g.division, g.competition].filter(Boolean);
+    return `
+      <div class="result-card">
+        <div class="result-teams">
+          <div class="rt home"><div class="rt-name ${t1Win ? 'win' : ''}">${cap(g.t1)}</div></div>
+          <div class="score-mid">${s1} – ${s2}</div>
+          <div class="rt away"><div class="rt-name ${t2Win ? 'win' : ''}">${cap(g.t2)}</div></div>
+        </div>
+        <div class="result-footer">
+          ${meta.map(p => `<span class="meta-chip">${p}</span>`).join('')}
+          ${!g.analysed ? '<span class="partial-chip">Partial data</span>' : ''}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ── Helpers ──────────────────────────────────────────────────────
+function set(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
+function cap(s) { return (s || '').replace(/\b\w/g, c => c.toUpperCase()); }
+function f1(n)  { return Number(n).toFixed(1); }
+function enc(s) { return encodeURIComponent(s); }
+</script>
+</body>
+</html>
