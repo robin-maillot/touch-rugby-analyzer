@@ -57,11 +57,12 @@ function doGet(e) {
       return json({ ok: true, sheets: sheets.map(name => ({ name, ...(meta[name] || {}) })) });
     }
 
-    // action=all → every row from every game sheet, metadata columns appended
+    // action=all → every row from every game sheet listed in _metadata, metadata columns appended
     if (e.parameter.action === 'all') {
       const meta   = getMetadata();
       const ss     = SpreadsheetApp.openById(SHEET_ID);
-      const sheets = ss.getSheets().filter(s => s.getName() !== METADATA_SHEET);
+      const metaNames = new Set(Object.keys(meta));
+      const sheets = ss.getSheets().filter(s => metaNames.has(s.getName()));
       const allRows = [];
       let headerSent = false;
 
