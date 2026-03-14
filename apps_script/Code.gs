@@ -5,10 +5,10 @@ const OVERRIDE_PASS   = 'm30-admin';
 const METADATA_SHEET  = '_metadata';  // reserved tab name for game metadata
 
 // Expected column order (must match what the Python pipeline reads)
-const HEADERS = ['Time', 'Possession Owner', 'Type', 'Name', 'Video Name', 'To Review', 'Comment', 'Youtube Link'];
+const HEADERS = ['Time', 'Possession Owner', 'Type', 'Name', 'To Review', 'Comment', 'Youtube Link', 'Action Owner'];
 
 // Metadata columns appended to action=all rows
-const META_COLS = ['Team 1', 'Team 2', 'Competition', 'Year', 'Division'];
+const META_COLS = ['Team 1', 'Team 2', 'Competition', 'Year', 'Division', 'Video Name'];
 
 // ── Metadata helper ────────────────────────────────────────────
 // Reads _metadata sheet and returns { [sheetName]: { team1, team2, competition, year, division } }
@@ -16,13 +16,14 @@ function getMetadata() {
   const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(METADATA_SHEET);
   if (!sheet) return {};
 
-  const values = sheet.getDataRange().getDisplayValues();
+  const values = sheet.getDataRange().getDisplayValuesd();
   if (values.length < 2) return {};
 
   const h    = values[0].map(s => s.toLowerCase().trim());
   const col  = name => h.indexOf(name);
   const ni   = col('sheet name'), t1i = col('team 1'), t2i = col('team 2');
   const ci   = col('competition'), yi = col('year'), di = col('division');
+  const vi   = col('video name');
 
   const meta = {};
   values.slice(1).forEach(row => {
@@ -34,6 +35,7 @@ function getMetadata() {
       competition: ci  >= 0 ? row[ci]  : '',
       year:        yi  >= 0 ? row[yi]  : '',
       division:    di  >= 0 ? row[di]  : '',
+      video:       vi  >= 0 ? row[vi]  : '',
     };
   });
   return meta;
@@ -72,7 +74,7 @@ function doGet(e) {
         }
         const name = sheet.getName();
         const m    = meta[name] || {};
-        const metaValues = [m.team1 || '', m.team2 || '', m.competition || '', m.year || '', m.division || ''];
+        const metaValues = [m.team1 || '', m.team2 || '', m.competition || '', m.year || '', m.division || '', m.video || ''];
         values.slice(1).forEach(row => allRows.push([...row, name, ...metaValues]));
       }
 
@@ -148,7 +150,7 @@ function writeMeta(sheetName, meta) {
   let sheet = ss.getSheetByName(METADATA_SHEET);
   if (!sheet) {
     sheet = ss.insertSheet(METADATA_SHEET);
-    sheet.appendRow(['Team 1', 'Team 2', 'Competition', 'Year', 'Division', 'Sheet Name']);
+    sheet.appendRow(['Team 1', 'Team 2', 'Competition', 'Year', 'Division', 'Video Name', 'Sheet Name']);
   }
 
   const values  = sheet.getDataRange().getValues();
@@ -161,6 +163,7 @@ function writeMeta(sheetName, meta) {
   const ci   = col('competition');
   const yi   = col('year');
   const di   = col('division');
+  const vi   = col('video name');
 
   // Build a row the same width as the header, filling known columns by position
   const numCols = headers.length;
@@ -172,6 +175,7 @@ function writeMeta(sheetName, meta) {
   if (ci  >= 0) row[ci]  = meta.competition || '';
   if (yi  >= 0) row[yi]  = meta.year        || '';
   if (di  >= 0) row[di]  = meta.division    || '';
+  if (vi  >= 0) row[vi]  = meta.video       || '';
 
   let existingRow = -1;
   for (let i = 1; i < values.length; i++) {
@@ -200,7 +204,7 @@ function backfillMetadata() {
   if (existing) ss.deleteSheet(existing);
   const meta = ss.insertSheet(METADATA_SHEET);
 
-  const header = ['Sheet Name', 'Team 1', 'Team 2', 'Competition', 'Year', 'Division'];
+  const header = ['Sheet Name', 'Team 1', 'Team 2', 'Competition', 'Year', 'Division', 'Video Name'];
   meta.appendRow(header);
 
   sheets.forEach(name => {
