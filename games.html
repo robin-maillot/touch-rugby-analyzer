@@ -185,7 +185,13 @@ async function loadGame() {
     const subtitle = metaSubtitle || sheetName.split('_').slice(0, -2).join(' · ').toUpperCase();
 
     const events = parseSheet(result.rows);
-    processEvents(events, team1, team2);
+    processEvents(events);
+    events.forEach(e => {
+      for (const col of ['Possession Owner', 'Action Owner']) {
+        if (e[col] === 'Team 1') e[col] = team1;
+        else if (e[col] === 'Team 2') e[col] = team2;
+      }
+    });
     renderGame(events, team1, team2, subtitle);
 
   } catch (err) {
@@ -201,13 +207,14 @@ function parseSheet(rows) {
   const col = name => headers.indexOf(name);
 
   const ti = col('time'), ty = col('type'), ni = col('name');
-  const pi = col('possession owner'), yi = col('youtube link');
+  const pi = col('possession owner'), yi = col('youtube link'), ai = col('action owner');
 
   return rows.slice(1).map(r => ({
     Time:               r[ti]  || '',
     Type:               r[ty]  || '',
     Name:               r[ni]  || '',
     'Possession Owner': pi >= 0 ? (r[pi] || '') : '',
+    'Action Owner':     ai >= 0 ? (r[ai] || '') : '',
     'Youtube Link':     yi >= 0 ? (r[yi] || '') : '',
   })).filter(e => e.Type);
 }
@@ -217,7 +224,7 @@ function getTeamNames(sheetName) {
   return [p[p.length - 2], p[p.length - 1]];
 }
 
-// ── Data processing — mirrors Python utils.py ─────────────────
+// ── Data processing ────────────────────────────────────────────
 function parseTimeStr(str) {
   const p = (str || '').split(':').map(Number);
   if (p.length === 3) return p[0] * 3600 + p[1] * 60 + p[2];
@@ -225,14 +232,7 @@ function parseTimeStr(str) {
   return 0;
 }
 
-function isTurnover(type, name) {
-  if (type === 'Try') return true;
-  if (type === 'Penalty' && !['Offside', 'Not Moving Forward', 'Shoulder'].includes(name)) return true;
-  if (type === 'Turnover' && name !== '6 Again') return true;
-  return false;
-}
-
-// Mirrors add_game_time() — converts wall-clock times to seconds from first Game Start
+// Converts wall-clock times to seconds from first Game Start
 function addGameTime(events) {
   events.forEach(e => { e._raw = parseTimeStr(e.Time); });
 
@@ -267,40 +267,8 @@ function addGameTime(events) {
   });
 }
 
-// Replace 'Team 1' / 'Team 2' placeholders with real names
-function replacePossessionNames(events, team1, team2) {
-  events.forEach(e => {
-    if (e['Possession Owner'] === 'Team 1') e['Possession Owner'] = team1;
-    else if (e['Possession Owner'] === 'Team 2') e['Possession Owner'] = team2;
-  });
-}
-
-// Forward-fill blank possession owner cells (mirrors infer_possession_owner)
-function fillPossessionOwner(events) {
-  let current = '';
-  events.forEach(e => {
-    if (e.Type === 'To Review') { e['Possession Owner'] = current; return; }
-    if (e['Possession Owner']) current = e['Possession Owner'];
-    else e['Possession Owner'] = current;
-  });
-}
-
-// Mirrors infer_action_owner: non-turnover penalties/turnovers belong to the opponent
-function addActionOwner(events, team1, team2) {
-  events.forEach(e => {
-    const opponent = e['Possession Owner'] === team1 ? team2 : team1;
-    const turnover = isTurnover(e.Type, e.Name);
-    e['Action Owner'] = (!turnover && (e.Type === 'Penalty' || e.Type === 'Turnover'))
-      ? opponent
-      : e['Possession Owner'];
-  });
-}
-
-function processEvents(events, team1, team2) {
+function processEvents(events) {
   addGameTime(events);
-  replacePossessionNames(events, team1, team2);
-  fillPossessionOwner(events);
-  addActionOwner(events, team1, team2);
 }
 
 function isFullyAnalysable(events) {

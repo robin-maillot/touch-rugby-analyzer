@@ -78,7 +78,7 @@
   .list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; flex-shrink: 0; }
   .list-header h2 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #666; }
   .annotations-list { overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 3px; padding-right: 2px; }
-  .annotation-row { display: grid; grid-template-columns: 55px 90px 90px 65px 1fr auto; align-items: center; gap: 8px; background: #1a1d27; border-radius: 6px; padding: 5px 10px; border-left: 3px solid; font-size: 0.77rem; cursor: pointer; transition: background 0.1s; }
+  .annotation-row { display: grid; grid-template-columns: 55px 90px 90px 65px 1fr 1fr auto; align-items: center; gap: 8px; background: #1a1d27; border-radius: 6px; padding: 5px 10px; border-left: 3px solid; font-size: 0.77rem; cursor: pointer; transition: background 0.1s; }
   .annotation-row:hover { background: #22253a; }
   .ann-time { font-family: monospace; color: #aaa; font-size: 0.73rem; }
   .ann-type { font-weight: 700; }
@@ -86,6 +86,7 @@
   .ann-yt a { color: #3b82f6; font-size: 0.7rem; text-decoration: none; }
   .ann-yt a:hover { text-decoration: underline; }
   .ann-possession { font-size: 0.72rem; color: #888; }
+  .ann-comment { font-size: 0.72rem; color: #f97316; font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .ann-del { background: none; border: none; color: #555; cursor: pointer; font-size: 0.95rem; padding: 0 3px; }
   .ann-del:hover { color: #ef4444; }
   .empty-state { color: #444; font-size: 0.8rem; text-align: center; padding: 20px; }
@@ -310,10 +311,11 @@ const DEFAULT_OTHER_TYPES = new Set(["Try","Turnover","Penalty"]);
 
 let annotations = [];
 let videoLoaded = false;
-let videoBaseName = 'touch_rugby_annotations';
+let videoBaseName = '';
 let selectedType = null;
 let pendingType = null;
 let pendingName = null;
+let pendingComment = null;
 let wasPlaying = false;
 let videoMode = 'none'; // 'local' | 'youtube'
 let ytPlayer = null;
@@ -339,6 +341,7 @@ function onVideoReady() {
 // ── Video size cycle ───────────────────────────────────────────
 const VIDEO_SIZES = [['S','38vh'],['M','52vh'],['L','68vh']];
 let videoSizeIdx = 1;
+document.documentElement.style.setProperty('--video-h', VIDEO_SIZES[videoSizeIdx][1]);
 function cycleVideoSize() {
   videoSizeIdx = (videoSizeIdx + 1) % VIDEO_SIZES.length;
   const [label, h] = VIDEO_SIZES[videoSizeIdx];
@@ -350,7 +353,7 @@ function cycleVideoSize() {
 function loadVideo(e) {
   const f = e.target.files[0];
   if (!f) return;
-  videoBaseName = f.name.replace(/\.[^/.]+$/, '');
+  videoBaseName = '';
   // Tear down any active YouTube player
   if (ytProgressInterval) { clearInterval(ytProgressInterval); ytProgressInterval = null; }
   if (ytPlayer) { ytPlayer.destroy(); ytPlayer = null; }
@@ -374,7 +377,10 @@ function loadYouTube() {
   const m = url.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/);
   if (!m) { alert('Invalid YouTube URL — could not extract a video ID.'); return; }
   const videoId = m[1];
-  videoBaseName = 'youtube_' + videoId;
+  videoBaseName = '';
+  fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`)
+    .then(r => r.json()).then(d => { if (d.title) videoBaseName = d.title; })
+    .catch(() => {});
   // Tear down local video
   vid.pause(); vid.src = ''; vid.style.display = 'none';
   document.getElementById('noVideo').style.display = 'none';
@@ -466,13 +472,19 @@ function isFullGame() { return document.getElementById('fullGameToggle').checked
 function needsTeamSelection(type) { return isFullGame() ? (type === 'Game Event' || type === 'To Review') : true; }
 function showTeamMenu() { document.getElementById('teamMenu').style.display = 'flex'; }
 function hideTeamMenu() { document.getElementById('teamMenu').style.display = 'none'; }
-function selectTeam(team) { if (pendingType !== null) tag(pendingType, pendingName, team); }
+function selectTeam(team) { if (pendingType !== null) tag(pendingType, pendingName, team, pendingComment || ''); }
 
 function isJsTurnover(type, name) {
   if (type === 'Try') return true;
   if (type === 'Penalty' && !['Offside', 'Not Moving Forward', 'Shoulder'].includes(name)) return true;
   if (type === 'Turnover' && name !== '6 Again') return true;
   return false;
+}
+
+function inferActionOwner(possessionOwner, type, name) {
+  if ((type === 'Penalty' || type === 'Turnover') && !isJsTurnover(type, name))
+    return possessionOwner === 'Team 1' ? 'Team 2' : 'Team 1';
+  return possessionOwner;
 }
 
 function inferPossessionOwner() {
@@ -497,6 +509,7 @@ function selectType(type) {
   selectedType = type;
   pendingType = null;
   pendingName = null;
+  pendingComment = null;
   hideTeamMenu();
   wasPlaying = !isPaused();
   if (wasPlaying) doPause();
@@ -513,9 +526,8 @@ function selectType(type) {
 }
 
 function confirmFreeText() {
-  const input = document.getElementById('freeTextInput');
-  const note = input ? input.value.trim() : '';
-  selectSubType('To Review', note);
+  const note = document.getElementById('freeTextInput')?.value.trim() || '';
+  selectSubType('To Review', '', note);
 }
 
 function renderSubmenu(type) {
@@ -538,16 +550,17 @@ function renderSubmenu(type) {
     </button>`).join('');
 }
 
-function selectSubType(type, name) {
-  if (needsTeamSelection(type)) { pendingType = type; pendingName = name; showTeamMenu(); }
-  else tag(type, name, isFullGame() ? inferPossessionOwner() : '');
+function selectSubType(type, name, comment = '') {
+  if (needsTeamSelection(type)) { pendingType = type; pendingName = name; pendingComment = comment; showTeamMenu(); }
+  else tag(type, name, isFullGame() ? inferPossessionOwner() : '', comment);
 }
 
 // ── Tagging ────────────────────────────────────────────────────
-function tag(type, name, possessionOwner) {
+function tag(type, name, possessionOwner, comment = '') {
   if (!videoLoaded) return;
   const t = getTime();
-  annotations.push({ id: Date.now() + Math.random(), type, name, possessionOwner, time: t, timeStr: fmt(t) });
+  const actionOwner = inferActionOwner(possessionOwner, type, name);
+  annotations.push({ id: Date.now() + Math.random(), type, name, possessionOwner, actionOwner, comment, time: t, timeStr: fmt(t) });
   annotations.sort((a,b) => a.time - b.time);
   renderList();
   renderMarkers();
@@ -589,6 +602,7 @@ function renderList() {
       <span class="ann-type" style="color:${COLORS[a.type]}">${a.type}</span>
       <span class="ann-name">${a.name || '—'}</span>
       <span class="ann-possession">${a.possessionOwner || '—'}</span>
+      <span class="ann-comment" title="${(a.comment || '').replace(/"/g,'&quot;')}">${a.comment || ''}</span>
       <span class="ann-yt">${ytCell}</span>
       <button class="ann-del" onclick="event.stopPropagation();deleteAnnotation(${a.id})" title="Delete">✕</button>
     </div>`;
@@ -644,15 +658,20 @@ async function loadFromSheet() {
     // rows[0] is the header row — skip it
     const headers = result.rows[0].map(h => h.toLowerCase());
     const col = name => headers.indexOf(name);
-    const timeIdx  = col('time'), typeIdx = col('type'), nameIdx = col('name');
-    const possIdx  = col('possession owner'), ytIdx = col('youtube link');
+    const timeIdx      = col('time'), typeIdx = col('type'), nameIdx = col('name');
+    const possIdx      = col('possession owner'), ytIdx = col('youtube link');
+    const commentIdx   = col('comment'), actionOwnerIdx = col('action owner');
 
     const loaded = result.rows.slice(1).map(r => {
       const timeStr = r[timeIdx] || '';
       const parts   = timeStr.split(':').map(Number);
       const time    = parts.length === 3 ? parts[0]*3600 + parts[1]*60 + parts[2] : 0;
-      return { id: Date.now() + Math.random(), type: r[typeIdx], name: r[nameIdx] || '',
-               possessionOwner: possIdx >= 0 ? (r[possIdx] || '') : '', time, timeStr };
+      const possessionOwner = possIdx >= 0 ? (r[possIdx] || '') : '';
+      const type = r[typeIdx], name = r[nameIdx] || '';
+      const actionOwner = actionOwnerIdx >= 0 && r[actionOwnerIdx] ? r[actionOwnerIdx] : inferActionOwner(possessionOwner, type, name);
+      return { id: Date.now() + Math.random(), type, name, possessionOwner, actionOwner,
+               comment: commentIdx >= 0 ? (r[commentIdx] || '') : '',
+               time, timeStr };
     }).filter(a => a.type && COLORS[a.type]);
 
     if (!loaded.length) { alert('No valid annotations found in this tab.'); return; }
@@ -720,16 +739,16 @@ async function pushToSheet(override = false) {
   btn.disabled = true;
   btn.textContent = '⏳ Pushing…';
 
-  // Column order must match Python pipeline: Time, Possession Owner, Type, Name, Video Name, To Review, Comment, Youtube Link
+  // Column order must match HEADERS in Code.gs: Time, Possession Owner, Type, Name, To Review, Comment, Youtube Link, Action Owner
   const rows = annotations.map(a => [
     a.timeStr,
     a.possessionOwner || '',
     a.type,
     a.name || '',
-    videoBaseName,
     a.type === 'To Review' ? 'Yes' : '',
-    a.type === 'To Review' ? (a.name || '') : '',
-    ytLink(a.time)
+    a.comment || '',
+    ytLink(a.time),
+    a.actionOwner || '',
   ]);
 
   try {
@@ -741,6 +760,7 @@ async function pushToSheet(override = false) {
         year:        document.getElementById('metaYear').value.trim(),
         division:    document.getElementById('metaDivision').value.trim(),
         competition: document.getElementById('metaCompetition').value.trim(),
+        video:       videoBaseName,
       },
     };
     if (override) body.overridePassword = overridePassword;
@@ -787,14 +807,14 @@ function exportCSV() {
   const fullGame = isFullGame();
   const headers = ['Time','Type','Name','Possession Owner'];
   if (fullGame) headers.push('Turnover');
-  headers.push('Video Name','To Review','Comment','Youtube Link');
+  headers.push('To Review','Comment','Youtube Link','Action Owner');
   const rows = [headers.join(','),
     ...annotations.map(a => {
       const yt = ytLink(a.time);
       const toReview = a.type === 'To Review' ? 'Yes' : '';
       const cols = [a.timeStr, a.type, a.name, a.possessionOwner || ''];
       if (fullGame) cols.push(isJsTurnover(a.type, a.name) ? 'Yes' : '');
-      cols.push(videoBaseName, toReview, '', yt);
+      cols.push(toReview, a.comment || '', yt, a.actionOwner || '');
       return cols.join(',');
     })
   ];
@@ -815,24 +835,41 @@ function loadCSV(e) {
     const headers = allLines[0].split(',').map(h => h.trim().toLowerCase());
     const col = name => headers.indexOf(name.toLowerCase());
     const timeIdx = col('time'), typeIdx = col('type'), nameIdx = col('name');
-    const possessionIdx = col('possession owner');
+    const possessionIdx = col('possession owner'), ytIdx = col('youtube link');
+    const commentIdx = col('comment'), actionOwnerIdx = col('action owner');
     if (timeIdx < 0 || typeIdx < 0 || nameIdx < 0) { alert('CSV missing required columns (Time, Type, Name).'); return; }
     const loaded = [];
+    let firstYtUrl = '';
     for (const line of allLines.slice(1)) {
       const parts = line.split(',');
       const timeStr = parts[timeIdx]?.trim(), type = parts[typeIdx]?.trim(), name = parts[nameIdx]?.trim() || '';
       const possessionOwner = possessionIdx >= 0 && parts[possessionIdx] ? parts[possessionIdx].trim() : '';
+      const comment = commentIdx >= 0 && parts[commentIdx] ? parts[commentIdx].trim() : '';
+      const actionOwner = actionOwnerIdx >= 0 && parts[actionOwnerIdx] ? parts[actionOwnerIdx].trim() : inferActionOwner(possessionOwner, type, name);
+      if (!firstYtUrl && ytIdx >= 0 && parts[ytIdx]) firstYtUrl = parts[ytIdx].trim();
       if (!timeStr || !COLORS[type]) continue;
-      const tp = timeStr.split(':').map(Number);
+      const cleanTime = timeStr.includes(' ') ? timeStr.split(' ')[1] : timeStr;
+      const tp = cleanTime.split(':').map(Number);
       const time = tp.length === 3 ? tp[0]*3600+tp[1]*60+tp[2] : tp[0]*60+tp[1];
       if (isNaN(time)) continue;
-      loaded.push({ id: Date.now()+Math.random(), type, name, possessionOwner, time, timeStr });
+      loaded.push({ id: Date.now()+Math.random(), type, name, possessionOwner, actionOwner, comment, time, timeStr: cleanTime });
     }
     if (!loaded.length) { alert('No valid annotations found in CSV.'); return; }
     annotations = loaded.sort((a,b)=>a.time-b.time);
+    // Clear metadata fields
+    ['metaTeam1','metaTeam2','metaYear','metaDivision','metaCompetition'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
     renderList(); renderMarkers();
     if (annotations.length) document.getElementById('lastAnnBtn').removeAttribute('disabled');
     setStatus(`✓ Loaded ${loaded.length} annotations from CSV`);
+    if (firstYtUrl) {
+      const m = firstYtUrl.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/);
+      if (m) {
+        document.getElementById('ytUrl').value = `https://www.youtube.com/watch?v=${m[1]}`;
+        loadYouTube();
+      }
+    }
   };
   reader.readAsText(f);
   e.target.value = '';

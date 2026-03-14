@@ -171,7 +171,8 @@
 const APPS_SCRIPT_URL    = 'https://script.google.com/macros/s/AKfycbzhMw4nQr2nVW0MLfPWVXRPXsvImerpzshQ5GnJ3873qQkGMz0bcJQdmTRXCxwygfFm/exec';
 const APPS_SCRIPT_SECRET = 'm30-test-key';
 
-const FILTERABLE = ['Type', 'Name', 'Possession Owner', 'Game'];
+const FILTERABLE = ['Type', 'Name', 'Possession Owner', 'Action Owner', 'Game'];
+const HIDDEN_COLS = new Set(['Team 1', 'Team 2', 'Video Name']);
 
 // ── State ──────────────────────────────────────────────────────
 let allData      = [];
@@ -208,6 +209,27 @@ function processRows(rows) {
 
   headers  = rows[0].map(h => h.trim());
   allData  = rows.slice(1).filter(r => r.some(c => c !== ''));
+
+  // Substitute 'Team 1'/'Team 2' placeholders with actual team names from metadata columns
+  const hi       = h => headers.findIndex(x => x.toLowerCase() === h);
+  const possIdx  = hi('possession owner'), actionIdx = hi('action owner');
+  const t1Idx    = hi('team 1'), t2Idx = hi('team 2');
+  if (t1Idx >= 0 && t2Idx >= 0) {
+    allData.forEach(row => {
+      const t1 = row[t1Idx], t2 = row[t2Idx];
+      for (const idx of [possIdx, actionIdx]) {
+        if (idx < 0) continue;
+        if (row[idx] === 'Team 1') row[idx] = t1;
+        else if (row[idx] === 'Team 2') row[idx] = t2;
+      }
+    });
+  }
+
+  // Drop hidden columns
+  const keepIdx = headers.map((h, i) => HIDDEN_COLS.has(h) ? -1 : i).filter(i => i >= 0);
+  headers = keepIdx.map(i => headers[i]);
+  allData = allData.map(row => keepIdx.map(i => row[i]));
+
   filtered = [...allData];
 
   buildSearchColSelect();
@@ -331,7 +353,7 @@ function renderRows(rows) {
         span.textContent = cell;
         span.className = 'badge ' + (TYPE_BADGE[cell.toLowerCase()] || '');
         td.appendChild(span);
-      } else if (col === 'possession owner' && cell) {
+      } else if ((col === 'possession owner' || col === 'action owner') && cell) {
         const span = document.createElement('span');
         span.textContent = cell;
         span.className = 'team-badge';

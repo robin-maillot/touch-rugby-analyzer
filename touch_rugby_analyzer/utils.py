@@ -154,7 +154,6 @@ def replace_team_names(data_df: pd.DataFrame, mapping: Dict[str, str]):
 
 
 def load_data(data_path: Path, simple: bool = False) -> pd.DataFrame:
-    local_team_name, other_team_name = get_names(data_path)
     year, division_name, competition_name = get_year_division_competition(data_path)
     data_df = pd.read_csv(data_path)
     data_df = data_df.dropna(axis=0, how="all", subset="Time")
@@ -165,9 +164,6 @@ def load_data(data_path: Path, simple: bool = False) -> pd.DataFrame:
         data_df[AGAINST_LOCALS_COL].fillna(False, inplace=True)
     infer_possession_owner(data_df)
     infer_action_owner(data_df)
-    replace_team_names(
-        data_df, mapping={"Team 1": local_team_name, "Team 2": other_team_name}
-    )
 
     data_df.Time = pd.to_datetime(data_df.Time)
     add_game_time(data_df)
