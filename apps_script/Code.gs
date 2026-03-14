@@ -16,7 +16,7 @@ function getMetadata() {
   const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(METADATA_SHEET);
   if (!sheet) return {};
 
-  const values = sheet.getDataRange().getDisplayValuesd();
+  const values = sheet.getDataRange().getDisplayValues();
   if (values.length < 2) return {};
 
   const h    = values[0].map(s => s.toLowerCase().trim());
