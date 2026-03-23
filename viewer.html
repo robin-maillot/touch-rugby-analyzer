@@ -275,7 +275,7 @@ function setStatus(msg, isError = false) {
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzhMw4nQr2nVW0MLfPWVXRPXsvImerpzshQ5GnJ3873qQkGMz0bcJQdmTRXCxwygfFm/exec';
 const APPS_SCRIPT_SECRET = 'm30-test-key';  // must match Code.gs
 
-const COLORS = { 'Try':'#22c55e', 'Turnover':'#f97316', 'Penalty Attack':'#ef4444', 'Penalty Defence':'#b91c1c', 'Game Event':'#3b82f6', 'To Review':'#a855f7' };
+const COLORS = { 'Try':'#22c55e', 'Turnover':'#f97316', 'Penalty Attack':'#ef4444', 'Penalty Defence':'#b91c1c', 'Penalty':'#ef4444', 'Game Event':'#3b82f6', 'To Review':'#a855f7' };
 
 // ── Fetch game list into sheet select ──────────────────────────
 async function fetchGameList() {
@@ -339,6 +339,7 @@ function onVideoReady() {
   videoLoaded = true;
   document.getElementById('timeDuration').textContent = fmt(getDuration());
   ['playBtn','skipBk','skipFw','speedSel'].forEach(id => document.getElementById(id).removeAttribute('disabled'));
+  renderMarkers();
 }
 
 // ── Video size cycle ───────────────────────────────────────────
