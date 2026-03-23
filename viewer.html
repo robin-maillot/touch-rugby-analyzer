@@ -197,12 +197,12 @@
       Simple Mode
     </label>
     <span style="width:1px;height:20px;background:#2a2d3a;margin:0 4px;flex-shrink:0"></span>
-    <button class="tag-btn" style="background:#f59e0b;color:#000" data-type="Try" onclick="selectType('Try')">Try <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.15);padding:1px 4px;border-radius:3px">T</kbd></button>
-    <button class="tag-btn" style="background:#ef4444;color:#fff" data-type="Turnover" onclick="selectType('Turnover')">Turnover <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">U</kbd></button>
-    <button class="tag-btn" style="background:#a855f7;color:#fff" data-type="Penalty Attack" onclick="selectType('Penalty Attack')">Pen Attack <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">P</kbd></button>
-    <button class="tag-btn" style="background:#6366f1;color:#fff" data-type="Penalty Defence" onclick="selectType('Penalty Defence')">Pen Defence <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">Q</kbd></button>
-    <button class="tag-btn" style="background:#10b981;color:#fff" data-type="Game Event" onclick="selectType('Game Event')">Game Event <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">G</kbd></button>
-    <button class="tag-btn" style="background:#f97316;color:#fff" data-type="To Review" onclick="selectType('To Review')">To Review <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">R</kbd></button>
+    <button class="tag-btn" style="background:#22c55e;color:#000" data-type="Try" onclick="selectType('Try')">Try <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.15);padding:1px 4px;border-radius:3px">T</kbd></button>
+    <button class="tag-btn" style="background:#f97316;color:#fff" data-type="Turnover" onclick="selectType('Turnover')">Turnover <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">U</kbd></button>
+    <button class="tag-btn" style="background:#ef4444;color:#fff" data-type="Penalty Attack" onclick="selectType('Penalty Attack')">Pen Attack <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">P</kbd></button>
+    <button class="tag-btn" style="background:#b91c1c;color:#fff" data-type="Penalty Defence" onclick="selectType('Penalty Defence')">Pen Defence <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">Q</kbd></button>
+    <button class="tag-btn" style="background:#3b82f6;color:#fff" data-type="Game Event" onclick="selectType('Game Event')">Game Event <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">G</kbd></button>
+    <button class="tag-btn" style="background:#a855f7;color:#fff" data-type="To Review" onclick="selectType('To Review')">To Review <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">R</kbd></button>
   </div>
 
   <!-- Sub-action buttons -->
@@ -227,12 +227,12 @@
       </div>
       <div class="markers-track" id="markersTrack"></div>
       <div class="legend">
-        <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div>Try</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div>Turnover</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#a855f7"></div>Pen Attack</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#6366f1"></div>Pen Defence</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#10b981"></div>Game Event</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#f97316"></div>To Review</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#22c55e"></div>Try</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#f97316"></div>Turnover</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div>Pen Attack</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#b91c1c"></div>Pen Defence</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div>Game Event</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#a855f7"></div>To Review</div>
       </div>
     </div>
   </div>
@@ -275,7 +275,7 @@ function setStatus(msg, isError = false) {
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzhMw4nQr2nVW0MLfPWVXRPXsvImerpzshQ5GnJ3873qQkGMz0bcJQdmTRXCxwygfFm/exec';
 const APPS_SCRIPT_SECRET = 'm30-test-key';  // must match Code.gs
 
-const COLORS = { 'Try':'#f59e0b', 'Turnover':'#ef4444', 'Penalty Attack':'#a855f7', 'Penalty Defence':'#6366f1', 'Game Event':'#10b981', 'To Review':'#f97316' };
+const COLORS = { 'Try':'#22c55e', 'Turnover':'#f97316', 'Penalty Attack':'#ef4444', 'Penalty Defence':'#b91c1c', 'Game Event':'#3b82f6', 'To Review':'#a855f7' };
 
 // ── Fetch game list into sheet select ──────────────────────────
 async function fetchGameList() {
