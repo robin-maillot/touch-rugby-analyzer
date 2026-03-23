@@ -261,6 +261,10 @@ function processRows(rows) {
   headers = keepIdx.map(i => headers[i]);
   allData = allData.map(row => keepIdx.map(i => row[i]));
 
+  // Exclude Game Event rows
+  const typeColIdx = headers.findIndex(h => h.toLowerCase() === 'type');
+  if (typeColIdx >= 0) allData = allData.filter(row => row[typeColIdx] !== 'Game Event');
+
   filtered = [...allData];
 
   buildSearchColSelect();

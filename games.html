@@ -372,11 +372,14 @@ function buildMetrics(possessions, teamNames, events) {
     const comps    = g.filter(p => p.End_Type === 'Try' || p.End_Event === '6th Touch').length;
     const avg      = g.length ? g.reduce((s, p) => s + p.Duration_Sec, 0) / g.length : 0;
     const total    = g.reduce((s, p) => s + p.Duration_Sec, 0);
-    const penalties = events.filter(e => e.Type === 'Penalty' && e['Action Owner'] === team).length;
+    const teamPens   = events.filter(e => e.Type === 'Penalty' && e['Action Owner'] === team);
+    const penAttack  = teamPens.filter(e => e['Action Owner'] === e['Possession Owner']).length;
+    const penDefence = teamPens.filter(e => e['Action Owner'] !== e['Possession Owner']).length;
     return {
       Team: team, Possessions: g.length, Tries: tries,
       'Success Rate': g.length ? `${(tries / g.length * 100).toFixed(1)}%` : '—',
-      Completions: comps, Penalties: penalties, 'Avg Time (s)': avg.toFixed(1), 'Total Time (s)': total.toFixed(1),
+      Completions: comps, 'Pen Attack': penAttack, 'Pen Defence': penDefence,
+      'Avg Time (s)': avg.toFixed(1), 'Total Time (s)': total.toFixed(1),
     };
   });
 }
@@ -478,7 +481,7 @@ async function renderGame(events, team1, team2, subtitle) {
   const teamNames     = [team1, team2];
   const triesData     = buildCumulativeData(filtered, 'Try',     teamNames, globalStart, globalEnd, startLink, endLink);
   const penData       = buildCumulativeData(filtered, 'Penalty', teamNames, globalStart, globalEnd, startLink, endLink);
-  const possData      = buildPossessionData(filtered);
+  const possData      = buildPossessionData(filtered.filter(e => e.Type !== 'To Review'));
   const metrics       = buildMetrics(possData, teamNames, filtered);
 
   // Show container first — vegaEmbed with width:"container" needs a visible element to measure
@@ -492,7 +495,7 @@ async function renderGame(events, team1, team2, subtitle) {
   await vegaEmbed('#vis-possession', possessionSpec(possData, teamNames), opts);
 
   // Metrics table
-  const cols = ['Team', 'Possessions', 'Tries', 'Success Rate', 'Completions', 'Penalties', 'Avg Time (s)', 'Total Time (s)'];
+  const cols = ['Team', 'Possessions', 'Tries', 'Success Rate', 'Completions', 'Pen Attack', 'Pen Defence', 'Avg Time (s)', 'Total Time (s)'];
   document.getElementById('metricsTable').innerHTML =
     `<table>
        <thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead>
