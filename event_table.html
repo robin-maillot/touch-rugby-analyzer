@@ -307,6 +307,8 @@ function buildFilterDropdowns() {
     const drop = document.createElement('div');
     drop.className = 'filter-dropdown';
 
+    drop.dataset.col = col;
+
     vals.forEach(val => {
       const label = document.createElement('label');
       const cb    = document.createElement('input');
@@ -452,17 +454,54 @@ function applyFilters() {
   currentPage = 1;
   sortFiltered();
   updatePagination();
+  updateFilterOptions();
+}
+
+function updateFilterOptions() {
+  const query  = document.getElementById('searchInput').value.toLowerCase();
+  const colIdx = parseInt(document.getElementById('searchCol').value);
+
+  FILTERABLE.forEach(col => {
+    const drop = document.querySelector(`.filter-dropdown[data-col="${col}"]`);
+    if (!drop) return;
+    const idx = headers.findIndex(h => h.toLowerCase() === col.toLowerCase());
+    if (idx === -1) return;
+
+    // Candidate rows: match text search + all active filters EXCEPT this column
+    const candidates = allData.filter(row => {
+      const match = colIdx === -1
+        ? row.some(c => String(c).toLowerCase().includes(query))
+        : String(row[colIdx]).toLowerCase().includes(query);
+      if (!match) return false;
+      for (const otherCol of FILTERABLE) {
+        if (otherCol === col) continue;
+        const set = activeFilters[otherCol];
+        if (!set || !set.size) continue;
+        const oIdx = headers.findIndex(h => h.toLowerCase() === otherCol.toLowerCase());
+        if (!set.has(row[oIdx])) return false;
+      }
+      return true;
+    });
+
+    const available = new Set(candidates.map(r => r[idx]).filter(Boolean));
+
+    drop.querySelectorAll('label').forEach(label => {
+      const cb = label.querySelector('input[type=checkbox]');
+      // Always show checked options so they can be deselected
+      label.style.display = (available.has(cb.value) || cb.checked) ? '' : 'none';
+    });
+  });
 }
 
 function resetFilters() {
   document.getElementById('searchInput').value = '';
-  // Uncheck all checkboxes
   document.querySelectorAll('.filter-dropdown input[type=checkbox]').forEach(cb => { cb.checked = false; });
-  // Reset active filters state and button styles
   document.querySelectorAll('.filter-btn').forEach(btn => {
     btn.classList.remove('active');
     btn.querySelector('span').textContent = btn.querySelector('span').textContent.replace(/ \(\d+\)$/, '');
   });
+  // Restore all hidden options before re-evaluating
+  document.querySelectorAll('.filter-dropdown label').forEach(l => l.style.display = '');
   FILTERABLE.forEach(col => { if (activeFilters[col]) activeFilters[col].clear(); });
   applyFilters();
 }

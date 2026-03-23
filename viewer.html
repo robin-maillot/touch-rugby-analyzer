@@ -199,7 +199,8 @@
     <span style="width:1px;height:20px;background:#2a2d3a;margin:0 4px;flex-shrink:0"></span>
     <button class="tag-btn" style="background:#f59e0b;color:#000" data-type="Try" onclick="selectType('Try')">Try <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.15);padding:1px 4px;border-radius:3px">T</kbd></button>
     <button class="tag-btn" style="background:#ef4444;color:#fff" data-type="Turnover" onclick="selectType('Turnover')">Turnover <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">U</kbd></button>
-    <button class="tag-btn" style="background:#a855f7;color:#fff" data-type="Penalty" onclick="selectType('Penalty')">Penalty <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">P</kbd></button>
+    <button class="tag-btn" style="background:#a855f7;color:#fff" data-type="Penalty Attack" onclick="selectType('Penalty Attack')">Pen Attack <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">P</kbd></button>
+    <button class="tag-btn" style="background:#6366f1;color:#fff" data-type="Penalty Defence" onclick="selectType('Penalty Defence')">Pen Defence <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">Q</kbd></button>
     <button class="tag-btn" style="background:#10b981;color:#fff" data-type="Game Event" onclick="selectType('Game Event')">Game Event <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">G</kbd></button>
     <button class="tag-btn" style="background:#f97316;color:#fff" data-type="To Review" onclick="selectType('To Review')">To Review <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">R</kbd></button>
   </div>
@@ -228,7 +229,8 @@
       <div class="legend">
         <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div>Try</div>
         <div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div>Turnover</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#a855f7"></div>Penalty</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#a855f7"></div>Pen Attack</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#6366f1"></div>Pen Defence</div>
         <div class="legend-item"><div class="legend-dot" style="background:#10b981"></div>Game Event</div>
         <div class="legend-item"><div class="legend-dot" style="background:#f97316"></div>To Review</div>
       </div>
@@ -273,7 +275,7 @@ function setStatus(msg, isError = false) {
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzhMw4nQr2nVW0MLfPWVXRPXsvImerpzshQ5GnJ3873qQkGMz0bcJQdmTRXCxwygfFm/exec';
 const APPS_SCRIPT_SECRET = 'm30-test-key';  // must match Code.gs
 
-const COLORS = { 'Try':'#f59e0b', 'Turnover':'#ef4444', 'Penalty':'#a855f7', 'Game Event':'#10b981', 'To Review':'#f97316' };
+const COLORS = { 'Try':'#f59e0b', 'Turnover':'#ef4444', 'Penalty Attack':'#a855f7', 'Penalty Defence':'#6366f1', 'Game Event':'#10b981', 'To Review':'#f97316' };
 
 // ── Fetch game list into sheet select ──────────────────────────
 async function fetchGameList() {
@@ -301,13 +303,14 @@ async function fetchGameList() {
 window.addEventListener('DOMContentLoaded', fetchGameList);
 
 const MENU = {
-  "Penalty":    ["Offside","Touch and Pass","Forward Pass","Delay of Play","In the Ruck","Shoulder","Off the Mark","Not Moving Forward","Other"],
+  "Penalty Attack":  ["Forward Pass","Touch and Pass","Off the Mark","Not Moving Forward","Delay of Play","Hard Touch","Other"],
+  "Penalty Defence": ["Offside","Hard Touch","In the Ruck","Not Moving Forward","Other"],
   "Turnover":   ["Ball Down","6th Touch","Dummy Touch","Bad Roll","6 Again","Interception","Other"],
   "Game Event": ["Game Start","Game End"],
   "Try":        ["Scoop","Other","32 - Long","33 Quicky","33","32 Cut","French Flair"],
   "To Review":  []
 };
-const DEFAULT_OTHER_TYPES = new Set(["Try","Turnover","Penalty"]);
+const DEFAULT_OTHER_TYPES = new Set(["Try","Turnover","Penalty Attack","Penalty Defence"]);
 
 let annotations = [];
 let videoLoaded = false;
@@ -476,13 +479,16 @@ function selectTeam(team) { if (pendingType !== null) tag(pendingType, pendingNa
 
 function isJsTurnover(type, name) {
   if (type === 'Try') return true;
-  if (type === 'Penalty' && !['Offside', 'Not Moving Forward', 'Shoulder'].includes(name)) return true;
+  if (type === 'Penalty Attack') return true;
+  if (type === 'Penalty Defence') return false;
   if (type === 'Turnover' && name !== '6 Again') return true;
   return false;
 }
 
 function inferActionOwner(possessionOwner, type, name) {
-  if ((type === 'Penalty' || type === 'Turnover') && !isJsTurnover(type, name))
+  if (type === 'Penalty Defence')
+    return possessionOwner === 'Team 1' ? 'Team 2' : 'Team 1';
+  if (type === 'Turnover' && !isJsTurnover(type, name))
     return possessionOwner === 'Team 1' ? 'Team 2' : 'Team 1';
   return possessionOwner;
 }
@@ -740,16 +746,19 @@ async function pushToSheet(override = false) {
   btn.textContent = '⏳ Pushing…';
 
   // Column order must match HEADERS in Code.gs: Time, Possession Owner, Type, Name, To Review, Comment, Youtube Link, Action Owner
-  const rows = annotations.map(a => [
-    a.timeStr,
-    a.possessionOwner || '',
-    a.type,
-    a.name || '',
-    a.type === 'To Review' ? 'Yes' : '',
-    a.comment || '',
-    ytLink(a.time),
-    a.actionOwner || '',
-  ]);
+  const rows = annotations.map(a => {
+    const outType = (a.type === 'Penalty Attack' || a.type === 'Penalty Defence') ? 'Penalty' : a.type;
+    return [
+      a.timeStr,
+      a.possessionOwner || '',
+      outType,
+      a.name || '',
+      a.type === 'To Review' ? 'Yes' : '',
+      a.comment || '',
+      ytLink(a.time),
+      a.actionOwner || '',
+    ];
+  });
 
   try {
     const body = {
@@ -812,7 +821,8 @@ function exportCSV() {
     ...annotations.map(a => {
       const yt = ytLink(a.time);
       const toReview = a.type === 'To Review' ? 'Yes' : '';
-      const cols = [a.timeStr, a.type, a.name, a.possessionOwner || ''];
+      const outType = (a.type === 'Penalty Attack' || a.type === 'Penalty Defence') ? 'Penalty' : a.type;
+      const cols = [a.timeStr, outType, a.name, a.possessionOwner || ''];
       if (fullGame) cols.push(isJsTurnover(a.type, a.name) ? 'Yes' : '');
       cols.push(toReview, a.comment || '', yt, a.actionOwner || '');
       return cols.join(',');
@@ -876,7 +886,7 @@ function loadCSV(e) {
 }
 
 // ── Keyboard shortcuts ─────────────────────────────────────────
-const TYPE_KEYS = { 't':'Try', 'u':'Turnover', 'p':'Penalty', 'g':'Game Event', 'r':'To Review' };
+const TYPE_KEYS = { 't':'Try', 'u':'Turnover', 'p':'Penalty Attack', 'q':'Penalty Defence', 'g':'Game Event', 'r':'To Review' };
 
 document.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
