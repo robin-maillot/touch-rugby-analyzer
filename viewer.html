@@ -18,6 +18,8 @@
   .main { display: flex; flex-direction: column; flex: 1; overflow: hidden; padding: 10px 12px; gap: 8px; }
 
   .video-wrapper { background: #000; border-radius: 8px; overflow: hidden; position: relative; flex-shrink: 0; display: flex; align-items: center; justify-content: center; height: var(--video-h, 52vh); border: 1px solid #2a2d3a; }
+  .video-resize-handle { height: 5px; cursor: row-resize; background: #2a2d3a; flex-shrink: 0; border-radius: 3px; transition: background 0.15s; user-select: none; }
+  .video-resize-handle:hover, .video-resize-handle.dragging { background: #3b82f6; }
   video { max-width: 100%; max-height: 100%; display: block; }
   .no-video { display: flex; flex-direction: column; align-items: center; gap: 10px; color: #555; }
   .no-video svg { opacity: 0.3; }
@@ -154,6 +156,8 @@
     <div id="ytPlayerContainer" style="display:none;width:100%;height:100%"></div>
   </div>
 
+  <div class="video-resize-handle" id="videoResizeHandle"></div>
+
   <div class="controls">
     <button class="btn btn-ghost" onclick="document.getElementById('fileInput').click()">📂 Open</button>
     <button class="btn btn-primary" id="playBtn" onclick="togglePlay()" disabled>▶ Play</button>
@@ -179,7 +183,6 @@
     <input class="yt-input" id="overridePass" type="password" placeholder="Override password (admin only)" style="width:200px;display:none">
     <button class="btn btn-danger" id="overrideBtn" style="display:none" onclick="pushToSheet(true)">⚠ Override Tab</button>
     <input type="file" id="csvInput" accept=".csv" style="display:none" onchange="loadCSV(event)">
-    <button class="btn btn-ghost" id="videoSizeBtn" onclick="cycleVideoSize()" title="Cycle video size">⬜ M</button>
   </div>
 
   <!-- Metadata bar -->
@@ -365,16 +368,40 @@ function onVideoReady() {
   renderMarkers();
 }
 
-// ── Video size cycle ───────────────────────────────────────────
-const VIDEO_SIZES = [['S','38vh'],['M','52vh'],['L','68vh']];
-let videoSizeIdx = 1;
-document.documentElement.style.setProperty('--video-h', VIDEO_SIZES[videoSizeIdx][1]);
-function cycleVideoSize() {
-  videoSizeIdx = (videoSizeIdx + 1) % VIDEO_SIZES.length;
-  const [label, h] = VIDEO_SIZES[videoSizeIdx];
-  document.documentElement.style.setProperty('--video-h', h);
-  document.getElementById('videoSizeBtn').textContent = `⬜ ${label}`;
+// ── Video resize handle ────────────────────────────────────────
+function setupVideoResizeHandle() {
+  const handle  = document.getElementById('videoResizeHandle');
+  const wrapper = document.getElementById('videoWrapper');
+  const main    = document.querySelector('.main');
+  let dragging = false, startY = 0, startH = 0;
+
+  handle.addEventListener('mousedown', e => {
+    dragging = true;
+    startY   = e.clientY;
+    startH   = wrapper.getBoundingClientRect().height;
+    handle.classList.add('dragging');
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+    document.getElementById('ytPlayerContainer').style.pointerEvents = 'none';
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    const mainH = main.getBoundingClientRect().height;
+    const newH  = Math.max(120, Math.min(mainH * 0.80, startH + (e.clientY - startY)));
+    document.documentElement.style.setProperty('--video-h', newH + 'px');
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    handle.classList.remove('dragging');
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    document.getElementById('ytPlayerContainer').style.pointerEvents = '';
+  });
 }
+setupVideoResizeHandle();
 
 // ── Local video loading ────────────────────────────────────────
 function loadVideo(e) {
