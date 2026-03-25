@@ -127,6 +127,11 @@
         <div class="card-title">Event Table</div>
         <div class="card-desc">Browse all tagged events</div>
       </a>
+      <a class="nav-card" href="event_table_v2.html" id="eventViewerCard" style="display:none">
+        <div class="card-icon">▶️</div>
+        <div class="card-title">Event Viewer</div>
+        <div class="card-desc">Browse events with video</div>
+      </a>
       <a class="nav-card" href="viewer.html" id="annotatorCard" style="display:none">
         <div class="card-icon">🎬</div>
         <div class="card-title">Annotator</div>
@@ -164,6 +169,7 @@
     sessionStorage.setItem('accessLevel', level);
     if (level === 'staff') {
       document.getElementById('annotatorCard').style.display = '';
+      document.getElementById('eventViewerCard').style.display = '';
     }
     loginScreen.style.display = 'none';
     appContent.style.display  = 'block';

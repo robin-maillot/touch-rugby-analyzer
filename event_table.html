@@ -93,6 +93,13 @@
     /* Game tag */
     .game-tag { font-size: 0.72rem; color: var(--text-muted); background: var(--surface-2); padding: 2px 7px; border-radius: 4px; border: 1px solid var(--border); }
 
+    /* Comment expand/collapse */
+    .comment-cell { font-size: 0.8rem; color: #f97316; font-style: italic; }
+    .comment-rest { display: none; white-space: pre-wrap; margin-top: 3px; }
+    .comment-rest.open { display: block; }
+    .comment-toggle { background: none; border: none; color: #888; cursor: pointer; font-size: 0.68rem; padding: 2px 0; display: inline-flex; align-items: center; gap: 2px; }
+    .comment-toggle:hover { color: #f97316; }
+
     .empty { text-align: center; padding: 48px; color: var(--text-dim); font-size: 0.88rem; }
     #loadingMsg { text-align: center; padding: 60px 24px; color: #888; font-size: 0.9rem; display: none; }
     #loadingMsg .hint { font-size: 0.78rem; color: #555; margin-top: 8px; display: none; }
@@ -125,6 +132,7 @@
     <a href="games.html">Games</a>
     <a href="dashboard.html">Dashboard</a>
     <a href="event_table.html" class="active">Events</a>
+    <a href="event_table_v2.html">Event Viewer</a>
     <a href="viewer.html" id="annotatorLink" style="display:none">Annotator</a>
   </nav>
   <script>if (sessionStorage.getItem('accessLevel') === 'staff') document.getElementById('annotatorLink').style.display = '';</script>
@@ -186,7 +194,7 @@ const LS = {
 };
 
 const FILTERABLE = ['Type', 'Name', 'Possession Owner', 'Action Owner', 'Game'];
-const HIDDEN_COLS = new Set(['Team 1', 'Team 2', 'Video Name']);
+const HIDDEN_COLS = new Set(['Team 1', 'Team 2', 'Video Name', 'To Review']);
 
 // ── State ──────────────────────────────────────────────────────
 let allData      = [];
@@ -400,6 +408,28 @@ function renderRows(rows) {
         span.textContent = cell;
         span.className = 'game-tag';
         td.appendChild(span);
+      } else if (col === 'comment' && cell) {
+        const lines = cell.split('\n');
+        const wrapper = document.createElement('div');
+        wrapper.className = 'comment-cell';
+        const preview = document.createElement('span');
+        preview.textContent = lines[0];
+        wrapper.appendChild(preview);
+        if (lines.length > 1) {
+          const rest = document.createElement('div');
+          rest.className = 'comment-rest';
+          rest.textContent = lines.slice(1).join('\n');
+          const toggle = document.createElement('button');
+          toggle.className = 'comment-toggle';
+          toggle.textContent = '▾ more';
+          toggle.onclick = e => {
+            e.stopPropagation();
+            const open = rest.classList.toggle('open');
+            toggle.textContent = open ? '▴ less' : '▾ more';
+          };
+          wrapper.append(toggle, rest);
+        }
+        td.appendChild(wrapper);
       } else {
         td.textContent = cell;
       }
