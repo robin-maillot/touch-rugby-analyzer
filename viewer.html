@@ -217,6 +217,8 @@
     <button class="tag-btn" style="background:#b91c1c;color:#fff" data-type="Penalty Defence" onclick="selectType('Penalty Defence')">Pen Defence <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">Q</kbd></button>
     <button class="tag-btn" style="background:#3b82f6;color:#fff" data-type="Game Event" onclick="selectType('Game Event')">Game Event <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">G</kbd></button>
     <button class="tag-btn" style="background:#a855f7;color:#fff" data-type="To Review" onclick="selectType('To Review')">To Review <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">R</kbd></button>
+    <span id="sixthTouchSep" style="width:1px;height:20px;background:#2a2d3a;margin:0 4px;flex-shrink:0"></span>
+    <button id="sixthTouchBtn" class="tag-btn" style="background:#c2410c;color:#fff" onclick="quickTag('Turnover','6th Touch')">6th Touch <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">6</kbd></button>
   </div>
 
   <!-- Sub-action buttons -->
@@ -562,6 +564,24 @@ function inferPossessionOwner() {
 // ── Type / sub-type selection ──────────────────────────────────
 function isDefaultOther() { return document.getElementById('defaultOtherToggle').checked; }
 
+function updateSimpleModeUI() {
+  const on = isDefaultOther();
+  document.getElementById('sixthTouchBtn').style.display = on ? '' : 'none';
+  document.getElementById('sixthTouchSep').style.display = on ? '' : 'none';
+}
+document.getElementById('defaultOtherToggle').addEventListener('change', updateSimpleModeUI);
+updateSimpleModeUI();
+
+function quickTag(type, name) {
+  selectedType = type;
+  pendingType = null; pendingName = null; pendingComment = null;
+  hideTeamMenu();
+  wasPlaying = !isPaused();
+  if (wasPlaying) doPause();
+  document.querySelectorAll('.tag-btn').forEach(b => b.classList.toggle('active', b.dataset.type === type));
+  selectSubType(type, name);
+}
+
 function selectType(type) {
   selectedType = type;
   pendingType = null;
@@ -609,7 +629,23 @@ function renderSubmenu(type) {
 
 function selectSubType(type, name, comment = '') {
   if (needsTeamSelection(type)) { pendingType = type; pendingName = name; pendingComment = comment; showTeamMenu(); }
-  else tag(type, name, isFullGame() ? inferPossessionOwner() : '', comment);
+  else {
+    if (isFullGame()) {
+      const inferred = inferPossessionOwner();
+      if (!inferred) {
+        setStatus('Cannot infer possession owner — tag a Game Start event first.', true);
+        alert('Cannot infer possession owner.\n\nNo prior annotation with a known possession owner was found.\n\nTag a Game Start (Game Event) with a possession owner first.');
+        selectedType = null;
+        document.querySelectorAll('.tag-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('submenu').innerHTML = '<span class="submenu-empty">Select an action above — then choose a sub-type (or press 1–9)</span>';
+        if (wasPlaying) { wasPlaying = false; doPlay(); }
+        return;
+      }
+      tag(type, name, inferred, comment);
+    } else {
+      tag(type, name, '', comment);
+    }
+  }
 }
 
 // ── Tagging ────────────────────────────────────────────────────
@@ -986,6 +1022,7 @@ document.addEventListener('keydown', e => {
     return;
   }
   if (TYPE_KEYS[k]) { selectType(TYPE_KEYS[k]); return; }
+  if (k === '6' && isDefaultOther()) { quickTag('Turnover', '6th Touch'); return; }
   // Team selection when team menu is showing
   if (pendingType !== null && (e.key === '1' || e.key === '2')) {
     e.preventDefault(); selectTeam(e.key === '1' ? 'Team 1' : 'Team 2'); return;
