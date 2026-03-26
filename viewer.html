@@ -93,6 +93,9 @@
   .ann-del:hover { color: #ef4444; }
   .ann-comment-btn { background: none; border: none; color: #555; cursor: pointer; font-size: 0.82rem; padding: 0 3px; }
   .ann-comment-btn:hover { color: #3b82f6; }
+  .ann-name-editable { cursor: pointer; border-bottom: 1px dashed #444; }
+  .ann-name-editable:hover { color: #e0e0e0; border-bottom-color: #888; }
+  .ann-name-select { background: #1a1d27; color: #e0e0e0; border: 1px solid #3b82f6; border-radius: 4px; font-size: 0.76rem; padding: 1px 4px; cursor: pointer; max-width: 100%; }
 
   /* Comment editor modal */
   .comment-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100; }
@@ -547,10 +550,12 @@ function inferActionOwner(possessionOwner, type, name) {
 }
 
 function inferPossessionOwner() {
-  // Walk back through annotations (skip To Review) to find the last possession anchor,
-  // then apply turnover logic to determine the next owner.
+  // Walk back through annotations strictly before the current video time
+  // (annotations are sorted by time, so this correctly handles mid-game insertions).
+  const now = getTime();
   for (let i = annotations.length - 1; i >= 0; i--) {
     const ann = annotations[i];
+    if (ann.time >= now) continue;
     if (ann.type === 'To Review') continue;
     if (!ann.possessionOwner) continue;
     const wasTurnover = isJsTurnover(ann.type, ann.name);
@@ -695,7 +700,7 @@ function renderList() {
     return `<div class="annotation-row" style="border-color:${COLORS[a.type]}" onclick="seekTo(${a.time})">
       <span class="ann-time">${a.timeStr}</span>
       <span class="ann-type" style="color:${COLORS[a.type]}">${a.type}</span>
-      <span class="ann-name">${a.name || '—'}</span>
+      <span class="ann-name${MENU[a.type] && MENU[a.type].length ? ' ann-name-editable' : ''}" id="ann-name-${a.id}" onclick="event.stopPropagation();editAnnotationName(${a.id})" title="${MENU[a.type] && MENU[a.type].length ? 'Click to change' : ''}">${a.name || '—'}</span>
       <span class="ann-possession">${a.possessionOwner || '—'}</span>
       <span class="ann-comment" title="${commentTitle}">${commentDisplay || ''}</span>
       <span class="ann-yt">${ytCell}</span>
@@ -718,6 +723,40 @@ function renderMarkers() {
 }
 
 function seekTo(t) { if (videoLoaded) setCurrentTime(t); }
+
+function editAnnotationName(id) {
+  const ann = annotations.find(a => a.id === id);
+  if (!ann) return;
+  const opts = MENU[ann.type];
+  if (!opts || opts.length === 0) return;
+
+  const span = document.getElementById(`ann-name-${id}`);
+  if (!span) return;
+
+  const sel = document.createElement('select');
+  sel.className = 'ann-name-select';
+  opts.forEach(o => {
+    const opt = document.createElement('option');
+    opt.value = o;
+    opt.textContent = o;
+    if (o === ann.name) opt.selected = true;
+    sel.appendChild(opt);
+  });
+
+  const commit = () => {
+    ann.name = sel.value;
+    ann.actionOwner = inferActionOwner(ann.possessionOwner, ann.type, ann.name);
+    renderList();
+    renderMarkers();
+  };
+  sel.onchange = commit;
+  sel.onblur = () => renderList();
+  sel.onkeydown = e => { if (e.key === 'Escape') { e.stopPropagation(); renderList(); } if (e.key === 'Enter') { e.stopPropagation(); commit(); } };
+  sel.onclick = e => e.stopPropagation();
+
+  span.replaceWith(sel);
+  sel.focus();
+}
 
 function deleteAnnotation(id) {
   annotations = annotations.filter(a => a.id !== id);

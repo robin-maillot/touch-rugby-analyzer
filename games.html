@@ -330,13 +330,40 @@ function buildCumulativeData(events, type, teamNames, globalStart, globalEnd, st
   return data;
 }
 
-function buildPossessionData(events) {
+function buildPossessionData(events, teamNames) {
+  const other = t => t === teamNames[0] ? teamNames[1] : teamNames[0];
+
+  // Re-infer possession owner forward through events so that a Try always
+  // flips possession regardless of what the Possession Owner column says.
+  let cur = null;
+  events.forEach((e, i) => {
+    if (e.Name === 'Game Start' || cur === null) {
+      cur = e['Possession Owner'] || cur;
+    } else {
+      const prev = events[i - 1];
+      if (prev.Name === 'Game End') {
+        cur = e['Possession Owner'] || cur;
+      } else if (prev.Type === 'Try') {
+        cur = other(cur);
+      } else if (prev.Type === 'Turnover' && prev.Name !== '6 Again') {
+        cur = other(cur);
+      } else if (prev.Type === 'Penalty') {
+        // Pen Attack: AO == inferred PO → possession changes
+        // Pen Defence: AO != inferred PO → possession stays
+        if (prev['Action Owner'] === prev._owner) cur = other(cur);
+      }
+    }
+    e._owner = cur;
+  });
+
   let prevOwner = null, pid = 0;
   events.forEach((e, i) => {
-    const newPoss = e['Possession Owner'] !== prevOwner || e.Name === 'Game Start' || (i > 0 && events[i-1].Name === 'Game End');
+    const newPoss = e._owner !== prevOwner
+      || e.Name === 'Game Start'
+      || (i > 0 && events[i - 1].Name === 'Game End');
     if (i === 0 || newPoss) pid++;
     e._pid = pid;
-    prevOwner = e['Possession Owner'];
+    prevOwner = e._owner;
   });
 
   const byPid = {};
@@ -344,7 +371,7 @@ function buildPossessionData(events) {
 
   const raw = Object.values(byPid).map(g => ({
     pid:        g[0]._pid,
-    Team:       g[0]['Possession Owner'],
+    Team:       g[0]._owner,
     rawStart:   Math.min(...g.map(e => e.GameTime)),
     rawEnd:     Math.max(...g.map(e => e.GameTime)),
     endType:    g[g.length - 1].Type,
@@ -481,7 +508,7 @@ async function renderGame(events, team1, team2, subtitle) {
   const teamNames     = [team1, team2];
   const triesData     = buildCumulativeData(filtered, 'Try',     teamNames, globalStart, globalEnd, startLink, endLink);
   const penData       = buildCumulativeData(filtered, 'Penalty', teamNames, globalStart, globalEnd, startLink, endLink);
-  const possData      = buildPossessionData(filtered.filter(e => e.Type !== 'To Review'));
+  const possData      = buildPossessionData(filtered.filter(e => e.Type !== 'To Review'), teamNames);
   const metrics       = buildMetrics(possData, teamNames, filtered);
 
   // Show container first — vegaEmbed with width:"container" needs a visible element to measure
