@@ -222,6 +222,7 @@
     <button class="tag-btn" style="background:#a855f7;color:#fff" data-type="To Review" onclick="selectType('To Review')">To Review <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">R</kbd></button>
     <span id="sixthTouchSep" style="width:1px;height:20px;background:#2a2d3a;margin:0 4px;flex-shrink:0"></span>
     <button id="sixthTouchBtn" class="tag-btn" style="background:#c2410c;color:#fff" onclick="quickTag('Turnover','6th Touch')">6th Touch <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">6</kbd></button>
+    <button id="sixAgainBtn" class="tag-btn" style="background:#c2410c;color:#fff" onclick="quickTag('Turnover','6 Again')">6 Again <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">1</kbd></button>
   </div>
 
   <!-- Sub-action buttons -->
@@ -572,6 +573,7 @@ function isDefaultOther() { return document.getElementById('defaultOtherToggle')
 function updateSimpleModeUI() {
   const on = isDefaultOther();
   document.getElementById('sixthTouchBtn').style.display = on ? '' : 'none';
+  document.getElementById('sixAgainBtn').style.display = on ? '' : 'none';
   document.getElementById('sixthTouchSep').style.display = on ? '' : 'none';
 }
 document.getElementById('defaultOtherToggle').addEventListener('change', updateSimpleModeUI);
@@ -1062,6 +1064,7 @@ document.addEventListener('keydown', e => {
   }
   if (TYPE_KEYS[k]) { selectType(TYPE_KEYS[k]); return; }
   if (k === '6' && isDefaultOther()) { quickTag('Turnover', '6th Touch'); return; }
+  if (k === '1' && isDefaultOther()) { quickTag('Turnover', '6 Again'); return; }
   // Team selection when team menu is showing
   if (pendingType !== null && (e.key === '1' || e.key === '2')) {
     e.preventDefault(); selectTeam(e.key === '1' ? 'Team 1' : 'Team 2'); return;
