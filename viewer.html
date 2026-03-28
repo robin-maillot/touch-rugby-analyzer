@@ -233,8 +233,8 @@
   <!-- Team / Possession Owner menu -->
   <div class="team-menu" id="teamMenu" style="display:none">
     <span class="team-label">POSSESSION OWNER:</span>
-    <button class="team-btn" style="background:#3b82f6;color:#fff" onclick="selectTeam('Team 1')">Team 1</button>
-    <button class="team-btn" style="background:#ef4444;color:#fff" onclick="selectTeam('Team 2')">Team 2</button>
+    <button class="team-btn" id="teamBtn1" style="background:#3b82f6;color:#fff" onclick="selectTeam('Team 1')">Team 1</button>
+    <button class="team-btn" id="teamBtn2" style="background:#ef4444;color:#fff" onclick="selectTeam('Team 2')">Team 2</button>
   </div>
 
   <!-- Timeline -->
@@ -662,6 +662,7 @@ function tag(type, name, possessionOwner, comment = '') {
   const actionOwner = inferActionOwner(possessionOwner, type, name);
   annotations.push({ id: Date.now() + Math.random(), type, name, possessionOwner, actionOwner, comment, time: t, timeStr: fmt(t) });
   annotations.sort((a,b) => a.time - b.time);
+  recomputeOwnersFrom(t);
   renderList();
   renderMarkers();
   flashType(type);
@@ -690,6 +691,13 @@ function ytLink(timeSeconds) {
   return `https://www.youtube.com/watch?v=${m[1]}&t=${t}s`;
 }
 
+function displayTeam(v) {
+  if (!v) return '—';
+  if (v === 'Team 1') { const n = document.getElementById('metaTeam1').value.trim(); return n || 'Team 1'; }
+  if (v === 'Team 2') { const n = document.getElementById('metaTeam2').value.trim(); return n || 'Team 2'; }
+  return v;
+}
+
 function renderList() {
   const el = document.getElementById('annList');
   document.getElementById('annCount').textContent = annotations.length;
@@ -703,7 +711,7 @@ function renderList() {
       <span class="ann-time">${a.timeStr}</span>
       <span class="ann-type" style="color:${COLORS[a.type]}">${a.type}</span>
       <span class="ann-name${MENU[a.type] && MENU[a.type].length ? ' ann-name-editable' : ''}" id="ann-name-${a.id}" onclick="event.stopPropagation();editAnnotationName(${a.id})" title="${MENU[a.type] && MENU[a.type].length ? 'Click to change' : ''}">${a.name || '—'}</span>
-      <span class="ann-possession">${a.possessionOwner || '—'}</span>
+      <span class="ann-possession">${displayTeam(a.possessionOwner)}</span>
       <span class="ann-comment" title="${commentTitle}">${commentDisplay || ''}</span>
       <span class="ann-yt">${ytCell}</span>
       <button class="ann-comment-btn" onclick="event.stopPropagation();openCommentEditor(${a.id})" title="${a.comment ? 'Edit comment' : 'Add comment'}">${a.comment ? '💬' : '✎'}</button>
@@ -748,6 +756,7 @@ function editAnnotationName(id) {
   const commit = () => {
     ann.name = sel.value;
     ann.actionOwner = inferActionOwner(ann.possessionOwner, ann.type, ann.name);
+    recomputeOwnersFrom(ann.time);
     renderList();
     renderMarkers();
   };
@@ -760,8 +769,30 @@ function editAnnotationName(id) {
   sel.focus();
 }
 
+function recomputeOwnersFrom(startTime) {
+  if (!isFullGame()) return;
+  for (let i = 0; i < annotations.length; i++) {
+    const ann = annotations[i];
+    if (ann.time < startTime) continue;
+    if (ann.type === 'Game Event' || ann.type === 'To Review') continue;
+    let inferred = '';
+    for (let j = i - 1; j >= 0; j--) {
+      const prev = annotations[j];
+      if (prev.type === 'To Review' || !prev.possessionOwner) continue;
+      inferred = isJsTurnover(prev.type, prev.name)
+        ? (prev.possessionOwner === 'Team 1' ? 'Team 2' : 'Team 1')
+        : prev.possessionOwner;
+      break;
+    }
+    ann.possessionOwner = inferred;
+    ann.actionOwner = inferActionOwner(inferred, ann.type, ann.name);
+  }
+}
+
 function deleteAnnotation(id) {
+  const deleted = annotations.find(a => a.id === id);
   annotations = annotations.filter(a => a.id !== id);
+  if (deleted) recomputeOwnersFrom(deleted.time);
   renderList(); renderMarkers();
   if (annotations.length === 0) document.getElementById('lastAnnBtn').setAttribute('disabled','');
 }
@@ -861,6 +892,9 @@ function updateSheetPreview() {
   const el = document.getElementById('sheetPreview');
   el.textContent = name || 'fill metadata to generate tab name';
   el.style.color = name ? '#3b82f6' : '#555';
+  document.getElementById('teamBtn1').textContent = displayTeam('Team 1');
+  document.getElementById('teamBtn2').textContent = displayTeam('Team 2');
+  if (annotations.length) renderList();
 }
 
 async function pushToSheet(override = false) {
