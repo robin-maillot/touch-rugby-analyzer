@@ -332,18 +332,28 @@ function buildCumulativeData(events, type, teamNames, globalStart, globalEnd, st
 }
 
 function buildPossessionData(events, teamNames) {
-  // Use Possession Owner column directly as ground truth, filling forward if blank.
+  const other = t => t === teamNames[0] ? teamNames[1] : teamNames[0];
+
+  // Use Possession Owner column as ground truth, but after a Try the other
+  // team always gets possession regardless of what PO says.
   let curOwner = null;
-  events.forEach(e => {
-    if (e['Possession Owner']) curOwner = e['Possession Owner'];
+  events.forEach((e, i) => {
+    const prev = i > 0 ? events[i - 1] : null;
+    if (prev && prev.Type === 'Try') {
+      curOwner = other(prev._owner);
+    } else if (e['Possession Owner']) {
+      curOwner = e['Possession Owner'];
+    }
     e._owner = curOwner;
   });
 
   let prevOwner = null, pid = 0;
   events.forEach((e, i) => {
+    const prev = i > 0 ? events[i - 1] : null;
     const newPoss = e._owner !== prevOwner
       || e.Name === 'Game Start'
-      || (i > 0 && events[i - 1].Name === 'Game End');
+      || (prev && prev.Name === 'Game End')
+      || (prev && prev.Type === 'Try');
     if (i === 0 || newPoss) pid++;
     e._pid = pid;
     prevOwner = e._owner;
