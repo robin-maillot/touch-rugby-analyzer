@@ -314,12 +314,13 @@ function isFullyAnalysable(events) {
 
 // ── Chart data builders — mirror generate_html_v2.py ──────────
 function buildCumulativeData(events, type, teamNames, globalStart, globalEnd, startLink, endLink) {
+  const types = Array.isArray(type) ? type : [type];
   const data = [];
   for (const team of teamNames) {
     data.push({ GameTime: globalStart, Team: team, Event: 'Game Start', Count: 0, Link: startLink });
     let count = 0;
     events
-      .filter(e => e.Type === type && e['Action Owner'] === team)
+      .filter(e => types.includes(e.Type) && e['Action Owner'] === team)
       .sort((a, b) => a.GameTime - b.GameTime)
       .forEach(e => {
         count++;
@@ -347,7 +348,7 @@ function buildPossessionData(events, teamNames) {
         cur = other(cur);
       } else if (prev.Type === 'Turnover' && prev.Name !== '6 Again') {
         cur = other(cur);
-      } else if (prev.Type === 'Penalty') {
+      } else if (prev.Type === 'Penalty' || prev.Type === 'Penalty Attack' || prev.Type === 'Penalty Defence') {
         // Pen Attack: AO == inferred PO → possession changes
         // Pen Defence: AO != inferred PO → possession stays
         if (prev['Action Owner'] === prev._owner) cur = other(cur);
@@ -383,7 +384,7 @@ function buildPossessionData(events, teamNames) {
     const start = i === 0 ? p.rawStart : (raw[i-1].endEvent === 'Game End' ? p.rawStart : raw[i-1].rawEnd);
     let cat;
     if      (p.endType  === 'Try')      cat = 'Try';
-    else if (p.endType  === 'Penalty')  cat = 'Penalty';
+    else if (p.endType === 'Penalty' || p.endType === 'Penalty Attack' || p.endType === 'Penalty Defence') cat = 'Penalty';
     else if (p.endEvent === '6th Touch') cat = '6th Touch';
     else                                cat = 'Other';
     return { Team: p.Team, Start: start, End: p.rawEnd,
@@ -399,7 +400,7 @@ function buildMetrics(possessions, teamNames, events) {
     const comps    = g.filter(p => p.End_Type === 'Try' || p.End_Event === '6th Touch').length;
     const avg      = g.length ? g.reduce((s, p) => s + p.Duration_Sec, 0) / g.length : 0;
     const total    = g.reduce((s, p) => s + p.Duration_Sec, 0);
-    const teamPens   = events.filter(e => e.Type === 'Penalty' && e['Action Owner'] === team);
+    const teamPens   = events.filter(e => (e.Type === 'Penalty' || e.Type === 'Penalty Attack' || e.Type === 'Penalty Defence') && e['Action Owner'] === team);
     const penAttack  = teamPens.filter(e => e['Action Owner'] === e['Possession Owner']).length;
     const penDefence = teamPens.filter(e => e['Action Owner'] !== e['Possession Owner']).length;
     return {
@@ -507,7 +508,7 @@ async function renderGame(events, team1, team2, subtitle) {
   const filtered      = events.filter(e => e.GameTime >= globalStart && e.GameTime <= globalEnd);
   const teamNames     = [team1, team2];
   const triesData     = buildCumulativeData(filtered, 'Try',     teamNames, globalStart, globalEnd, startLink, endLink);
-  const penData       = buildCumulativeData(filtered, 'Penalty', teamNames, globalStart, globalEnd, startLink, endLink);
+  const penData       = buildCumulativeData(filtered, ['Penalty', 'Penalty Attack', 'Penalty Defence'], teamNames, globalStart, globalEnd, startLink, endLink);
   const possData      = buildPossessionData(filtered.filter(e => e.Type !== 'To Review'), teamNames);
   const metrics       = buildMetrics(possData, teamNames, filtered);
 
