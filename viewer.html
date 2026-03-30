@@ -912,7 +912,7 @@ async function pushToSheet(override = false) {
 
   // Column order must match HEADERS in Code.gs: Time, Possession Owner, Type, Name, To Review, Comment, Youtube Link, Action Owner
   const rows = annotations.map(a => {
-    const outType = (a.type === 'Penalty Attack' || a.type === 'Penalty Defence') ? 'Penalty' : a.type;
+    const outType = a.type;
     return [
       a.timeStr,
       a.possessionOwner || '',
@@ -986,7 +986,7 @@ function exportCSV() {
     ...annotations.map(a => {
       const yt = ytLink(a.time);
       const toReview = a.type === 'To Review' ? 'Yes' : '';
-      const outType = (a.type === 'Penalty Attack' || a.type === 'Penalty Defence') ? 'Penalty' : a.type;
+      const outType = a.type;
       const cols = [a.timeStr, outType, a.name, a.possessionOwner || ''];
       if (fullGame) cols.push(isJsTurnover(a.type, a.name) ? 'Yes' : '');
       cols.push(toReview, a.comment || '', yt, a.actionOwner || '');
