@@ -32,6 +32,13 @@
   .header-nav a.active { background: var(--surface-2); color: var(--accent); }
   #rowCount { font-size: 0.78rem; color: var(--text-muted); }
 
+  /* ── Video panel hidden state ─────────────────────────────── */
+  .video-panel.hidden { display: none; }
+  .resize-handle.hidden { display: none; }
+  #toggleVideoBtn { background: var(--surface-2); color: var(--text-muted); border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px; font-size: 0.78rem; cursor: pointer; white-space: nowrap; }
+  #toggleVideoBtn:hover { background: #2e3245; color: var(--text); }
+  #toggleVideoBtn.active { border-color: var(--accent); color: var(--accent); }
+
   /* ── Split layout ─────────────────────────────────────────── */
   .split { display: flex; flex: 1; overflow: hidden; min-height: 0; }
 
@@ -162,10 +169,10 @@
     <span>Touch Rugby Analyzer</span>
   </a>
   <span id="rowCount"></span>
+  <button id="toggleVideoBtn" class="active" onclick="toggleVideoPanel()" title="Toggle video player">&#9654; Video</button>
   <nav class="header-nav">
     <a href="games.html">Games</a>
-    <a href="event_table.html">Events</a>
-    <a href="event_table_v2.html" class="active">Event Viewer</a>
+    <a href="event_viewer.html" class="active">Events</a>
     <a href="viewer.html" id="annotatorLink" style="display:none">Annotator</a>
   </nav>
   <script>if (sessionStorage.getItem('accessLevel') === 'staff') document.getElementById('annotatorLink').style.display = '';</script>
@@ -843,6 +850,15 @@ function fmt(s) {
   if (!s || isNaN(s)) return '0:00:00';
   const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = Math.floor(s%60);
   return `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+}
+
+function toggleVideoPanel() {
+  const panel = document.getElementById('videoPanel');
+  const handle = document.getElementById('resizeHandle');
+  const btn = document.getElementById('toggleVideoBtn');
+  const hidden = panel.classList.toggle('hidden');
+  handle.classList.toggle('hidden', hidden);
+  btn.classList.toggle('active', !hidden);
 }
 
 function togglePlay() {
