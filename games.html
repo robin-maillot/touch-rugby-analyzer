@@ -48,6 +48,11 @@
     .chart-wrap { overflow-x: auto; width: 100%; }
     .vega-embed { width: 100% !important; }
     .card-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: #666; margin-bottom: 10px; }
+
+    .half-toggle { display: flex; gap: 4px; margin-top: 10px; flex-wrap: wrap; }
+    .half-btn { background: #0f1117; border: 1px solid #2a2d3a; color: #888; border-radius: 5px; padding: 4px 12px; font-size: 0.78rem; cursor: pointer; transition: background 0.15s, color 0.15s; }
+    .half-btn:hover { background: #22253a; color: #e0e0e0; }
+    .half-btn.active { background: #22253a; color: #3b82f6; border-color: #3b82f6; }
   </style>
 </head>
 <body>
@@ -86,6 +91,9 @@
     <div class="card">
       <div id="gameTitle"></div>
       <div id="gameSubtitle"></div>
+      <div id="halfSelector" style="display:none">
+        <div class="half-toggle" id="halfToggle"></div>
+      </div>
     </div>
 
     <div class="card">
@@ -482,6 +490,22 @@ function possessionSpec(data, teamNames) {
 }
 
 // ── Render ─────────────────────────────────────────────────────
+let currentGame = null;
+
+function ordinal(n) {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+async function selectHalf(halfValue) {
+  // Update button states
+  document.querySelectorAll('.half-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.half === String(halfValue));
+  });
+  await renderStats(halfValue);
+}
+
 async function renderGame(events, team1, team2, subtitle) {
   document.getElementById('loading').style.display = 'none';
 
@@ -490,31 +514,73 @@ async function renderGame(events, team1, team2, subtitle) {
     return;
   }
 
-  const startEvent  = events.find(e => e.Name === 'Game Start');
-  const lastEnd     = [...events].reverse().find(e => e.Name === 'Game End');
-  const globalStart = startEvent.GameTime;
-  const globalEnd   = lastEnd.GameTime;
-  const startLink   = startEvent['Youtube Link'] || '';
-  const endLink     = lastEnd['Youtube Link']    || '';
+  const starts = events.filter(e => e.Name === 'Game Start').sort((a, b) => a.GameTime - b.GameTime);
+  const ends   = events.filter(e => e.Name === 'Game End').sort((a, b) => a.GameTime - b.GameTime);
 
-  const filtered      = events.filter(e => e.GameTime >= globalStart && e.GameTime <= globalEnd);
-  const teamNames     = [team1, team2];
-  const triesData     = buildCumulativeData(filtered, 'Try',     teamNames, globalStart, globalEnd, startLink, endLink);
-  const penData       = buildCumulativeData(filtered, ['Penalty', 'Penalty Attack', 'Penalty Defence'], teamNames, globalStart, globalEnd, startLink, endLink);
-  const possData      = buildPossessionData(filtered.filter(e => e.Type !== 'To Review'), teamNames);
-  const metrics       = buildMetrics(possData, teamNames, filtered);
+  currentGame = { events, team1, team2, starts, ends };
+
+  // Build half toggle buttons
+  const toggleEl = document.getElementById('halfToggle');
+  toggleEl.innerHTML = '';
+  const halfSelector = document.getElementById('halfSelector');
+
+  if (starts.length > 1) {
+    const allBtn = document.createElement('button');
+    allBtn.className = 'half-btn active';
+    allBtn.dataset.half = 'all';
+    allBtn.textContent = 'Full Game';
+    allBtn.onclick = () => selectHalf('all');
+    toggleEl.appendChild(allBtn);
+    for (let i = 0; i < starts.length; i++) {
+      const btn = document.createElement('button');
+      btn.className = 'half-btn';
+      btn.dataset.half = String(i);
+      btn.textContent = `${ordinal(i + 1)} Half`;
+      btn.onclick = () => selectHalf(i);
+      toggleEl.appendChild(btn);
+    }
+    halfSelector.style.display = '';
+  } else {
+    halfSelector.style.display = 'none';
+  }
 
   // Show container first — vegaEmbed with width:"container" needs a visible element to measure
   document.getElementById('gameTitle').textContent    = `${team1} vs ${team2}`;
   document.getElementById('gameSubtitle').textContent = subtitle;
   document.getElementById('gameContent').style.display = 'block';
 
+  await renderStats('all');
+}
+
+async function renderStats(halfValue) {
+  const { events, team1, team2, starts, ends } = currentGame;
+  const teamNames = [team1, team2];
+
+  let rangeStart, rangeEnd, startLink, endLink;
+  if (halfValue === 'all') {
+    rangeStart = starts[0].GameTime;
+    rangeEnd   = ends[ends.length - 1].GameTime;
+    startLink  = starts[0]['Youtube Link'] || '';
+    endLink    = ends[ends.length - 1]['Youtube Link'] || '';
+  } else {
+    const hi   = parseInt(halfValue);
+    rangeStart = starts[hi].GameTime;
+    rangeEnd   = ends[hi].GameTime;
+    startLink  = starts[hi]['Youtube Link'] || '';
+    endLink    = ends[hi]['Youtube Link']   || '';
+  }
+
+  const filtered  = events.filter(e => e.GameTime >= rangeStart && e.GameTime <= rangeEnd);
+  const triesData = buildCumulativeData(filtered, 'Try', teamNames, rangeStart, rangeEnd, startLink, endLink);
+  const penData   = buildCumulativeData(filtered, ['Penalty', 'Penalty Attack', 'Penalty Defence'], teamNames, rangeStart, rangeEnd, startLink, endLink);
+  const possData  = buildPossessionData(filtered.filter(e => e.Type !== 'To Review'), teamNames);
+  const metrics   = buildMetrics(possData, teamNames, filtered);
+
   const opts = { config: VEGA_CONFIG, actions: false };
   await vegaEmbed('#vis-tries',      cumulativeSpec(triesData, 'Tries vs Time',     'Cumulative Tries',     teamNames), opts);
   await vegaEmbed('#vis-penalties',  cumulativeSpec(penData,   'Penalties vs Time', 'Cumulative Penalties', teamNames), opts);
   await vegaEmbed('#vis-possession', possessionSpec(possData, teamNames), opts);
 
-  // Metrics table
   const cols = ['Team', 'Possessions', 'Tries', 'Success Rate', 'Completions', 'Pen Attack', 'Pen Defence', 'Avg Time (s)', 'Total Time (s)'];
   document.getElementById('metricsTable').innerHTML =
     `<table>
