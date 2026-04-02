@@ -107,6 +107,17 @@
 
   /* ── Table ────────────────────────────────────────────────── */
   .table-wrap { flex: 1; overflow: auto; min-height: 0; }
+  .table-panel { position: relative; }
+
+  /* Scroll-to-bottom button */
+  .scroll-bottom-btn { position: absolute; bottom: 60px; right: 18px; z-index: 20; background: var(--accent); color: #fff; border: none; border-radius: 50%; width: 30px; height: 30px; font-size: 1rem; line-height: 1; cursor: pointer; display: none; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.5); transition: background 0.15s; }
+  .scroll-bottom-btn:hover { background: var(--accent-hover); }
+  .scroll-bottom-btn.visible { display: flex; }
+
+  /* Vertical layout mode */
+  .split.vertical { flex-direction: column; }
+  .split.vertical .video-panel { width: 100% !important; max-width: none; height: var(--vp-h, 38vh); border-right: none; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .split.vertical .resize-handle { width: 100%; height: 5px; cursor: row-resize; }
   table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
   thead { position: sticky; top: 0; z-index: 10; }
   th { background: var(--surface); color: var(--text-muted); padding: 8px 10px; text-align: left; font-weight: 600; border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; white-space: nowrap; }
@@ -170,6 +181,7 @@
   </a>
   <span id="rowCount"></span>
   <button id="toggleVideoBtn" class="active" onclick="toggleVideoPanel()" title="Toggle video player">&#9654; Video</button>
+  <button id="layoutBtn" style="background:var(--surface-2);color:var(--text-muted);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:0.78rem;cursor:pointer;white-space:nowrap;transition:all 0.15s" onclick="toggleLayout()" title="Toggle video layout">↕ Stack</button>
   <nav class="header-nav">
     <a href="games.html">Games</a>
     <a href="event_viewer.html" class="active">Events</a>
@@ -258,6 +270,8 @@
       <div class="empty" id="emptyState" style="display:none">No matching records found.</div>
     </div>
 
+    <button class="scroll-bottom-btn" id="scrollBottomBtn" title="Scroll to bottom" onclick="document.querySelector('.table-wrap').scrollTo({top:999999,behavior:'smooth'})">↓</button>
+
     <div class="pagination" id="pagination" style="display:none">
       <div class="pagination-info">
         Showing <span id="rangeStart">0</span>–<span id="rangeEnd">0</span> of <span id="totalRows">0</span>
@@ -320,6 +334,15 @@ window.addEventListener('DOMContentLoaded', () => {
   setupSeekbar();
   setupResizeHandle();
   fetchAll();
+
+  const wrap = document.querySelector('.table-wrap');
+  const btn  = document.getElementById('scrollBottomBtn');
+  function updateScrollBtn() {
+    const atBottom = wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight < 40;
+    btn.classList.toggle('visible', !atBottom && wrap.scrollHeight > wrap.clientHeight + 40);
+  }
+  wrap.addEventListener('scroll', updateScrollBtn);
+  window._updateScrollBtn = updateScrollBtn;
 });
 
 // ── Data fetching ───────────────────────────────────────────────
@@ -543,6 +566,7 @@ function renderRows(rows) {
   const empty = document.getElementById('emptyState');
   tbody.innerHTML = '';
   empty.style.display = rows.length ? 'none' : 'block';
+  setTimeout(() => window._updateScrollBtn && window._updateScrollBtn(), 0);
 
   // Offset of this page in filtered[]
   const pageOffset = (currentPage - 1) * rowsPerPage;
@@ -914,23 +938,31 @@ function setupResizeHandle() {
   const handle = document.getElementById('resizeHandle');
   const panel  = document.getElementById('videoPanel');
   const split  = document.getElementById('split');
-  let dragging = false, startX = 0, startW = 0;
+  let dragging = false, startPos = 0, startSize = 0;
 
   handle.addEventListener('mousedown', e => {
-    dragging = true;
-    startX   = e.clientX;
-    startW   = panel.getBoundingClientRect().width;
+    const vertical = split.classList.contains('vertical');
+    dragging  = true;
+    startPos  = vertical ? e.clientY : e.clientX;
+    startSize = vertical ? panel.getBoundingClientRect().height : panel.getBoundingClientRect().width;
     handle.classList.add('dragging');
-    document.body.style.cursor = 'col-resize';
+    document.body.style.cursor = vertical ? 'row-resize' : 'col-resize';
     document.body.style.userSelect = 'none';
     document.getElementById('ytContainer').style.pointerEvents = 'none';
   });
 
   document.addEventListener('mousemove', e => {
     if (!dragging) return;
-    const splitW = split.getBoundingClientRect().width;
-    const newW   = Math.max(260, Math.min(splitW * 0.70, startW + (e.clientX - startX)));
-    document.documentElement.style.setProperty('--vp-w', newW + 'px');
+    const vertical = split.classList.contains('vertical');
+    if (vertical) {
+      const splitH = split.getBoundingClientRect().height;
+      const newH   = Math.max(150, Math.min(splitH * 0.75, startSize + (e.clientY - startPos)));
+      document.documentElement.style.setProperty('--vp-h', newH + 'px');
+    } else {
+      const splitW = split.getBoundingClientRect().width;
+      const newW   = Math.max(260, Math.min(splitW * 0.70, startSize + (e.clientX - startPos)));
+      document.documentElement.style.setProperty('--vp-w', newW + 'px');
+    }
   });
 
   document.addEventListener('mouseup', () => {
@@ -942,6 +974,28 @@ function setupResizeHandle() {
     document.getElementById('ytContainer').style.pointerEvents = '';
   });
 }
+
+function toggleLayout() {
+  const split    = document.getElementById('split');
+  const btn      = document.getElementById('layoutBtn');
+  const vertical = split.classList.toggle('vertical');
+  btn.textContent    = vertical ? '↔ Side' : '↕ Stack';
+  btn.style.borderColor = vertical ? 'var(--accent)' : 'var(--border)';
+  btn.style.color       = vertical ? 'var(--accent)' : 'var(--text-muted)';
+  localStorage.setItem('events-layout', vertical ? 'vertical' : 'horizontal');
+}
+(function initLayout() {
+  const saved = localStorage.getItem('events-layout');
+  if (saved === 'vertical') {
+    document.getElementById('split').classList.add('vertical');
+    const btn = document.getElementById('layoutBtn');
+    if (btn) {
+      btn.textContent    = '↔ Side';
+      btn.style.borderColor = 'var(--accent)';
+      btn.style.color       = 'var(--accent)';
+    }
+  }
+})();
 
 // ── Keyboard shortcuts ────────────────────────────────────────────
 document.addEventListener('keydown', e => {

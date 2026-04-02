@@ -76,7 +76,22 @@
   .legend-dot { width: 9px; height: 9px; border-radius: 2px; }
 
   /* List */
-  .list-section { flex: 1; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
+  .list-section { flex: 1; overflow: hidden; display: flex; flex-direction: column; min-height: 0; position: relative; }
+
+  /* Scroll-to-bottom button */
+  .scroll-bottom-btn { position: absolute; bottom: 12px; right: 16px; z-index: 20; background: #3b82f6; color: #fff; border: none; border-radius: 50%; width: 30px; height: 30px; font-size: 1rem; line-height: 1; cursor: pointer; display: none; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.5); transition: background 0.15s; }
+  .scroll-bottom-btn:hover { background: #2563eb; }
+  .scroll-bottom-btn.visible { display: flex; }
+
+  /* Content panel + layout modes */
+  .content-panel { display: flex; flex-direction: column; gap: 8px; flex: 1; overflow: hidden; min-height: 0; }
+  .main.horizontal { flex-direction: row; align-items: stretch; }
+  .main.horizontal .video-wrapper { height: auto !important; width: var(--video-w, 45%); align-self: stretch; }
+  .main.horizontal .video-resize-handle { width: 5px; height: auto !important; cursor: col-resize; }
+  .main.horizontal .content-panel { overflow-y: auto; overflow-x: hidden; }
+  .layout-btn { background: #1a1d27; border: 1px solid #2a2d3a; border-radius: 6px; color: #888; font-size: 0.75rem; padding: 4px 10px; cursor: pointer; white-space: nowrap; flex-shrink: 0; transition: all 0.15s; }
+  .layout-btn:hover { background: #22253a; color: #e0e0e0; border-color: #3a3d4a; }
+  .layout-btn.active { border-color: #3b82f6; color: #3b82f6; }
   .list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; flex-shrink: 0; }
   .list-header h2 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #666; }
   .annotations-list { overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 3px; padding-right: 2px; }
@@ -136,7 +151,8 @@
   <span class="yt-label">YouTube URL:</span>
   <input class="yt-input" id="ytUrl" type="text" placeholder="https://www.youtube.com/watch?v=..." onkeydown="if(event.key==='Enter')loadYouTube()">
   <button class="btn btn-primary" onclick="loadYouTube()" style="padding:4px 10px;font-size:0.76rem">▶ Load YT</button>
-  <nav style="display:flex;gap:4px;margin-left:auto">
+  <nav style="display:flex;gap:4px;margin-left:auto;align-items:center">
+    <button id="layoutBtn" class="layout-btn" onclick="toggleLayout()" title="Toggle video layout">↔ Side</button>
     <a href="games.html" style="color:#888;text-decoration:none;font-size:0.8rem;padding:5px 10px;border-radius:6px;transition:background 0.15s" onmouseover="this.style.background='#22253a';this.style.color='#e0e0e0'" onmouseout="this.style.background='';this.style.color='#888'">Games</a>
     <a href="event_viewer.html" style="color:#888;text-decoration:none;font-size:0.8rem;padding:5px 10px;border-radius:6px;transition:background 0.15s" onmouseover="this.style.background='#22253a';this.style.color='#e0e0e0'" onmouseout="this.style.background='';this.style.color='#888'">Events</a>
     <a href="viewer.html" style="background:#22253a;color:#3b82f6;text-decoration:none;font-size:0.8rem;padding:5px 10px;border-radius:6px">Annotator</a>
@@ -160,6 +176,8 @@
   </div>
 
   <div class="video-resize-handle" id="videoResizeHandle"></div>
+
+  <div id="contentPanel" class="content-panel">
 
   <div class="controls">
     <button class="btn btn-ghost" onclick="document.getElementById('fileInput').click()">📂 Open</button>
@@ -266,7 +284,10 @@
     <div class="annotations-list" id="annList">
       <div class="empty-state">No annotations yet — load a video and start tagging</div>
     </div>
+    <button class="scroll-bottom-btn" id="scrollBottomBtn" title="Scroll to bottom" onclick="document.getElementById('annList').scrollTo({top:999999,behavior:'smooth'})">↓</button>
   </div>
+
+  </div><!-- /.content-panel -->
 
 </div>
 
@@ -332,7 +353,18 @@ async function fetchGameList() {
     sel.innerHTML = '<option value="">Could not load games</option>';
   }
 }
-window.addEventListener('DOMContentLoaded', fetchGameList);
+window.addEventListener('DOMContentLoaded', () => {
+  fetchGameList();
+  const list = document.getElementById('annList');
+  const btn  = document.getElementById('scrollBottomBtn');
+  function updateScrollBtn() {
+    const atBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 40;
+    btn.classList.toggle('visible', !atBottom && list.scrollHeight > list.clientHeight + 40);
+  }
+  list.addEventListener('scroll', updateScrollBtn);
+  // expose so renderAnnotations can call it
+  window._updateScrollBtn = updateScrollBtn;
+});
 
 const MENU = {
   "Penalty Attack":  ["Forward Pass","Touch and Pass","Off the Mark","Not Moving Forward","Delay of Play","Hard Touch","Other"],
@@ -379,23 +411,31 @@ function setupVideoResizeHandle() {
   const handle  = document.getElementById('videoResizeHandle');
   const wrapper = document.getElementById('videoWrapper');
   const main    = document.querySelector('.main');
-  let dragging = false, startY = 0, startH = 0;
+  let dragging = false, startPos = 0, startSize = 0;
 
   handle.addEventListener('mousedown', e => {
-    dragging = true;
-    startY   = e.clientY;
-    startH   = wrapper.getBoundingClientRect().height;
+    const horizontal = main.classList.contains('horizontal');
+    dragging  = true;
+    startPos  = horizontal ? e.clientX : e.clientY;
+    startSize = horizontal ? wrapper.getBoundingClientRect().width : wrapper.getBoundingClientRect().height;
     handle.classList.add('dragging');
-    document.body.style.cursor = 'row-resize';
+    document.body.style.cursor = horizontal ? 'col-resize' : 'row-resize';
     document.body.style.userSelect = 'none';
     document.getElementById('ytPlayerContainer').style.pointerEvents = 'none';
   });
 
   document.addEventListener('mousemove', e => {
     if (!dragging) return;
-    const mainH = main.getBoundingClientRect().height;
-    const newH  = Math.max(120, Math.min(mainH * 0.80, startH + (e.clientY - startY)));
-    document.documentElement.style.setProperty('--video-h', newH + 'px');
+    const horizontal = main.classList.contains('horizontal');
+    if (horizontal) {
+      const mainW = main.getBoundingClientRect().width;
+      const newW  = Math.max(200, Math.min(mainW * 0.75, startSize + (e.clientX - startPos)));
+      document.documentElement.style.setProperty('--video-w', newW + 'px');
+    } else {
+      const mainH = main.getBoundingClientRect().height;
+      const newH  = Math.max(120, Math.min(mainH * 0.80, startSize + (e.clientY - startPos)));
+      document.documentElement.style.setProperty('--video-h', newH + 'px');
+    }
   });
 
   document.addEventListener('mouseup', () => {
@@ -408,6 +448,23 @@ function setupVideoResizeHandle() {
   });
 }
 setupVideoResizeHandle();
+
+function toggleLayout() {
+  const main = document.querySelector('.main');
+  const btn  = document.getElementById('layoutBtn');
+  const horizontal = main.classList.toggle('horizontal');
+  btn.textContent = horizontal ? '↕ Stack' : '↔ Side';
+  btn.classList.toggle('active', horizontal);
+  localStorage.setItem('annotator-layout', horizontal ? 'horizontal' : 'vertical');
+}
+(function initLayout() {
+  const saved = localStorage.getItem('annotator-layout');
+  if (saved === 'horizontal') {
+    document.querySelector('.main').classList.add('horizontal');
+    const btn = document.getElementById('layoutBtn');
+    if (btn) { btn.textContent = '↕ Stack'; btn.classList.add('active'); }
+  }
+})();
 
 // ── Local video loading ────────────────────────────────────────
 function loadVideo(e) {
@@ -702,6 +759,7 @@ function renderList() {
   const el = document.getElementById('annList');
   document.getElementById('annCount').textContent = annotations.length;
   if (annotations.length === 0) { el.innerHTML = '<div class="empty-state">No annotations yet</div>'; return; }
+  setTimeout(() => window._updateScrollBtn && window._updateScrollBtn(), 0);
   el.innerHTML = annotations.map(a => {
     const yt = ytLink(a.time);
     const ytCell = yt ? `<a href="${yt}" target="_blank" title="Open YouTube -5s">▶ YT</a>` : '<span style="color:#333">—</span>';
