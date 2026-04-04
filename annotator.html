@@ -1021,6 +1021,8 @@ async function pushToSheet(override = false) {
   });
 
   try {
+    const names = annotations.map(a => a.name || '');
+    const analyzable = names.includes('Game Start') && names.includes('Game End') ? 'TRUE' : 'FALSE';
     const body = {
       secret: APPS_SCRIPT_SECRET, sheetName, rows,
       meta: {
@@ -1030,6 +1032,7 @@ async function pushToSheet(override = false) {
         division:    document.getElementById('metaDivision').value.trim(),
         competition: document.getElementById('metaCompetition').value.trim(),
         video:       videoBaseName,
+        analyzable,
       },
     };
     if (override) body.overridePassword = overridePassword;

@@ -151,14 +151,15 @@ const gamesMeta = {};
 function applyGameList(result) {
   const sel = document.getElementById('gameSelect');
   sel.innerHTML = '<option value="">— Select a game —</option>';
-  result.sheets.forEach(entry => {
+  const analyzable = result.sheets.filter(entry => entry.analyzable === 'TRUE');
+  analyzable.forEach(entry => {
     gamesMeta[entry.name] = entry;
     const opt = document.createElement('option');
     opt.value = entry.name;
     opt.textContent = sheetNameToLabel(entry);
     sel.appendChild(opt);
   });
-  setStatus(`${result.sheets.length} game${result.sheets.length !== 1 ? 's' : ''}`);
+  setStatus(`${analyzable.length} game${analyzable.length !== 1 ? 's' : ''}`);
 }
 
 async function fetchGameList() {
@@ -219,7 +220,7 @@ async function loadGame() {
         else if (e[col] === 'Team 2') e[col] = team2;
       }
     });
-    renderGame(events, team1, team2, subtitle);
+    renderGame(events, team1, team2, subtitle, m.analyzable);
   }
 
   const cachedGame = LS.get('game_' + sheetName);
@@ -312,12 +313,6 @@ function addGameTime(events) {
 
 function processEvents(events) {
   addGameTime(events);
-}
-
-function isFullyAnalysable(events) {
-  const starts = events.filter(e => e.Name === 'Game Start').length;
-  const ends   = events.filter(e => e.Name === 'Game End').length;
-  return starts > 0 && starts === ends;
 }
 
 // ── Chart data builders — mirror generate_html_v2.py ──────────
@@ -506,10 +501,10 @@ async function selectHalf(halfValue) {
   await renderStats(halfValue);
 }
 
-async function renderGame(events, team1, team2, subtitle) {
+async function renderGame(events, team1, team2, subtitle, analyzable) {
   document.getElementById('loading').style.display = 'none';
 
-  if (!isFullyAnalysable(events)) {
+  if (analyzable !== 'TRUE') {
     document.getElementById('notAnalysable').style.display = 'block';
     return;
   }
