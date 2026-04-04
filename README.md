@@ -11,7 +11,7 @@ python main.py
 
 ---
 
-## Annotator (viewer.html)
+## Annotator (annotator.html)
 
 The annotator is the main tool for tagging events in a match video. Access it via the **Annotator** link in the nav bar (staff login required).
 

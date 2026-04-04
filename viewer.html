@@ -3,514 +3,853 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Touch Rugby Annotator</title>
+<title>Event Viewer — Touch Rugby Analyzer</title>
 <style>
+  :root {
+    --bg:           #0f1117;
+    --surface:      #1a1d27;
+    --surface-2:    #22253a;
+    --border:       #2a2d3a;
+    --border-light: #1f2230;
+    --text:         #e0e0e0;
+    --text-muted:   #888;
+    --text-dim:     #555;
+    --accent:       #3b82f6;
+    --accent-hover: #2563eb;
+    --vp-w:         420px;
+  }
+
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Segoe UI', sans-serif; background: #0f1117; color: #e0e0e0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+  body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
 
-  header { background: #1a1d27; padding: 10px 20px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #2a2d3a; flex-shrink: 0; }
-  header h1 { font-size: 1.1rem; font-weight: 600; color: #fff; }
-  header span { font-size: 0.75rem; color: #888; }
-  .yt-input { background: #0f1117; border: 1px solid #3a3d4a; border-radius: 5px; color: #ccc; padding: 4px 8px; font-size: 0.78rem; width: 260px; }
-  .yt-input::placeholder { color: #555; }
-  .yt-label { font-size: 0.75rem; color: #888; white-space: nowrap; }
+  /* ── Header ───────────────────────────────────────────────── */
+  header { background: var(--surface); padding: 10px 20px; display: flex; align-items: center; gap: 14px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
+  .logo span { font-size: 1rem; font-weight: 600; color: #fff; white-space: nowrap; }
+  .header-nav { display: flex; gap: 4px; margin-left: auto; }
+  .header-nav a { color: var(--text-muted); text-decoration: none; font-size: 0.8rem; padding: 5px 10px; border-radius: 6px; transition: background 0.15s, color 0.15s; }
+  .header-nav a:hover { background: var(--surface-2); color: var(--text); }
+  .header-nav a.active { background: var(--surface-2); color: var(--accent); }
+  #rowCount { font-size: 0.78rem; color: var(--text-muted); }
 
-  .main { display: flex; flex-direction: column; flex: 1; overflow: hidden; padding: 10px 12px; gap: 8px; }
+  /* ── Video panel hidden state ─────────────────────────────── */
+  .video-panel.hidden { display: none; }
+  .resize-handle.hidden { display: none; }
+  #toggleVideoBtn { background: var(--surface-2); color: var(--text-muted); border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px; font-size: 0.78rem; cursor: pointer; white-space: nowrap; }
+  #toggleVideoBtn:hover { background: #2e3245; color: var(--text); }
+  #toggleVideoBtn.active { border-color: var(--accent); color: var(--accent); }
 
-  .video-wrapper { background: #000; border-radius: 8px; overflow: hidden; position: relative; flex-shrink: 0; display: flex; align-items: center; justify-content: center; height: var(--video-h, 52vh); border: 1px solid #2a2d3a; }
-  .video-resize-handle { height: 5px; cursor: row-resize; background: #2a2d3a; flex-shrink: 0; border-radius: 3px; transition: background 0.15s; user-select: none; }
-  .video-resize-handle:hover, .video-resize-handle.dragging { background: #3b82f6; }
-  video { max-width: 100%; max-height: 100%; display: block; }
-  .no-video { display: flex; flex-direction: column; align-items: center; gap: 10px; color: #555; }
-  .no-video svg { opacity: 0.3; }
-  .no-video p { font-size: 0.85rem; }
+  /* ── Split layout ─────────────────────────────────────────── */
+  .split { display: flex; flex: 1; overflow: hidden; min-height: 0; }
 
-  .controls { display: flex; align-items: center; gap: 8px; background: #1a1d27; border-radius: 8px; padding: 7px 12px; border: 1px solid #2a2d3a; flex-shrink: 0; flex-wrap: wrap; }
-  .btn { border: none; border-radius: 6px; padding: 5px 12px; font-size: 0.78rem; cursor: pointer; font-weight: 600; transition: all 0.15s; }
-  .btn-primary { background: #3b82f6; color: #fff; }
-  .btn-primary:hover { background: #2563eb; }
-  .btn-ghost { background: #2a2d3a; color: #ccc; }
-  .btn-ghost:hover { background: #3a3d4a; }
+  .video-panel { width: var(--vp-w); min-width: 260px; max-width: 70vw; display: flex; flex-direction: column; border-right: 1px solid var(--border); flex-shrink: 0; }
+
+  .resize-handle { width: 5px; cursor: col-resize; background: var(--border); flex-shrink: 0; transition: background 0.15s; user-select: none; }
+  .resize-handle:hover, .resize-handle.dragging { background: var(--accent); }
+
+  .table-panel { flex: 1; overflow: hidden; display: flex; flex-direction: column; min-width: 0; }
+
+  /* ── Video area ───────────────────────────────────────────── */
+  .video-area { flex: 1; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; min-height: 0; }
+  #ytContainer { width: 100%; height: 100%; display: none; }
+  .no-video-msg { color: #555; font-size: 0.8rem; text-align: center; padding: 24px 16px; line-height: 1.8; }
+  .no-video-msg svg { opacity: 0.2; display: block; margin: 0 auto 10px; }
+
+  /* ── Video controls ───────────────────────────────────────── */
+  .video-controls { background: var(--surface); border-top: 1px solid var(--border); padding: 7px 10px; display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
+  .vc-row { display: flex; align-items: center; gap: 5px; }
+
+  .btn { border: none; border-radius: 5px; padding: 4px 10px; font-size: 0.75rem; cursor: pointer; font-weight: 600; transition: background 0.15s; white-space: nowrap; }
+  .btn-ghost { background: var(--surface-2); color: var(--text-muted); border: 1px solid var(--border); }
+  .btn-ghost:hover { background: #2e3245; color: var(--text); }
   .btn-ghost:disabled { opacity: 0.4; cursor: default; }
-  .btn-danger { background: #ef4444; color: #fff; }
-  .btn-danger:hover { background: #dc2626; }
-  .btn-export { background: #10b981; color: #fff; }
-  .btn-export:hover { background: #059669; }
-  .btn-push { background: #6366f1; color: #fff; }
-  .btn-push:hover { background: #4f46e5; }
-  .btn-push:disabled { opacity: 0.5; cursor: default; }
-  .btn-load { background: #0ea5e9; color: #fff; }
-  .btn-load:hover { background: #0284c7; }
-  .btn-load:disabled { opacity: 0.5; cursor: default; }
-  .time-display { font-family: monospace; font-size: 0.88rem; color: #fff; background: #0f1117; padding: 4px 8px; border-radius: 5px; min-width: 75px; text-align: center; }
-  select { background: #2a2d3a; color: #ccc; border: 1px solid #3a3d4a; border-radius: 5px; padding: 4px 7px; font-size: 0.78rem; cursor: pointer; }
+  .btn-primary { background: var(--accent); color: #fff; border: none; }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-primary:disabled { opacity: 0.5; cursor: default; }
+  .btn-nav { background: var(--surface-2); color: var(--text-muted); border: 1px solid var(--border); border-radius: 5px; padding: 4px 9px; font-size: 0.73rem; cursor: pointer; font-weight: 700; }
+  .btn-nav:hover { background: #2e3245; color: var(--text); }
+  .btn-nav:disabled { opacity: 0.35; cursor: default; }
 
-  /* Tag buttons */
-  .tag-bar { display: flex; gap: 7px; flex-wrap: wrap; flex-shrink: 0; align-items: center; }
-  .tag-btn { border: none; border-radius: 8px; padding: 7px 14px; font-size: 0.8rem; font-weight: 700; cursor: pointer; transition: transform 0.1s, box-shadow 0.1s; display: flex; align-items: center; gap: 5px; }
-  .tag-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
-  .tag-btn.active { outline: 3px solid #fff; outline-offset: 2px; }
+  .seekbar-wrap { position: relative; height: 5px; background: var(--surface-2); border-radius: 3px; cursor: pointer; flex: 1; }
+  .seekbar-fill { height: 100%; background: var(--accent); border-radius: 3px; pointer-events: none; }
+  .seekbar-thumb { position: absolute; top: 50%; transform: translate(-50%,-50%); width: 12px; height: 12px; background: #fff; border-radius: 50%; pointer-events: none; box-shadow: 0 0 4px rgba(0,0,0,0.5); }
+  .time-display { font-family: monospace; font-size: 0.8rem; color: #fff; background: var(--bg); padding: 3px 7px; border-radius: 4px; white-space: nowrap; }
+  .speed-sel { background: var(--surface-2); color: var(--text-muted); border: 1px solid var(--border); border-radius: 5px; padding: 3px 5px; font-size: 0.73rem; cursor: pointer; }
 
-  /* Sub-menu */
-  .submenu { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; background: #1a1d27; border-radius: 8px; padding: 6px 10px; border: 1px solid #2a2d3a; flex-shrink: 0; min-height: 36px; }
-  .submenu-label { font-size: 0.72rem; color: #888; margin-right: 4px; }
-  .sub-btn { border: none; border-radius: 6px; padding: 4px 10px; font-size: 0.76rem; font-weight: 600; cursor: pointer; background: #2a2d3a; color: #ddd; transition: background 0.1s; display: flex; align-items: center; gap: 4px; }
-  .sub-btn:hover { background: #3a3d4a; }
-  .sub-btn .hotkey { font-size: 0.65rem; opacity: 0.55; background: rgba(255,255,255,0.1); padding: 1px 4px; border-radius: 3px; }
-  .submenu-empty { font-size: 0.75rem; color: #444; font-style: italic; }
+  /* ── Now-playing card ─────────────────────────────────────── */
+  .now-playing { background: var(--surface); border-top: 1px solid var(--border); padding: 8px 10px; flex-shrink: 0; min-height: 48px; display: flex; flex-direction: column; gap: 3px; }
+  .np-label { font-size: 0.63rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-dim); }
+  .np-empty { font-size: 0.78rem; color: var(--text-dim); font-style: italic; }
+  .np-info { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .np-time { font-family: monospace; font-size: 0.73rem; color: var(--text-muted); background: var(--bg); padding: 2px 6px; border-radius: 3px; }
+  .np-game { font-size: 0.7rem; color: var(--text-muted); background: var(--surface-2); padding: 2px 7px; border-radius: 4px; border: 1px solid var(--border); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+  .np-comment { font-size: 0.72rem; color: #f97316; font-style: italic; white-space: pre-wrap; line-height: 1.4; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
 
-  /* Timeline */
-  .timeline-section { flex-shrink: 0; }
-  .timeline-label { font-size: 0.68rem; color: #666; margin-bottom: 3px; letter-spacing: 0.05em; text-transform: uppercase; }
-  .timeline-wrapper { position: relative; background: #1a1d27; border-radius: 8px; border: 1px solid #2a2d3a; padding: 8px 12px; }
-  .seekbar-container { position: relative; height: 6px; background: #2a2d3a; border-radius: 3px; cursor: pointer; margin-bottom: 7px; }
-  .seekbar-fill { height: 100%; background: #3b82f6; border-radius: 3px; pointer-events: none; }
-  .seekbar-thumb { position: absolute; top: 50%; transform: translate(-50%, -50%); width: 13px; height: 13px; background: #fff; border-radius: 50%; box-shadow: 0 0 4px rgba(0,0,0,0.5); pointer-events: none; }
-  .markers-track { position: relative; height: 26px; background: #0f1117; border-radius: 4px; overflow: visible; }
-  .marker { position: absolute; top: 2px; width: 4px; height: 22px; border-radius: 2px; transform: translateX(-50%); cursor: pointer; z-index: 2; }
-  .marker:hover { width: 6px; z-index: 10; }
-  .marker-tooltip { display: none; position: absolute; bottom: 130%; left: 50%; transform: translateX(-50%); background: #1a1d27; border: 1px solid #3a3d4a; border-radius: 5px; padding: 3px 7px; font-size: 0.68rem; white-space: nowrap; color: #fff; z-index: 20; }
-  .marker:hover .marker-tooltip { display: block; }
-  .legend { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 5px; }
-  .legend-item { display: flex; align-items: center; gap: 4px; font-size: 0.7rem; color: #aaa; }
-  .legend-dot { width: 9px; height: 9px; border-radius: 2px; }
+  /* ── Table controls ───────────────────────────────────────── */
+  .controls { background: var(--surface); border-bottom: 1px solid var(--border); padding: 8px 12px; display: flex; flex-direction: column; gap: 7px; flex-shrink: 0; }
+  .top-row { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; }
+  .search-group { display: flex; flex-grow: 1; min-width: 180px; }
+  .col-select { padding: 6px 8px; background: var(--surface-2); border: 1px solid var(--border); border-right: none; border-radius: 6px 0 0 6px; color: var(--text-muted); font-size: 0.78rem; cursor: pointer; outline: none; max-width: 120px; }
+  .search-input { flex-grow: 1; padding: 6px 10px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 0 6px 6px 0; color: var(--text); font-size: 0.8rem; outline: none; }
+  .search-input:focus { border-color: var(--accent); }
+  .search-input::placeholder { color: var(--text-dim); }
+  .filter-row { display: flex; gap: 7px; flex-wrap: wrap; align-items: center; }
+  .filter-wrap { position: relative; }
+  .filter-btn { display: flex; align-items: center; gap: 6px; padding: 5px 10px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; color: var(--text-muted); font-size: 0.77rem; cursor: pointer; user-select: none; white-space: nowrap; }
+  .filter-btn::after { content: '▾'; font-size: 0.7em; opacity: 0.6; }
+  .filter-btn:hover { border-color: #3a3d4a; color: var(--text); }
+  .filter-btn.active { border-color: var(--accent); color: var(--accent); }
+  .filter-dropdown { position: absolute; top: calc(100% + 4px); left: 0; min-width: 160px; max-height: 260px; overflow-y: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); z-index: 100; display: none; padding: 4px 0; }
+  .filter-dropdown.open { display: block; }
+  .filter-dropdown label { display: flex; align-items: center; gap: 8px; padding: 6px 12px; font-size: 0.79rem; color: var(--text-muted); cursor: pointer; }
+  .filter-dropdown label:hover { background: var(--surface-2); color: var(--text); }
+  .filter-dropdown input[type=checkbox] { accent-color: var(--accent); width: 13px; height: 13px; cursor: pointer; }
 
-  /* List */
-  .list-section { flex: 1; overflow: hidden; display: flex; flex-direction: column; min-height: 0; position: relative; }
+  /* ── Table ────────────────────────────────────────────────── */
+  .table-wrap { flex: 1; overflow: auto; min-height: 0; }
+  .table-panel { position: relative; }
 
   /* Scroll-to-bottom button */
-  .scroll-bottom-btn { position: absolute; bottom: 12px; right: 16px; z-index: 20; background: #3b82f6; color: #fff; border: none; border-radius: 50%; width: 30px; height: 30px; font-size: 1rem; line-height: 1; cursor: pointer; display: none; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.5); transition: background 0.15s; }
-  .scroll-bottom-btn:hover { background: #2563eb; }
+  .scroll-bottom-btn { position: absolute; bottom: 60px; right: 18px; z-index: 20; background: var(--accent); color: #fff; border: none; border-radius: 50%; width: 30px; height: 30px; font-size: 1rem; line-height: 1; cursor: pointer; display: none; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.5); transition: background 0.15s; }
+  .scroll-bottom-btn:hover { background: var(--accent-hover); }
   .scroll-bottom-btn.visible { display: flex; }
 
-  /* Content panel + layout modes */
-  .content-panel { display: flex; flex-direction: column; gap: 8px; flex: 1; overflow: hidden; min-height: 0; }
-  .main.horizontal { flex-direction: row; align-items: stretch; }
-  .main.horizontal .video-wrapper { height: auto !important; width: var(--video-w, 45%); align-self: stretch; }
-  .main.horizontal .video-resize-handle { width: 5px; height: auto !important; cursor: col-resize; }
-  .main.horizontal .content-panel { overflow-y: auto; overflow-x: hidden; }
-  .layout-btn { background: #1a1d27; border: 1px solid #2a2d3a; border-radius: 6px; color: #888; font-size: 0.75rem; padding: 4px 10px; cursor: pointer; white-space: nowrap; flex-shrink: 0; transition: all 0.15s; }
-  .layout-btn:hover { background: #22253a; color: #e0e0e0; border-color: #3a3d4a; }
-  .layout-btn.active { border-color: #3b82f6; color: #3b82f6; }
-  .list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; flex-shrink: 0; }
-  .list-header h2 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #666; }
-  .annotations-list { overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 3px; padding-right: 2px; }
-  .annotation-row { display: grid; grid-template-columns: 55px 90px 90px 65px 1fr 1fr auto auto auto; align-items: center; gap: 8px; background: #1a1d27; border-radius: 6px; padding: 5px 10px; border-left: 3px solid; font-size: 0.77rem; cursor: pointer; transition: background 0.1s; }
-  .annotation-row:hover { background: #22253a; }
-  .ann-time { font-family: monospace; color: #aaa; font-size: 0.73rem; }
-  .ann-type { font-weight: 700; }
-  .ann-name { color: #bbb; }
-  .ann-yt a { color: #3b82f6; font-size: 0.7rem; text-decoration: none; }
-  .ann-yt a:hover { text-decoration: underline; }
-  .ann-possession { font-size: 0.72rem; color: #888; }
-  .ann-comment { font-size: 0.72rem; color: #f97316; font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .ann-del { background: none; border: none; color: #555; cursor: pointer; font-size: 0.95rem; padding: 0 3px; }
-  .ann-del:hover { color: #ef4444; }
-  .ann-comment-btn { background: none; border: none; color: #555; cursor: pointer; font-size: 0.82rem; padding: 0 3px; }
-  .ann-comment-btn:hover { color: #3b82f6; }
-  .ann-name-editable { cursor: pointer; border-bottom: 1px dashed #444; }
-  .ann-name-editable:hover { color: #e0e0e0; border-bottom-color: #888; }
-  .ann-name-select { background: #1a1d27; color: #e0e0e0; border: 1px solid #3b82f6; border-radius: 4px; font-size: 0.76rem; padding: 1px 4px; cursor: pointer; max-width: 100%; }
+  /* Vertical layout mode */
+  .split.vertical { flex-direction: column; }
+  .split.vertical .video-panel { width: 100% !important; max-width: none; height: var(--vp-h, 38vh); border-right: none; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .split.vertical .resize-handle { width: 100%; height: 5px; cursor: row-resize; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+  thead { position: sticky; top: 0; z-index: 10; }
+  th { background: var(--surface); color: var(--text-muted); padding: 8px 10px; text-align: left; font-weight: 600; border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; white-space: nowrap; }
+  th:hover { color: var(--text); }
+  th.sort-asc::after  { content: ' ▲'; font-size: 0.65em; color: var(--accent); }
+  th.sort-desc::after { content: ' ▼'; font-size: 0.65em; color: var(--accent); }
+  td { padding: 6px 10px; border-bottom: 1px solid var(--border-light); color: #ccc; vertical-align: middle; }
+  tr.playable { cursor: pointer; }
+  tr.playable:hover td { background: var(--surface-2); }
+  tr.active-row td { background: rgba(59,130,246,0.13) !important; }
+  tr.active-row { outline: none; }
 
-  /* Comment editor modal */
-  .comment-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100; }
-  .comment-dialog { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); z-index: 101; background: #1a1d27; border: 1px solid #3a3d4a; border-radius: 10px; padding: 16px; width: 440px; max-width: 92vw; display: flex; flex-direction: column; gap: 10px; }
-  .comment-dialog h3 { font-size: 0.82rem; color: #aaa; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
-  .comment-textarea { background: #0f1117; border: 1px solid #3a3d4a; border-radius: 6px; color: #e0e0e0; padding: 8px 10px; font-size: 0.82rem; resize: vertical; min-height: 110px; font-family: 'Segoe UI', sans-serif; line-height: 1.5; width: 100%; }
-  .comment-textarea:focus { outline: none; border-color: #3b82f6; }
-  .comment-dialog-btns { display: flex; gap: 8px; justify-content: flex-end; }
-  .comment-hint { font-size: 0.68rem; color: #555; }
-  .empty-state { color: #444; font-size: 0.8rem; text-align: center; padding: 20px; }
+  /* Type badges */
+  .badge { padding: 2px 7px; border-radius: 10px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+  .badge-try      { background: rgba(0,200,83,0.15);   color: #00c853; }
+  .badge-penalty  { background: rgba(244,67,54,0.15);  color: #f44336; }
+  .badge-turnover { background: rgba(255,152,0,0.15);  color: #ff9800; }
+  .badge-toreview { background: rgba(249,115,22,0.15); color: #f97316; }
 
-  /* Full game toggle */
-  .full-game-toggle { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; color: #ccc; cursor: pointer; background: #1a1d27; border: 1px solid #2a2d3a; border-radius: 8px; padding: 6px 12px; flex-shrink: 0; white-space: nowrap; }
-  .full-game-toggle input[type=checkbox] { accent-color: #3b82f6; width: 14px; height: 14px; cursor: pointer; }
+  .team-badge { padding: 2px 7px; border-radius: 10px; font-size: 0.7rem; font-weight: 600; background: rgba(59,130,246,0.12); color: #93c5fd; border: 1px solid rgba(59,130,246,0.2); }
+  .yt-link { display: inline-flex; align-items: center; gap: 4px; color: #f44336; text-decoration: none; font-size: 0.73rem; font-weight: 600; background: rgba(244,67,54,0.1); padding: 2px 7px; border-radius: 4px; }
+  .yt-link:hover { background: rgba(244,67,54,0.2); }
+  .game-tag { font-size: 0.7rem; color: var(--text-muted); background: var(--surface-2); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border); }
 
-  /* Meta bar */
-  .meta-bar { display: flex; gap: 8px; align-items: center; background: #1a1d27; border-radius: 8px; padding: 6px 10px; border: 1px solid #2a2d3a; flex-shrink: 0; flex-wrap: wrap; }
-  .meta-label { font-size: 0.72rem; color: #888; white-space: nowrap; }
-  .meta-sep { font-size: 0.78rem; color: #555; }
-  .meta-input { width: 110px !important; }
+  /* Comment expand */
+  .comment-cell { font-size: 0.78rem; color: #f97316; font-style: italic; }
+  .comment-rest { display: none; white-space: pre-wrap; margin-top: 3px; }
+  .comment-rest.open { display: block; }
+  .comment-toggle { background: none; border: none; color: #888; cursor: pointer; font-size: 0.66rem; padding: 2px 0; display: inline-flex; align-items: center; gap: 2px; }
+  .comment-toggle:hover { color: #f97316; }
 
-  /* Team menu */
-  .team-menu { display: flex; gap: 8px; align-items: center; background: #1a1d27; border-radius: 8px; padding: 6px 10px; border: 1px solid #3b82f6; flex-shrink: 0; min-height: 36px; }
-  .team-label { font-size: 0.72rem; color: #3b82f6; margin-right: 4px; }
-  .team-btn { border: none; border-radius: 6px; padding: 5px 16px; font-size: 0.78rem; font-weight: 700; cursor: pointer; transition: all 0.15s; }
-  .team-btn:hover { filter: brightness(1.15); transform: translateY(-1px); }
+  /* Play icon on hover */
+  .play-icon { opacity: 0; font-size: 0.75rem; color: var(--accent); margin-right: 4px; transition: opacity 0.1s; }
+  tr.playable:hover .play-icon { opacity: 1; }
+  tr.active-row .play-icon { opacity: 1; color: #22c55e; }
+
+  .empty { text-align: center; padding: 40px; color: var(--text-dim); font-size: 0.85rem; }
+  #loadingMsg { text-align: center; padding: 50px 24px; color: #888; font-size: 0.88rem; display: none; }
+  #errorMsg   { color: #ef4444; font-size: 0.8rem; padding: 10px 16px; display: none; }
+  .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #2a2d3a; border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 8px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Pagination ───────────────────────────────────────────── */
+  .pagination { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--surface); border-top: 1px solid var(--border); flex-shrink: 0; flex-wrap: wrap; gap: 7px; }
+  .pagination-info { font-size: 0.77rem; color: var(--text-muted); }
+  .pagination-actions { display: flex; align-items: center; gap: 7px; }
+  .page-select { background: var(--surface-2); color: var(--text-muted); border: 1px solid var(--border); border-radius: 5px; padding: 3px 7px; font-size: 0.77rem; cursor: pointer; }
+  #pageIndicator { font-size: 0.77rem; color: var(--text-muted); min-width: 80px; text-align: center; }
+
+  /* touch-action prevents browser scroll from hijacking drags */
+  .resize-handle { touch-action: none; }
+  .seekbar-wrap  { touch-action: none; }
+
+  @media (max-width: 640px) {
+    header { padding: 6px 10px; gap: 6px; flex-wrap: wrap; }
+    .logo span { display: none; }
+    /* Force vertical (stack) layout on small screens regardless of toggle */
+    .split { flex-direction: column !important; }
+    .video-panel { width: 100% !important; max-width: none !important; height: var(--vp-h, 33vh) !important; border-right: none; border-bottom: 1px solid var(--border); }
+    /* Bigger drag handle */
+    .resize-handle { width: 100% !important; height: 14px !important; cursor: row-resize !important; }
+    /* Bigger seekbar */
+    .seekbar-wrap  { height: 18px; border-radius: 9px; }
+    .seekbar-fill  { border-radius: 9px; }
+    .seekbar-thumb { width: 22px; height: 22px; }
+    /* Larger tap targets */
+    .btn, .btn-nav { min-height: 36px; padding: 6px 12px; }
+    /* Make table horizontally scrollable */
+    .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    table { min-width: 600px; }
+  }
 </style>
 </head>
 <body>
 
 <header>
-  <a href="index.html" style="display:flex;align-items:center;gap:7px;text-decoration:none;flex-shrink:0">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><path d="M2 12h20"/></svg>
-    <span style="font-size:0.95rem;font-weight:600;color:#fff">Touch Rugby Analyzer</span>
+  <a class="logo" href="index.html">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2">
+      <circle cx="12" cy="12" r="10"/>
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+      <path d="M2 12h20"/>
+    </svg>
+    <span>Touch Rugby Analyzer</span>
   </a>
-  <span style="width:1px;height:18px;background:#2a2d3a;flex-shrink:0"></span>
-  <h1>Annotator</h1>
-  <span class="yt-label">YouTube URL:</span>
-  <input class="yt-input" id="ytUrl" type="text" placeholder="https://www.youtube.com/watch?v=..." onkeydown="if(event.key==='Enter')loadYouTube()">
-  <button class="btn btn-primary" onclick="loadYouTube()" style="padding:4px 10px;font-size:0.76rem">▶ Load YT</button>
-  <nav style="display:flex;gap:4px;margin-left:auto;align-items:center">
-    <button id="layoutBtn" class="layout-btn" onclick="toggleLayout()" title="Toggle video layout">↔ Side</button>
-    <a href="games.html" style="color:#888;text-decoration:none;font-size:0.8rem;padding:5px 10px;border-radius:6px;transition:background 0.15s" onmouseover="this.style.background='#22253a';this.style.color='#e0e0e0'" onmouseout="this.style.background='';this.style.color='#888'">Games</a>
-    <a href="event_viewer.html" style="color:#888;text-decoration:none;font-size:0.8rem;padding:5px 10px;border-radius:6px;transition:background 0.15s" onmouseover="this.style.background='#22253a';this.style.color='#e0e0e0'" onmouseout="this.style.background='';this.style.color='#888'">Events</a>
-    <a href="viewer.html" style="background:#22253a;color:#3b82f6;text-decoration:none;font-size:0.8rem;padding:5px 10px;border-radius:6px">Annotator</a>
+  <span id="rowCount"></span>
+  <button id="toggleVideoBtn" class="active" onclick="toggleVideoPanel()" title="Toggle video player">&#9654; Video</button>
+  <button id="layoutBtn" style="background:var(--surface-2);color:var(--text-muted);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:0.78rem;cursor:pointer;white-space:nowrap;transition:all 0.15s" onclick="toggleLayout()" title="Toggle video layout">↕ Stack</button>
+  <nav class="header-nav">
+    <a href="games.html">Games</a>
+    <a href="viewer.html" class="active">Events</a>
+    <a href="annotator.html" id="annotatorLink" style="display:none">Annotator</a>
   </nav>
+  <script>if (sessionStorage.getItem('accessLevel') === 'staff') document.getElementById('annotatorLink').style.display = '';</script>
 </header>
 
-<div class="main">
+<div id="errorMsg"></div>
 
-  <div class="video-wrapper" id="videoWrapper">
-    <div class="no-video" id="noVideo">
-      <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="7" width="16" height="12" rx="2"/><path d="m18 10 4-2v8l-4-2"/></svg>
-      <p>Load a local video file or paste a YouTube URL above</p>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">📂 Open Local Video</button>
-        <button class="btn btn-ghost" onclick="loadYouTube()">▶ Load YouTube URL</button>
+<div class="split" id="split">
+
+  <!-- ── Video panel ──────────────────────────────────────── -->
+  <div class="video-panel" id="videoPanel">
+
+    <div class="video-area" id="videoArea">
+      <div class="no-video-msg" id="noVideoMsg">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="2" y="7" width="16" height="12" rx="2"/>
+          <path d="m18 10 4-2v8l-4-2"/>
+        </svg>
+        Click any row to start watching
       </div>
-      <input type="file" id="fileInput" accept="video/*" style="display:none" onchange="loadVideo(event)">
+      <div id="ytContainer"></div>
     </div>
-    <video id="vid" style="display:none" onclick="togglePlay()"></video>
-    <div id="ytPlayerContainer" style="display:none;width:100%;height:100%"></div>
-  </div>
 
-  <div class="video-resize-handle" id="videoResizeHandle"></div>
-
-  <div id="contentPanel" class="content-panel">
-
-  <div class="controls">
-    <button class="btn btn-ghost" onclick="document.getElementById('fileInput').click()">📂 Open</button>
-    <button class="btn btn-primary" id="playBtn" onclick="togglePlay()" disabled>▶ Play</button>
-    <button class="btn btn-ghost" onclick="skip(-5)" disabled id="skipBk">−5s</button>
-    <button class="btn btn-ghost" onclick="skip(5)" disabled id="skipFw">+5s</button>
-    <button class="btn btn-ghost" onclick="gotoLastAnnotation()" id="lastAnnBtn" disabled title="Jump to last annotation">⏮ Last Tag</button>
-    <span class="time-display" id="timeCurrent">0:00:00</span>
-    <span style="color:#555">/</span>
-    <span class="time-display" id="timeDuration">0:00:00</span>
-    <span style="font-size:0.72rem;color:#888">Speed:</span>
-    <select id="speedSel" onchange="setSpeed()" disabled>
-      <option value="0.25">0.25×</option>
-      <option value="0.5">0.5×</option>
-      <option value="1" selected>1×</option>
-      <option value="1.5">1.5×</option>
-      <option value="2">2×</option>
-    </select>
-    <button class="btn btn-export" onclick="exportCSV()">⬇ Export CSV</button>
-    <button class="btn btn-ghost" onclick="document.getElementById('csvInput').click()">📂 Load CSV</button>
-    <select id="sheetSelect" style="min-width:220px"><option value="">Loading games…</option></select>
-    <button class="btn btn-load" id="loadSheetBtn" onclick="loadFromSheet()">⬇ Load from Sheet</button>
-    <button class="btn btn-push" id="pushBtn" onclick="pushToSheet()">⬆ Push to Sheet</button>
-    <input class="yt-input" id="overridePass" type="password" placeholder="Override password (admin only)" style="width:200px;display:none">
-    <button class="btn btn-danger" id="overrideBtn" style="display:none" onclick="pushToSheet(true)">⚠ Override Tab</button>
-    <input type="file" id="csvInput" accept=".csv" style="display:none" onchange="loadCSV(event)">
-  </div>
-
-  <!-- Metadata bar -->
-  <div class="meta-bar">
-    <span class="meta-label">METADATA:</span>
-    <input class="yt-input meta-input" id="metaTeam1" placeholder="Team 1" oninput="updateSheetPreview()">
-    <span class="meta-sep">vs</span>
-    <input class="yt-input meta-input" id="metaTeam2" placeholder="Team 2" oninput="updateSheetPreview()">
-    <span class="meta-sep">|</span>
-    <input class="yt-input meta-input" id="metaYear" placeholder="Year" style="width:70px !important" oninput="updateSheetPreview()">
-    <input class="yt-input meta-input" id="metaDivision" placeholder="Division" style="width:80px !important" oninput="updateSheetPreview()">
-    <input class="yt-input meta-input" id="metaCompetition" placeholder="Competition" oninput="updateSheetPreview()">
-    <span class="meta-sep">→</span>
-    <span id="sheetPreview" style="font-family:monospace;font-size:0.72rem;color:#555;white-space:nowrap">fill metadata to generate tab name</span>
-  </div>
-
-  <!-- Action buttons -->
-  <div class="tag-bar" id="tagBar">
-    <span style="font-size:0.72rem;color:#666;margin-right:2px">ACTION:</span>
-    <label class="full-game-toggle">
-      <input type="checkbox" id="fullGameToggle" checked>
-      Full Game Analysis
-    </label>
-    <label class="full-game-toggle">
-      <input type="checkbox" id="defaultOtherToggle" checked>
-      Simple Mode
-    </label>
-    <span style="width:1px;height:20px;background:#2a2d3a;margin:0 4px;flex-shrink:0"></span>
-    <button class="tag-btn" style="background:#22c55e;color:#000" data-type="Try" onclick="selectType('Try')">Try <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.15);padding:1px 4px;border-radius:3px">T</kbd></button>
-    <button class="tag-btn" style="background:#f97316;color:#fff" data-type="Turnover" onclick="selectType('Turnover')">Turnover <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">U</kbd></button>
-    <button class="tag-btn" style="background:#ef4444;color:#fff" data-type="Penalty Attack" onclick="selectType('Penalty Attack')">Pen Attack <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">P</kbd></button>
-    <button class="tag-btn" style="background:#b91c1c;color:#fff" data-type="Penalty Defence" onclick="selectType('Penalty Defence')">Pen Defence <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">Q</kbd></button>
-    <button class="tag-btn" style="background:#3b82f6;color:#fff" data-type="Game Event" onclick="selectType('Game Event')">Game Event <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">G</kbd></button>
-    <button class="tag-btn" style="background:#a855f7;color:#fff" data-type="To Review" onclick="selectType('To Review')">To Review <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">R</kbd></button>
-    <span id="sixthTouchSep" style="width:1px;height:20px;background:#2a2d3a;margin:0 4px;flex-shrink:0"></span>
-    <button id="sixthTouchBtn" class="tag-btn" style="background:#c2410c;color:#fff" onclick="quickTag('Turnover','6th Touch')">6th Touch <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">6</kbd></button>
-    <button id="sixAgainBtn" class="tag-btn" style="background:#c2410c;color:#fff" onclick="quickTag('Turnover','6 Again')">6 Again <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">5</kbd></button>
-  </div>
-
-  <!-- Sub-action buttons -->
-  <div class="submenu" id="submenu">
-    <span class="submenu-empty">Select an action above — then choose a sub-type (or press 1–9)</span>
-  </div>
-
-  <!-- Team / Possession Owner menu -->
-  <div class="team-menu" id="teamMenu" style="display:none">
-    <span class="team-label">POSSESSION OWNER:</span>
-    <button class="team-btn" id="teamBtn1" style="background:#3b82f6;color:#fff" onclick="selectTeam('Team 1')">Team 1</button>
-    <button class="team-btn" id="teamBtn2" style="background:#ef4444;color:#fff" onclick="selectTeam('Team 2')">Team 2</button>
-  </div>
-
-  <!-- Timeline -->
-  <div class="timeline-section">
-    <div class="timeline-label">Timeline</div>
-    <div class="timeline-wrapper">
-      <div class="seekbar-container" id="seekbar" onmousedown="startSeek(event)">
-        <div class="seekbar-fill" id="seekFill" style="width:0%"></div>
-        <div class="seekbar-thumb" id="seekThumb" style="left:0%"></div>
+    <div class="video-controls">
+      <div class="vc-row">
+        <div class="seekbar-wrap" id="seekbar">
+          <div class="seekbar-fill" id="seekFill" style="width:0%"></div>
+          <div class="seekbar-thumb" id="seekThumb" style="left:0%"></div>
+        </div>
       </div>
-      <div class="markers-track" id="markersTrack"></div>
-      <div class="legend">
-        <div class="legend-item"><div class="legend-dot" style="background:#22c55e"></div>Try</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#f97316"></div>Turnover</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div>Pen Attack</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#b91c1c"></div>Pen Defence</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div>Game Event</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#a855f7"></div>To Review</div>
+      <div class="vc-row">
+        <button class="btn-nav" id="prevRowBtn" disabled onclick="navigateRow(-1)">◀ Prev</button>
+        <button class="btn btn-primary" id="playBtn" disabled onclick="togglePlay()">▶ Play</button>
+        <button class="btn btn-ghost" id="skipBk" disabled onclick="skip(-5)">−5s</button>
+        <button class="btn btn-ghost" id="skipFw" disabled onclick="skip(5)">+5s</button>
+        <span class="time-display" id="timeCurrent">0:00:00</span>
+        <span style="color:var(--text-dim);font-size:0.8rem">/</span>
+        <span class="time-display" id="timeDuration">0:00:00</span>
+        <select class="speed-sel" id="speedSel" disabled onchange="setSpeed()">
+          <option value="0.25">0.25×</option>
+          <option value="0.5">0.5×</option>
+          <option value="1" selected>1×</option>
+          <option value="1.5">1.5×</option>
+          <option value="2">2×</option>
+        </select>
+        <button class="btn-nav" id="nextRowBtn" disabled onclick="navigateRow(1)">Next ▶</button>
       </div>
     </div>
+
+    <div class="now-playing" id="nowPlaying">
+      <span class="np-label">Now Playing</span>
+      <span class="np-empty" id="npEmpty">No annotation selected</span>
+      <div class="np-info" id="npInfo" style="display:none"></div>
+      <div class="np-comment" id="npComment" style="display:none"></div>
+    </div>
+
   </div>
 
-  <!-- Annotations list -->
-  <div class="list-section">
-    <div class="list-header">
-      <h2>Annotations (<span id="annCount">0</span>)</h2>
-      <button class="btn btn-danger" onclick="clearAll()" style="font-size:0.72rem;padding:3px 9px">Clear All</button>
+  <!-- ── Resize handle ────────────────────────────────────── -->
+  <div class="resize-handle" id="resizeHandle"></div>
+
+  <!-- ── Table panel ──────────────────────────────────────── -->
+  <div class="table-panel">
+
+    <div class="controls" id="controls" style="display:none">
+      <div class="top-row">
+        <div class="search-group">
+          <select id="searchCol" class="col-select"></select>
+          <input id="searchInput" class="search-input" type="text" placeholder="Search…">
+        </div>
+        <button class="btn btn-ghost" onclick="resetFilters()">↺ Reset</button>
+      </div>
+      <div class="filter-row" id="filterRow"></div>
     </div>
-    <div class="annotations-list" id="annList">
-      <div class="empty-state">No annotations yet — load a video and start tagging</div>
+
+    <div id="loadingMsg"><span class="spinner"></span>Loading events…</div>
+
+    <div class="table-wrap">
+      <table id="dataTable">
+        <thead></thead>
+        <tbody></tbody>
+      </table>
+      <div class="empty" id="emptyState" style="display:none">No matching records found.</div>
     </div>
-    <button class="scroll-bottom-btn" id="scrollBottomBtn" title="Scroll to bottom" onclick="document.getElementById('annList').scrollTo({top:999999,behavior:'smooth'})">↓</button>
-  </div>
 
-  </div><!-- /.content-panel -->
+    <button class="scroll-bottom-btn" id="scrollBottomBtn" title="Scroll to bottom" onclick="document.querySelector('.table-wrap').scrollTo({top:999999,behavior:'smooth'})">↓</button>
 
-</div>
+    <div class="pagination" id="pagination" style="display:none">
+      <div class="pagination-info">
+        Showing <span id="rangeStart">0</span>–<span id="rangeEnd">0</span> of <span id="totalRows">0</span>
+      </div>
+      <div class="pagination-actions">
+        <label style="font-size:0.77rem;color:var(--text-muted)">Rows:
+          <select id="rowsPerPage" class="page-select">
+            <option value="25">25</option>
+            <option value="50" selected>50</option>
+            <option value="100">100</option>
+            <option value="250">250</option>
+          </select>
+        </label>
+        <button id="prevBtn" class="btn btn-ghost" disabled>‹ Prev</button>
+        <span id="pageIndicator">Page 1</span>
+        <button id="nextBtn" class="btn btn-ghost" disabled>Next ›</button>
+      </div>
+    </div>
 
-<!-- Comment editor modal -->
-<div id="commentOverlay" class="comment-overlay" style="display:none" onclick="closeCommentEditor()"></div>
-<div id="commentDialog" class="comment-dialog" style="display:none">
-  <h3>Comment</h3>
-  <textarea id="commentTextarea" class="comment-textarea" placeholder="Add a comment… (supports multiple paragraphs)" onkeydown="if(event.key==='Escape'){event.preventDefault();closeCommentEditor()}if(event.key==='Enter'&&(event.ctrlKey||event.metaKey)){event.preventDefault();saveComment()}"></textarea>
-  <span class="comment-hint">Ctrl+Enter to save · Escape to cancel</span>
-  <div class="comment-dialog-btns">
-    <button class="btn btn-ghost" onclick="closeCommentEditor()">Cancel</button>
-    <button class="btn btn-primary" onclick="saveComment()">Save</button>
   </div>
 </div>
 
 <script>
-// ── Access gate ────────────────────────────────────────────────
-if (sessionStorage.getItem('accessLevel') !== 'staff') {
-  window.location.replace('index.html');
-}
+// ── Config ──────────────────────────────────────────────────────
+const APPS_SCRIPT_URL    = 'https://script.google.com/macros/s/AKfycbzhMw4nQr2nVW0MLfPWVXRPXsvImerpzshQ5GnJ3873qQkGMz0bcJQdmTRXCxwygfFm/exec';
+const APPS_SCRIPT_SECRET = 'm30-test-key';
 
-// ── Status bar helper ──────────────────────────────────────────
-function setStatus(msg, isError = false) {
-  let el = document.getElementById('viewerStatus');
-  if (!el) {
-    el = document.createElement('span');
-    el.id = 'viewerStatus';
-    el.style.cssText = 'font-size:0.75rem;margin-left:4px;transition:opacity 0.4s';
-    document.querySelector('.controls').appendChild(el);
-  }
-  el.style.color = isError ? '#ef4444' : '#10b981';
-  el.style.opacity = '1';
-  el.textContent = msg;
-  if (msg) setTimeout(() => { el.style.opacity = '0'; }, 3000);
-}
-// ── Apps Script config ─────────────────────────────────────────
-// Set these after deploying apps_script/Code.gs as a Web App
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzhMw4nQr2nVW0MLfPWVXRPXsvImerpzshQ5GnJ3873qQkGMz0bcJQdmTRXCxwygfFm/exec';
-const APPS_SCRIPT_SECRET = 'm30-test-key';  // must match Code.gs
+const LS = {
+  get(k)    { try { return JSON.parse(localStorage.getItem('trl_' + k)); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem('trl_' + k, JSON.stringify(v)); } catch {} },
+};
 
-const COLORS = { 'Try':'#22c55e', 'Turnover':'#f97316', 'Penalty Attack':'#ef4444', 'Penalty Defence':'#b91c1c', 'Penalty':'#ef4444', 'Game Event':'#3b82f6', 'To Review':'#a855f7' };
+const FILTERABLE  = ['Type', 'Name', 'Possession Owner', 'Action Owner', 'Game'];
+const HIDDEN_COLS = new Set(['Team 1', 'Team 2', 'Video Name', 'To Review']);
+const TYPE_BADGE  = { 'try':'badge-try', 'penalty':'badge-penalty', 'penalty attack':'badge-penalty', 'penalty defence':'badge-penalty', 'turnover':'badge-turnover', 'to review':'badge-toreview' };
 
-// ── Fetch game list into sheet select ──────────────────────────
-async function fetchGameList() {
-  const sel = document.getElementById('sheetSelect');
-  try {
-    const resp   = await fetch(`${APPS_SCRIPT_URL}?secret=${encodeURIComponent(APPS_SCRIPT_SECRET)}&action=list`);
-    const result = await resp.json();
-    if (!result.ok) throw new Error(result.error);
-    sel.innerHTML = '<option value="">— Select a game —</option>';
-    result.sheets.forEach(entry => {
-      const t1   = entry.team1, t2 = entry.team2;
-      const comp = [entry.year, entry.division, entry.competition].filter(Boolean).join(' ');
-      let label;
-      if (t1 && t2) label = `${t1} vs ${t2}${comp ? '  (' + comp + ')' : ''}`;
-      else          label = entry.name;
-      const opt = document.createElement('option');
-      opt.value = entry.name;
-      opt.textContent = label;
-      sel.appendChild(opt);
-    });
-  } catch (err) {
-    sel.innerHTML = '<option value="">Could not load games</option>';
-  }
-}
+// ── Table state ─────────────────────────────────────────────────
+let allData      = [];
+let filtered     = [];
+let headers      = [];
+let sortCol      = -1;
+let sortAsc      = true;
+let currentPage  = 1;
+let rowsPerPage  = 50;
+let activeFilters = {};
+
+// Column indices (resolved after headers load)
+let colTime = -1, colYt = -1, colType = -1, colName = -1, colGame = -1, colComment = -1, colPoss = -1;
+
+// ── Video state ─────────────────────────────────────────────────
+let ytPlayer          = null;
+let ytProgressInterval = null;
+let currentVideoId    = null;
+let pendingSeekTime   = null;
+let videoReady        = false;
+let activeRowIdx      = -1;   // index in `filtered`
+
+// ── Bootstrap ───────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
-  fetchGameList();
-  const list = document.getElementById('annList');
+  setupSeekbar();
+  setupResizeHandle();
+  fetchAll();
+
+  const wrap = document.querySelector('.table-wrap');
   const btn  = document.getElementById('scrollBottomBtn');
   function updateScrollBtn() {
-    const atBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 40;
-    btn.classList.toggle('visible', !atBottom && list.scrollHeight > list.clientHeight + 40);
+    const atBottom = wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight < 40;
+    btn.classList.toggle('visible', !atBottom && wrap.scrollHeight > wrap.clientHeight + 40);
   }
-  list.addEventListener('scroll', updateScrollBtn);
-  // expose so renderAnnotations can call it
+  wrap.addEventListener('scroll', updateScrollBtn);
   window._updateScrollBtn = updateScrollBtn;
 });
 
-const MENU = {
-  "Penalty Attack":  ["Forward Pass","Touch and Pass","Off the Mark","Not Moving Forward","Delay of Play","Hard Touch","Other"],
-  "Penalty Defence": ["Offside","Hard Touch","In the Ruck","Not Moving Forward","Other"],
-  "Turnover":   ["Ball Down","6th Touch","Dummy Touch","Bad Roll","6 Again","Interception","Other"],
-  "Game Event": ["Game Start","Game End"],
-  "Try":        ["Scoop","Other","32 - Long","33 Quicky","33","32 Cut","French Flair"],
-  "To Review":  []
-};
-const DEFAULT_OTHER_TYPES = new Set(["Try","Turnover","Penalty Attack","Penalty Defence"]);
-
-let annotations = [];
-let videoLoaded = false;
-let videoBaseName = '';
-let selectedType = null;
-let pendingType = null;
-let pendingName = null;
-let pendingComment = null;
-let wasPlaying = false;
-let videoMode = 'none'; // 'local' | 'youtube'
-let ytPlayer = null;
-let ytProgressInterval = null;
-
-const vid = document.getElementById('vid');
-
-// ── Video abstraction layer ────────────────────────────────────
-function getTime()     { return videoMode === 'youtube' ? (ytPlayer ? ytPlayer.getCurrentTime() : 0) : vid.currentTime; }
-function getDuration() { return videoMode === 'youtube' ? (ytPlayer && typeof ytPlayer.getDuration === 'function' ? ytPlayer.getDuration() : 0) : vid.duration; }
-function isPaused()    { return videoMode === 'youtube' ? (!ytPlayer || ytPlayer.getPlayerState() !== YT.PlayerState.PLAYING) : vid.paused; }
-function doPlay()  { if (videoMode === 'youtube') { if (ytPlayer) ytPlayer.playVideo();  } else vid.play();  document.getElementById('playBtn').textContent = '⏸ Pause'; }
-function doPause() { if (videoMode === 'youtube') { if (ytPlayer) ytPlayer.pauseVideo(); } else vid.pause(); document.getElementById('playBtn').textContent = '▶ Play'; }
-function setCurrentTime(t) { if (videoMode === 'youtube') { if (ytPlayer) ytPlayer.seekTo(t, true); } else vid.currentTime = t; }
-function setRate(r)    { if (videoMode === 'youtube') { if (ytPlayer) ytPlayer.setPlaybackRate(r); } else vid.playbackRate = r; }
-
-function onVideoReady() {
-  videoLoaded = true;
-  document.getElementById('timeDuration').textContent = fmt(getDuration());
-  ['playBtn','skipBk','skipFw','speedSel'].forEach(id => document.getElementById(id).removeAttribute('disabled'));
-  renderMarkers();
-}
-
-// ── Video resize handle ────────────────────────────────────────
-function setupVideoResizeHandle() {
-  const handle  = document.getElementById('videoResizeHandle');
-  const wrapper = document.getElementById('videoWrapper');
-  const main    = document.querySelector('.main');
-  let dragging = false, startPos = 0, startSize = 0;
-
-  handle.addEventListener('mousedown', e => {
-    const horizontal = main.classList.contains('horizontal');
-    dragging  = true;
-    startPos  = horizontal ? e.clientX : e.clientY;
-    startSize = horizontal ? wrapper.getBoundingClientRect().width : wrapper.getBoundingClientRect().height;
-    handle.classList.add('dragging');
-    document.body.style.cursor = horizontal ? 'col-resize' : 'row-resize';
-    document.body.style.userSelect = 'none';
-    document.getElementById('ytPlayerContainer').style.pointerEvents = 'none';
-  });
-
-  document.addEventListener('mousemove', e => {
-    if (!dragging) return;
-    const horizontal = main.classList.contains('horizontal');
-    if (horizontal) {
-      const mainW = main.getBoundingClientRect().width;
-      const newW  = Math.max(200, Math.min(mainW * 0.75, startSize + (e.clientX - startPos)));
-      document.documentElement.style.setProperty('--video-w', newW + 'px');
-    } else {
-      const mainH = main.getBoundingClientRect().height;
-      const newH  = Math.max(120, Math.min(mainH * 0.80, startSize + (e.clientY - startPos)));
-      document.documentElement.style.setProperty('--video-h', newH + 'px');
-    }
-  });
-
-  document.addEventListener('mouseup', () => {
-    if (!dragging) return;
-    dragging = false;
-    handle.classList.remove('dragging');
-    document.body.style.cursor = '';
-    document.body.style.userSelect = '';
-    document.getElementById('ytPlayerContainer').style.pointerEvents = '';
-  });
-}
-setupVideoResizeHandle();
-
-function toggleLayout() {
-  const main = document.querySelector('.main');
-  const btn  = document.getElementById('layoutBtn');
-  const horizontal = main.classList.toggle('horizontal');
-  btn.textContent = horizontal ? '↕ Stack' : '↔ Side';
-  btn.classList.toggle('active', horizontal);
-  localStorage.setItem('annotator-layout', horizontal ? 'horizontal' : 'vertical');
-}
-(function initLayout() {
-  const saved = localStorage.getItem('annotator-layout');
-  if (saved === 'horizontal') {
-    document.querySelector('.main').classList.add('horizontal');
-    const btn = document.getElementById('layoutBtn');
-    if (btn) { btn.textContent = '↕ Stack'; btn.classList.add('active'); }
+// ── Data fetching ───────────────────────────────────────────────
+async function fetchAll() {
+  const cached = LS.get('all');
+  if (cached) {
+    processRows(cached.rows);
+  } else {
+    document.getElementById('loadingMsg').style.display = 'block';
   }
-})();
-
-// ── Local video loading ────────────────────────────────────────
-function loadVideo(e) {
-  const f = e.target.files[0];
-  if (!f) return;
-  videoBaseName = '';
-  // Tear down any active YouTube player
-  if (ytProgressInterval) { clearInterval(ytProgressInterval); ytProgressInterval = null; }
-  if (ytPlayer) { ytPlayer.destroy(); ytPlayer = null; }
-  document.getElementById('ytPlayerContainer').style.display = 'none';
-  videoMode = 'local';
-  vid.src = URL.createObjectURL(f);
-  vid.style.display = 'block';
-  document.getElementById('noVideo').style.display = 'none';
-  vid.onloadedmetadata = () => {
-    onVideoReady();
-    if (confirm(`Video loaded: "${f.name}"\n\nLoad a matching CSV file?\n(Look for "${videoBaseName}.csv" in the same folder)`))
-      document.getElementById('csvInput').click();
-  };
-  vid.ontimeupdate = updateProgress;
-  vid.onended = () => document.getElementById('playBtn').textContent = '▶ Play';
+  try {
+    const resp   = await fetch(`${APPS_SCRIPT_URL}?secret=${enc(APPS_SCRIPT_SECRET)}&action=all`);
+    const result = await resp.json();
+    if (!result.ok) throw new Error(result.error);
+    LS.set('all', result);
+    processRows(result.rows);
+  } catch (err) {
+    if (!cached) {
+      document.getElementById('loadingMsg').style.display = 'none';
+      const el = document.getElementById('errorMsg');
+      el.textContent = 'Failed to load events: ' + err.message;
+      el.style.display = 'block';
+    }
+  }
 }
 
-// ── YouTube loading ────────────────────────────────────────────
-function loadYouTube() {
-  const url = document.getElementById('ytUrl').value.trim();
-  const m = url.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/);
-  if (!m) { alert('Invalid YouTube URL — could not extract a video ID.'); return; }
-  const videoId = m[1];
-  videoBaseName = '';
-  fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`)
-    .then(r => r.json()).then(d => { if (d.title) videoBaseName = d.title; })
-    .catch(() => {});
-  // Tear down local video
-  vid.pause(); vid.src = ''; vid.style.display = 'none';
-  document.getElementById('noVideo').style.display = 'none';
-  document.getElementById('ytPlayerContainer').style.display = 'block';
+function processRows(rows) {
+  document.getElementById('loadingMsg').style.display = 'none';
+  if (!rows || rows.length < 2) return;
+
+  headers = rows[0].map(h => h.trim());
+  allData = rows.slice(1).filter(r => r.some(c => c !== ''));
+
+  // Substitute Team 1/Team 2 placeholders
+  const hi      = h => headers.findIndex(x => x.toLowerCase() === h);
+  const possIdx = hi('possession owner'), actionIdx = hi('action owner');
+  const t1Idx   = hi('team 1'), t2Idx = hi('team 2');
+  if (t1Idx >= 0 && t2Idx >= 0) {
+    allData.forEach(row => {
+      const t1 = row[t1Idx], t2 = row[t2Idx];
+      for (const idx of [possIdx, actionIdx]) {
+        if (idx < 0) continue;
+        if (row[idx] === 'Team 1') row[idx] = t1;
+        else if (row[idx] === 'Team 2') row[idx] = t2;
+      }
+    });
+  }
+
+  // Drop hidden columns
+  const keepIdx = headers.map((h, i) => HIDDEN_COLS.has(h) ? -1 : i).filter(i => i >= 0);
+  headers = keepIdx.map(i => headers[i]);
+  allData = allData.map(row => keepIdx.map(i => row[i]));
+
+  // Exclude Game Event rows
+  const typeColIdx = headers.findIndex(h => h.toLowerCase() === 'type');
+  if (typeColIdx >= 0) allData = allData.filter(row => row[typeColIdx] !== 'Game Event');
+
+  // Resolve column indices
+  const hli   = h => headers.findIndex(x => x.toLowerCase() === h);
+  colTime    = hli('time');
+  colYt      = hli('youtube link');
+  colType    = hli('type');
+  colName    = hli('name');
+  colGame    = hli('game');
+  colComment = hli('comment');
+  colPoss    = hli('possession owner');
+
+  filtered = [...allData];
+  buildSearchColSelect();
+  buildFilterDropdowns();
+  renderHeaders();
+  applyFilters();
+
+  document.getElementById('controls').style.display  = '';
+  document.getElementById('pagination').style.display = '';
+}
+
+// ── Search / Filter ─────────────────────────────────────────────
+function buildSearchColSelect() {
+  const sel = document.getElementById('searchCol');
+  sel.innerHTML = '<option value="-1">All Columns</option>';
+  headers.forEach((h, i) => {
+    const opt = document.createElement('option');
+    opt.value = i; opt.textContent = h || '#';
+    sel.appendChild(opt);
+  });
+}
+
+function buildFilterDropdowns() {
+  const row = document.getElementById('filterRow');
+  row.innerHTML = '';
+  activeFilters = {};
+  FILTERABLE.forEach(col => {
+    const idx = headers.findIndex(h => h.toLowerCase() === col.toLowerCase());
+    if (idx === -1) return;
+    activeFilters[col] = new Set();
+    const vals = [...new Set(allData.map(r => r[idx]).filter(Boolean))].sort();
+    if (!vals.length) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'filter-wrap';
+    const btn = document.createElement('div');
+    btn.className = 'filter-btn';
+    btn.innerHTML = `<span>${col}</span>`;
+    const drop = document.createElement('div');
+    drop.className = 'filter-dropdown';
+    drop.dataset.col = col;
+    vals.forEach(val => {
+      const label = document.createElement('label');
+      const cb    = document.createElement('input');
+      cb.type = 'checkbox'; cb.value = val;
+      cb.addEventListener('change', () => {
+        cb.checked ? activeFilters[col].add(val) : activeFilters[col].delete(val);
+        const has = activeFilters[col].size > 0;
+        btn.classList.toggle('active', has);
+        btn.querySelector('span').textContent = has ? `${col} (${activeFilters[col].size})` : col;
+        applyFilters();
+      });
+      label.append(cb, document.createTextNode(' ' + val));
+      drop.appendChild(label);
+    });
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      document.querySelectorAll('.filter-dropdown.open').forEach(d => { if (d !== drop) d.classList.remove('open'); });
+      drop.classList.toggle('open');
+    });
+    wrap.append(btn, drop);
+    row.appendChild(wrap);
+  });
+}
+
+document.addEventListener('click', () => {
+  document.querySelectorAll('.filter-dropdown.open').forEach(d => d.classList.remove('open'));
+});
+
+function applyFilters() {
+  const query  = document.getElementById('searchInput').value.toLowerCase();
+  const colIdx = parseInt(document.getElementById('searchCol').value);
+  filtered = allData.filter(row => {
+    const match = colIdx === -1
+      ? row.some(c => String(c).toLowerCase().includes(query))
+      : String(row[colIdx]).toLowerCase().includes(query);
+    if (!match) return false;
+    for (const col of FILTERABLE) {
+      const set = activeFilters[col];
+      if (!set || !set.size) continue;
+      const idx = headers.findIndex(h => h.toLowerCase() === col.toLowerCase());
+      if (!set.has(row[idx])) return false;
+    }
+    return true;
+  });
+  currentPage = 1;
+  sortFiltered();
+  // Re-find the active row in the new filtered set
+  if (activeRowIdx >= 0) {
+    // activeRowIdx is now stale — we'll just clear the highlight since filtered changed
+    // (keeping it would be complex; user can re-click)
+  }
+  updatePagination();
+  updateFilterOptions();
+}
+
+function updateFilterOptions() {
+  const query  = document.getElementById('searchInput').value.toLowerCase();
+  const colIdx = parseInt(document.getElementById('searchCol').value);
+  FILTERABLE.forEach(col => {
+    const drop = document.querySelector(`.filter-dropdown[data-col="${col}"]`);
+    if (!drop) return;
+    const idx = headers.findIndex(h => h.toLowerCase() === col.toLowerCase());
+    if (idx === -1) return;
+    const candidates = allData.filter(row => {
+      const match = colIdx === -1
+        ? row.some(c => String(c).toLowerCase().includes(query))
+        : String(row[colIdx]).toLowerCase().includes(query);
+      if (!match) return false;
+      for (const otherCol of FILTERABLE) {
+        if (otherCol === col) continue;
+        const set = activeFilters[otherCol];
+        if (!set || !set.size) continue;
+        const oIdx = headers.findIndex(h => h.toLowerCase() === otherCol.toLowerCase());
+        if (!set.has(row[oIdx])) return false;
+      }
+      return true;
+    });
+    const available = new Set(candidates.map(r => r[idx]).filter(Boolean));
+    drop.querySelectorAll('label').forEach(label => {
+      const cb = label.querySelector('input[type=checkbox]');
+      label.style.display = (available.has(cb.value) || cb.checked) ? '' : 'none';
+    });
+  });
+}
+
+function resetFilters() {
+  document.getElementById('searchInput').value = '';
+  document.querySelectorAll('.filter-dropdown input[type=checkbox]').forEach(cb => { cb.checked = false; });
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.classList.remove('active');
+    btn.querySelector('span').textContent = btn.querySelector('span').textContent.replace(/ \(\d+\)$/, '');
+  });
+  document.querySelectorAll('.filter-dropdown label').forEach(l => l.style.display = '');
+  FILTERABLE.forEach(col => { if (activeFilters[col]) activeFilters[col].clear(); });
+  applyFilters();
+}
+
+// ── Table rendering ─────────────────────────────────────────────
+function renderHeaders() {
+  const thead = document.querySelector('#dataTable thead');
+  thead.innerHTML = '';
+  const tr = document.createElement('tr');
+  headers.forEach((h, i) => {
+    const th = document.createElement('th');
+    th.textContent = h || '#';
+    th.onclick = () => sortBy(i);
+    if (i === sortCol) th.classList.add(sortAsc ? 'sort-asc' : 'sort-desc');
+    tr.appendChild(th);
+  });
+  thead.appendChild(tr);
+}
+
+function renderRows(rows) {
+  const tbody = document.querySelector('#dataTable tbody');
+  const empty = document.getElementById('emptyState');
+  tbody.innerHTML = '';
+  empty.style.display = rows.length ? 'none' : 'block';
+  setTimeout(() => window._updateScrollBtn && window._updateScrollBtn(), 0);
+
+  // Offset of this page in filtered[]
+  const pageOffset = (currentPage - 1) * rowsPerPage;
+
+  rows.forEach((row, pageIdx) => {
+    const filteredIdx = pageOffset + pageIdx;
+    const tr = document.createElement('tr');
+    const hasYt = colYt >= 0 && row[colYt] && String(row[colYt]).includes('youtu');
+    if (hasYt) tr.classList.add('playable');
+    if (filteredIdx === activeRowIdx) tr.classList.add('active-row');
+    tr.dataset.filteredIdx = filteredIdx;
+
+    row.forEach((cell, i) => {
+      const td  = document.createElement('td');
+      const col = (headers[i] || '').toLowerCase();
+
+      if (i === colTime && hasYt) {
+        // Time cell: show play icon + time
+        td.innerHTML = `<span class="play-icon">▶</span>${cell || ''}`;
+      } else if ((col.includes('youtube') || col.includes('link')) && cell && String(cell).startsWith('http')) {
+        const a = document.createElement('a');
+        a.href = cell; a.target = '_blank'; a.rel = 'noopener';
+        a.className = 'yt-link';
+        a.innerHTML = '▶ Watch';
+        a.onclick = e => e.stopPropagation();
+        td.appendChild(a);
+      } else if (col === 'type' && cell) {
+        const span = document.createElement('span');
+        span.textContent = cell;
+        span.className = 'badge ' + (TYPE_BADGE[cell.toLowerCase()] || '');
+        td.appendChild(span);
+      } else if ((col === 'possession owner' || col === 'action owner') && cell) {
+        const span = document.createElement('span');
+        span.textContent = cell;
+        span.className = 'team-badge';
+        td.appendChild(span);
+      } else if (col === 'game' && cell) {
+        const span = document.createElement('span');
+        span.textContent = cell;
+        span.className = 'game-tag';
+        td.appendChild(span);
+      } else if (col === 'comment' && cell) {
+        const lines = cell.split('\n');
+        const wrapper = document.createElement('div');
+        wrapper.className = 'comment-cell';
+        const preview = document.createElement('span');
+        preview.textContent = lines[0];
+        wrapper.appendChild(preview);
+        if (lines.length > 1) {
+          const rest = document.createElement('div');
+          rest.className = 'comment-rest';
+          rest.textContent = lines.slice(1).join('\n');
+          const toggle = document.createElement('button');
+          toggle.className = 'comment-toggle';
+          toggle.textContent = '▾ more';
+          toggle.onclick = e => {
+            e.stopPropagation();
+            const open = rest.classList.toggle('open');
+            toggle.textContent = open ? '▴ less' : '▾ more';
+          };
+          wrapper.append(toggle, rest);
+        }
+        td.appendChild(wrapper);
+      } else {
+        td.textContent = cell;
+      }
+      tr.appendChild(td);
+    });
+
+    if (hasYt) {
+      tr.onclick = () => playFilteredRow(filteredIdx);
+    }
+    tbody.appendChild(tr);
+  });
+
+  document.querySelector('.table-wrap').scrollTop = 0;
+}
+
+// ── Sort ────────────────────────────────────────────────────────
+function sortBy(col) {
+  sortAsc = (sortCol === col) ? !sortAsc : true;
+  sortCol = col;
+  sortFiltered();
+  renderHeaders();
+  updatePagination();
+}
+
+function sortFiltered() {
+  if (sortCol === -1) return;
+  const sample = filtered.find(r => r[sortCol] !== '')?.[sortCol];
+  const numeric = sample !== undefined && !isNaN(parseFloat(sample)) && isFinite(sample);
+  filtered.sort((a, b) => {
+    const va = a[sortCol], vb = b[sortCol];
+    if (numeric) return sortAsc ? va - vb : vb - va;
+    const sa = (va || '').toLowerCase(), sb = (vb || '').toLowerCase();
+    return sortAsc ? sa.localeCompare(sb) : sb.localeCompare(sa);
+  });
+}
+
+// ── Pagination ──────────────────────────────────────────────────
+function updatePagination() {
+  const total      = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / rowsPerPage));
+  if (currentPage > totalPages) currentPage = totalPages;
+  const start = (currentPage - 1) * rowsPerPage;
+  const end   = Math.min(start + rowsPerPage, total);
+  document.getElementById('rangeStart').textContent   = total ? start + 1 : 0;
+  document.getElementById('rangeEnd').textContent     = end;
+  document.getElementById('totalRows').textContent    = total;
+  document.getElementById('pageIndicator').textContent = `Page ${currentPage} of ${totalPages}`;
+  document.getElementById('rowCount').textContent     = `${total} rows`;
+  document.getElementById('prevBtn').disabled = currentPage <= 1;
+  document.getElementById('nextBtn').disabled = currentPage >= totalPages;
+  renderRows(filtered.slice(start, end));
+  updateNavButtons();
+}
+
+document.getElementById('rowsPerPage').addEventListener('change', e => { rowsPerPage = +e.target.value; currentPage = 1; updatePagination(); });
+document.getElementById('prevBtn').addEventListener('click', () => { if (currentPage > 1) { currentPage--; updatePagination(); } });
+document.getElementById('nextBtn').addEventListener('click', () => { const t = Math.ceil(filtered.length / rowsPerPage); if (currentPage < t) { currentPage++; updatePagination(); } });
+document.getElementById('searchInput').addEventListener('input', applyFilters);
+document.getElementById('searchCol').addEventListener('change', applyFilters);
+
+// ── Row playback ─────────────────────────────────────────────────
+function playFilteredRow(filteredIdx) {
+  const row = filtered[filteredIdx];
+  if (!row) return;
+
+  activeRowIdx = filteredIdx;
+
+  // Highlight row
+  document.querySelectorAll('#dataTable tbody tr').forEach(tr => {
+    tr.classList.toggle('active-row', parseInt(tr.dataset.filteredIdx) === filteredIdx);
+  });
+
+  // Parse time
+  const timeStr = colTime >= 0 ? (row[colTime] || '') : '';
+  const parts   = timeStr.split(':').map(Number);
+  const secs    = parts.length === 3 ? parts[0]*3600 + parts[1]*60 + parts[2]
+                : parts.length === 2 ? parts[0]*60 + parts[1] : 0;
+  const seekTo  = Math.max(0, secs - 5);
+
+  // Extract YouTube video ID
+  const ytUrl  = colYt >= 0 ? (row[colYt] || '') : '';
+  const m      = ytUrl.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/);
+  const videoId = m ? m[1] : null;
+
+  if (videoId) {
+    if (videoId !== currentVideoId) {
+      currentVideoId  = videoId;
+      pendingSeekTime = seekTo;
+      loadYTPlayer(videoId, seekTo);
+    } else if (ytPlayer && videoReady) {
+      ytPlayer.seekTo(seekTo, true);
+      ytPlayer.playVideo();
+    }
+  }
+
+  // Update now-playing card
+  updateNowPlaying(row);
+  updateNavButtons();
+}
+
+function navigateRow(delta) {
+  if (filtered.length === 0) return;
+  let next = activeRowIdx + delta;
+  if (next < 0) next = 0;
+  if (next >= filtered.length) next = filtered.length - 1;
+  if (next === activeRowIdx) return;
+
+  // Navigate to the correct page if needed
+  const targetPage = Math.floor(next / rowsPerPage) + 1;
+  if (targetPage !== currentPage) {
+    currentPage = targetPage;
+    updatePagination(); // re-renders the table
+  }
+
+  playFilteredRow(next);
+
+  // Scroll active row into view
+  const activeEl = document.querySelector('#dataTable tbody tr.active-row');
+  if (activeEl) activeEl.scrollIntoView({ block: 'nearest' });
+}
+
+function updateNavButtons() {
+  document.getElementById('prevRowBtn').disabled = activeRowIdx <= 0;
+  document.getElementById('nextRowBtn').disabled = activeRowIdx < 0 || activeRowIdx >= filtered.length - 1;
+}
+
+function updateNowPlaying(row) {
+  const empty  = document.getElementById('npEmpty');
+  const info   = document.getElementById('npInfo');
+  const comment = document.getElementById('npComment');
+
+  empty.style.display = 'none';
+  info.style.display  = '';
+
+  const type    = colType    >= 0 ? (row[colType]    || '') : '';
+  const name    = colName    >= 0 ? (row[colName]    || '') : '';
+  const game    = colGame    >= 0 ? (row[colGame]    || '') : '';
+  const time    = colTime    >= 0 ? (row[colTime]    || '') : '';
+  const cmmt    = colComment >= 0 ? (row[colComment] || '') : '';
+  const poss    = colPoss    >= 0 ? (row[colPoss]    || '') : '';
+
+  info.innerHTML = '';
+  if (type) {
+    const badge = document.createElement('span');
+    badge.className = 'badge ' + (TYPE_BADGE[type.toLowerCase()] || '');
+    badge.textContent = type;
+    info.appendChild(badge);
+  }
+  if (name) {
+    const s = document.createElement('span');
+    s.style.cssText = 'font-size:0.82rem;color:var(--text)';
+    s.textContent = name;
+    info.appendChild(s);
+  }
+  if (poss) {
+    const s = document.createElement('span');
+    s.className = 'team-badge';
+    s.style.fontSize = '0.7rem';
+    s.textContent = poss;
+    info.appendChild(s);
+  }
+  if (time) {
+    const s = document.createElement('span');
+    s.className = 'np-time';
+    s.textContent = time;
+    info.appendChild(s);
+  }
+  if (game) {
+    const s = document.createElement('span');
+    s.className = 'np-game';
+    s.textContent = game;
+    info.appendChild(s);
+  }
+
+  if (cmmt) {
+    comment.textContent = cmmt;
+    comment.style.display = '';
+  } else {
+    comment.style.display = 'none';
+  }
+}
+
+// ── YouTube player ───────────────────────────────────────────────
+function loadYTPlayer(videoId, seekTime = 0) {
+  document.getElementById('noVideoMsg').style.display = 'none';
+  document.getElementById('ytContainer').style.display = 'block';
+  videoReady = false;
+  pendingSeekTime = seekTime;
   if (ytProgressInterval) { clearInterval(ytProgressInterval); ytProgressInterval = null; }
-  videoMode = 'youtube';
+
   if (window.YT && YT.Player) {
     createYTPlayer(videoId);
   } else {
     window._ytPendingId = videoId;
     if (!document.getElementById('ytApiScript')) {
       const tag = document.createElement('script');
-      tag.id = 'ytApiScript';
+      tag.id  = 'ytApiScript';
       tag.src = 'https://www.youtube.com/iframe_api';
       document.head.appendChild(tag);
     }
@@ -523,8 +862,7 @@ window.onYouTubeIframeAPIReady = function() {
 
 function createYTPlayer(videoId) {
   if (ytPlayer) { ytPlayer.destroy(); ytPlayer = null; }
-  // Replace container contents so YT.Player has a fresh target element
-  const container = document.getElementById('ytPlayerContainer');
+  const container = document.getElementById('ytContainer');
   container.innerHTML = '<div id="ytInner"></div>';
   ytPlayer = new YT.Player('ytInner', {
     videoId,
@@ -533,641 +871,168 @@ function createYTPlayer(videoId) {
     playerVars: { rel: 0, modestbranding: 1 },
     events: {
       onReady: () => {
-        onVideoReady();
+        videoReady = true;
+        const dur = ytPlayer.getDuration();
+        document.getElementById('timeDuration').textContent = fmt(dur);
+        ['playBtn','skipBk','skipFw','speedSel'].forEach(id => document.getElementById(id).removeAttribute('disabled'));
+        if (pendingSeekTime !== null) {
+          ytPlayer.seekTo(pendingSeekTime, true);
+          ytPlayer.playVideo();
+          pendingSeekTime = null;
+        }
         ytProgressInterval = setInterval(updateProgress, 250);
       },
       onStateChange: ev => {
-        if      (ev.data === YT.PlayerState.PLAYING) document.getElementById('playBtn').textContent = '⏸ Pause';
+        const btn = document.getElementById('playBtn');
+        if (ev.data === YT.PlayerState.PLAYING)      btn.textContent = '⏸ Pause';
         else if (ev.data === YT.PlayerState.PAUSED ||
-                 ev.data === YT.PlayerState.ENDED)  document.getElementById('playBtn').textContent = '▶ Play';
+                 ev.data === YT.PlayerState.ENDED)   btn.textContent = '▶ Play';
       }
     }
   });
 }
 
-// ── Playback ───────────────────────────────────────────────────
+// ── Playback helpers ─────────────────────────────────────────────
 function fmt(s) {
   if (!s || isNaN(s)) return '0:00:00';
   const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = Math.floor(s%60);
   return `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
 }
-function togglePlay() {
-  if (!videoLoaded) return;
-  if (isPaused()) doPlay(); else doPause();
+
+function toggleVideoPanel() {
+  const panel = document.getElementById('videoPanel');
+  const handle = document.getElementById('resizeHandle');
+  const btn = document.getElementById('toggleVideoBtn');
+  const hidden = panel.classList.toggle('hidden');
+  handle.classList.toggle('hidden', hidden);
+  btn.classList.toggle('active', !hidden);
 }
-function skip(s) { if (videoLoaded) setCurrentTime(Math.max(0, Math.min(getDuration(), getTime() + s))); }
-function setSpeed() { if (videoLoaded) setRate(parseFloat(document.getElementById('speedSel').value)); }
+
+function togglePlay() {
+  if (!ytPlayer || !videoReady) return;
+  if (ytPlayer.getPlayerState() === YT.PlayerState.PLAYING) {
+    ytPlayer.pauseVideo();
+  } else {
+    ytPlayer.playVideo();
+  }
+}
+
+function skip(s) {
+  if (!ytPlayer || !videoReady) return;
+  ytPlayer.seekTo(Math.max(0, ytPlayer.getCurrentTime() + s), true);
+}
+
+function setSpeed() {
+  if (ytPlayer && videoReady) ytPlayer.setPlaybackRate(parseFloat(document.getElementById('speedSel').value));
+}
+
 function updateProgress() {
-  const dur = getDuration(), cur = getTime();
+  if (!ytPlayer || !videoReady) return;
+  const cur = ytPlayer.getCurrentTime(), dur = ytPlayer.getDuration();
   const pct = dur ? (cur / dur * 100) : 0;
-  document.getElementById('seekFill').style.width = pct + '%';
-  document.getElementById('seekThumb').style.left = pct + '%';
+  document.getElementById('seekFill').style.width  = pct + '%';
+  document.getElementById('seekThumb').style.left  = pct + '%';
   document.getElementById('timeCurrent').textContent = fmt(cur);
 }
-function gotoLastAnnotation() {
-  if (!videoLoaded || annotations.length === 0) return;
-  setCurrentTime(annotations[annotations.length - 1].time);
-}
 
-// ── Seek bar ───────────────────────────────────────────────────
-let seeking = false;
-function startSeek(e) {
-  if (!videoLoaded) return;
-  seeking = true; doSeek(e);
-  document.addEventListener('mousemove', doSeekMove);
-  document.addEventListener('mouseup', endSeek);
-}
-function doSeekMove(e) { if (seeking) doSeek(e); }
-function endSeek() { seeking = false; document.removeEventListener('mousemove', doSeekMove); document.removeEventListener('mouseup', endSeek); }
-function doSeek(e) {
-  const r = document.getElementById('seekbar').getBoundingClientRect();
-  setCurrentTime(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * getDuration());
-}
-
-// ── Full Game Analysis helpers ─────────────────────────────────
-function isFullGame() { return document.getElementById('fullGameToggle').checked; }
-function needsTeamSelection(type) { return isFullGame() ? (type === 'Game Event' || type === 'To Review') : true; }
-function showTeamMenu() { document.getElementById('teamMenu').style.display = 'flex'; }
-function hideTeamMenu() { document.getElementById('teamMenu').style.display = 'none'; }
-function selectTeam(team) { if (pendingType !== null) tag(pendingType, pendingName, team, pendingComment || ''); }
-
-function isJsTurnover(type, name) {
-  if (type === 'Try') return true;
-  if (type === 'Penalty Attack') return true;
-  if (type === 'Penalty Defence') return false;
-  if (type === 'Turnover' && name !== '6 Again') return true;
-  return false;
-}
-
-function inferActionOwner(possessionOwner, type, name) {
-  if (type === 'Penalty Defence')
-    return possessionOwner === 'Team 1' ? 'Team 2' : 'Team 1';
-  if (type === 'Turnover' && !isJsTurnover(type, name))
-    return possessionOwner === 'Team 1' ? 'Team 2' : 'Team 1';
-  return possessionOwner;
-}
-
-function inferPossessionOwner() {
-  // Walk back through annotations strictly before the current video time
-  // (annotations are sorted by time, so this correctly handles mid-game insertions).
-  const now = getTime();
-  for (let i = annotations.length - 1; i >= 0; i--) {
-    const ann = annotations[i];
-    if (ann.time >= now) continue;
-    if (ann.type === 'To Review') continue;
-    if (!ann.possessionOwner) continue;
-    const wasTurnover = isJsTurnover(ann.type, ann.name);
-    return wasTurnover
-      ? (ann.possessionOwner === 'Team 1' ? 'Team 2' : 'Team 1')
-      : ann.possessionOwner;
+// ── Seekbar ──────────────────────────────────────────────────────
+function setupSeekbar() {
+  const bar = document.getElementById('seekbar');
+  let seeking = false;
+  function doSeek(e) {
+    if (!ytPlayer || !videoReady) return;
+    const r   = bar.getBoundingClientRect();
+    const pct = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+    ytPlayer.seekTo(pct * ytPlayer.getDuration(), true);
   }
-  return '';
+  bar.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    bar.setPointerCapture(e.pointerId);
+    seeking = true; doSeek(e);
+    bar.addEventListener('pointermove', onMove);
+    bar.addEventListener('pointerup', () => {
+      seeking = false;
+      bar.removeEventListener('pointermove', onMove);
+    }, { once: true });
+  });
+  function onMove(e) { if (seeking) doSeek(e); }
 }
 
-// ── Type / sub-type selection ──────────────────────────────────
-function isDefaultOther() { return document.getElementById('defaultOtherToggle').checked; }
+// ── Resize handle ────────────────────────────────────────────────
+function setupResizeHandle() {
+  const handle = document.getElementById('resizeHandle');
+  const panel  = document.getElementById('videoPanel');
+  const split  = document.getElementById('split');
+  let dragging = false, startPos = 0, startSize = 0;
 
-function updateSimpleModeUI() {
-  const on = isDefaultOther();
-  document.getElementById('sixthTouchBtn').style.display = on ? '' : 'none';
-  document.getElementById('sixAgainBtn').style.display = on ? '' : 'none';
-  document.getElementById('sixthTouchSep').style.display = on ? '' : 'none';
-}
-document.getElementById('defaultOtherToggle').addEventListener('change', updateSimpleModeUI);
-updateSimpleModeUI();
+  handle.addEventListener('pointerdown', e => {
+    const vertical = split.classList.contains('vertical') || window.innerWidth <= 640;
+    e.preventDefault();
+    handle.setPointerCapture(e.pointerId);
+    dragging  = true;
+    startPos  = vertical ? e.clientY : e.clientX;
+    startSize = vertical ? panel.getBoundingClientRect().height : panel.getBoundingClientRect().width;
+    handle.classList.add('dragging');
+    document.body.style.userSelect = 'none';
+    document.getElementById('ytContainer').style.pointerEvents = 'none';
+  });
 
-function quickTag(type, name) {
-  selectedType = type;
-  pendingType = null; pendingName = null; pendingComment = null;
-  hideTeamMenu();
-  wasPlaying = !isPaused();
-  if (wasPlaying) doPause();
-  document.querySelectorAll('.tag-btn').forEach(b => b.classList.toggle('active', b.dataset.type === type));
-  selectSubType(type, name);
-}
-
-function selectType(type) {
-  selectedType = type;
-  pendingType = null;
-  pendingName = null;
-  pendingComment = null;
-  hideTeamMenu();
-  wasPlaying = !isPaused();
-  if (wasPlaying) doPause();
-  document.querySelectorAll('.tag-btn').forEach(b => b.classList.toggle('active', b.dataset.type === type));
-  if (isDefaultOther() && DEFAULT_OTHER_TYPES.has(type)) {
-    selectSubType(type, 'Other');
-    return;
-  }
-  renderSubmenu(type);
-  if (type !== 'To Review' && MENU[type].length === 0) {
-    if (needsTeamSelection(type)) { pendingType = type; pendingName = ''; showTeamMenu(); }
-    else tag(type, '', '');
-  }
-}
-
-function confirmFreeText() {
-  const note = document.getElementById('freeTextInput')?.value.trim() || '';
-  selectSubType('To Review', '', note);
-}
-
-function renderSubmenu(type) {
-  const el = document.getElementById('submenu');
-  if (type === 'To Review') {
-    el.innerHTML = `<span class="submenu-label" style="color:${COLORS[type]}">Note:</span>` +
-      `<input type="text" id="freeTextInput" class="yt-input" placeholder="Add a note (optional)…" style="width:220px" onkeydown="if(event.key==='Enter'){event.preventDefault();confirmFreeText()}">` +
-      `<button class="sub-btn" onclick="confirmFreeText()">✓ Confirm</button>`;
-    setTimeout(() => document.getElementById('freeTextInput')?.focus(), 0);
-    return;
-  }
-  const opts = MENU[type];
-  if (!opts || opts.length === 0) {
-    el.innerHTML = `<span class="submenu-empty" style="color:#666">Tagging <strong style="color:${COLORS[type]}">${type}</strong> — no sub-type needed</span>`;
-    return;
-  }
-  el.innerHTML = `<span class="submenu-label" style="color:${COLORS[type]}">${type}:</span>` +
-    opts.map((o, i) => `<button class="sub-btn" onclick="selectSubType('${type}','${o.replace(/'/g,"\\'")}')">
-      <span class="hotkey">${i+1}</span>${o}
-    </button>`).join('');
-}
-
-function selectSubType(type, name, comment = '') {
-  if (needsTeamSelection(type)) { pendingType = type; pendingName = name; pendingComment = comment; showTeamMenu(); }
-  else {
-    if (isFullGame()) {
-      const inferred = inferPossessionOwner();
-      if (!inferred) {
-        setStatus('Cannot infer possession owner — tag a Game Start event first.', true);
-        alert('Cannot infer possession owner.\n\nNo prior annotation with a known possession owner was found.\n\nTag a Game Start (Game Event) with a possession owner first.');
-        selectedType = null;
-        document.querySelectorAll('.tag-btn').forEach(b => b.classList.remove('active'));
-        document.getElementById('submenu').innerHTML = '<span class="submenu-empty">Select an action above — then choose a sub-type (or press 1–9)</span>';
-        if (wasPlaying) { wasPlaying = false; doPlay(); }
-        return;
-      }
-      tag(type, name, inferred, comment);
+  handle.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const vertical = split.classList.contains('vertical') || window.innerWidth <= 640;
+    if (vertical) {
+      const splitH = split.getBoundingClientRect().height;
+      const newH   = Math.max(150, Math.min(splitH * 0.75, startSize + (e.clientY - startPos)));
+      document.documentElement.style.setProperty('--vp-h', newH + 'px');
     } else {
-      tag(type, name, '', comment);
+      const splitW = split.getBoundingClientRect().width;
+      const newW   = Math.max(260, Math.min(splitW * 0.70, startSize + (e.clientX - startPos)));
+      document.documentElement.style.setProperty('--vp-w', newW + 'px');
     }
-  }
-}
-
-// ── Tagging ────────────────────────────────────────────────────
-function tag(type, name, possessionOwner, comment = '') {
-  if (!videoLoaded) return;
-  const t = getTime();
-  const actionOwner = inferActionOwner(possessionOwner, type, name);
-  annotations.push({ id: Date.now() + Math.random(), type, name, possessionOwner, actionOwner, comment, time: t, timeStr: fmt(t) });
-  annotations.sort((a,b) => a.time - b.time);
-  recomputeOwnersFrom(t);
-  renderList();
-  renderMarkers();
-  flashType(type);
-  document.getElementById('lastAnnBtn').removeAttribute('disabled');
-  selectedType = null; pendingType = null; pendingName = null;
-  hideTeamMenu();
-  document.querySelectorAll('.tag-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('submenu').innerHTML = '<span class="submenu-empty">Select an action above — then choose a sub-type (or press 1–9)</span>';
-  if (wasPlaying) { wasPlaying = false; doPlay(); }
-}
-
-function flashType(type) {
-  const el = document.querySelector(`.tag-btn[data-type="${type}"]`);
-  if (!el) return;
-  el.style.transform = 'scale(1.09)';
-  setTimeout(() => el.style.transform = '', 200);
-}
-
-// ── Annotations rendering ──────────────────────────────────────
-function ytLink(timeSeconds) {
-  const url = document.getElementById('ytUrl').value.trim();
-  if (!url) return '';
-  const m = url.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/);
-  if (!m) return '';
-  const t = Math.max(0, Math.floor(timeSeconds) - 5);
-  return `https://www.youtube.com/watch?v=${m[1]}&t=${t}s`;
-}
-
-function displayTeam(v) {
-  if (!v) return '—';
-  if (v === 'Team 1') { const n = document.getElementById('metaTeam1').value.trim(); return n || 'Team 1'; }
-  if (v === 'Team 2') { const n = document.getElementById('metaTeam2').value.trim(); return n || 'Team 2'; }
-  return v;
-}
-
-function renderList() {
-  const el = document.getElementById('annList');
-  document.getElementById('annCount').textContent = annotations.length;
-  if (annotations.length === 0) { el.innerHTML = '<div class="empty-state">No annotations yet</div>'; return; }
-  setTimeout(() => window._updateScrollBtn && window._updateScrollBtn(), 0);
-  el.innerHTML = annotations.map(a => {
-    const yt = ytLink(a.time);
-    const ytCell = yt ? `<a href="${yt}" target="_blank" title="Open YouTube -5s">▶ YT</a>` : '<span style="color:#333">—</span>';
-    const commentTitle = (a.comment || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/\n/g,'&#10;');
-    const commentDisplay = (a.comment || '').replace(/&/g,'&amp;').replace(/</g,'&lt;');
-    return `<div class="annotation-row" style="border-color:${COLORS[a.type]}" onclick="seekTo(${a.time})">
-      <span class="ann-time">${a.timeStr}</span>
-      <span class="ann-type" style="color:${COLORS[a.type]}">${a.type}</span>
-      <span class="ann-name${MENU[a.type] && MENU[a.type].length ? ' ann-name-editable' : ''}" id="ann-name-${a.id}" onclick="event.stopPropagation();editAnnotationName(${a.id})" title="${MENU[a.type] && MENU[a.type].length ? 'Click to change' : ''}">${a.name || '—'}</span>
-      <span class="ann-possession">${displayTeam(a.possessionOwner)}</span>
-      <span class="ann-comment" title="${commentTitle}">${commentDisplay || ''}</span>
-      <span class="ann-yt">${ytCell}</span>
-      <button class="ann-comment-btn" onclick="event.stopPropagation();openCommentEditor(${a.id})" title="${a.comment ? 'Edit comment' : 'Add comment'}">${a.comment ? '💬' : '✎'}</button>
-      <button class="ann-del" onclick="event.stopPropagation();deleteAnnotation(${a.id})" title="Delete">✕</button>
-    </div>`;
-  }).join('');
-}
-
-function renderMarkers() {
-  const track = document.getElementById('markersTrack');
-  const dur = getDuration();
-  if (!dur) { track.innerHTML = ''; return; }
-  track.innerHTML = annotations.map(a => {
-    const pct = (a.time / dur * 100).toFixed(3);
-    return `<div class="marker" style="left:${pct}%;background:${COLORS[a.type]}" onclick="seekTo(${a.time})">
-      <div class="marker-tooltip">${a.type}${a.name ? ': '+a.name : ''} @ ${a.timeStr}</div>
-    </div>`;
-  }).join('');
-}
-
-function seekTo(t) { if (videoLoaded) setCurrentTime(t); }
-
-function editAnnotationName(id) {
-  const ann = annotations.find(a => a.id === id);
-  if (!ann) return;
-  const opts = MENU[ann.type];
-  if (!opts || opts.length === 0) return;
-
-  const span = document.getElementById(`ann-name-${id}`);
-  if (!span) return;
-
-  const sel = document.createElement('select');
-  sel.className = 'ann-name-select';
-  opts.forEach(o => {
-    const opt = document.createElement('option');
-    opt.value = o;
-    opt.textContent = o;
-    if (o === ann.name) opt.selected = true;
-    sel.appendChild(opt);
   });
 
-  const commit = () => {
-    ann.name = sel.value;
-    ann.actionOwner = inferActionOwner(ann.possessionOwner, ann.type, ann.name);
-    recomputeOwnersFrom(ann.time);
-    renderList();
-    renderMarkers();
-  };
-  sel.onchange = commit;
-  sel.onblur = () => renderList();
-  sel.onkeydown = e => { if (e.key === 'Escape') { e.stopPropagation(); renderList(); } if (e.key === 'Enter') { e.stopPropagation(); commit(); } };
-  sel.onclick = e => e.stopPropagation();
-
-  span.replaceWith(sel);
-  sel.focus();
-}
-
-function recomputeOwnersFrom(startTime) {
-  if (!isFullGame()) return;
-  for (let i = 0; i < annotations.length; i++) {
-    const ann = annotations[i];
-    if (ann.time < startTime) continue;
-    if (ann.type === 'Game Event' || ann.type === 'To Review') continue;
-    let inferred = '';
-    for (let j = i - 1; j >= 0; j--) {
-      const prev = annotations[j];
-      if (prev.type === 'To Review' || !prev.possessionOwner) continue;
-      inferred = isJsTurnover(prev.type, prev.name)
-        ? (prev.possessionOwner === 'Team 1' ? 'Team 2' : 'Team 1')
-        : prev.possessionOwner;
-      break;
-    }
-    ann.possessionOwner = inferred;
-    ann.actionOwner = inferActionOwner(inferred, ann.type, ann.name);
-  }
-}
-
-function deleteAnnotation(id) {
-  const deleted = annotations.find(a => a.id === id);
-  annotations = annotations.filter(a => a.id !== id);
-  if (deleted) recomputeOwnersFrom(deleted.time);
-  renderList(); renderMarkers();
-  if (annotations.length === 0) document.getElementById('lastAnnBtn').setAttribute('disabled','');
-}
-
-function clearAll() {
-  if (!annotations.length) return;
-  if (confirm('Delete all annotations?')) {
-    annotations = [];
-    renderList(); renderMarkers();
-    document.getElementById('lastAnnBtn').setAttribute('disabled','');
-  }
-}
-
-// ── Load from Google Sheet ─────────────────────────────────────
-async function loadFromSheet() {
-  const sheetName = document.getElementById('sheetSelect').value;
-  if (!sheetName) { alert('Select a game first.'); return; }
-  if (APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_URL_HERE') { alert('APPS_SCRIPT_URL is not configured in viewer.html.'); return; }
-
-  const btn = document.getElementById('loadSheetBtn');
-  btn.disabled = true;
-  btn.textContent = '⏳ Loading…';
-
-  try {
-    const url = `${APPS_SCRIPT_URL}?secret=${encodeURIComponent(APPS_SCRIPT_SECRET)}&sheetName=${encodeURIComponent(sheetName)}`;
-    const resp = await fetch(url);
-    const result = await resp.json();
-
-    if (!result.ok) { alert('Error: ' + result.error); return; }
-
-    // rows[0] is the header row — skip it
-    const headers = result.rows[0].map(h => h.toLowerCase());
-    const col = name => headers.indexOf(name);
-    const timeIdx      = col('time'), typeIdx = col('type'), nameIdx = col('name');
-    const possIdx      = col('possession owner'), ytIdx = col('youtube link');
-    const commentIdx   = col('comment'), actionOwnerIdx = col('action owner');
-
-    const loaded = result.rows.slice(1).map(r => {
-      const timeStr = r[timeIdx] || '';
-      const parts   = timeStr.split(':').map(Number);
-      const time    = parts.length === 3 ? parts[0]*3600 + parts[1]*60 + parts[2] : 0;
-      const possessionOwner = possIdx >= 0 ? (r[possIdx] || '') : '';
-      const type = r[typeIdx], name = r[nameIdx] || '';
-      const actionOwner = actionOwnerIdx >= 0 && r[actionOwnerIdx] ? r[actionOwnerIdx] : inferActionOwner(possessionOwner, type, name);
-      return { id: Date.now() + Math.random(), type, name, possessionOwner, actionOwner,
-               comment: commentIdx >= 0 ? (r[commentIdx] || '') : '',
-               time, timeStr };
-    }).filter(a => a.type && COLORS[a.type]);
-
-    if (!loaded.length) { alert('No valid annotations found in this tab.'); return; }
-    annotations = loaded.sort((a, b) => a.time - b.time);
-    renderList(); renderMarkers();
-
-    // Populate metadata fields
-    const m = result.meta || {};
-    document.getElementById('metaTeam1').value       = m.team1       || '';
-    document.getElementById('metaTeam2').value       = m.team2       || '';
-    document.getElementById('metaYear').value        = m.year        || '';
-    document.getElementById('metaDivision').value    = m.division    || '';
-    document.getElementById('metaCompetition').value = m.competition || '';
-    updateSheetPreview();
-
-    // Auto-load YouTube video after annotations are rendered
-    if (ytIdx >= 0) {
-      const firstYtUrl = result.rows.slice(1).map(r => r[ytIdx]).find(v => v && String(v).includes('youtu'));
-      if (firstYtUrl) {
-        const m = String(firstYtUrl).match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/);
-        if (m) {
-          document.getElementById('ytUrl').value = `https://www.youtube.com/watch?v=${m[1]}`;
-          loadYouTube();
-        }
-      }
-    }
-    document.getElementById('lastAnnBtn').removeAttribute('disabled');
-    btn.textContent = `✓ Loaded ${loaded.length}`;
-    setTimeout(() => { btn.disabled = false; btn.textContent = '⬇ Load from Sheet'; }, 2500);
-  } catch (err) {
-    alert('Network error: ' + err.message);
-    btn.disabled = false;
-    btn.textContent = '⬇ Load from Sheet';
-  }
-}
-
-// ── Push to Google Sheet ───────────────────────────────────────
-function metaToSheetName() {
-  const slug = s => s.trim().toLowerCase().replace(/\s+/g, '-');
-  const year  = slug(document.getElementById('metaYear').value);
-  const div   = slug(document.getElementById('metaDivision').value);
-  const comp  = slug(document.getElementById('metaCompetition').value);
-  const t1    = slug(document.getElementById('metaTeam1').value);
-  const t2    = slug(document.getElementById('metaTeam2').value);
-  return [year, div, comp, t1, t2].filter(Boolean).join('_');
-}
-
-function updateSheetPreview() {
-  const name = metaToSheetName();
-  const el = document.getElementById('sheetPreview');
-  el.textContent = name || 'fill metadata to generate tab name';
-  el.style.color = name ? '#3b82f6' : '#555';
-  document.getElementById('teamBtn1').textContent = displayTeam('Team 1');
-  document.getElementById('teamBtn2').textContent = displayTeam('Team 2');
-  if (annotations.length) renderList();
-}
-
-async function pushToSheet(override = false) {
-  if (annotations.length === 0) { alert('No annotations to push.'); return; }
-  const sheetName = metaToSheetName();
-  if (!sheetName) { alert('Fill in the metadata fields — the sheet tab name is derived from them.'); return; }
-  if (APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_URL_HERE') { alert('APPS_SCRIPT_URL is not configured in viewer.html.'); return; }
-
-  const overridePassword = override ? document.getElementById('overridePass').value.trim() : '';
-  if (override && !overridePassword) { alert('Enter the override password first.'); return; }
-
-  const btn = override ? document.getElementById('overrideBtn') : document.getElementById('pushBtn');
-  btn.disabled = true;
-  btn.textContent = '⏳ Pushing…';
-
-  // Column order must match HEADERS in Code.gs: Time, Possession Owner, Type, Name, To Review, Comment, Youtube Link, Action Owner
-  const rows = annotations.map(a => {
-    const outType = a.type;
-    return [
-      a.timeStr,
-      a.possessionOwner || '',
-      outType,
-      a.name || '',
-      a.type === 'To Review' ? 'Yes' : '',
-      a.comment || '',
-      ytLink(a.time),
-      a.actionOwner || '',
-    ];
+  handle.addEventListener('pointerup', () => {
+    if (!dragging) return;
+    dragging = false;
+    handle.classList.remove('dragging');
+    document.body.style.userSelect = '';
+    document.getElementById('ytContainer').style.pointerEvents = '';
   });
+}
 
-  try {
-    const body = {
-      secret: APPS_SCRIPT_SECRET, sheetName, rows,
-      meta: {
-        team1:       document.getElementById('metaTeam1').value.trim(),
-        team2:       document.getElementById('metaTeam2').value.trim(),
-        year:        document.getElementById('metaYear').value.trim(),
-        division:    document.getElementById('metaDivision').value.trim(),
-        competition: document.getElementById('metaCompetition').value.trim(),
-        video:       videoBaseName,
-      },
-    };
-    if (override) body.overridePassword = overridePassword;
-
-    const resp = await fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify(body)
-    });
-    const result = await resp.json();
-
-    if (!result.ok) {
-      // Tab exists and no override attempted — reveal the override controls
-      if (result.tabExists && !override) {
-        document.getElementById('overridePass').style.display = '';
-        document.getElementById('overrideBtn').style.display = '';
-        alert(`Tab "${sheetName}" already exists.\nEnter the admin password and click ⚠ Override Tab to replace it.`);
-        btn.disabled = false;
-        btn.textContent = '⬆ Push to Sheet';
-        return;
-      }
-      alert('Error: ' + result.error);
-      btn.disabled = false;
-      btn.textContent = override ? '⚠ Override Tab' : '⬆ Push to Sheet';
-      return;
+function toggleLayout() {
+  const split    = document.getElementById('split');
+  const btn      = document.getElementById('layoutBtn');
+  const vertical = split.classList.toggle('vertical');
+  btn.textContent    = vertical ? '↔ Side' : '↕ Stack';
+  btn.style.borderColor = vertical ? 'var(--accent)' : 'var(--border)';
+  btn.style.color       = vertical ? 'var(--accent)' : 'var(--text-muted)';
+  localStorage.setItem('events-layout', vertical ? 'vertical' : 'horizontal');
+}
+(function initLayout() {
+  const saved = localStorage.getItem('events-layout');
+  if (saved === 'vertical') {
+    document.getElementById('split').classList.add('vertical');
+    const btn = document.getElementById('layoutBtn');
+    if (btn) {
+      btn.textContent    = '↔ Side';
+      btn.style.borderColor = 'var(--accent)';
+      btn.style.color       = 'var(--accent)';
     }
-
-    // Success — hide override controls and reset
-    document.getElementById('overridePass').style.display = 'none';
-    document.getElementById('overridePass').value = '';
-    document.getElementById('overrideBtn').style.display = 'none';
-    btn.textContent = `✓ Pushed ${result.appended} rows!`;
-    setTimeout(() => { btn.disabled = false; btn.textContent = override ? '⚠ Override Tab' : '⬆ Push to Sheet'; }, 2500);
-  } catch (err) {
-    alert('Network error: ' + err.message);
-    btn.disabled = false;
-    btn.textContent = override ? '⚠ Override Tab' : '⬆ Push to Sheet';
   }
-}
+})();
 
-// ── CSV export ─────────────────────────────────────────────────
-function exportCSV() {
-  if (annotations.length === 0) { alert('No annotations to export.'); return; }
-  const fullGame = isFullGame();
-  const headers = ['Time','Type','Name','Possession Owner'];
-  if (fullGame) headers.push('Turnover');
-  headers.push('To Review','Comment','Youtube Link','Action Owner');
-  const rows = [headers.join(','),
-    ...annotations.map(a => {
-      const yt = ytLink(a.time);
-      const toReview = a.type === 'To Review' ? 'Yes' : '';
-      const outType = a.type;
-      const cols = [a.timeStr, outType, a.name, a.possessionOwner || ''];
-      if (fullGame) cols.push(isJsTurnover(a.type, a.name) ? 'Yes' : '');
-      cols.push(toReview, a.comment || '', yt, a.actionOwner || '');
-      return cols.join(',');
-    })
-  ];
-  const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = `${videoBaseName}.csv`;
-  link.click(); URL.revokeObjectURL(link.href);
-}
-
-// ── CSV import ─────────────────────────────────────────────────
-function loadCSV(e) {
-  const f = e.target.files[0]; if (!f) return;
-  const reader = new FileReader();
-  reader.onload = ev => {
-    const allLines = ev.target.result.trim().split('\n').filter(l => l.trim());
-    if (allLines.length < 2) { alert('No valid annotations found in CSV.'); return; }
-    const headers = allLines[0].split(',').map(h => h.trim().toLowerCase());
-    const col = name => headers.indexOf(name.toLowerCase());
-    const timeIdx = col('time'), typeIdx = col('type'), nameIdx = col('name');
-    const possessionIdx = col('possession owner'), ytIdx = col('youtube link');
-    const commentIdx = col('comment'), actionOwnerIdx = col('action owner');
-    if (timeIdx < 0 || typeIdx < 0 || nameIdx < 0) { alert('CSV missing required columns (Time, Type, Name).'); return; }
-    const loaded = [];
-    let firstYtUrl = '';
-    for (const line of allLines.slice(1)) {
-      const parts = line.split(',');
-      const timeStr = parts[timeIdx]?.trim(), type = parts[typeIdx]?.trim(), name = parts[nameIdx]?.trim() || '';
-      const possessionOwner = possessionIdx >= 0 && parts[possessionIdx] ? parts[possessionIdx].trim() : '';
-      const comment = commentIdx >= 0 && parts[commentIdx] ? parts[commentIdx].trim() : '';
-      const actionOwner = actionOwnerIdx >= 0 && parts[actionOwnerIdx] ? parts[actionOwnerIdx].trim() : inferActionOwner(possessionOwner, type, name);
-      if (!firstYtUrl && ytIdx >= 0 && parts[ytIdx]) firstYtUrl = parts[ytIdx].trim();
-      if (!timeStr || !COLORS[type]) continue;
-      const cleanTime = timeStr.includes(' ') ? timeStr.split(' ')[1] : timeStr;
-      const tp = cleanTime.split(':').map(Number);
-      const time = tp.length === 3 ? tp[0]*3600+tp[1]*60+tp[2] : tp[0]*60+tp[1];
-      if (isNaN(time)) continue;
-      loaded.push({ id: Date.now()+Math.random(), type, name, possessionOwner, actionOwner, comment, time, timeStr: cleanTime });
-    }
-    if (!loaded.length) { alert('No valid annotations found in CSV.'); return; }
-    annotations = loaded.sort((a,b)=>a.time-b.time);
-    // Clear metadata fields
-    ['metaTeam1','metaTeam2','metaYear','metaDivision','metaCompetition'].forEach(id => {
-      document.getElementById(id).value = '';
-    });
-    renderList(); renderMarkers();
-    if (annotations.length) document.getElementById('lastAnnBtn').removeAttribute('disabled');
-    setStatus(`✓ Loaded ${loaded.length} annotations from CSV`);
-    if (firstYtUrl) {
-      const m = firstYtUrl.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/);
-      if (m) {
-        document.getElementById('ytUrl').value = `https://www.youtube.com/watch?v=${m[1]}`;
-        loadYouTube();
-      }
-    }
-  };
-  reader.readAsText(f);
-  e.target.value = '';
-}
-
-// ── Comment editor ─────────────────────────────────────────────
-let editingCommentId = null;
-
-function openCommentEditor(id) {
-  editingCommentId = id;
-  const ann = annotations.find(a => a.id === id);
-  if (!ann) return;
-  document.getElementById('commentTextarea').value = ann.comment || '';
-  document.getElementById('commentOverlay').style.display = '';
-  document.getElementById('commentDialog').style.display = '';
-  setTimeout(() => document.getElementById('commentTextarea').focus(), 0);
-}
-
-function closeCommentEditor() {
-  editingCommentId = null;
-  document.getElementById('commentOverlay').style.display = 'none';
-  document.getElementById('commentDialog').style.display = 'none';
-}
-
-function saveComment() {
-  if (editingCommentId === null) return;
-  const ann = annotations.find(a => a.id === editingCommentId);
-  if (ann) {
-    ann.comment = document.getElementById('commentTextarea').value;
-    renderList();
-  }
-  closeCommentEditor();
-}
-
-// ── Keyboard shortcuts ─────────────────────────────────────────
-const TYPE_KEYS = { 't':'Try', 'u':'Turnover', 'p':'Penalty Attack', 'q':'Penalty Defence', 'g':'Game Event', 'r':'To Review' };
-
+// ── Keyboard shortcuts ────────────────────────────────────────────
 document.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
-  const k = e.key.toLowerCase();
-  if (k === ' ') { e.preventDefault(); togglePlay(); return; }
-  if (e.key === 'ArrowLeft') { skip(-5); return; }
-  if (e.key === 'ArrowRight') { skip(5); return; }
-  if (e.key === 'Escape') {
-    selectedType = null; pendingType = null; pendingName = null;
-    hideTeamMenu();
-    document.querySelectorAll('.tag-btn').forEach(b => b.classList.remove('active'));
-    document.getElementById('submenu').innerHTML = '<span class="submenu-empty">Select an action above — then choose a sub-type (or press 1–9)</span>';
-    if (wasPlaying) { wasPlaying = false; doPlay(); }
-    return;
-  }
-  if (TYPE_KEYS[k]) { selectType(TYPE_KEYS[k]); return; }
-  if (k === '6' && isDefaultOther()) { quickTag('Turnover', '6th Touch'); return; }
-  if (k === '5' && isDefaultOther()) { quickTag('Turnover', '6 Again'); return; }
-  // Team selection when team menu is showing
-  if (pendingType !== null && (e.key === '1' || e.key === '2')) {
-    e.preventDefault(); selectTeam(e.key === '1' ? 'Team 1' : 'Team 2'); return;
-  }
-  // Sub-type by number
-  if (selectedType && /^[1-9]$/.test(e.key)) {
-    const opts = MENU[selectedType];
-    const idx = parseInt(e.key) - 1;
-    if (idx < opts.length) { e.preventDefault(); selectSubType(selectedType, opts[idx]); }
-  }
+  if (e.key === ' ')            { e.preventDefault(); togglePlay(); }
+  if (e.key === 'ArrowLeft')   { skip(-5); }
+  if (e.key === 'ArrowRight')  { skip(5); }
+  if (e.key === 'ArrowUp')     { e.preventDefault(); navigateRow(-1); }
+  if (e.key === 'ArrowDown')   { e.preventDefault(); navigateRow(1); }
 });
+
+function enc(s) { return encodeURIComponent(s); }
 </script>
 </body>
 </html>
