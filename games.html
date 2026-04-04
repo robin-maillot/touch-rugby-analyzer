@@ -125,8 +125,8 @@ const APPS_SCRIPT_SECRET = sessionStorage.getItem('password') || '';
 
 // ── localStorage cache (stale-while-revalidate) ─────────────────
 const LS = {
-  get(k)    { try { return JSON.parse(localStorage.getItem('trl_' + k)); } catch { return null; } },
-  set(k, v) { try { localStorage.setItem('trl_' + k, JSON.stringify(v)); } catch {} },
+  get(k)    { try { return JSON.parse(localStorage.getItem('trl2_' + k)); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem('trl2_' + k, JSON.stringify(v)); } catch {} },
 };
 
 // Charts use container width (responsive)
@@ -206,7 +206,9 @@ async function loadGame() {
   setStatus('');
 
   function applyGame(result) {
-    const m = gamesMeta[sheetName] || result.meta || {};
+    const listed = gamesMeta[sheetName] || {};
+    const fetched = result.meta || {};
+    const m = { ...fetched, ...listed };
     const fallback = getTeamNames(sheetName);
     const team1 = m.team1 || fallback[0];
     const team2 = m.team2 || fallback[1];
@@ -220,7 +222,8 @@ async function loadGame() {
         else if (e[col] === 'Team 2') e[col] = team2;
       }
     });
-    renderGame(events, team1, team2, subtitle, m.analyzable, m.youtubelink || '');
+    const youtubelink = listed.youtubelink || fetched.youtubelink || '';
+    renderGame(events, team1, team2, subtitle, m.analyzable, youtubelink);
   }
 
   const cachedGame = LS.get('game_' + sheetName);

@@ -342,8 +342,8 @@ const APPS_SCRIPT_URL    = 'https://script.google.com/macros/s/AKfycbzhMw4nQr2nV
 const APPS_SCRIPT_SECRET = sessionStorage.getItem('password') || '';
 
 const LS = {
-  get(k)    { try { return JSON.parse(localStorage.getItem('trl_' + k)); } catch { return null; } },
-  set(k, v) { try { localStorage.setItem('trl_' + k, JSON.stringify(v)); } catch {} },
+  get(k)    { try { return JSON.parse(localStorage.getItem('trl2_' + k)); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem('trl2_' + k, JSON.stringify(v)); } catch {} },
 };
 
 const FILTERABLE  = ['Type', 'Name', 'Possession Owner', 'Action Owner', 'Game'];

@@ -258,24 +258,28 @@ function writeMeta(sheetName, meta) {
   const ai   = col('analyzable');
   const yui  = col('youtube link');
 
-  // Build a row the same width as the header, filling known columns by position
+  // Find existing row, if any
   const numCols = headers.length;
-  const makeRow = () => Array(numCols).fill('');
-  const row = makeRow();
-  if (ni  >= 0) row[ni]  = sheetName;
-  if (t1i >= 0) row[t1i] = meta.team1       || '';
-  if (t2i >= 0) row[t2i] = meta.team2       || '';
-  if (ci  >= 0) row[ci]  = meta.competition || '';
-  if (yi  >= 0) row[yi]  = meta.year        || '';
-  if (di  >= 0) row[di]  = meta.division    || '';
-  if (vi  >= 0) row[vi]  = meta.video       || '';
-  if (ai  >= 0) row[ai]  = meta.analyzable  || '';
-  if (yui >= 0) row[yui] = meta.youtubelink || '';
-
   let existingRow = -1;
+  let existingData = null;
   for (let i = 1; i < values.length; i++) {
-    if (ni >= 0 && values[i][ni] === sheetName) { existingRow = i + 1; break; } // 1-indexed
+    if (ni >= 0 && values[i][ni] === sheetName) { existingRow = i + 1; existingData = values[i]; break; }
   }
+
+  // Start from existing data (to preserve fields not in this update) or a blank row
+  const row = existingData ? existingData.map(String) : Array(numCols).fill('');
+  while (row.length < numCols) row.push('');
+
+  // Only overwrite fields that are explicitly provided in meta
+  if (ni  >= 0)                             row[ni]  = sheetName;
+  if (t1i >= 0 && meta.team1       != null) row[t1i] = meta.team1;
+  if (t2i >= 0 && meta.team2       != null) row[t2i] = meta.team2;
+  if (ci  >= 0 && meta.competition != null) row[ci]  = meta.competition;
+  if (yi  >= 0 && meta.year        != null) row[yi]  = meta.year;
+  if (di  >= 0 && meta.division    != null) row[di]  = meta.division;
+  if (vi  >= 0 && meta.video       != null) row[vi]  = meta.video;
+  if (ai  >= 0 && meta.analyzable  != null) row[ai]  = meta.analyzable;
+  if (yui >= 0 && meta.youtubelink != null) row[yui] = meta.youtubelink;
 
   if (existingRow > 0) {
     sheet.getRange(existingRow, 1, 1, numCols).setValues([row]);
