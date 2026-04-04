@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live Games — Touch Rugby Analyzer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0f1117;
+      --surface:   #181b26;
+      --surface-2: #22253a;
+      --border:    #2a2d3a;
+      --text:      #e0e0e0;
+      --text-muted:#888;
+      --accent:    #3b82f6;
+    }
+
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    header h1 { font-size: 1rem; font-weight: 600; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: #ef4444; animation: pulse 1.4s ease-in-out infinite; flex-shrink: 0; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+    .refresh-info { margin-left: auto; font-size: 0.75rem; color: var(--text-muted); }
+
+    main { padding: 32px 24px; max-width: 900px; margin: 0 auto; }
+
+    #empty {
+      text-align: center;
+      padding: 80px 24px;
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+    #empty p { margin-top: 8px; font-size: 0.8rem; }
+
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    .live-badge {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      color: #ef4444;
+      background: rgba(239,68,68,0.12);
+      border: 1px solid rgba(239,68,68,0.3);
+      border-radius: 4px;
+      padding: 2px 7px;
+    }
+    .game-time { margin-left: auto; font-size: 0.78rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+    .scoreboard {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .team { flex: 1; text-align: center; }
+    .team-name { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .score { font-size: 2.8rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+    .divider { font-size: 1.4rem; color: var(--border); flex-shrink: 0; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="dot"></div>
+  <h1>Live Games</h1>
+  <span class="refresh-info" id="refreshInfo">refreshing every 30s</span>
+</header>
+
+<main>
+  <div id="empty" style="display:none">
+    No live games right now
+    <p>Games appear here when an annotator enables live mode.</p>
+  </div>
+  <div class="grid" id="grid"></div>
+</main>
+
+<script>
+const APPS_SCRIPT_URL    = 'https://script.google.com/macros/s/AKfycbzhMw4nQr2nVW0MLfPWVXRPXsvImerpzshQ5GnJ3873qQkGMz0bcJQdmTRXCxwygfFm/exec';
+const APPS_SCRIPT_SECRET = sessionStorage.getItem('password') || 'm30';
+const STALE_MS           = 2 * 60 * 1000; // hide games not updated in last 2 minutes
+
+function fmtTime(seconds) {
+  const s = Math.floor(seconds);
+  const m = Math.floor(s / 60);
+  const h = Math.floor(m / 60);
+  if (h > 0) return `${h}:${String(m % 60).padStart(2,'0')}:${String(s % 60).padStart(2,'0')}`;
+  return `${m}:${String(s % 60).padStart(2,'0')}`;
+}
+
+function render(games) {
+  const grid  = document.getElementById('grid');
+  const empty = document.getElementById('empty');
+  const now   = Date.now();
+
+  const active = games.filter(g => {
+    if (!g.updatedAt) return true;
+    return (now - new Date(g.updatedAt).getTime()) < STALE_MS;
+  });
+
+  if (!active.length) {
+    grid.innerHTML  = '';
+    empty.style.display = 'block';
+    return;
+  }
+
+  empty.style.display = 'none';
+  grid.innerHTML = active.map(g => `
+    <div class="card">
+      <div class="card-header">
+        <span class="live-badge">LIVE</span>
+        <span class="game-time">${fmtTime(g.timeSeconds)}</span>
+      </div>
+      <div class="scoreboard">
+        <div class="team">
+          <div class="team-name">${g.team1 || 'Team 1'}</div>
+          <div class="score">${g.score1}</div>
+        </div>
+        <div class="divider">–</div>
+        <div class="team">
+          <div class="team-name">${g.team2 || 'Team 2'}</div>
+          <div class="score">${g.score2}</div>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function fetchLive() {
+  try {
+    const resp   = await fetch(`${APPS_SCRIPT_URL}?secret=${encodeURIComponent(APPS_SCRIPT_SECRET)}&action=live`);
+    const result = await resp.json();
+    if (result.ok) {
+      render(result.games);
+      document.getElementById('refreshInfo').textContent = `updated ${new Date().toLocaleTimeString()}`;
+    }
+  } catch (err) {
+    // keep showing last state on network error
+  }
+}
+
+fetchLive();
+setInterval(fetchLive, 30000);
+</script>
+</body>
+</html>

@@ -1,8 +1,9 @@
 // ── Configuration ──────────────────────────────────────────────
 const SHEET_ID        = '1B9DwThGoINgicevtjoUDkeQBoGBCD6QFjL0oL7mAU-k';
-const SECRET          = 'm30-test-key';
-const OVERRIDE_PASS   = 'm30-admin';
+const VALID_SECRETS   = new Set(['m30', 'm30-admin', 'm30-staff']);
+const ADMIN_SECRET    = 'm30-admin';
 const METADATA_SHEET  = '_metadata';  // reserved tab name for game metadata
+const LIVE_SHEET      = '_live';      // reserved tab name for live game state
 
 // Expected column order (must match what the Python pipeline reads)
 const HEADERS = ['Time', 'Possession Owner', 'Type', 'Name', 'To Review', 'Comment', 'Youtube Link', 'Action Owner'];
@@ -67,8 +68,33 @@ function rawJson(str) {
 // ── GET — list sheets or fetch rows from a tab ─────────────────
 function doGet(e) {
   try {
-    if (e.parameter.secret !== SECRET) {
+    if (!VALID_SECRETS.has(e.parameter.secret)) {
       return json({ ok: false, error: 'Unauthorized' });
+    }
+
+    // action=live → current live game states
+    if (e.parameter.action === 'live') {
+      const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(LIVE_SHEET);
+      if (!sheet) return json({ ok: true, games: [] });
+      const values = sheet.getDataRange().getDisplayValues();
+      if (values.length < 2) return json({ ok: true, games: [] });
+      const h   = values[0].map(s => s.toLowerCase().trim());
+      const col = name => h.indexOf(name);
+      const ni  = col('sheet name'), t1i = col('team 1'), t2i = col('team 2');
+      const s1i = col('score 1'),    s2i = col('score 2');
+      const tsi = col('time seconds'), uai = col('updated at');
+      const games = values.slice(1)
+        .map(row => ({
+          name:        row[ni]  || '',
+          team1:       t1i >= 0 ? row[t1i] : '',
+          team2:       t2i >= 0 ? row[t2i] : '',
+          score1:      s1i >= 0 ? Number(row[s1i]) : 0,
+          score2:      s2i >= 0 ? Number(row[s2i]) : 0,
+          timeSeconds: tsi >= 0 ? Number(row[tsi]) : 0,
+          updatedAt:   uai >= 0 ? row[uai] : '',
+        }))
+        .filter(g => g.name);
+      return json({ ok: true, games });
     }
 
     // action=list → sheet names + metadata for each game
@@ -137,19 +163,31 @@ function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents);
 
-    if (data.secret !== SECRET) {
+    if (!VALID_SECRETS.has(data.secret)) {
       return json({ ok: false, error: 'Unauthorized' });
+    }
+
+    // action=live_update → upsert a row in _live
+    if (data.action === 'live_update') {
+      writeLiveRow(data.sheetName, data.team1, data.team2, data.score1, data.score2, data.timeSeconds);
+      return json({ ok: true });
+    }
+
+    // action=live_clear → remove a row from _live
+    if (data.action === 'live_clear') {
+      clearLiveRow(data.sheetName);
+      return json({ ok: true });
     }
 
     const ss    = SpreadsheetApp.openById(SHEET_ID);
     const sheet = ss.getSheetByName(data.sheetName);
 
     if (sheet) {
-      if (!data.overridePassword) {
+      if (!data.override) {
         return json({ ok: false, error: `Tab "${data.sheetName}" already exists.`, tabExists: true });
       }
-      if (data.overridePassword !== OVERRIDE_PASS) {
-        return json({ ok: false, error: 'Incorrect override password.' });
+      if (data.secret !== ADMIN_SECRET) {
+        return json({ ok: false, error: 'Admin access required to override.' });
       }
       ss.deleteSheet(sheet);
     }
@@ -260,6 +298,41 @@ function backfillMetadata() {
   });
 
   Logger.log('_metadata backfilled with ' + sheets.length + ' games.');
+}
+
+// ── Live game state helpers ─────────────────────────────────────
+function writeLiveRow(sheetName, team1, team2, score1, score2, timeSeconds) {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  let sheet = ss.getSheetByName(LIVE_SHEET);
+  if (!sheet) {
+    sheet = ss.insertSheet(LIVE_SHEET);
+    sheet.appendRow(['Sheet Name', 'Team 1', 'Team 2', 'Score 1', 'Score 2', 'Time Seconds', 'Updated At']);
+  }
+
+  const now    = new Date().toISOString();
+  const newRow = [sheetName, team1 || '', team2 || '', score1 || 0, score2 || 0, timeSeconds || 0, now];
+  const values = sheet.getDataRange().getValues();
+
+  for (let i = 1; i < values.length; i++) {
+    if (String(values[i][0]) === sheetName) {
+      sheet.getRange(i + 1, 1, 1, newRow.length).setValues([newRow]);
+      return;
+    }
+  }
+  sheet.appendRow(newRow);
+}
+
+function clearLiveRow(sheetName) {
+  const ss    = SpreadsheetApp.openById(SHEET_ID);
+  const sheet = ss.getSheetByName(LIVE_SHEET);
+  if (!sheet) return;
+  const values = sheet.getDataRange().getValues();
+  for (let i = 1; i < values.length; i++) {
+    if (String(values[i][0]) === sheetName) {
+      sheet.deleteRow(i + 1);
+      return;
+    }
+  }
 }
 
 function json(obj) {

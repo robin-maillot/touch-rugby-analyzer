@@ -127,6 +127,11 @@
         <div class="card-title">Event Viewer</div>
         <div class="card-desc">Browse events with video</div>
       </a>
+      <a class="nav-card" href="live.html">
+        <div class="card-icon">🔴</div>
+        <div class="card-title">Live</div>
+        <div class="card-desc">Live scores &amp; games</div>
+      </a>
       <a class="nav-card" href="annotator.html" id="annotatorCard" style="display:none">
         <div class="card-icon">🎬</div>
         <div class="card-title">Annotator</div>
@@ -137,7 +142,7 @@
 
 <script>
   // --- PASSWORD LOGIC ---
-  const PASSWORDS = { 'm30': 'basic', 'm30-staff': 'staff' };
+  const PASSWORDS = { 'm30': 'basic', 'm30-staff': 'staff', 'm30-admin': 'admin' };
 
   const loginScreen = document.getElementById('login-screen');
   const appContent  = document.getElementById('app-content');
@@ -146,8 +151,10 @@
   const errorMsg    = document.getElementById('error-msg');
 
   function checkPassword() {
-    const level = PASSWORDS[passInput.value];
+    const pwd   = passInput.value;
+    const level = PASSWORDS[pwd];
     if (level) {
+      sessionStorage.setItem('password', pwd);
       initApp(level);
     } else {
       errorMsg.style.display = 'block';
@@ -161,8 +168,7 @@
 
   // --- APP LOGIC ---
   function initApp(level) {
-    sessionStorage.setItem('accessLevel', level);
-    if (level === 'staff') {
+    if (level === 'staff' || level === 'admin') {
       document.getElementById('annotatorCard').style.display = '';
     }
     loginScreen.style.display = 'none';

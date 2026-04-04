@@ -188,6 +188,7 @@
   <nav style="display:flex;gap:4px;margin-left:auto;align-items:center">
     <button id="layoutBtn" class="layout-btn" onclick="toggleLayout()" title="Toggle video layout">↔ Side</button>
     <a href="games.html" style="color:#888;text-decoration:none;font-size:0.8rem;padding:5px 10px;border-radius:6px;transition:background 0.15s" onmouseover="this.style.background='#22253a';this.style.color='#e0e0e0'" onmouseout="this.style.background='';this.style.color='#888'">Games</a>
+    <a href="dashboard.html" style="color:#888;text-decoration:none;font-size:0.8rem;padding:5px 10px;border-radius:6px;transition:background 0.15s" onmouseover="this.style.background='#22253a';this.style.color='#e0e0e0'" onmouseout="this.style.background='';this.style.color='#888'">Dashboard</a>
     <a href="viewer.html" style="color:#888;text-decoration:none;font-size:0.8rem;padding:5px 10px;border-radius:6px;transition:background 0.15s" onmouseover="this.style.background='#22253a';this.style.color='#e0e0e0'" onmouseout="this.style.background='';this.style.color='#888'">Events</a>
     <a href="annotator.html" style="background:#22253a;color:#3b82f6;text-decoration:none;font-size:0.8rem;padding:5px 10px;border-radius:6px">Annotator</a>
   </nav>
@@ -235,7 +236,7 @@
     <select id="sheetSelect" style="min-width:220px"><option value="">Loading games…</option></select>
     <button class="btn btn-load" id="loadSheetBtn" onclick="loadFromSheet()">⬇ Load from Sheet</button>
     <button class="btn btn-push" id="pushBtn" onclick="pushToSheet()">⬆ Push to Sheet</button>
-    <input class="yt-input" id="overridePass" type="password" placeholder="Override password (admin only)" style="width:200px;display:none">
+    <button class="btn btn-ghost" id="liveBtn" onclick="toggleLive()" title="Broadcast live score every 30s">⚫ Go Live</button>
     <button class="btn btn-danger" id="overrideBtn" style="display:none" onclick="pushToSheet(true)">⚠ Override Tab</button>
     <input type="file" id="csvInput" accept=".csv" style="display:none" onchange="loadCSV(event)">
   </div>
@@ -339,9 +340,7 @@
 
 <script>
 // ── Access gate ────────────────────────────────────────────────
-if (sessionStorage.getItem('accessLevel') !== 'staff') {
-  window.location.replace('index.html');
-}
+{ const p = sessionStorage.getItem('password'); if (p !== 'm30-staff' && p !== 'm30-admin') window.location.replace('index.html'); }
 
 // ── Status bar helper ──────────────────────────────────────────
 function setStatus(msg, isError = false) {
@@ -360,7 +359,7 @@ function setStatus(msg, isError = false) {
 // ── Apps Script config ─────────────────────────────────────────
 // Set these after deploying apps_script/Code.gs as a Web App
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzhMw4nQr2nVW0MLfPWVXRPXsvImerpzshQ5GnJ3873qQkGMz0bcJQdmTRXCxwygfFm/exec';
-const APPS_SCRIPT_SECRET = 'm30-test-key';  // must match Code.gs
+const APPS_SCRIPT_SECRET = sessionStorage.getItem('password') || '';
 
 const COLORS = { 'Try':'#22c55e', 'Turnover':'#f97316', 'Penalty Attack':'#ef4444', 'Penalty Defence':'#b91c1c', 'Penalty':'#ef4444', 'Game Event':'#3b82f6', 'To Review':'#a855f7' };
 
@@ -384,7 +383,7 @@ async function fetchGameList() {
       sel.appendChild(opt);
     });
   } catch (err) {
-    sel.innerHTML = '<option value="">Could not load games</option>';
+    sel.innerHTML = `<option value="">Could not load games: ${err.message}</option>`;
   }
 }
 window.addEventListener('DOMContentLoaded', () => {
@@ -992,14 +991,64 @@ function updateSheetPreview() {
   if (annotations.length) renderList();
 }
 
+// ── Live mode ──────────────────────────────────────────────────
+let liveMode     = false;
+let liveInterval = null;
+
+function toggleLive() {
+  const sheetName = metaToSheetName();
+  if (!sheetName) { alert('Fill in the metadata fields — the sheet tab name is needed for live mode.'); return; }
+  liveMode = !liveMode;
+  const btn = document.getElementById('liveBtn');
+  if (liveMode) {
+    btn.textContent = '🔴 Live';
+    btn.style.color = '#ef4444';
+    pushLiveUpdate();
+    liveInterval = setInterval(pushLiveUpdate, 30000);
+    window.addEventListener('beforeunload', stopLive);
+  } else {
+    stopLive();
+  }
+}
+
+function stopLive() {
+  liveMode = false;
+  clearInterval(liveInterval);
+  liveInterval = null;
+  const btn = document.getElementById('liveBtn');
+  if (btn) { btn.textContent = '⚫ Go Live'; btn.style.color = ''; }
+  const sheetName = metaToSheetName();
+  if (sheetName) {
+    fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ secret: APPS_SCRIPT_SECRET, action: 'live_clear', sheetName }),
+    }).catch(() => {});
+  }
+}
+
+async function pushLiveUpdate() {
+  const sheetName = metaToSheetName();
+  if (!sheetName) return;
+  const team1 = document.getElementById('metaTeam1').value.trim() || 'Team 1';
+  const team2 = document.getElementById('metaTeam2').value.trim() || 'Team 2';
+  const score1 = annotations.filter(a => a.type === 'Try' && a.actionOwner === 'Team 1').length;
+  const score2 = annotations.filter(a => a.type === 'Try' && a.actionOwner === 'Team 2').length;
+  const last   = annotations.length ? annotations[annotations.length - 1].time : 0;
+  const gameStart = annotations.find(a => a.name === 'Game Start');
+  const timeSeconds = gameStart ? Math.max(0, last - gameStart.time) : last;
+  fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({ secret: APPS_SCRIPT_SECRET, action: 'live_update', sheetName, team1, team2, score1, score2, timeSeconds }),
+  }).catch(() => {});
+}
+
 async function pushToSheet(override = false) {
   if (annotations.length === 0) { alert('No annotations to push.'); return; }
   const sheetName = metaToSheetName();
   if (!sheetName) { alert('Fill in the metadata fields — the sheet tab name is derived from them.'); return; }
   if (APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_URL_HERE') { alert('APPS_SCRIPT_URL is not configured in annotator.html.'); return; }
-
-  const overridePassword = override ? document.getElementById('overridePass').value.trim() : '';
-  if (override && !overridePassword) { alert('Enter the override password first.'); return; }
 
   const btn = override ? document.getElementById('overrideBtn') : document.getElementById('pushBtn');
   btn.disabled = true;
@@ -1035,7 +1084,7 @@ async function pushToSheet(override = false) {
         analyzable,
       },
     };
-    if (override) body.overridePassword = overridePassword;
+    if (override) body.override = true;
 
     const resp = await fetch(APPS_SCRIPT_URL, {
       method: 'POST',
@@ -1045,11 +1094,13 @@ async function pushToSheet(override = false) {
     const result = await resp.json();
 
     if (!result.ok) {
-      // Tab exists and no override attempted — reveal the override controls
       if (result.tabExists && !override) {
-        document.getElementById('overridePass').style.display = '';
-        document.getElementById('overrideBtn').style.display = '';
-        alert(`Tab "${sheetName}" already exists.\nEnter the admin password and click ⚠ Override Tab to replace it.`);
+        if (APPS_SCRIPT_SECRET === 'm30-admin') {
+          document.getElementById('overrideBtn').style.display = '';
+          alert(`Tab "${sheetName}" already exists. Click ⚠ Override Tab to replace it.`);
+        } else {
+          alert(`Tab "${sheetName}" already exists. Admin access is required to override.`);
+        }
         btn.disabled = false;
         btn.textContent = '⬆ Push to Sheet';
         return;
@@ -1060,9 +1111,7 @@ async function pushToSheet(override = false) {
       return;
     }
 
-    // Success — hide override controls and reset
-    document.getElementById('overridePass').style.display = 'none';
-    document.getElementById('overridePass').value = '';
+    // Success
     document.getElementById('overrideBtn').style.display = 'none';
     btn.textContent = `✓ Pushed ${result.appended} rows!`;
     setTimeout(() => { btn.disabled = false; btn.textContent = override ? '⚠ Override Tab' : '⬆ Push to Sheet'; }, 2500);

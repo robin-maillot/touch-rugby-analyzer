@@ -211,7 +211,7 @@
     <a href="viewer.html" class="active">Events</a>
     <a href="annotator.html" id="annotatorLink" style="display:none">Annotator</a>
   </nav>
-  <script>if (sessionStorage.getItem('accessLevel') === 'staff') document.getElementById('annotatorLink').style.display = '';</script>
+  <script>{ const p = sessionStorage.getItem('password'); if (p === 'm30-staff' || p === 'm30-admin') document.getElementById('annotatorLink').style.display = ''; }</script>
 </header>
 
 <div id="errorMsg"></div>
@@ -321,7 +321,7 @@
 <script>
 // ── Config ──────────────────────────────────────────────────────
 const APPS_SCRIPT_URL    = 'https://script.google.com/macros/s/AKfycbzhMw4nQr2nVW0MLfPWVXRPXsvImerpzshQ5GnJ3873qQkGMz0bcJQdmTRXCxwygfFm/exec';
-const APPS_SCRIPT_SECRET = 'm30-test-key';
+const APPS_SCRIPT_SECRET = sessionStorage.getItem('password') || '';
 
 const LS = {
   get(k)    { try { return JSON.parse(localStorage.getItem('trl_' + k)); } catch { return null; } },
