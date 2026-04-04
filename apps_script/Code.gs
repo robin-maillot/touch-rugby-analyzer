@@ -6,10 +6,10 @@ const METADATA_SHEET  = '_metadata';  // reserved tab name for game metadata
 const LIVE_SHEET      = '_live';      // reserved tab name for live game state
 
 // Expected column order (must match what the Python pipeline reads)
-const HEADERS = ['Time', 'Possession Owner', 'Type', 'Name', 'To Review', 'Comment', 'Youtube Link', 'Action Owner'];
+const HEADERS = ['Time', 'Possession Owner', 'Type', 'Name', 'To Review', 'Comment', 'Action Owner'];
 
 // Metadata columns appended to action=all rows
-const META_COLS = ['Team 1', 'Team 2', 'Competition', 'Year', 'Division', 'Video Name', 'Analyzable', 'Youtube URL'];
+const META_COLS = ['Team 1', 'Team 2', 'Competition', 'Year', 'Division', 'Video Name', 'Analyzable'];
 
 // ── Metadata helper ────────────────────────────────────────────
 // Reads _metadata sheet and returns { [sheetName]: { team1, team2, competition, year, division } }
@@ -24,7 +24,7 @@ function getMetadata() {
   const col  = name => h.indexOf(name);
   const ni   = col('sheet name'), t1i = col('team 1'), t2i = col('team 2');
   const ci   = col('competition'), yi = col('year'), di = col('division');
-  const vi   = col('video name'), ai = col('analyzable'), yui = col('youtube url');
+  const vi   = col('video name'), ai = col('analyzable'), yui = col('youtube link');
 
   const meta = {};
   values.slice(1).forEach(row => {
@@ -38,7 +38,7 @@ function getMetadata() {
       division:    di  >= 0 ? row[di]  : '',
       video:       vi  >= 0 ? row[vi]  : '',
       analyzable:  ai  >= 0 ? row[ai]  : '',
-      youtubeUrl:  yui >= 0 ? row[yui] : '',
+      youtubelink: yui >= 0 ? row[yui] : '',
     };
   });
   return meta;
@@ -130,7 +130,7 @@ function doGet(e) {
         }
         const name = sheet.getName();
         const m    = meta[name] || {};
-        const metaValues = [m.team1 || '', m.team2 || '', m.competition || '', m.year || '', m.division || '', m.video || '', m.analyzable || '', m.youtubeUrl || ''];
+        const metaValues = [m.team1 || '', m.team2 || '', m.competition || '', m.year || '', m.division || '', m.video || '', m.analyzable || ''];
         values.slice(1).forEach(row => allRows.push([...row, name, ...metaValues]));
       }
 
@@ -241,7 +241,7 @@ function writeMeta(sheetName, meta) {
   let sheet = ss.getSheetByName(METADATA_SHEET);
   if (!sheet) {
     sheet = ss.insertSheet(METADATA_SHEET);
-    sheet.appendRow(['Sheet Name', 'Team 1', 'Team 2', 'Competition', 'Year', 'Division', 'Video Name', 'Analyzable', 'Youtube URL']);
+    sheet.appendRow(['Sheet Name', 'Team 1', 'Team 2', 'Competition', 'Year', 'Division', 'Video Name', 'Analyzable', 'Youtube Link']);
   }
 
   const values  = sheet.getDataRange().getValues();
@@ -256,7 +256,7 @@ function writeMeta(sheetName, meta) {
   const di   = col('division');
   const vi   = col('video name');
   const ai   = col('analyzable');
-  const yui  = col('youtube url');
+  const yui  = col('youtube link');
 
   // Build a row the same width as the header, filling known columns by position
   const numCols = headers.length;
@@ -270,7 +270,7 @@ function writeMeta(sheetName, meta) {
   if (di  >= 0) row[di]  = meta.division    || '';
   if (vi  >= 0) row[vi]  = meta.video       || '';
   if (ai  >= 0) row[ai]  = meta.analyzable  || '';
-  if (yui >= 0) row[yui] = meta.youtubeUrl  || '';
+  if (yui >= 0) row[yui] = meta.youtubelink || '';
 
   let existingRow = -1;
   for (let i = 1; i < values.length; i++) {
@@ -380,41 +380,17 @@ function updateRow(sheetName, time, name, comment) {
   return false;
 }
 
-// ── Backfill YouTube links into a game tab ──────────────────────
-function backfillYoutubeLinks(sheetName, youtubeUrl, offsetSeconds) {
+// ── Write YouTube link into _metadata for a game ───────────────
+function backfillYoutubeLinks(sheetName, youtubeUrl) {
   const m = String(youtubeUrl).match(/(?:v=|youtu\.be\/|embed\/|live\/)([A-Za-z0-9_-]{11})/);
   if (!m) throw new Error('Invalid YouTube URL — could not extract video ID.');
-  const videoId = m[1];
 
   const ss    = SpreadsheetApp.openById(SHEET_ID);
   const sheet = ss.getSheetByName(sheetName);
   if (!sheet) throw new Error(`Tab "${sheetName}" not found.`);
 
-  const values  = sheet.getDataRange().getValues();
-  const headers = values[0].map(h => String(h).toLowerCase().trim());
-  const timeIdx = headers.indexOf('time');
-  const ytIdx   = headers.indexOf('youtube link');
-  if (timeIdx < 0) throw new Error('Time column not found.');
-  if (ytIdx   < 0) throw new Error('Youtube Link column not found.');
-
-  const ytValues = values.slice(1).map(row => {
-    const parts = String(row[timeIdx]).split(':').map(Number);
-    let secs = 0;
-    if (parts.length === 3)      secs = parts[0]*3600 + parts[1]*60 + parts[2];
-    else if (parts.length === 2) secs = parts[0]*60   + parts[1];
-    else                         secs = parseFloat(row[timeIdx]) || 0;
-    const t = Math.max(0, Math.floor(secs + offsetSeconds) - 5);
-    return [`https://www.youtube.com/watch?v=${videoId}&t=${t}s`];
-  });
-
-  if (ytValues.length > 0) {
-    sheet.getRange(2, ytIdx + 1, ytValues.length, 1).setValues(ytValues);
-  }
-
-  // Persist youtube URL in _metadata
-  writeMeta(sheetName, { youtubeUrl });
-
-  return ytValues.length;
+  writeMeta(sheetName, { youtubelink: youtubeUrl });
+  return 1;
 }
 
 function json(obj) {

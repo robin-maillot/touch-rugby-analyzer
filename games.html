@@ -220,7 +220,7 @@ async function loadGame() {
         else if (e[col] === 'Team 2') e[col] = team2;
       }
     });
-    renderGame(events, team1, team2, subtitle, m.analyzable);
+    renderGame(events, team1, team2, subtitle, m.analyzable, m.youtubelink || '');
   }
 
   const cachedGame = LS.get('game_' + sheetName);
@@ -244,6 +244,15 @@ async function loadGame() {
   }
 }
 
+// ── Helpers ────────────────────────────────────────────────────
+function makeYtUrl(baseUrl, rawSeconds) {
+  if (!baseUrl) return '';
+  const m = baseUrl.match(/(?:v=|youtu\.be\/|embed\/|live\/)([A-Za-z0-9_-]{11})/);
+  if (!m) return '';
+  const t = Math.max(0, Math.floor(rawSeconds) - 5);
+  return `https://www.youtube.com/watch?v=${m[1]}&t=${t}s`;
+}
+
 // ── Sheet parsing ──────────────────────────────────────────────
 function parseSheet(rows) {
   if (!rows || rows.length < 2) return [];
@@ -251,7 +260,7 @@ function parseSheet(rows) {
   const col = name => headers.indexOf(name);
 
   const ti = col('time'), ty = col('type'), ni = col('name');
-  const pi = col('possession owner'), yi = col('youtube link'), ai = col('action owner');
+  const pi = col('possession owner'), ai = col('action owner');
 
   return rows.slice(1).map(r => ({
     Time:               r[ti]  || '',
@@ -259,7 +268,6 @@ function parseSheet(rows) {
     Name:               r[ni]  || '',
     'Possession Owner': pi >= 0 ? (r[pi] || '') : '',
     'Action Owner':     ai >= 0 ? (r[ai] || '') : '',
-    'Youtube Link':     yi >= 0 ? (r[yi] || '') : '',
   })).filter(e => e.Type);
 }
 
@@ -316,7 +324,7 @@ function processEvents(events) {
 }
 
 // ── Chart data builders — mirror generate_html_v2.py ──────────
-function buildCumulativeData(events, type, teamNames, globalStart, globalEnd, startLink, endLink) {
+function buildCumulativeData(events, type, teamNames, globalStart, globalEnd, startLink, endLink, baseUrl) {
   const types = Array.isArray(type) ? type : [type];
   const data = [];
   for (const team of teamNames) {
@@ -327,14 +335,14 @@ function buildCumulativeData(events, type, teamNames, globalStart, globalEnd, st
       .sort((a, b) => a.GameTime - b.GameTime)
       .forEach(e => {
         count++;
-        data.push({ GameTime: e.GameTime, Team: team, Event: e.Name, Count: count, Link: e['Youtube Link'] });
+        data.push({ GameTime: e.GameTime, Team: team, Event: e.Name, Count: count, Link: makeYtUrl(baseUrl, e._raw) });
       });
     data.push({ GameTime: globalEnd, Team: team, Event: 'Game End', Count: count, Link: endLink });
   }
   return data;
 }
 
-function buildPossessionData(events, teamNames) {
+function buildPossessionData(events, teamNames, baseUrl) {
   const other = t => t === teamNames[0] ? teamNames[1] : teamNames[0];
 
   // Use Possession Owner column as ground truth, but after a Try the other
@@ -372,7 +380,7 @@ function buildPossessionData(events, teamNames) {
     rawEnd:     Math.max(...g.map(e => e.GameTime)),
     endType:    g[g.length - 1].Type,
     endEvent:   g[g.length - 1].Name,
-    Link:       g[g.length - 1]['Youtube Link'],
+    Link:       makeYtUrl(baseUrl, g[g.length - 1]._raw),
   }));
 
   return raw.map((p, i) => {
@@ -501,7 +509,7 @@ async function selectHalf(halfValue) {
   await renderStats(halfValue);
 }
 
-async function renderGame(events, team1, team2, subtitle, analyzable) {
+async function renderGame(events, team1, team2, subtitle, analyzable, baseUrl) {
   document.getElementById('loading').style.display = 'none';
 
   if (analyzable !== 'TRUE') {
@@ -512,7 +520,7 @@ async function renderGame(events, team1, team2, subtitle, analyzable) {
   const starts = events.filter(e => e.Name === 'Game Start').sort((a, b) => a.GameTime - b.GameTime);
   const ends   = events.filter(e => e.Name === 'Game End').sort((a, b) => a.GameTime - b.GameTime);
 
-  currentGame = { events, team1, team2, starts, ends };
+  currentGame = { events, team1, team2, starts, ends, baseUrl: baseUrl || '' };
 
   // Build half toggle buttons
   const toggleEl = document.getElementById('halfToggle');
@@ -551,24 +559,25 @@ async function renderStats(halfValue) {
   const { events, team1, team2, starts, ends } = currentGame;
   const teamNames = [team1, team2];
 
+  const baseUrl = currentGame.baseUrl || '';
   let rangeStart, rangeEnd, startLink, endLink;
   if (halfValue === 'all') {
     rangeStart = starts[0].GameTime;
     rangeEnd   = ends[ends.length - 1].GameTime;
-    startLink  = starts[0]['Youtube Link'] || '';
-    endLink    = ends[ends.length - 1]['Youtube Link'] || '';
+    startLink  = makeYtUrl(baseUrl, starts[0]._raw);
+    endLink    = makeYtUrl(baseUrl, ends[ends.length - 1]._raw);
   } else {
     const hi   = parseInt(halfValue);
     rangeStart = starts[hi].GameTime;
     rangeEnd   = ends[hi].GameTime;
-    startLink  = starts[hi]['Youtube Link'] || '';
-    endLink    = ends[hi]['Youtube Link']   || '';
+    startLink  = makeYtUrl(baseUrl, starts[hi]._raw);
+    endLink    = makeYtUrl(baseUrl, ends[hi]._raw);
   }
 
   const filtered  = events.filter(e => e.GameTime >= rangeStart && e.GameTime <= rangeEnd);
-  const triesData = buildCumulativeData(filtered, 'Try', teamNames, rangeStart, rangeEnd, startLink, endLink);
-  const penData   = buildCumulativeData(filtered, ['Penalty', 'Penalty Attack', 'Penalty Defence'], teamNames, rangeStart, rangeEnd, startLink, endLink);
-  const possData  = buildPossessionData(filtered.filter(e => e.Type !== 'To Review'), teamNames);
+  const triesData = buildCumulativeData(filtered, 'Try', teamNames, rangeStart, rangeEnd, startLink, endLink, baseUrl);
+  const penData   = buildCumulativeData(filtered, ['Penalty', 'Penalty Attack', 'Penalty Defence'], teamNames, rangeStart, rangeEnd, startLink, endLink, baseUrl);
+  const possData  = buildPossessionData(filtered.filter(e => e.Type !== 'To Review'), teamNames, baseUrl);
   const metrics   = buildMetrics(possData, teamNames, filtered);
 
   const opts = { config: VEGA_CONFIG, actions: false };

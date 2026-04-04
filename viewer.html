@@ -347,7 +347,7 @@ const LS = {
 };
 
 const FILTERABLE  = ['Type', 'Name', 'Possession Owner', 'Action Owner', 'Game'];
-const HIDDEN_COLS = new Set(['Team 1', 'Team 2', 'Video Name', 'To Review']);
+const HIDDEN_COLS = new Set(['Team 1', 'Team 2', 'Video Name', 'To Review', 'Youtube Link']);
 const TYPE_BADGE  = { 'try':'badge-try', 'penalty':'badge-penalty', 'penalty attack':'badge-penalty', 'penalty defence':'badge-penalty', 'turnover':'badge-turnover', 'to review':'badge-toreview' };
 
 const isAdmin = sessionStorage.getItem('password') === 'm30-admin';
@@ -424,7 +424,10 @@ let rowsPerPage  = 50;
 let activeFilters = {};
 
 // Column indices (resolved after headers load)
-let colTime = -1, colYt = -1, colType = -1, colName = -1, colGame = -1, colComment = -1, colPoss = -1;
+let colTime = -1, colType = -1, colName = -1, colGame = -1, colComment = -1, colPoss = -1;
+
+// YouTube base URLs from metadata, keyed by game sheet name
+let gameYtMap = {};
 
 // ── Video state ─────────────────────────────────────────────────
 let ytPlayer          = null;
@@ -451,21 +454,41 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 // ── Data fetching ───────────────────────────────────────────────
+function buildGameYtMap(sheets) {
+  gameYtMap = {};
+  if (!sheets) return;
+  sheets.forEach(entry => { if (entry.youtubelink) gameYtMap[entry.name] = entry.youtubelink; });
+}
+
 async function fetchAll() {
-  const cached = LS.get('all');
-  if (cached) {
-    processRows(cached.rows);
+  const cachedAll  = LS.get('all');
+  const cachedList = LS.get('list');
+
+  if (cachedList) buildGameYtMap(cachedList.sheets);
+  if (cachedAll) {
+    processRows(cachedAll.rows);
   } else {
     document.getElementById('loadingMsg').style.display = 'block';
   }
+
   try {
-    const resp   = await fetch(`${APPS_SCRIPT_URL}?secret=${enc(APPS_SCRIPT_SECRET)}&action=all`);
-    const result = await resp.json();
-    if (!result.ok) throw new Error(result.error);
-    LS.set('all', result);
-    processRows(result.rows);
+    const [allResp, listResp] = await Promise.all([
+      fetch(`${APPS_SCRIPT_URL}?secret=${enc(APPS_SCRIPT_SECRET)}&action=all`),
+      fetch(`${APPS_SCRIPT_URL}?secret=${enc(APPS_SCRIPT_SECRET)}&action=list`),
+    ]);
+    const [allResult, listResult] = await Promise.all([allResp.json(), listResp.json()]);
+
+    if (!allResult.ok) throw new Error(allResult.error);
+    LS.set('all', allResult);
+
+    if (listResult.ok) {
+      LS.set('list', listResult);
+      buildGameYtMap(listResult.sheets);
+    }
+
+    processRows(allResult.rows);
   } catch (err) {
-    if (!cached) {
+    if (!cachedAll) {
       document.getElementById('loadingMsg').style.display = 'none';
       const el = document.getElementById('errorMsg');
       el.textContent = 'Failed to load events: ' + err.message;
@@ -508,10 +531,6 @@ function processRows(rows) {
   // Resolve column indices
   const hli   = h => headers.findIndex(x => x.toLowerCase() === h);
   colTime    = hli('time');
-  colYt      = hli('youtube link');
-
-  // Exclude rows with no YouTube link
-  if (colYt >= 0) allData = allData.filter(row => row[colYt] && String(row[colYt]).includes('youtu'));
   colType    = hli('type');
   colName    = hli('name');
   colGame    = hli('game');
@@ -682,7 +701,7 @@ function renderRows(rows) {
   rows.forEach((row, pageIdx) => {
     const filteredIdx = pageOffset + pageIdx;
     const tr = document.createElement('tr');
-    const hasYt = colYt >= 0 && row[colYt] && String(row[colYt]).includes('youtu');
+    const hasYt = colGame >= 0 && !!(gameYtMap[row[colGame]]);
     if (hasYt) tr.classList.add('playable');
     if (filteredIdx === activeRowIdx) tr.classList.add('active-row');
     tr.dataset.filteredIdx = filteredIdx;
@@ -694,13 +713,6 @@ function renderRows(rows) {
       if (i === colTime && hasYt) {
         // Time cell: show play icon + time
         td.innerHTML = `<span class="play-icon">▶</span>${cell || ''}`;
-      } else if ((col.includes('youtube') || col.includes('link')) && cell && String(cell).startsWith('http')) {
-        const a = document.createElement('a');
-        a.href = cell; a.target = '_blank'; a.rel = 'noopener';
-        a.className = 'yt-link';
-        a.innerHTML = '▶ Watch';
-        a.onclick = e => e.stopPropagation();
-        td.appendChild(a);
       } else if (col === 'type' && cell) {
         const span = document.createElement('span');
         span.textContent = cell;
@@ -845,9 +857,10 @@ function playFilteredRow(filteredIdx) {
                 : parts.length === 2 ? parts[0]*60 + parts[1] : 0;
   const seekTo  = Math.max(0, secs - 5);
 
-  // Extract YouTube video ID
-  const ytUrl  = colYt >= 0 ? (row[colYt] || '') : '';
-  const m      = ytUrl.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/);
+  // Extract YouTube video ID from game metadata
+  const gameKey = colGame >= 0 ? (row[colGame] || '') : '';
+  const baseUrl = gameYtMap[gameKey] || '';
+  const m       = baseUrl.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/);
   const videoId = m ? m[1] : null;
 
   if (videoId) {

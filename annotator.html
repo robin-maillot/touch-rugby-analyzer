@@ -921,7 +921,7 @@ async function loadFromSheet() {
     const headers = result.rows[0].map(h => h.toLowerCase());
     const col = name => headers.indexOf(name);
     const timeIdx      = col('time'), typeIdx = col('type'), nameIdx = col('name');
-    const possIdx      = col('possession owner'), ytIdx = col('youtube link');
+    const possIdx      = col('possession owner');
     const commentIdx   = col('comment'), actionOwnerIdx = col('action owner');
 
     const loaded = result.rows.slice(1).map(r => {
@@ -949,15 +949,12 @@ async function loadFromSheet() {
     document.getElementById('metaCompetition').value = m.competition || '';
     updateSheetPreview();
 
-    // Auto-load YouTube video after annotations are rendered
-    if (ytIdx >= 0) {
-      const firstYtUrl = result.rows.slice(1).map(r => r[ytIdx]).find(v => v && String(v).includes('youtu'));
-      if (firstYtUrl) {
-        const m = String(firstYtUrl).match(/(?:v=|youtu\.be\/|embed\/|live\/)([A-Za-z0-9_-]{11})/);
-        if (m) {
-          document.getElementById('ytUrl').value = `https://www.youtube.com/watch?v=${m[1]}`;
-          loadYouTube();
-        }
+    // Auto-load YouTube video from game metadata
+    if (m.youtubelink) {
+      const ytMatch = String(m.youtubelink).match(/(?:v=|youtu\.be\/|embed\/|live\/)([A-Za-z0-9_-]{11})/);
+      if (ytMatch) {
+        document.getElementById('ytUrl').value = `https://www.youtube.com/watch?v=${ytMatch[1]}`;
+        loadYouTube();
       }
     }
     document.getElementById('lastAnnBtn').removeAttribute('disabled');
@@ -1054,7 +1051,7 @@ async function pushToSheet(override = false) {
   btn.disabled = true;
   btn.textContent = '⏳ Pushing…';
 
-  // Column order must match HEADERS in Code.gs: Time, Possession Owner, Type, Name, To Review, Comment, Youtube Link, Action Owner
+  // Column order must match HEADERS in Code.gs: Time, Possession Owner, Type, Name, To Review, Comment, Action Owner
   const rows = annotations.map(a => {
     const outType = a.type;
     return [
@@ -1064,7 +1061,6 @@ async function pushToSheet(override = false) {
       a.name || '',
       a.type === 'To Review' ? 'Yes' : '',
       a.comment || '',
-      ytLink(a.time),
       a.actionOwner || '',
     ];
   });
@@ -1128,15 +1124,14 @@ function exportCSV() {
   const fullGame = isFullGame();
   const headers = ['Time','Type','Name','Possession Owner'];
   if (fullGame) headers.push('Turnover');
-  headers.push('To Review','Comment','Youtube Link','Action Owner');
+  headers.push('To Review','Comment','Action Owner');
   const rows = [headers.join(','),
     ...annotations.map(a => {
-      const yt = ytLink(a.time);
       const toReview = a.type === 'To Review' ? 'Yes' : '';
       const outType = a.type;
       const cols = [a.timeStr, outType, a.name, a.possessionOwner || ''];
       if (fullGame) cols.push(isJsTurnover(a.type, a.name) ? 'Yes' : '');
-      cols.push(toReview, a.comment || '', yt, a.actionOwner || '');
+      cols.push(toReview, a.comment || '', a.actionOwner || '');
       return cols.join(',');
     })
   ];
@@ -1157,18 +1152,16 @@ function loadCSV(e) {
     const headers = allLines[0].split(',').map(h => h.trim().toLowerCase());
     const col = name => headers.indexOf(name.toLowerCase());
     const timeIdx = col('time'), typeIdx = col('type'), nameIdx = col('name');
-    const possessionIdx = col('possession owner'), ytIdx = col('youtube link');
+    const possessionIdx = col('possession owner');
     const commentIdx = col('comment'), actionOwnerIdx = col('action owner');
     if (timeIdx < 0 || typeIdx < 0 || nameIdx < 0) { alert('CSV missing required columns (Time, Type, Name).'); return; }
     const loaded = [];
-    let firstYtUrl = '';
     for (const line of allLines.slice(1)) {
       const parts = line.split(',');
       const timeStr = parts[timeIdx]?.trim(), type = parts[typeIdx]?.trim(), name = parts[nameIdx]?.trim() || '';
       const possessionOwner = possessionIdx >= 0 && parts[possessionIdx] ? parts[possessionIdx].trim() : '';
       const comment = commentIdx >= 0 && parts[commentIdx] ? parts[commentIdx].trim() : '';
       const actionOwner = actionOwnerIdx >= 0 && parts[actionOwnerIdx] ? parts[actionOwnerIdx].trim() : inferActionOwner(possessionOwner, type, name);
-      if (!firstYtUrl && ytIdx >= 0 && parts[ytIdx]) firstYtUrl = parts[ytIdx].trim();
       if (!timeStr || !COLORS[type]) continue;
       const cleanTime = timeStr.includes(' ') ? timeStr.split(' ')[1] : timeStr;
       const tp = cleanTime.split(':').map(Number);
@@ -1185,13 +1178,6 @@ function loadCSV(e) {
     renderList(); renderMarkers();
     if (annotations.length) document.getElementById('lastAnnBtn').removeAttribute('disabled');
     setStatus(`✓ Loaded ${loaded.length} annotations from CSV`);
-    if (firstYtUrl) {
-      const m = firstYtUrl.match(/(?:v=|youtu\.be\/|embed\/|live\/)([A-Za-z0-9_-]{11})/);
-      if (m) {
-        document.getElementById('ytUrl').value = `https://www.youtube.com/watch?v=${m[1]}`;
-        loadYouTube();
-      }
-    }
   };
   reader.readAsText(f);
   e.target.value = '';
