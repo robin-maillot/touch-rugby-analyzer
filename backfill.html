@@ -134,15 +134,6 @@ if (sessionStorage.getItem('password') !== 'm30-admin') window.location.replace(
 const APPS_SCRIPT_URL    = 'https://script.google.com/macros/s/AKfycbzhMw4nQr2nVW0MLfPWVXRPXsvImerpzshQ5GnJ3873qQkGMz0bcJQdmTRXCxwygfFm/exec';
 const APPS_SCRIPT_SECRET = 'm30-admin';
 
-function parseOffset(val) {
-  val = val.trim();
-  if (!val) return 0;
-  if (val.includes(':')) {
-    const parts = val.split(':').map(Number);
-    return parts.length === 2 ? parts[0]*60 + parts[1] : parts[0]*3600 + parts[1]*60 + parts[2];
-  }
-  return parseFloat(val) || 0;
-}
 
 function gameLabel(g) {
   if (g.team1 && g.team2) {
@@ -155,13 +146,13 @@ function gameLabel(g) {
 function renderCard(g, container) {
   const { title, sub } = gameLabel(g);
   const card = document.createElement('div');
-  card.className = 'game-card' + (g.youtubeUrl ? ' done' : '');
+  card.className = 'game-card' + (g.youtubelink ? ' done' : '');
   card.id = 'card-' + g.name;
 
   let existingHtml = '';
-  if (g.youtubeUrl) {
+  if (g.youtubelink) {
     existingHtml = `<div class="done-badge">✓ Video linked</div>
-      <div class="existing-url"><a href="${g.youtubeUrl}" target="_blank" rel="noopener">${g.youtubeUrl}</a></div>`;
+      <div class="existing-url"><a href="${g.youtubelink}" target="_blank" rel="noopener">${g.youtubelink}</a></div>`;
   }
 
   card.innerHTML = `
@@ -171,17 +162,12 @@ function renderCard(g, container) {
     <div class="form-row">
       <div class="field">
         <label>YouTube URL</label>
-        <input type="url" class="url-input" placeholder="https://www.youtube.com/watch?v=..." value="${g.youtubeUrl || ''}">
-      </div>
-      <div class="field field-offset">
-        <label>Start offset (MM:SS)</label>
-        <input type="text" class="offset-input" placeholder="0:00">
+        <input type="url" class="url-input" placeholder="https://www.youtube.com/watch?v=..." value="${g.youtubelink || ''}">
       </div>
       <button class="submit-btn" onclick="submit(this, '${g.name}')">
-        ${g.youtubeUrl ? 'Update' : 'Apply'}
+        ${g.youtubelink ? 'Update' : 'Apply'}
       </button>
     </div>
-    <div class="hint">Offset = video timestamp where annotation time 0:00:00 occurs (e.g. 2:15 if game starts 2m15s into the video)</div>
   `;
   container.appendChild(card);
 }
@@ -189,22 +175,21 @@ function renderCard(g, container) {
 async function submit(btn, sheetName) {
   const card   = document.getElementById('card-' + sheetName);
   const url    = card.querySelector('.url-input').value.trim();
-  const offset = parseOffset(card.querySelector('.offset-input').value);
 
   if (!url) { alert('Enter a YouTube URL first.'); return; }
 
   btn.disabled    = true;
-  btn.textContent = '⏳ Updating…';
+  btn.textContent = '⏳ Saving…';
 
   try {
     const resp   = await fetch(APPS_SCRIPT_URL, {
       method:  'POST',
       headers: { 'Content-Type': 'text/plain' },
-      body:    JSON.stringify({ secret: APPS_SCRIPT_SECRET, action: 'backfill_youtube', sheetName, youtubeUrl: url, offsetSeconds: offset }),
+      body:    JSON.stringify({ secret: APPS_SCRIPT_SECRET, action: 'backfill_youtube', sheetName, youtubeUrl: url }),
     });
     const result = await resp.json();
     if (!result.ok) throw new Error(result.error);
-    btn.textContent = `✓ ${result.updated} rows updated`;
+    btn.textContent = '✓ Saved';
     btn.classList.add('success');
     card.classList.add('done');
     card.querySelector('.game-sub') && (card.querySelector('.game-sub').textContent || '');
@@ -233,8 +218,8 @@ async function load() {
 
     document.getElementById('loading').style.display = 'none';
 
-    const missing = result.sheets.filter(g => !g.youtubeUrl);
-    const linked  = result.sheets.filter(g =>  g.youtubeUrl);
+    const missing = result.sheets.filter(g => !g.youtubelink);
+    const linked  = result.sheets.filter(g =>  g.youtubelink);
 
     if (!missing.length && !linked.length) {
       document.getElementById('allDone').style.display = 'block';
