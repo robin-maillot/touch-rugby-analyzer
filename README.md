@@ -1,163 +1,172 @@
 # Touch Rugby Analyzer
 
-A web-based tool for annotating touch rugby match footage with events, possession tracking, and statistics.
+A web-based platform for annotating, reviewing, and analysing touch rugby matches.
 
 **Deployment:** [touch-rugby-analyzer](https://robin-maillot.github.io/touch-rugby-analyzer/)
 
-Run locally:
-```
-python main.py
-```
-
 ---
 
-## Annotator (annotator.html)
+## Access levels
 
-The annotator is the main tool for tagging events in a match video. Access it via the **Annotator** link in the nav bar (staff login required).
+All pages are behind a password prompt on `index.html`. Three passwords exist:
 
-### Loading a video
-
-- **Local file** — click **Open** or **Open Local Video** and select a video file from your machine. You'll be prompted to load a matching CSV if one is available.
-- **YouTube** — paste a YouTube URL into the field in the header and click **▶ Load YT** (or press Enter). The video will load in the player and annotations can be pushed directly to Google Sheets.
-
----
-
-### Modes
-
-Two toggles control how the annotator behaves. They can be combined.
-
-#### Full Game Analysis
-When **on**, the tool tracks which team has possession for every event. Most events infer the possession owner automatically from the previous event — you only need to manually select a team for **Game Start** and **To Review** events.
-
-When **off**, possession is not tracked at all. Use this for lightweight tagging where you only care about event types and timestamps.
-
-#### Simple Mode
-When **on**, the sub-type for Try, Turnover, Penalty Attack and Penalty Defence is automatically set to **Other** — so tagging any of those requires only a single click. A dedicated **6th Touch** button also appears for fast turnover tagging.
-
-When **off**, you must explicitly choose a sub-type from the submenu before the event is saved.
-
-> **Simple Mode + Full Game Analysis**: possession is inferred automatically. If it cannot be inferred (i.e. no Game Start has been tagged yet), an error will appear — tag a Game Start event first.
-
----
-
-### Action buttons
-
-Press the keyboard shortcut or click the button, then select a sub-type if prompted.
-
-#### Try — `T`
-A try is scored by the attacking team. The possession owner is the team that scored.
-
-Sub-types: `Scoop`, `32 - Long`, `33 Quicky`, `33`, `32 Cut`, `French Flair`, `Other`
-
-#### Turnover — `U`
-Possession changes from the attacking team to the defending team (except **6 Again**, which keeps possession).
-
-| Sub-type | When to use |
+| Password | Access |
 |---|---|
-| Ball Down | The ball hits the ground |
-| 6th Touch | The attacking team uses all 6 touches |
-| Dummy Touch | Referee calls a dummy touch |
-| Bad Roll | The roll ball goes off-line or is touched incorrectly |
-| 6 Again | Referee awards 6 more touches — possession **stays** with the attacking team |
-| Interception | Defending team intercepts the ball |
-| Other | Any other turnover |
+| `m30` | Viewer — Game Analysis, Dashboard, Event Viewer, Live |
+| `m30-staff` | Staff — everything above + Annotator + Field Annotator |
+| `m30-admin` | Admin — everything above + Video Backfill + inline event editing in the viewer + sheet override |
 
-#### Pen Attack — `P`
-A penalty awarded **against the defence** (the attacking team benefits). Use this when the defending team commits a foul.
-
-Sub-types: `Forward Pass`, `Touch and Pass`, `Off the Mark`, `Not Moving Forward`, `Delay of Play`, `Hard Touch`, `Other`
-
-#### Pen Defence — `Q`
-A penalty awarded **against the attack** (the defending team benefits). Use this when the attacking team commits a foul. Possession transfers to the defending team.
-
-Sub-types: `Offside`, `Hard Touch`, `In the Ruck`, `Not Moving Forward`, `Other`
-
-#### Game Event — `G`
-Structural events that mark the boundaries of play. Always requires a possession owner to be selected (which team kicks off or restarts).
-
-| Sub-type | When to use |
-|---|---|
-| Game Start | Start of the game or a half — tag this **first** so possession can be inferred for all subsequent events |
-| Game End | End of the game or a half |
-
-#### To Review — `R`
-Marks a moment in the video for later review. An optional free-text note can be added. Always requires a possession owner to be selected.
-
-#### 6th Touch — `6` *(Simple Mode only)*
-A shortcut that tags a Turnover with sub-type **6th Touch** in a single click. Equivalent to clicking Turnover → 6th Touch in the submenu. Only visible when Simple Mode is on.
+The password is stored in `sessionStorage` and used as the API secret for all calls to the Apps Script backend.
 
 ---
 
-### Possession inference
+## Pages
 
-In Full Game Analysis mode, the annotator automatically determines which team has possession when you tag an event, based on the most recent event **before the current video position**:
+### Game Analysis (`games.html`)
+*Available to all*
 
-- **Possession stays** with the same team after: Try, Penalty Attack, Turnover (all sub-types except 6 Again)
-- **Possession switches** to the other team after: Penalty Defence, Turnover → 6 Again
-
-This means you can go back and tag events in the middle of a match and the inference will still be correct relative to where you are in the video.
+Charts and statistics for a single game. Select a game from the dropdown to load it. Only games marked **Analyzable** in `_metadata` are shown. Displays possession charts, try timelines, penalty breakdowns, and half-by-half stats.
 
 ---
 
-### Editing annotations
+### Dashboard (`dashboard.html`)
+*Available to all*
 
-The annotations list at the bottom shows every tagged event in chronological order.
-
-- **Seek** — click anywhere on a row to jump to that timestamp in the video.
-- **Change sub-type** — click on the sub-type name (shown with a dashed underline) to open an inline dropdown and select a different option.
-- **Add / edit comment** — click **✎** (or **💬** if a comment exists) to open the comment editor.
-- **Delete** — click **✕** on the right of the row.
-- **Clear all** — the **Clear All** button removes every annotation after confirmation.
-
-The **⏮ Last Tag** button jumps the video back to the most recently tagged event, useful for reviewing the last tag without losing your place.
+Aggregate view across all analysable games. Shows team rankings, cumulative try charts, and cross-game comparisons.
 
 ---
 
-### Metadata
+### Event Viewer (`viewer.html`)
+*Available to all*
 
-Fill in the fields in the metadata bar before pushing to Google Sheets:
+Searchable, filterable table of every event across all games. Clicking a row with a YouTube link plays the video at that timestamp. Supports filtering by Type, Name, Possession Owner, Action Owner, and Game. Events without a YouTube link are hidden.
 
-| Field | Example |
-|---|---|
-| Team 1 | France |
-| Team 2 | England |
-| Year | 2025 |
-| Division | M30 |
-| Competition | Seniors Cup |
-
-The tab name in Google Sheets is generated automatically from these fields (e.g. `2025_m30_seniors-cup_france_england`). The preview updates as you type.
+**Admin extras:** Name and Comment cells become editable inline. Name shows a dropdown with the same options as the annotator (depends on Type). A **💾 Save N changes** button appears in the toolbar when edits are pending and sends all changes to the sheet in one request.
 
 ---
 
-### Saving and loading
+### Live (`live.html`)
+*Available to all — uses `m30` as fallback if not logged in*
 
-#### Export CSV
-Downloads all annotations as a `.csv` file. In Full Game Analysis mode the CSV includes a **Turnover** column.
-
-#### Load CSV
-Imports annotations from a previously exported CSV file. If the CSV contains a YouTube link, the video is loaded automatically.
-
-#### Push to Sheet — `⬆`
-Uploads annotations to the configured Google Sheet. Requires metadata to be filled in. If the tab already exists, you'll be prompted for an admin override password before the existing data is replaced.
-
-#### Load from Sheet — `⬇`
-Downloads annotations from a Google Sheet tab. Select the game from the dropdown and click the button. The video (if YouTube) and metadata are loaded automatically.
+Displays live scores for games currently being annotated in live mode. Cards show team names, score, and elapsed game time. Updates every 30 seconds. Games that haven't pushed an update in the last 2 minutes are hidden automatically.
 
 ---
 
-### Keyboard shortcuts
+### Annotator (`annotator.html`)
+*Staff and admin only*
+
+The main tool for tagging events against a match video (local file or YouTube).
+
+#### Loading a video
+- **Local file** — click **Open** and select a video. You'll be prompted to load a matching CSV.
+- **YouTube** — paste a URL into the header field (supports `/watch`, `/live`, `youtu.be` formats) and click **▶ Load YT**.
+
+#### Event types
+
+| Button | Key | Description |
+|---|---|---|
+| Try | `T` | Try scored by the possession team. Sub-types: Scoop, 32-Long, 33 Quicky, 33, 32 Cut, French Flair, Other |
+| Turnover | `U` | Ball changes hands. Sub-types: Ball Down, 6th Touch, Dummy Touch, Bad Roll, 6 Again, Interception, Other |
+| Pen Attack | `P` | Penalty against the defence (attacking team benefits) |
+| Pen Defence | `Q` | Penalty against the attack (defending team benefits, possession switches) |
+| Game Event | `G` | Game Start or Game End — tag first so possession can be inferred |
+| To Review | `R` | Marks a moment for later review |
+| 6th Touch | `6` | Shortcut for Turnover → 6th Touch (Simple Mode only) |
+
+#### Modes
+- **Full Game Analysis** — tracks possession for every event. Inferred automatically after a Game Start is tagged.
+- **Simple Mode** — sub-type defaults to Other on a single click; a 6th Touch shortcut button appears.
+
+#### Possession inference
+- Possession **stays** after: Try, Penalty Attack, Turnover (all except 6 Again)
+- Possession **switches** after: Penalty Defence, Turnover → 6 Again
+
+#### Keyboard shortcuts
 
 | Key | Action |
 |---|---|
 | `Space` | Play / Pause |
 | `←` / `→` | Skip −5s / +5s |
-| `T` | Tag Try |
-| `U` | Tag Turnover |
-| `P` | Tag Penalty Attack |
-| `Q` | Tag Penalty Defence |
-| `G` | Tag Game Event |
-| `R` | Tag To Review |
-| `6` | Tag 6th Touch *(Simple Mode only)* |
-| `1`–`9` | Select sub-type by position in the submenu |
-| `1` / `2` | Select Team 1 / Team 2 when possession menu is open |
-| `Escape` | Cancel current selection |
+| `T` `U` `P` `Q` `G` `R` | Tag event type |
+| `6` | Tag 6th Touch (Simple Mode) |
+| `1`–`9` | Select sub-type by position |
+| `Escape` | Cancel selection |
+
+#### Metadata
+Fill in Team 1, Team 2, Year, Division, Competition before pushing. The Google Sheet tab name is generated automatically (e.g. `2025_m30_seniors-cup_france_england`).
+
+#### Saving
+- **⬆ Push to Sheet** — uploads all annotations. If the tab already exists, an Override button appears (admin only; no extra password needed).
+- **⬇ Load from Sheet** — downloads annotations for the selected game.
+- **⬇ Export CSV / 📂 Load CSV** — local CSV backup.
+- **⚫ Go Live** — starts broadcasting the current score every 30 seconds to the Live page. Turns 🔴 when active. Clears the live entry when turned off or the tab is closed.
+
+---
+
+### Field Annotator (`field.html`)
+*Staff and admin only*
+
+Mobile-friendly annotation without a video. Designed for use on the pitch during live games. Timestamps are wall-clock based: the first event is `0:00:00` and all subsequent events are offset from that.
+
+#### Layout
+- **Possession toggle** — set which team has the ball before tagging. Labels update when team names are filled in.
+- **Event buttons** (two-column grid):
+
+| Left | Right |
+|---|---|
+| Try | Turnover |
+| Pen Attack | 6th Touch |
+| Pen Defence | 6 Again |
+
+- **Game Start / Game End** — structural events; the game clock counts up from Game Start.
+- **Recent events** — last 5 events shown, with an Undo button to remove the last one.
+
+#### Possession rules
+- Try and Turnover (including 6th Touch) auto-switch possession to the other team.
+- 6 Again keeps possession with the attacking team.
+- Try ownership is inferred from possession at the time of tagging.
+
+#### Setup panel
+Tap **⚙ Setup** to enter Team 1, Team 2, Year, Division, Competition. The Google Sheet tab name preview updates as you type.
+
+#### Saving
+- **⬆ Push** — same format as the video annotator, fully compatible with the Games and Dashboard pages.
+- **⚫ Live** — same live broadcast as the video annotator. Uses real elapsed time since Game Start.
+
+---
+
+### Video Backfill (`backfill.html`)
+*Admin only*
+
+Links a YouTube video to a game that was annotated without one (e.g. annotated on the field). Shows games missing a YouTube URL at the top and already-linked games below.
+
+For each game, enter:
+- **YouTube URL** — the video to link (any standard YouTube URL format).
+- **Start offset (MM:SS)** — the timestamp in the video that corresponds to annotation time `0:00:00`. For example, if the game starts 2 minutes and 15 seconds into the video, enter `2:15`.
+
+On submit, every event row in the sheet gets a YouTube link computed as `video_offset + event_time − 5s` (5-second lookback). The YouTube URL is also saved to `_metadata` so the game won't appear in the missing list again.
+
+---
+
+## Apps Script backend
+
+All data is stored in a single Google Sheet. The Apps Script web app (`apps_script/Code.gs`) serves as the API.
+
+### `_metadata` sheet
+
+One row per game. Columns: `Sheet Name`, `Team 1`, `Team 2`, `Competition`, `Year`, `Division`, `Video Name`, `Analyzable`, `Youtube URL`.
+
+- **Analyzable** — `TRUE` if the game has both a Game Start and Game End event. Set automatically on push. Only `TRUE` games appear in Game Analysis and Dashboard.
+- **Youtube URL** — set by the Video Backfill page. Used to detect which games need backlinking.
+
+### `_live` sheet
+
+Transient live game state. One row per active live session. Columns: `Sheet Name`, `Team 1`, `Team 2`, `Score 1`, `Score 2`, `Time Seconds`, `Updated At`. Managed automatically by the annotators.
+
+### Game tabs
+
+Each game is a separate sheet tab named `YEAR_DIVISION_COMPETITION_TEAM1_TEAM2`. Columns: `Time`, `Possession Owner`, `Type`, `Name`, `To Review`, `Comment`, `Youtube Link`, `Action Owner`.
+
+### Deploying updates
+
+After editing `Code.gs`, go to the Apps Script editor → **Deploy → Manage deployments → edit the existing deployment → New version**. The web app URL stays the same.

@@ -152,6 +152,23 @@
   /* Play icon on hover */
   .play-icon { opacity: 0; font-size: 0.75rem; color: var(--accent); margin-right: 4px; transition: opacity 0.1s; }
   tr.playable:hover .play-icon { opacity: 1; }
+
+  /* Admin inline editing */
+  .edit-select, .edit-input {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-size: 0.78rem;
+    padding: 3px 6px;
+    outline: none;
+    width: 100%;
+  }
+  .edit-select:focus, .edit-input:focus { border-color: var(--accent); }
+  .edit-select.dirty, .edit-input.dirty { border-color: #f97316; }
+  #saveBtn { background: #f97316; color: #fff; border: none; border-radius: 6px; padding: 5px 12px; font-size: 0.78rem; font-weight: 600; cursor: pointer; display: none; }
+  #saveBtn:hover { background: #ea6e00; }
+  #saveBtn:disabled { opacity: 0.6; cursor: default; }
   tr.active-row .play-icon { opacity: 1; color: #22c55e; }
 
   .empty { text-align: center; padding: 40px; color: var(--text-dim); font-size: 0.85rem; }
@@ -280,6 +297,7 @@
           <input id="searchInput" class="search-input" type="text" placeholder="Search…">
         </div>
         <button class="btn btn-ghost" onclick="resetFilters()">↺ Reset</button>
+        <button id="saveBtn" onclick="saveEdits()">💾 Save</button>
       </div>
       <div class="filter-row" id="filterRow"></div>
     </div>
@@ -331,6 +349,69 @@ const LS = {
 const FILTERABLE  = ['Type', 'Name', 'Possession Owner', 'Action Owner', 'Game'];
 const HIDDEN_COLS = new Set(['Team 1', 'Team 2', 'Video Name', 'To Review']);
 const TYPE_BADGE  = { 'try':'badge-try', 'penalty':'badge-penalty', 'penalty attack':'badge-penalty', 'penalty defence':'badge-penalty', 'turnover':'badge-turnover', 'to review':'badge-toreview' };
+
+const isAdmin = sessionStorage.getItem('password') === 'm30-admin';
+
+const NAMES_BY_TYPE = {
+  'Try':             ['Scoop', 'Other', '32 - Long', '33 Quicky', '33', '32 Cut', 'French Flair'],
+  'Turnover':        ['Ball Down', '6th Touch', 'Dummy Touch', 'Bad Roll', '6 Again', 'Interception', 'Other'],
+  'Penalty Attack':  ['Forward Pass', 'Obstruction', 'Wrong Ball', 'Other'],
+  'Penalty Defence': ['Forward Pass', 'Obstruction', 'Wrong Ball', 'Offside', 'Early Rush', 'Other'],
+  'Game Event':      ['Game Start', 'Game End'],
+  'To Review':       [],
+};
+
+// ── Admin edit tracking ─────────────────────────────────────────
+const pendingEdits = new Map(); // keyed by row array reference
+
+function markDirty(row, field, value) {
+  if (!pendingEdits.has(row)) {
+    pendingEdits.set(row, {
+      sheetName: row[colGame],
+      time:      row[colTime],
+      name:      row[colName],
+      comment:   row[colComment] || '',
+    });
+  }
+  pendingEdits.get(row)[field] = value;
+  if (field === 'name')    row[colName]    = value;
+  if (field === 'comment') row[colComment] = value;
+  updateSaveBtn();
+}
+
+function updateSaveBtn() {
+  const btn = document.getElementById('saveBtn');
+  if (!btn) return;
+  const n = pendingEdits.size;
+  btn.style.display  = n > 0 ? '' : 'none';
+  btn.textContent    = `💾 Save ${n} change${n !== 1 ? 's' : ''}`;
+}
+
+async function saveEdits() {
+  if (!pendingEdits.size) return;
+  const btn = document.getElementById('saveBtn');
+  btn.disabled    = true;
+  btn.textContent = '⏳ Saving…';
+  const changes = [...pendingEdits.values()];
+  try {
+    const resp   = await fetch(APPS_SCRIPT_URL, {
+      method:  'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body:    JSON.stringify({ secret: APPS_SCRIPT_SECRET, action: 'update_rows', changes }),
+    });
+    const result = await resp.json();
+    if (!result.ok) throw new Error(result.error);
+    pendingEdits.clear();
+    // Clear dirty styling
+    document.querySelectorAll('.edit-select.dirty, .edit-input.dirty').forEach(el => el.classList.remove('dirty'));
+    btn.textContent = `✓ Saved ${result.updated}`;
+    setTimeout(() => { btn.disabled = false; updateSaveBtn(); }, 2000);
+  } catch (err) {
+    alert('Save failed: ' + err.message);
+    btn.disabled = false;
+    updateSaveBtn();
+  }
+}
 
 // ── Table state ─────────────────────────────────────────────────
 let allData      = [];
@@ -428,6 +509,9 @@ function processRows(rows) {
   const hli   = h => headers.findIndex(x => x.toLowerCase() === h);
   colTime    = hli('time');
   colYt      = hli('youtube link');
+
+  // Exclude rows with no YouTube link
+  if (colYt >= 0) allData = allData.filter(row => row[colYt] && String(row[colYt]).includes('youtu'));
   colType    = hli('type');
   colName    = hli('name');
   colGame    = hli('game');
@@ -632,6 +716,34 @@ function renderRows(rows) {
         span.textContent = cell;
         span.className = 'game-tag';
         td.appendChild(span);
+      } else if (col === 'name' && isAdmin) {
+        const type    = colType >= 0 ? row[colType] : '';
+        const options = NAMES_BY_TYPE[type] || [];
+        const allOpts = options.includes(cell) || !cell ? options : [cell, ...options];
+        const isDirty = pendingEdits.has(row) && pendingEdits.get(row).name !== (allData.indexOf(row) >= 0 ? row[colName] : cell);
+        if (allOpts.length) {
+          const sel = document.createElement('select');
+          sel.className = 'edit-select' + (pendingEdits.has(row) ? ' dirty' : '');
+          sel.onclick = e => e.stopPropagation();
+          allOpts.forEach(opt => {
+            const o = document.createElement('option');
+            o.value = opt; o.textContent = opt;
+            if (opt === cell) o.selected = true;
+            sel.appendChild(o);
+          });
+          sel.onchange = () => { sel.classList.add('dirty'); markDirty(row, 'name', sel.value); };
+          td.appendChild(sel);
+        } else {
+          td.textContent = cell;
+        }
+      } else if (col === 'comment' && isAdmin) {
+        const input = document.createElement('input');
+        input.type      = 'text';
+        input.value     = cell || '';
+        input.className = 'edit-input' + (pendingEdits.has(row) ? ' dirty' : '');
+        input.onclick   = e => e.stopPropagation();
+        input.onchange  = () => { input.classList.add('dirty'); markDirty(row, 'comment', input.value); };
+        td.appendChild(input);
       } else if (col === 'comment' && cell) {
         const lines = cell.split('\n');
         const wrapper = document.createElement('div');

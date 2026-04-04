@@ -137,6 +137,16 @@
         <div class="card-title">Annotator</div>
         <div class="card-desc">Tag events on video</div>
       </a>
+      <a class="nav-card" href="field.html" id="fieldCard" style="display:none">
+        <div class="card-icon">📱</div>
+        <div class="card-title">Field Annotator</div>
+        <div class="card-desc">Live tagging without video</div>
+      </a>
+      <a class="nav-card" href="backfill.html" id="backfillCard" style="display:none">
+        <div class="card-icon">🔗</div>
+        <div class="card-title">Video Backfill</div>
+        <div class="card-desc">Link videos to field annotations</div>
+      </a>
     </div>
   </div>
 
@@ -170,6 +180,10 @@
   function initApp(level) {
     if (level === 'staff' || level === 'admin') {
       document.getElementById('annotatorCard').style.display = '';
+      document.getElementById('fieldCard').style.display = '';
+    }
+    if (level === 'admin') {
+      document.getElementById('backfillCard').style.display = '';
     }
     loginScreen.style.display = 'none';
     appContent.style.display  = 'block';

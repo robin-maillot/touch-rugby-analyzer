@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Field Annotator</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0f1117;
+      --surface:   #181b26;
+      --surface-2: #22253a;
+      --border:    #2a2d3a;
+      --text:      #e0e0e0;
+      --text-muted:#888;
+      --accent:    #3b82f6;
+      --green:     #22c55e;
+      --orange:    #f97316;
+      --red:       #ef4444;
+      --red-dark:  #b91c1c;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* ── Header ─────────────────────────────────────────────────── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    header h1 { font-size: 0.9rem; font-weight: 600; }
+    .header-actions { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+    .btn-icon {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+    .btn-icon:active { background: var(--surface-2); }
+
+    /* ── Settings panel ─────────────────────────────────────────── */
+    #settingsPanel {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 16px;
+      display: none;
+      flex-direction: column;
+      gap: 10px;
+    }
+    #settingsPanel.open { display: flex; }
+    .settings-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .settings-row input {
+      flex: 1;
+      min-width: 80px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 8px 10px;
+      font-size: 0.85rem;
+      outline: none;
+    }
+    .settings-row input:focus { border-color: var(--accent); }
+    .settings-row input::placeholder { color: #444; }
+    .settings-label { font-size: 0.72rem; color: var(--text-muted); margin-bottom: 2px; }
+    #sheetPreview {
+      font-size: 0.72rem;
+      font-family: monospace;
+      color: var(--text-muted);
+      padding: 4px 0;
+    }
+
+    /* ── Scoreboard ─────────────────────────────────────────────── */
+    #scoreboard {
+      background: var(--surface);
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .score-team { flex: 1; text-align: center; }
+    .score-name { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .score-val  { font-size: 3rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+    .score-sep  { font-size: 1.5rem; color: var(--border); padding: 0 8px; }
+    #gameClock  { font-size: 0.75rem; color: var(--text-muted); font-variant-numeric: tabular-nums; margin-top: 2px; }
+
+    /* ── Main content ───────────────────────────────────────────── */
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 14px 12px;
+      overflow-y: auto;
+    }
+
+    /* ── Possession toggle ──────────────────────────────────────── */
+    .section-label { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.06em; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px; }
+    .poss-toggle { display: flex; gap: 6px; }
+    .poss-btn {
+      flex: 1;
+      padding: 14px 8px;
+      border-radius: 10px;
+      border: 2px solid var(--border);
+      background: var(--surface);
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-align: center;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .poss-btn.active { border-color: var(--accent); background: rgba(59,130,246,0.12); color: var(--text); }
+
+    /* ── Event buttons ──────────────────────────────────────────── */
+    .event-grid {
+      display: grid;
+      gap: 8px;
+    }
+    .event-grid.two-col { grid-template-columns: 1fr 1fr; }
+    .event-grid.one-col { grid-template-columns: 1fr; }
+
+    .evt-btn {
+      padding: 18px 12px;
+      border-radius: 10px;
+      border: none;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 0.02em;
+      transition: filter 0.1s, transform 0.1s;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    .evt-btn:active { filter: brightness(0.85); transform: scale(0.97); }
+
+    .btn-try1    { background: var(--green);    color: #000; }
+    .btn-turn    { background: var(--orange);   color: #fff; }
+    .btn-pen-atk { background: var(--red);      color: #fff; }
+    .btn-pen-def { background: var(--red-dark); color: #fff; }
+    .btn-game    { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
+
+    /* ── Recent events ──────────────────────────────────────────── */
+    #recentList {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .recent-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 0.82rem;
+    }
+    .recent-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .recent-time { font-variant-numeric: tabular-nums; color: var(--text-muted); font-size: 0.75rem; min-width: 52px; }
+    .recent-text { flex: 1; }
+    .recent-team { color: var(--text-muted); font-size: 0.75rem; }
+    .btn-undo {
+      margin-left: auto;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.75rem;
+      padding: 2px 6px;
+    }
+
+    /* ── Action bar ─────────────────────────────────────────────── */
+    #actionBar {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      padding: 10px 12px;
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .action-btn {
+      flex: 1;
+      padding: 13px;
+      border-radius: 8px;
+      border: none;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .action-btn:disabled { opacity: 0.5; }
+    .btn-push { background: var(--accent); color: #fff; }
+    .btn-live { background: var(--surface-2); border: 1px solid var(--border); color: var(--text-muted); }
+    .btn-live.active { color: var(--red); border-color: var(--red); background: rgba(239,68,68,0.08); }
+    .btn-override { background: #7f1d1d; color: #fff; display: none; }
+  </style>
+</head>
+<body>
+
+<header>
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><path d="M2 12h20"/></svg>
+  <h1>Field Annotator</h1>
+  <div class="header-actions">
+    <a href="index.html" class="btn-icon">← Back</a>
+    <button class="btn-icon" onclick="toggleSettings()" id="settingsBtn">⚙ Setup</button>
+  </div>
+</header>
+
+<div id="settingsPanel">
+  <div>
+    <div class="settings-label">Teams</div>
+    <div class="settings-row">
+      <input id="metaTeam1" placeholder="Team 1" oninput="onMetaChange()">
+      <input id="metaTeam2" placeholder="Team 2" oninput="onMetaChange()">
+    </div>
+  </div>
+  <div>
+    <div class="settings-label">Competition</div>
+    <div class="settings-row">
+      <input id="metaYear"        placeholder="Year"        style="max-width:80px" oninput="onMetaChange()">
+      <input id="metaDivision"    placeholder="Division"    style="max-width:90px" oninput="onMetaChange()">
+      <input id="metaCompetition" placeholder="Competition" oninput="onMetaChange()">
+    </div>
+  </div>
+  <div id="sheetPreview">fill metadata to generate tab name</div>
+</div>
+
+<div id="scoreboard">
+  <div class="score-team">
+    <div class="score-name" id="scoreName1">Team 1</div>
+    <div class="score-val"  id="scoreVal1">0</div>
+  </div>
+  <div style="text-align:center">
+    <div class="score-sep">–</div>
+    <div id="gameClock">00:00</div>
+  </div>
+  <div class="score-team">
+    <div class="score-name" id="scoreName2">Team 2</div>
+    <div class="score-val"  id="scoreVal2">0</div>
+  </div>
+</div>
+
+<main>
+
+  <div>
+    <div class="section-label">Possession</div>
+    <div class="poss-toggle">
+      <button class="poss-btn active" id="possBtn1" onclick="setPossession('Team 1')">Team 1</button>
+      <button class="poss-btn"        id="possBtn2" onclick="setPossession('Team 2')">Team 2</button>
+    </div>
+  </div>
+
+  <div>
+    <div class="section-label">Events</div>
+    <div class="event-grid two-col">
+      <button class="evt-btn btn-try1"    onclick="tagWithPossession('Try','Try')">Try</button>
+      <button class="evt-btn btn-turn"    onclick="tagWithPossession('Turnover','Turnover')">Turnover</button>
+      <button class="evt-btn btn-pen-atk" onclick="tagWithPossession('Penalty Attack','Penalty Attack')">Pen Attack</button>
+      <button class="evt-btn btn-turn"    onclick="tagWithPossession('Turnover','6th Touch')">6th Touch</button>
+      <button class="evt-btn btn-pen-def" onclick="tagWithPossession('Penalty Defence','Penalty Defence')">Pen Defence</button>
+      <button class="evt-btn btn-turn"    style="opacity:0.65" onclick="tagWithPossession('Turnover','6 Again')">6 Again</button>
+    </div>
+  </div>
+
+  <div>
+    <div class="section-label">Game Events</div>
+    <div class="event-grid two-col">
+      <button class="evt-btn btn-game" onclick="tagGameEvent('Game Start')">Game Start</button>
+      <button class="evt-btn btn-game" onclick="tagGameEvent('Game End')">Game End</button>
+    </div>
+  </div>
+
+  <div>
+    <div class="section-label" style="display:flex;align-items:center;justify-content:space-between">
+      Recent
+      <button onclick="undoLast()" style="background:none;border:none;color:var(--text-muted);font-size:0.75rem;cursor:pointer;padding:0">↩ Undo</button>
+    </div>
+    <div id="recentList"><div style="color:var(--text-muted);font-size:0.82rem;padding:8px 0">No events yet</div></div>
+  </div>
+
+</main>
+
+<div id="actionBar">
+  <button class="action-btn btn-push"     id="pushBtn"     onclick="pushToSheet()">⬆ Push</button>
+  <button class="action-btn btn-override" id="overrideBtn" onclick="pushToSheet(true)">⚠ Override</button>
+  <button class="action-btn btn-live"     id="liveBtn"     onclick="toggleLive()">⚫ Live</button>
+</div>
+
+<script>
+// ── Access gate ────────────────────────────────────────────────
+{ const p = sessionStorage.getItem('password'); if (p !== 'm30-staff' && p !== 'm30-admin') window.location.replace('index.html'); }
+
+// ── Config ─────────────────────────────────────────────────────
+const APPS_SCRIPT_URL    = 'https://script.google.com/macros/s/AKfycbzhMw4nQr2nVW0MLfPWVXRPXsvImerpzshQ5GnJ3873qQkGMz0bcJQdmTRXCxwygfFm/exec';
+const APPS_SCRIPT_SECRET = sessionStorage.getItem('password') || '';
+
+// ── State ──────────────────────────────────────────────────────
+let annotations  = [];
+let possession   = 'Team 1';
+let wallStart    = null; // Date.now() when first event is tagged
+let liveMode     = false;
+let liveInterval = null;
+
+// ── Time helpers ───────────────────────────────────────────────
+function nowSeconds() {
+  if (wallStart === null) { wallStart = Date.now(); return 0; }
+  return (Date.now() - wallStart) / 1000;
+}
+
+function fmt(s) {
+  if (!s || isNaN(s)) return '0:00:00';
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = Math.floor(s % 60);
+  return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+}
+
+function fmtClock(s) {
+  const m = Math.floor(s / 60), sec = Math.floor(s % 60);
+  return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+}
+
+// ── Possession ─────────────────────────────────────────────────
+function setPossession(team) {
+  possession = team;
+  document.getElementById('possBtn1').classList.toggle('active', team === 'Team 1');
+  document.getElementById('possBtn2').classList.toggle('active', team === 'Team 2');
+}
+
+function otherTeam(team) {
+  return team === 'Team 1' ? 'Team 2' : 'Team 1';
+}
+
+// ── Tagging ────────────────────────────────────────────────────
+function inferActionOwner(type, possessionOwner) {
+  if (type === 'Penalty Defence') return otherTeam(possessionOwner);
+  return possessionOwner;
+}
+
+function tag(type, name, possessionOwner) {
+  const t = nowSeconds();
+  const actionOwner = inferActionOwner(type, possessionOwner);
+  annotations.push({ id: Date.now() + Math.random(), type, name, possessionOwner, actionOwner, comment: '', time: t, timeStr: fmt(t) });
+
+  // Auto-switch possession after try or turnover
+  if (type === 'Try')                              setPossession(otherTeam(possessionOwner));
+  if (type === 'Turnover' && name !== '6 Again')   setPossession(otherTeam(possessionOwner));
+
+  updateUI();
+  if (liveMode) pushLiveUpdate();
+}
+
+function tagWithPossession(type, name) {
+  tag(type, name, possession);
+}
+
+function tagGameEvent(name) {
+  tag('Game Event', name, possession);
+}
+
+function undoLast() {
+  if (!annotations.length) return;
+  annotations.pop();
+  updateUI();
+}
+
+// ── UI update ──────────────────────────────────────────────────
+function updateUI() {
+  // Score
+  const t1 = document.getElementById('metaTeam1').value.trim() || 'Team 1';
+  const t2 = document.getElementById('metaTeam2').value.trim() || 'Team 2';
+  document.getElementById('scoreName1').textContent = t1;
+  document.getElementById('scoreName2').textContent = t2;
+  document.getElementById('scoreVal1').textContent  = annotations.filter(a => a.type === 'Try' && a.actionOwner === 'Team 1').length;
+  document.getElementById('scoreVal2').textContent  = annotations.filter(a => a.type === 'Try' && a.actionOwner === 'Team 2').length;
+
+  // Clock
+  const gameStart = annotations.find(a => a.name === 'Game Start');
+  const lastTime  = annotations.length ? annotations[annotations.length - 1].time : 0;
+  const elapsed   = gameStart ? Math.max(0, lastTime - gameStart.time) : lastTime;
+  document.getElementById('gameClock').textContent = fmtClock(elapsed);
+
+  // Recent events (last 5, newest first)
+  const COLORS = { 'Try': '#22c55e', 'Turnover': '#f97316', 'Penalty Attack': '#ef4444', 'Penalty Defence': '#b91c1c', 'Game Event': '#3b82f6' };
+  const el = document.getElementById('recentList');
+  if (!annotations.length) {
+    el.innerHTML = '<div style="color:var(--text-muted);font-size:0.82rem;padding:8px 0">No events yet</div>';
+    return;
+  }
+  const recent = [...annotations].reverse().slice(0, 5);
+  el.innerHTML = recent.map(a => {
+    const color = COLORS[a.type] || '#888';
+    const team  = a.actionOwner === 'Team 1'
+      ? (document.getElementById('metaTeam1').value.trim() || 'Team 1')
+      : (document.getElementById('metaTeam2').value.trim() || 'Team 2');
+    const teamStr = a.type !== 'Game Event' ? ` · ${team}` : '';
+    return `<div class="recent-item">
+      <div class="recent-dot" style="background:${color}"></div>
+      <span class="recent-time">${fmtClock(a.time)}</span>
+      <span class="recent-text">${a.name}${teamStr}</span>
+    </div>`;
+  }).join('');
+}
+
+// Update possession button labels when team names change
+function onMetaChange() {
+  const t1 = document.getElementById('metaTeam1').value.trim() || 'Team 1';
+  const t2 = document.getElementById('metaTeam2').value.trim() || 'Team 2';
+  document.getElementById('possBtn1').textContent = t1;
+  document.getElementById('possBtn2').textContent = t2;
+  updateUI();
+  updateSheetPreview();
+}
+
+// ── Settings panel ─────────────────────────────────────────────
+function toggleSettings() {
+  document.getElementById('settingsPanel').classList.toggle('open');
+}
+
+function metaToSheetName() {
+  const slug = s => s.trim().toLowerCase().replace(/\s+/g, '-');
+  const year  = slug(document.getElementById('metaYear').value);
+  const div   = slug(document.getElementById('metaDivision').value);
+  const comp  = slug(document.getElementById('metaCompetition').value);
+  const t1    = slug(document.getElementById('metaTeam1').value);
+  const t2    = slug(document.getElementById('metaTeam2').value);
+  return [year, div, comp, t1, t2].filter(Boolean).join('_');
+}
+
+function updateSheetPreview() {
+  const name = metaToSheetName();
+  const el   = document.getElementById('sheetPreview');
+  el.textContent = name || 'fill metadata to generate tab name';
+  el.style.color = name ? '#3b82f6' : 'var(--text-muted)';
+}
+
+// ── Clock ticker ───────────────────────────────────────────────
+setInterval(() => {
+  if (!wallStart || !annotations.length) return;
+  const gameStart     = annotations.find(a => a.name === 'Game Start');
+  const gameStartWall = gameStart ? wallStart + gameStart.time * 1000 : wallStart;
+  const live = (Date.now() - gameStartWall) / 1000;
+  document.getElementById('gameClock').textContent = fmtClock(Math.max(0, live));
+}, 1000);
+
+// ── Live mode ──────────────────────────────────────────────────
+function toggleLive() {
+  const sheetName = metaToSheetName();
+  if (!sheetName) { alert('Fill in team/competition details first.'); return; }
+  liveMode = !liveMode;
+  const btn = document.getElementById('liveBtn');
+  if (liveMode) {
+    btn.textContent = '🔴 Live';
+    btn.classList.add('active');
+    pushLiveUpdate();
+    liveInterval = setInterval(pushLiveUpdate, 30000);
+    window.addEventListener('beforeunload', stopLive);
+  } else {
+    stopLive();
+  }
+}
+
+function stopLive() {
+  liveMode = false;
+  clearInterval(liveInterval);
+  liveInterval = null;
+  const btn = document.getElementById('liveBtn');
+  if (btn) { btn.textContent = '⚫ Live'; btn.classList.remove('active'); }
+  const sheetName = metaToSheetName();
+  if (sheetName) {
+    fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ secret: APPS_SCRIPT_SECRET, action: 'live_clear', sheetName }),
+    }).catch(() => {});
+  }
+}
+
+function pushLiveUpdate() {
+  const sheetName = metaToSheetName();
+  if (!sheetName) return;
+  const team1 = document.getElementById('metaTeam1').value.trim() || 'Team 1';
+  const team2 = document.getElementById('metaTeam2').value.trim() || 'Team 2';
+  const score1 = annotations.filter(a => a.type === 'Try' && a.actionOwner === 'Team 1').length;
+  const score2 = annotations.filter(a => a.type === 'Try' && a.actionOwner === 'Team 2').length;
+  const gameStart = annotations.find(a => a.name === 'Game Start');
+  const gameStartWall = gameStart ? wallStart + gameStart.time * 1000 : (wallStart || Date.now());
+  const timeSeconds = Math.max(0, (Date.now() - gameStartWall) / 1000);
+  fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({ secret: APPS_SCRIPT_SECRET, action: 'live_update', sheetName, team1, team2, score1, score2, timeSeconds }),
+  }).catch(() => {});
+}
+
+// ── Push to sheet ──────────────────────────────────────────────
+async function pushToSheet(override = false) {
+  if (!annotations.length) { alert('No events to push.'); return; }
+  const sheetName = metaToSheetName();
+  if (!sheetName) { alert('Fill in team/competition details first.'); return; }
+
+  const btn = override ? document.getElementById('overrideBtn') : document.getElementById('pushBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Pushing…';
+
+  // Columns: Time, Possession Owner, Type, Name, To Review, Comment, Youtube Link, Action Owner
+  const rows = annotations.map(a => [
+    a.timeStr, a.possessionOwner, a.type, a.name, '', a.comment, '', a.actionOwner,
+  ]);
+
+  try {
+    const names      = annotations.map(a => a.name);
+    const analyzable = names.includes('Game Start') && names.includes('Game End') ? 'TRUE' : 'FALSE';
+    const body = {
+      secret: APPS_SCRIPT_SECRET, sheetName, rows,
+      meta: {
+        team1:       document.getElementById('metaTeam1').value.trim(),
+        team2:       document.getElementById('metaTeam2').value.trim(),
+        year:        document.getElementById('metaYear').value.trim(),
+        division:    document.getElementById('metaDivision').value.trim(),
+        competition: document.getElementById('metaCompetition').value.trim(),
+        video:       '',
+        analyzable,
+      },
+    };
+    if (override) body.override = true;
+
+    const resp   = await fetch(APPS_SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(body) });
+    const result = await resp.json();
+
+    if (!result.ok) {
+      if (result.tabExists && !override) {
+        if (APPS_SCRIPT_SECRET === 'm30-admin') {
+          document.getElementById('overrideBtn').style.display = '';
+          alert(`Tab "${sheetName}" already exists. Tap ⚠ Override to replace it.`);
+        } else {
+          alert(`Tab "${sheetName}" already exists. Admin access required to override.`);
+        }
+        btn.disabled = false;
+        btn.textContent = '⬆ Push';
+        return;
+      }
+      alert('Error: ' + result.error);
+      btn.disabled = false;
+      btn.textContent = override ? '⚠ Override' : '⬆ Push';
+      return;
+    }
+
+    document.getElementById('overrideBtn').style.display = 'none';
+    btn.textContent = `✓ ${result.appended} rows`;
+    setTimeout(() => { btn.disabled = false; btn.textContent = override ? '⚠ Override' : '⬆ Push'; }, 2500);
+  } catch (err) {
+    alert('Network error: ' + err.message);
+    btn.disabled = false;
+    btn.textContent = override ? '⚠ Override' : '⬆ Push';
+  }
+}
+</script>
+</body>
+</html>
