@@ -68,6 +68,22 @@
     .field input:focus { border-color: var(--accent); }
     .field input::placeholder { color: #444; }
     .field-offset { max-width: 120px; }
+    .field-time   { max-width: 120px; }
+
+    .load-time-btn {
+      padding: 8px 12px;
+      background: var(--surface-2);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      white-space: nowrap;
+      align-self: flex-end;
+    }
+    .load-time-btn:hover   { color: var(--text); }
+    .load-time-btn:disabled { opacity: 0.5; cursor: default; }
+    .load-time-btn.loaded  { color: var(--green); border-color: var(--green); }
 
     .submit-btn {
       padding: 9px 18px;
@@ -168,8 +184,46 @@ function renderCard(g, container) {
         ${g.youtubelink ? 'Update' : 'Apply'}
       </button>
     </div>
+    <div class="form-row" style="margin-top:8px">
+      <div class="field field-time">
+        <label>First event time</label>
+        <input type="text" class="first-time-input" placeholder="0:00:00" pattern="\\d+:\\d{2}:\\d{2}">
+      </div>
+      <button class="load-time-btn" onclick="loadFirstTime(this, '${g.name}')">Load time</button>
+    </div>
   `;
   container.appendChild(card);
+}
+
+function parseHMS(str) {
+  const parts = str.split(':').map(Number);
+  if (parts.some(isNaN)) return NaN;
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  return NaN;
+}
+
+async function loadFirstTime(btn, sheetName) {
+  btn.disabled    = true;
+  btn.textContent = '⏳';
+  const card = document.getElementById('card-' + sheetName);
+  try {
+    const resp   = await fetch(`${APPS_SCRIPT_URL}?secret=${encodeURIComponent(APPS_SCRIPT_SECRET)}&sheetName=${encodeURIComponent(sheetName)}`);
+    const result = await resp.json();
+    if (!result.ok) throw new Error(result.error);
+    const rows = result.rows;
+    if (!rows || rows.length < 2) throw new Error('No events found');
+    const timeStr = rows[1][0];  // Time is column A
+    const input = card.querySelector('.first-time-input');
+    input.value = timeStr;
+    input.dataset.original = timeStr;
+    btn.textContent = '✓ Loaded';
+    btn.classList.add('loaded');
+  } catch (err) {
+    btn.textContent = 'Retry';
+    btn.disabled = false;
+    alert('Failed to load events: ' + err.message);
+  }
 }
 
 async function submit(btn, sheetName) {
@@ -178,6 +232,16 @@ async function submit(btn, sheetName) {
 
   if (!url) { alert('Enter a YouTube URL first.'); return; }
 
+  const firstTimeInput = card.querySelector('.first-time-input');
+  const newTimeStr  = firstTimeInput?.value.trim();
+  const origTimeStr = firstTimeInput?.dataset.original;
+  let offsetSeconds = 0;
+  if (newTimeStr && origTimeStr && newTimeStr !== origTimeStr) {
+    const newSecs  = parseHMS(newTimeStr);
+    const origSecs = parseHMS(origTimeStr);
+    if (!isNaN(newSecs) && !isNaN(origSecs)) offsetSeconds = newSecs - origSecs;
+  }
+
   btn.disabled    = true;
   btn.textContent = '⏳ Saving…';
 
@@ -185,7 +249,7 @@ async function submit(btn, sheetName) {
     const resp   = await fetch(APPS_SCRIPT_URL, {
       method:  'POST',
       headers: { 'Content-Type': 'text/plain' },
-      body:    JSON.stringify({ secret: APPS_SCRIPT_SECRET, action: 'backfill_youtube', sheetName, youtubeUrl: url }),
+      body:    JSON.stringify({ secret: APPS_SCRIPT_SECRET, action: 'backfill_youtube', sheetName, youtubeUrl: url, offsetSeconds }),
     });
     const result = await resp.json();
     if (!result.ok) throw new Error(result.error);

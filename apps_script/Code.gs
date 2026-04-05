@@ -385,7 +385,8 @@ function updateRow(sheetName, time, name, comment) {
 }
 
 // ── Write YouTube link into _metadata for a game ───────────────
-function backfillYoutubeLinks(sheetName, youtubeUrl) {
+// offsetSeconds: if non-zero, shifts every Time value in the sheet by this amount.
+function backfillYoutubeLinks(sheetName, youtubeUrl, offsetSeconds) {
   const m = String(youtubeUrl).match(/(?:v=|youtu\.be\/|embed\/|live\/)([A-Za-z0-9_-]{11})/);
   if (!m) throw new Error('Invalid YouTube URL — could not extract video ID.');
 
@@ -394,6 +395,33 @@ function backfillYoutubeLinks(sheetName, youtubeUrl) {
   if (!sheet) throw new Error(`Tab "${sheetName}" not found.`);
 
   writeMeta(sheetName, { youtubelink: youtubeUrl });
+
+  if (offsetSeconds && offsetSeconds !== 0) {
+    const values  = sheet.getDataRange().getDisplayValues();
+    if (values.length < 2) return 1;
+    const headers = values[0].map(s => s.toLowerCase().trim());
+    const timeIdx = headers.indexOf('time');
+    if (timeIdx < 0) return 1;
+
+    const newTimes = [];
+    for (let i = 1; i < values.length; i++) {
+      const timeStr = values[i][timeIdx];
+      const parts   = timeStr ? timeStr.split(':').map(Number) : [];
+      let secs;
+      if      (parts.length === 3) secs = parts[0]*3600 + parts[1]*60 + parts[2];
+      else if (parts.length === 2) secs = parts[0]*60   + parts[1];
+      else { newTimes.push([timeStr]); continue; }
+
+      const s   = Math.max(0, secs + offsetSeconds);
+      const h   = Math.floor(s / 3600);
+      const min = Math.floor((s % 3600) / 60);
+      const sec = Math.floor(s % 60);
+      newTimes.push([`${h}:${String(min).padStart(2,'0')}:${String(sec).padStart(2,'0')}`]);
+    }
+
+    sheet.getRange(2, timeIdx + 1, newTimes.length, 1).setValues(newTimes);
+  }
+
   return 1;
 }
 
