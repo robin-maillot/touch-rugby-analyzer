@@ -222,13 +222,14 @@
   <span id="rowCount"></span>
   <button id="toggleVideoBtn" class="active" onclick="toggleVideoPanel()" title="Toggle video player">&#9654; Video</button>
   <button id="layoutBtn" style="background:var(--surface-2);color:var(--text-muted);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:0.78rem;cursor:pointer;white-space:nowrap;transition:all 0.15s" onclick="toggleLayout()" title="Toggle video layout">↕ Stack</button>
+  <button id="editModeBtn" style="display:none;background:var(--surface-2);color:var(--text-muted);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:0.78rem;cursor:pointer;white-space:nowrap;transition:all 0.15s" onclick="toggleEditMode()" title="Toggle edit mode">✏ Edit</button>
   <nav class="header-nav">
     <a href="games.html">Games</a>
     <a href="dashboard.html">Dashboard</a>
     <a href="viewer.html" class="active">Events</a>
     <a href="annotator.html" id="annotatorLink" style="display:none">Annotator</a>
   </nav>
-  <script>{ const p = sessionStorage.getItem('password'); if (p === 'm30-staff' || p === 'm30-admin') document.getElementById('annotatorLink').style.display = ''; }</script>
+  <script>{ const p = sessionStorage.getItem('password'); if (p === 'm30-staff' || p === 'm30-admin') document.getElementById('annotatorLink').style.display = ''; if (p === 'm30-admin') document.getElementById('editModeBtn').style.display = ''; }</script>
 </header>
 
 <div id="errorMsg"></div>
@@ -351,6 +352,7 @@ const HIDDEN_COLS = new Set(['Team 1', 'Team 2', 'Video Name', 'To Review', 'You
 const TYPE_BADGE  = { 'try':'badge-try', 'penalty':'badge-penalty', 'penalty attack':'badge-penalty', 'penalty defence':'badge-penalty', 'turnover':'badge-turnover', 'to review':'badge-toreview' };
 
 const isAdmin = sessionStorage.getItem('password') === 'm30-admin';
+let editMode = false;
 
 const NAMES_BY_TYPE = {
   'Try':             ['Scoop', 'Other', '32 - Long', '33 Quicky', '33', '32 Cut', 'French Flair'],
@@ -360,6 +362,17 @@ const NAMES_BY_TYPE = {
   'Game Event':      ['Game Start', 'Game End'],
   'To Review':       [],
 };
+
+// ── Edit mode toggle ────────────────────────────────────────────
+function toggleEditMode() {
+  editMode = !editMode;
+  const btn = document.getElementById('editModeBtn');
+  btn.textContent = editMode ? '👁 View' : '✏ Edit';
+  btn.style.color       = editMode ? 'var(--accent)'  : 'var(--text-muted)';
+  btn.style.borderColor = editMode ? 'var(--accent)'  : 'var(--border)';
+  renderHeaders();
+  updatePagination();
+}
 
 // ── Admin edit tracking ─────────────────────────────────────────
 const pendingEdits = new Map(); // keyed by row array reference
@@ -728,7 +741,7 @@ function renderRows(rows) {
         span.textContent = cell;
         span.className = 'game-tag';
         td.appendChild(span);
-      } else if (col === 'name' && isAdmin) {
+      } else if (col === 'name' && isAdmin && editMode) {
         const type    = colType >= 0 ? row[colType] : '';
         const options = NAMES_BY_TYPE[type] || [];
         const allOpts = options.includes(cell) || !cell ? options : [cell, ...options];
@@ -748,7 +761,7 @@ function renderRows(rows) {
         } else {
           td.textContent = cell;
         }
-      } else if (col === 'comment' && isAdmin) {
+      } else if (col === 'comment' && isAdmin && editMode) {
         const input = document.createElement('input');
         input.type      = 'text';
         input.value     = cell || '';
