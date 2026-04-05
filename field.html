@@ -156,8 +156,10 @@
     .btn-try1    { background: var(--green);    color: #000; }
     .btn-turn    { background: var(--orange);   color: #fff; }
     .btn-pen-atk { background: var(--red);      color: #fff; }
-    .btn-pen-def { background: var(--red-dark); color: #fff; }
-    .btn-game    { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
+    .btn-pen-def  { background: var(--red-dark); color: #fff; }
+    .btn-game     { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
+    .btn-review   { background: #4c1d95; color: #c4b5fd; border: 1px solid #6d28d9; }
+    .btn-undo-big { background: var(--surface-2); color: var(--text-muted); border: 1px solid var(--border); }
 
     /* ── Recent events ──────────────────────────────────────────── */
     #recentList {
@@ -291,10 +293,14 @@
   </div>
 
   <div>
-    <div class="section-label" style="display:flex;align-items:center;justify-content:space-between">
-      Recent
-      <button onclick="undoLast()" style="background:none;border:none;color:var(--text-muted);font-size:0.75rem;cursor:pointer;padding:0">↩ Undo</button>
+    <div class="event-grid two-col">
+      <button class="evt-btn btn-review"   onclick="tagToReview()">To Review</button>
+      <button class="evt-btn btn-undo-big" onclick="undoLast()">↩ Undo</button>
     </div>
+  </div>
+
+  <div>
+    <div class="section-label">Recent</div>
     <div id="recentList"><div style="color:var(--text-muted);font-size:0.82rem;padding:8px 0">No events yet</div></div>
   </div>
 
@@ -376,6 +382,13 @@ function tagGameEvent(name) {
   tag('Game Event', name, possession);
 }
 
+function tagToReview() {
+  const t = nowSeconds();
+  annotations.push({ id: Date.now() + Math.random(), type: 'To Review', name: 'To Review', possessionOwner: possession, actionOwner: possession, comment: '?', time: t, timeStr: fmt(t) });
+  updateUI();
+  if (liveMode) pushLiveUpdate();
+}
+
 function undoLast() {
   if (!annotations.length) return;
   annotations.pop();
@@ -399,7 +412,7 @@ function updateUI() {
   document.getElementById('gameClock').textContent = fmtClock(elapsed);
 
   // Recent events (last 5, newest first)
-  const COLORS = { 'Try': '#22c55e', 'Turnover': '#f97316', 'Penalty Attack': '#ef4444', 'Penalty Defence': '#b91c1c', 'Game Event': '#3b82f6' };
+  const COLORS = { 'Try': '#22c55e', 'Turnover': '#f97316', 'Penalty Attack': '#ef4444', 'Penalty Defence': '#b91c1c', 'Game Event': '#3b82f6', 'To Review': '#7c3aed' };
   const el = document.getElementById('recentList');
   if (!annotations.length) {
     el.innerHTML = '<div style="color:var(--text-muted);font-size:0.82rem;padding:8px 0">No events yet</div>';
