@@ -409,10 +409,13 @@ function buildMetrics(possessions, teamNames, events) {
     const teamPens   = events.filter(e => (e.Type === 'Penalty' || e.Type === 'Penalty Attack' || e.Type === 'Penalty Defence') && e['Action Owner'] === team);
     const penAttack  = teamPens.filter(e => e['Action Owner'] === e['Possession Owner']).length;
     const penDefence = teamPens.filter(e => e['Action Owner'] !== e['Possession Owner']).length;
+    const successRate  = g.length ? `${(tries / g.length * 100).toFixed(1)}%` : '—';
+    const compsRate    = g.length ? `${(comps / g.length * 100).toFixed(1)}%` : '—';
     return {
-      Team: team, Possessions: g.length, Tries: tries,
-      'Success Rate': g.length ? `${(tries / g.length * 100).toFixed(1)}%` : '—',
-      Completions: comps, 'Pen Attack': penAttack, 'Pen Defence': penDefence,
+      Team: team, Possessions: g.length,
+      Tries: g.length ? `${tries} (${successRate})` : tries,
+      Completions: g.length ? `${comps} (${compsRate})` : comps,
+      'Pen Attack': penAttack, 'Pen Defence': penDefence,
       'Avg Time (s)': avg.toFixed(1), 'Total Time (s)': total.toFixed(1),
     };
   });
@@ -588,7 +591,7 @@ async function renderStats(halfValue) {
   await vegaEmbed('#vis-penalties',  cumulativeSpec(penData,   'Penalties vs Time', 'Cumulative Penalties', teamNames), opts);
   await vegaEmbed('#vis-possession', possessionSpec(possData, teamNames), opts);
 
-  const cols = ['Team', 'Possessions', 'Tries', 'Success Rate', 'Completions', 'Pen Attack', 'Pen Defence', 'Avg Time (s)', 'Total Time (s)'];
+  const cols = ['Team', 'Possessions', 'Tries', 'Completions', 'Pen Attack', 'Pen Defence', 'Avg Time (s)', 'Total Time (s)'];
   document.getElementById('metricsTable').innerHTML =
     `<table>
        <thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead>

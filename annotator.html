@@ -128,6 +128,12 @@
 
   /* Meta bar */
   .meta-bar { display: flex; gap: 8px; align-items: center; background: #1a1d27; border-radius: 8px; padding: 6px 10px; border: 1px solid #2a2d3a; flex-shrink: 0; flex-wrap: wrap; }
+
+  /* Collapse toggle */
+  .collapse-toggle { display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; background: #1a1d27; border: 1px solid #2a2d3a; border-radius: 6px; padding: 3px 10px; flex-shrink: 0; color: #555; font-size: 0.72rem; user-select: none; transition: background 0.15s, color 0.15s; }
+  .collapse-toggle:hover { background: #22253a; color: #aaa; }
+  .collapse-toggle .chevron { transition: transform 0.2s; display: inline-block; }
+  .collapse-toggle.collapsed .chevron { transform: rotate(-90deg); }
   .meta-label { font-size: 0.72rem; color: #888; white-space: nowrap; }
   .meta-sep { font-size: 0.78rem; color: #555; }
   .meta-input { width: 110px !important; }
@@ -213,6 +219,11 @@
   <div class="video-resize-handle" id="videoResizeHandle"></div>
 
   <div id="contentPanel" class="content-panel">
+
+  <!-- Collapse toggle for controls + meta -->
+  <div id="collapseToggle" class="collapse-toggle" onclick="toggleTopCollapse()" title="Show/hide controls and metadata">
+    <span class="chevron">▾</span><span id="collapseLabel">Hide controls</span>
+  </div>
 
   <div class="controls">
     <button class="btn btn-ghost" onclick="document.getElementById('fileInput').click()">📂 Open</button>
@@ -481,6 +492,21 @@ function setupVideoResizeHandle() {
   });
 }
 setupVideoResizeHandle();
+
+function toggleTopCollapse() {
+  const toggle = document.getElementById('collapseToggle');
+  const label  = document.getElementById('collapseLabel');
+  const controls = document.querySelector('.controls');
+  const metaBar  = document.querySelector('.meta-bar');
+  const collapsed = toggle.classList.toggle('collapsed');
+  controls.style.display = collapsed ? 'none' : '';
+  metaBar.style.display  = collapsed ? 'none' : '';
+  label.textContent = collapsed ? 'Show controls' : 'Hide controls';
+  localStorage.setItem('annotator-top-collapsed', collapsed ? '1' : '0');
+}
+(function initTopCollapse() {
+  if (localStorage.getItem('annotator-top-collapsed') === '1') toggleTopCollapse();
+})();
 
 function toggleLayout() {
   const main = document.querySelector('.main');
@@ -757,6 +783,10 @@ function tag(type, name, possessionOwner, comment = '') {
   annotations.sort((a,b) => a.time - b.time);
   recomputeOwnersFrom(t);
   renderList();
+  // If the new annotation landed at the end, scroll the list to show it
+  const annList = document.getElementById('annList');
+  const isAtEnd = annotations[annotations.length - 1].time === t;
+  if (isAtEnd) annList.scrollTo({ top: annList.scrollHeight, behavior: 'smooth' });
   renderMarkers();
   flashType(type);
   document.getElementById('lastAnnBtn').removeAttribute('disabled');
