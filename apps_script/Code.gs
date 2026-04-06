@@ -256,7 +256,16 @@ function writeMeta(sheetName, meta) {
   const di   = col('division');
   const vi   = col('video name');
   const ai   = col('analyzable');
-  const yui  = col('youtube link');
+  let yui    = col('youtube link');
+
+  // Add 'Youtube Link' column if missing and we have a value to write
+  if (yui < 0 && meta.youtubelink != null) {
+    sheet.getRange(1, headers.length + 1).setValue('Youtube Link');
+    headers.push('youtube link');
+    yui = headers.length - 1;
+    // Refresh values to include the new column in subsequent reads
+    values.forEach(row => { while (row.length < headers.length) row.push(''); });
+  }
 
   // Find existing row, if any
   const numCols = headers.length;

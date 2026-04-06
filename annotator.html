@@ -1078,6 +1078,7 @@ async function pushToSheet(override = false) {
         competition: document.getElementById('metaCompetition').value.trim(),
         video:       videoBaseName,
         analyzable,
+        youtubelink: document.getElementById('ytUrl').value.trim(),
       },
     };
     if (override) body.override = true;
