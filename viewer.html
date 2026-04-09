@@ -347,8 +347,8 @@ const LS = {
   set(k, v) { try { localStorage.setItem('trl2_' + k, JSON.stringify(v)); } catch {} },
 };
 
-const FILTERABLE  = ['Type', 'Name', 'Possession Owner', 'Action Owner', 'Game'];
-const HIDDEN_COLS = new Set(['Team 1', 'Team 2', 'Video Name', 'To Review', 'Youtube Link']);
+const FILTERABLE  = ['Type', 'Name', 'Action Owner', 'Game'];
+const HIDDEN_COLS = new Set(['Team 1', 'Team 2', 'Video Name', 'To Review', 'Youtube Link', 'Possession Owner', 'Analyzable']);
 const TYPE_BADGE  = { 'try':'badge-try', 'penalty':'badge-penalty', 'penalty attack':'badge-penalty', 'penalty defence':'badge-penalty', 'turnover':'badge-turnover', 'to review':'badge-toreview' };
 
 const isAdmin = sessionStorage.getItem('password') === 'm30-admin';
@@ -437,7 +437,7 @@ let rowsPerPage  = 50;
 let activeFilters = {};
 
 // Column indices (resolved after headers load)
-let colTime = -1, colType = -1, colName = -1, colGame = -1, colComment = -1, colPoss = -1;
+let colTime = -1, colType = -1, colName = -1, colGame = -1, colComment = -1, colAction = -1;
 
 // YouTube base URLs from metadata, keyed by game sheet name
 let gameYtMap = {};
@@ -537,6 +537,16 @@ function processRows(rows) {
   headers = keepIdx.map(i => headers[i]);
   allData = allData.map(row => keepIdx.map(i => row[i]));
 
+  // Move Action Owner to right after Time
+  const _aoIdx = headers.findIndex(h => h.toLowerCase() === 'action owner');
+  const _tIdx  = headers.findIndex(h => h.toLowerCase() === 'time');
+  if (_aoIdx > 0 && _tIdx >= 0 && _aoIdx !== _tIdx + 1) {
+    const reorder = headers.map((_, i) => i).filter(i => i !== _aoIdx);
+    reorder.splice(_tIdx + 1, 0, _aoIdx);
+    headers = reorder.map(i => headers[i]);
+    allData = allData.map(row => reorder.map(i => row[i]));
+  }
+
   // Exclude Game Event rows
   const typeColIdx = headers.findIndex(h => h.toLowerCase() === 'type');
   if (typeColIdx >= 0) allData = allData.filter(row => row[typeColIdx] !== 'Game Event');
@@ -548,7 +558,7 @@ function processRows(rows) {
   colName    = hli('name');
   colGame    = hli('game');
   colComment = hli('comment');
-  colPoss    = hli('possession owner');
+  colAction  = hli('action owner');
 
   filtered = [...allData];
   buildSearchColSelect();
@@ -731,7 +741,7 @@ function renderRows(rows) {
         span.textContent = cell;
         span.className = 'badge ' + (TYPE_BADGE[cell.toLowerCase()] || '');
         td.appendChild(span);
-      } else if ((col === 'possession owner' || col === 'action owner') && cell) {
+      } else if (col === 'action owner' && cell) {
         const span = document.createElement('span');
         span.textContent = cell;
         span.className = 'team-badge';
@@ -931,7 +941,7 @@ function updateNowPlaying(row) {
   const game    = colGame    >= 0 ? (row[colGame]    || '') : '';
   const time    = colTime    >= 0 ? (row[colTime]    || '') : '';
   const cmmt    = colComment >= 0 ? (row[colComment] || '') : '';
-  const poss    = colPoss    >= 0 ? (row[colPoss]    || '') : '';
+  const poss    = colAction  >= 0 ? (row[colAction]  || '') : '';
 
   info.innerHTML = '';
   if (type) {

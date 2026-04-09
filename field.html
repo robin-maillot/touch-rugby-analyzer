@@ -275,11 +275,11 @@
   <div>
     <div class="section-label">Events</div>
     <div class="event-grid two-col">
-      <button class="evt-btn btn-try1"    onclick="tagWithPossession('Try','Try')">Try</button>
-      <button class="evt-btn btn-turn"    onclick="tagWithPossession('Turnover','Turnover')">Turnover</button>
-      <button class="evt-btn btn-pen-atk" onclick="tagWithPossession('Penalty Attack','Penalty Attack')">Pen Attack</button>
+      <button class="evt-btn btn-try1"    onclick="tagWithPossession('Try','Other')">Try</button>
+      <button class="evt-btn btn-turn"    onclick="tagWithPossession('Turnover','Other')">Turnover</button>
+      <button class="evt-btn btn-pen-atk" onclick="tagWithPossession('Penalty Attack','Other')">Pen Attack</button>
       <button class="evt-btn btn-turn"    onclick="tagWithPossession('Turnover','6th Touch')">6th Touch</button>
-      <button class="evt-btn btn-pen-def" onclick="tagWithPossession('Penalty Defence','Penalty Defence')">Pen Defence</button>
+      <button class="evt-btn btn-pen-def" onclick="tagWithPossession('Penalty Defence','Other')">Pen Defence</button>
       <button class="evt-btn btn-turn"    style="opacity:0.65" onclick="tagWithPossession('Turnover','6 Again')">6 Again</button>
     </div>
   </div>
@@ -366,9 +366,10 @@ function tag(type, name, possessionOwner) {
   const actionOwner = inferActionOwner(type, possessionOwner);
   annotations.push({ id: Date.now() + Math.random(), type, name, possessionOwner, actionOwner, comment: '', time: t, timeStr: fmt(t) });
 
-  // Auto-switch possession after try or turnover
+  // Auto-switch possession after try, turnover, or penalty attack
   if (type === 'Try')                              setPossession(otherTeam(possessionOwner));
   if (type === 'Turnover' && name !== '6 Again')   setPossession(otherTeam(possessionOwner));
+  if (type === 'Penalty Attack')                   setPossession(otherTeam(possessionOwner));
 
   updateUI();
   if (liveMode) pushLiveUpdate();
@@ -534,9 +535,9 @@ async function pushToSheet(override = false) {
   btn.disabled = true;
   btn.textContent = '⏳ Pushing…';
 
-  // Columns: Time, Possession Owner, Type, Name, To Review, Comment, Youtube Link, Action Owner
+  // Columns: Time, Possession Owner, Type, Name, To Review, Comment, Action Owner
   const rows = annotations.map(a => [
-    a.timeStr, a.possessionOwner, a.type, a.name, '', a.comment, '', a.actionOwner,
+    a.timeStr, a.possessionOwner, a.type, a.name, '', a.comment, a.actionOwner,
   ]);
 
   try {
