@@ -215,6 +215,75 @@
     .btn-live { background: var(--surface-2); border: 1px solid var(--border); color: var(--text-muted); }
     .btn-live.active { color: var(--red); border-color: var(--red); background: rgba(239,68,68,0.08); }
     .btn-override { background: #7f1d1d; color: #fff; display: none; }
+
+    /* ── Stats modal ─────────────────────────────────────────────── */
+    #statsOverlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.72);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    #statsOverlay.open { display: flex; }
+    #statsCard {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      width: 100%;
+      max-width: 440px;
+      max-height: 85dvh;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+    .stats-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .stats-title { font-size: 0.9rem; font-weight: 700; }
+    .stats-close {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.4rem;
+      line-height: 1;
+      cursor: pointer;
+      padding: 2px 6px;
+    }
+    .stats-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .stats-table thead tr { background: var(--bg); }
+    .stats-table th {
+      padding: 9px 12px;
+      color: var(--text-muted);
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      text-align: center;
+    }
+    .stats-table th:first-child { text-align: left; }
+    .stats-table td {
+      padding: 11px 12px;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+    .stats-table td:first-child {
+      text-align: left;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+    }
+    .stats-win  { color: var(--green); font-weight: 700; }
+    .stats-lose { color: var(--text-muted); }
+    .stats-bad  { color: var(--red); font-weight: 700; }
   </style>
 </head>
 <body>
@@ -224,6 +293,7 @@
   <h1>Field Annotator</h1>
   <div class="header-actions">
     <a href="index.html" class="btn-icon">← Back</a>
+    <button class="btn-icon" onclick="openStats()">Stats</button>
     <button class="btn-icon" onclick="toggleSettings()" id="settingsBtn">⚙ Setup</button>
   </div>
 </header>
@@ -312,6 +382,16 @@
   <button class="action-btn btn-live"     id="liveBtn"     onclick="toggleLive()">⚫ Live</button>
 </div>
 
+<div id="statsOverlay" onclick="if(event.target===this)closeStats()">
+  <div id="statsCard">
+    <div class="stats-header">
+      <span class="stats-title" id="statsTitle">Stats</span>
+      <button class="stats-close" onclick="closeStats()">×</button>
+    </div>
+    <table class="stats-table" id="statsTable"></table>
+  </div>
+</div>
+
 <script>
 // ── Access gate ────────────────────────────────────────────────
 { const p = sessionStorage.getItem('password'); if (p !== 'm30-staff' && p !== 'm30-admin') window.location.replace('index.html'); }
@@ -397,6 +477,12 @@ function undoLast() {
 }
 
 // ── UI update ──────────────────────────────────────────────────
+const EVENT_LABELS = { 'Try': 'Try', 'Turnover': 'Turnover', 'Penalty Attack': 'Pen Attack', 'Penalty Defence': 'Pen Defence' };
+function eventLabel(a) {
+  if (a.name !== 'Other') return a.name;
+  return EVENT_LABELS[a.type] || a.type;
+}
+
 function updateUI() {
   // Score
   const t1 = document.getElementById('metaTeam1').value.trim() || 'Team 1';
@@ -429,7 +515,7 @@ function updateUI() {
     return `<div class="recent-item">
       <div class="recent-dot" style="background:${color}"></div>
       <span class="recent-time">${fmtClock(a.time)}</span>
-      <span class="recent-text">${a.name}${teamStr}</span>
+      <span class="recent-text">${eventLabel(a)}${teamStr}</span>
     </div>`;
   }).join('');
 }
@@ -523,6 +609,94 @@ function pushLiveUpdate() {
     headers: { 'Content-Type': 'text/plain' },
     body: JSON.stringify({ secret: APPS_SCRIPT_SECRET, action: 'live_update', sheetName, team1, team2, score1, score2, timeSeconds }),
   }).catch(() => {});
+}
+
+// ── Stats modal ────────────────────────────────────────────────
+function computeStats() {
+  const t1name = document.getElementById('metaTeam1').value.trim() || 'Team 1';
+  const t2name = document.getElementById('metaTeam2').value.trim() || 'Team 2';
+
+  const evts = annotations.filter(a => a.type !== 'To Review' && a.type !== 'Game Event');
+
+  // Group consecutive events by possessionOwner into possession segments
+  const segs = [];
+  let cur = null;
+  for (const e of evts) {
+    if (!cur || e.possessionOwner !== cur.owner) {
+      if (cur) segs.push(cur);
+      cur = { owner: e.possessionOwner, events: [e] };
+    } else {
+      cur.events.push(e);
+    }
+  }
+  if (cur) segs.push(cur);
+
+  // Assign durations: each possession starts where the previous ended
+  const gameStart = annotations.find(a => a.name === 'Game Start');
+  const t0 = gameStart ? gameStart.time : (evts.length ? evts[0].time : 0);
+  for (let i = 0; i < segs.length; i++) {
+    const last = segs[i].events[segs[i].events.length - 1];
+    segs[i].endType  = last.type;
+    segs[i].endName  = last.name;
+    segs[i].end      = last.time;
+    segs[i].start    = i === 0 ? t0 : segs[i - 1].end;
+    segs[i].duration = Math.max(0, segs[i].end - segs[i].start);
+  }
+
+  const statFor = key => {
+    const mine   = segs.filter(s => s.owner === key);
+    const tries  = mine.filter(s => s.endType === 'Try').length;
+    const comps  = mine.filter(s => s.endType === 'Try' || s.endName === '6th Touch').length;
+    const penAtk = annotations.filter(a => a.type === 'Penalty Attack'  && a.actionOwner === key).length;
+    const penDef = annotations.filter(a => a.type === 'Penalty Defence' && a.actionOwner === key).length;
+    const total  = mine.reduce((s, p) => s + p.duration, 0);
+    const avg    = mine.length ? total / mine.length : 0;
+    const pct    = (n, d) => d ? ` (${Math.round(n / d * 100)}%)` : '';
+    return {
+      score:        annotations.filter(a => a.type === 'Try' && a.actionOwner === key).length,
+      possessions:  mine.length,
+      tries:        tries + pct(tries, mine.length),  triesRaw:    tries,
+      comps:        comps + pct(comps, mine.length),  compsRaw:    comps,
+      penAtk, penDef,
+      avgTime:      avg.toFixed(1),    avgTimeRaw:   avg,
+      totalTime:    total.toFixed(1),  totalTimeRaw: total,
+    };
+  };
+
+  return { t1: { name: t1name, ...statFor('Team 1') }, t2: { name: t2name, ...statFor('Team 2') } };
+}
+
+function openStats() {
+  const { t1, t2 } = computeStats();
+  document.getElementById('statsTitle').textContent = `${t1.name} vs ${t2.name}`;
+
+  // [label, t1 display, t2 display, t1 raw, t2 raw, higherIsBetter: true/false/null]
+  const rows = [
+    ['Score',          t1.score,      t2.score,      t1.score,       t2.score,       true ],
+    ['Possessions',    t1.possessions,t2.possessions,t1.possessions, t2.possessions, null ],
+    ['Tries',          t1.tries,      t2.tries,      t1.triesRaw,    t2.triesRaw,    true ],
+    ['Completions',    t1.comps,      t2.comps,      t1.compsRaw,    t2.compsRaw,    true ],
+    ['Pen Attack',     t1.penAtk,     t2.penAtk,     t1.penAtk,      t2.penAtk,      false],
+    ['Pen Defence',    t1.penDef,     t2.penDef,     t1.penDef,      t2.penDef,      false],
+    ['Avg Time (s)',   t1.avgTime,    t2.avgTime,    t1.avgTimeRaw,  t2.avgTimeRaw,  null ],
+    ['Total Time (s)', t1.totalTime,  t2.totalTime,  t1.totalTimeRaw,t2.totalTimeRaw,null ],
+  ];
+
+  const tbody = rows.map(([label, d1, d2, r1, r2, hib]) => {
+    let c1 = '', c2 = '';
+    if (hib === true)  { if (r1 > r2) c1 = 'stats-win'; else if (r2 > r1) c2 = 'stats-win'; }
+    if (hib === false) { if (r1 < r2) c1 = 'stats-win'; else if (r2 < r1) c2 = 'stats-win'; }
+    return `<tr><td>${label}</td><td class="${c1}">${d1}</td><td class="${c2}">${d2}</td></tr>`;
+  }).join('');
+
+  document.getElementById('statsTable').innerHTML =
+    `<thead><tr><th></th><th>${t1.name}</th><th>${t2.name}</th></tr></thead><tbody>${tbody}</tbody>`;
+
+  document.getElementById('statsOverlay').classList.add('open');
+}
+
+function closeStats() {
+  document.getElementById('statsOverlay').classList.remove('open');
 }
 
 // ── Push to sheet ──────────────────────────────────────────────
