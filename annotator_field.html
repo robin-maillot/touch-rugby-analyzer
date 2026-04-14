@@ -42,7 +42,7 @@
       flex-shrink: 0;
     }
     header h1 { font-size: 0.9rem; font-weight: 600; }
-    .header-actions { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+    .header-actions { margin-left: auto; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
     .btn-icon {
       background: none;
       border: 1px solid var(--border);
@@ -52,7 +52,11 @@
       font-size: 0.8rem;
       cursor: pointer;
     }
-    .btn-icon:active { background: var(--surface-2); }
+    .btn-icon:active   { background: var(--surface-2); }
+    .btn-icon:disabled { opacity: 0.5; }
+    .btn-hdr-push     { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .btn-hdr-override { background: #7f1d1d; color: #fff; border-color: #7f1d1d; display: none; }
+    .btn-live.active  { color: var(--red); border-color: var(--red); background: rgba(239,68,68,0.08); }
 
     /* ── Settings panel ─────────────────────────────────────────── */
     #settingsPanel {
@@ -132,10 +136,7 @@
     .poss-btn.active { border-color: var(--accent); background: rgba(59,130,246,0.12); color: var(--text); }
 
     /* ── Event buttons ──────────────────────────────────────────── */
-    .event-grid {
-      display: grid;
-      gap: 8px;
-    }
+    .event-grid { display: grid; gap: 8px; }
     .event-grid.two-col { grid-template-columns: 1fr 1fr; }
     .event-grid.one-col { grid-template-columns: 1fr; }
 
@@ -153,20 +154,16 @@
     }
     .evt-btn:active { filter: brightness(0.85); transform: scale(0.97); }
 
-    .btn-try1    { background: var(--green);    color: #000; }
-    .btn-turn    { background: var(--orange);   color: #fff; }
-    .btn-pen-atk { background: var(--red);      color: #fff; }
-    .btn-pen-def  { background: var(--red-dark); color: #fff; }
-    .btn-game     { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
-    .btn-review   { background: #4c1d95; color: #c4b5fd; border: 1px solid #6d28d9; }
-    .btn-undo-big { background: var(--surface-2); color: var(--text-muted); border: 1px solid var(--border); }
+    .btn-try1    { background: var(--green);      color: #000; }
+    .btn-turn    { background: var(--orange);     color: #fff; }
+    .btn-pen-atk { background: var(--red);        color: #fff; }
+    .btn-pen-def { background: var(--red-dark);   color: #fff; }
+    .btn-game    { background: var(--surface-2);  color: var(--text); border: 1px solid var(--border); }
+    .btn-review  { background: #4c1d95; color: #c4b5fd; border: 1px solid #6d28d9; }
+    .btn-undo-big{ background: var(--surface-2);  color: var(--text-muted); border: 1px solid var(--border); }
 
     /* ── Recent events ──────────────────────────────────────────── */
-    #recentList {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
+    #recentList { display: flex; flex-direction: column; gap: 4px; }
     .recent-item {
       display: flex;
       align-items: center;
@@ -177,113 +174,167 @@
       padding: 8px 12px;
       font-size: 0.82rem;
     }
-    .recent-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .recent-dot  { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
     .recent-time { font-variant-numeric: tabular-nums; color: var(--text-muted); font-size: 0.75rem; min-width: 52px; }
     .recent-text { flex: 1; }
-    .recent-team { color: var(--text-muted); font-size: 0.75rem; }
-    .btn-undo {
-      margin-left: auto;
-      background: none;
-      border: none;
-      color: var(--text-muted);
-      cursor: pointer;
-      font-size: 0.75rem;
-      padding: 2px 6px;
-    }
 
-    /* ── Action bar ─────────────────────────────────────────────── */
-    #actionBar {
-      background: var(--surface);
-      border-top: 1px solid var(--border);
-      padding: 10px 12px;
-      display: flex;
-      gap: 8px;
-      flex-shrink: 0;
-    }
-    .action-btn {
-      flex: 1;
-      padding: 13px;
-      border-radius: 8px;
-      border: none;
-      font-size: 0.85rem;
-      font-weight: 600;
-      cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .action-btn:disabled { opacity: 0.5; }
-    .btn-push { background: var(--accent); color: #fff; }
-    .btn-live { background: var(--surface-2); border: 1px solid var(--border); color: var(--text-muted); }
-    .btn-live.active { color: var(--red); border-color: var(--red); background: rgba(239,68,68,0.08); }
-    .btn-override { background: #7f1d1d; color: #fff; display: none; }
 
-    /* ── Stats modal ─────────────────────────────────────────────── */
+    /* ── Stats modal v2 ─────────────────────────────────────────── */
     #statsOverlay {
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,0.72);
+      background: rgba(0,0,0,0.75);
       z-index: 100;
-      align-items: center;
+      align-items: flex-end;
       justify-content: center;
-      padding: 16px;
     }
     #statsOverlay.open { display: flex; }
+
+    /* Sheet up from bottom on mobile; centred dialog on wider screens */
     #statsCard {
       background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 14px;
+      border-radius: 20px 20px 0 0;
       width: 100%;
-      max-width: 440px;
-      max-height: 85dvh;
+      max-height: 90dvh;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
+      padding-bottom: env(safe-area-inset-bottom, 0px);
     }
-    .stats-header {
+    @media (min-width: 600px) {
+      #statsOverlay { align-items: center; padding: 24px; }
+      #statsCard { border-radius: 16px; max-width: 520px; max-height: 85dvh; }
+    }
+
+    /* drag handle hint */
+    .stats-handle {
+      width: 36px; height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      margin: 10px auto 0;
+      flex-shrink: 0;
+    }
+    @media (min-width: 600px) { .stats-handle { display: none; } }
+
+    /* hero score at top of modal */
+    .stats-hero {
+      padding: 16px 20px 14px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 14px 16px;
-      border-bottom: 1px solid var(--border);
-      flex-shrink: 0;
     }
-    .stats-title { font-size: 0.9rem; font-weight: 700; }
-    .stats-close {
-      background: none;
-      border: none;
+    .stats-hero-team { flex: 1; text-align: center; }
+    .stats-hero-name {
+      font-size: 0.78rem;
       color: var(--text-muted);
-      font-size: 1.4rem;
+      margin-bottom: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .stats-hero-score {
+      font-size: 3rem;
+      font-weight: 700;
       line-height: 1;
-      cursor: pointer;
-      padding: 2px 6px;
+      font-variant-numeric: tabular-nums;
+      color: var(--text);
     }
-    .stats-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-    .stats-table thead tr { background: var(--bg); }
-    .stats-table th {
-      padding: 9px 12px;
+    .stats-hero-score.win { color: var(--green); }
+    .stats-hero-sep { font-size: 1.4rem; color: var(--border); padding: 0 8px; flex-shrink: 0; }
+
+    /* game status line */
+    .stats-status {
+      text-align: center;
+      font-size: 0.72rem;
       color: var(--text-muted);
-      font-size: 0.7rem;
-      font-weight: 600;
+      padding: 0 20px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .stats-status .dot-live {
+      display: inline-block;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--red);
+      margin-right: 5px;
+      animation: pulse 1.4s ease-in-out infinite;
+      vertical-align: middle;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    /* section divider */
+    .stats-section {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      padding: 14px 16px 4px;
+    }
+
+    /* individual stat row */
+    .stat-row {
+      padding: 10px 16px 11px;
+      border-top: 1px solid var(--border);
+    }
+    .stat-row-label {
+      font-size: 0.68rem;
       text-transform: uppercase;
       letter-spacing: 0.05em;
-      text-align: center;
-    }
-    .stats-table th:first-child { text-align: left; }
-    .stats-table td {
-      padding: 11px 12px;
-      border-top: 1px solid var(--border);
-      text-align: center;
-      color: var(--text);
-      font-variant-numeric: tabular-nums;
-    }
-    .stats-table td:first-child {
-      text-align: left;
       color: var(--text-muted);
-      font-size: 0.8rem;
+      margin-bottom: 8px;
     }
-    .stats-win  { color: var(--green); font-weight: 700; }
-    .stats-lose { color: var(--text-muted); }
-    .stats-bad  { color: var(--red); font-weight: 700; }
+    .stat-row-values {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 8px;
+    }
+    .stat-cell { display: flex; flex-direction: column; }
+    .stat-cell:last-child { align-items: flex-end; }
+    .stat-num {
+      font-size: 1.75rem;
+      font-weight: 700;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+      color: var(--text);
+    }
+    .stat-num.win { color: var(--green); }
+    .stat-num.bad { color: var(--red); }
+    .stat-pct  { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+    .stat-team { font-size: 0.7rem;  color: var(--text-muted); margin-top: 3px; }
+
+    /* proportion bar */
+    .stat-bar {
+      height: 5px;
+      border-radius: 3px;
+      background: var(--bg);
+      overflow: hidden;
+      display: flex;
+      gap: 1px;
+    }
+    .stat-bar-seg {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.35s ease;
+    }
+
+    /* close button */
+    .stats-close-btn {
+      margin: 12px 16px 16px;
+      padding: 14px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      width: calc(100% - 32px);
+      -webkit-tap-highlight-color: transparent;
+      flex-shrink: 0;
+    }
+    .stats-close-btn:active { background: var(--border); }
   </style>
 </head>
 <body>
@@ -293,8 +344,11 @@
   <h1>Field Annotator</h1>
   <div class="header-actions">
     <a href="index.html" class="btn-icon">← Back</a>
-    <button class="btn-icon" onclick="openStats()">Stats</button>
-    <button class="btn-icon" onclick="toggleSettings()" id="settingsBtn">⚙ Setup</button>
+    <button class="btn-icon btn-hdr-push" id="pushBtn"     onclick="pushToSheet()">⬆ Push</button>
+    <button class="btn-icon btn-hdr-override" id="overrideBtn" onclick="pushToSheet(true)">⚠ Override</button>
+    <button class="btn-icon"              onclick="openStats()">Stats</button>
+    <button class="btn-icon btn-live"     id="liveBtn"     onclick="toggleLive()">⚫ Live</button>
+    <button class="btn-icon"              onclick="toggleSettings()" id="settingsBtn">⚙ Setup</button>
   </div>
 </header>
 
@@ -376,19 +430,24 @@
 
 </main>
 
-<div id="actionBar">
-  <button class="action-btn btn-push"     id="pushBtn"     onclick="pushToSheet()">⬆ Push</button>
-  <button class="action-btn btn-override" id="overrideBtn" onclick="pushToSheet(true)">⚠ Override</button>
-  <button class="action-btn btn-live"     id="liveBtn"     onclick="toggleLive()">⚫ Live</button>
-</div>
-
+<!-- Stats modal -->
 <div id="statsOverlay" onclick="if(event.target===this)closeStats()">
   <div id="statsCard">
-    <div class="stats-header">
-      <span class="stats-title" id="statsTitle">Stats</span>
-      <button class="stats-close" onclick="closeStats()">×</button>
+    <div class="stats-handle"></div>
+    <div class="stats-hero">
+      <div class="stats-hero-team">
+        <div class="stats-hero-name"  id="heroName1">Team 1</div>
+        <div class="stats-hero-score" id="heroScore1">0</div>
+      </div>
+      <div class="stats-hero-sep">–</div>
+      <div class="stats-hero-team">
+        <div class="stats-hero-name"  id="heroName2">Team 2</div>
+        <div class="stats-hero-score" id="heroScore2">0</div>
+      </div>
     </div>
-    <table class="stats-table" id="statsTable"></table>
+    <div class="stats-status" id="statsStatus"></div>
+    <div id="statsBody"></div>
+    <button class="stats-close-btn" onclick="closeStats()">Close</button>
   </div>
 </div>
 
@@ -403,7 +462,7 @@ const APPS_SCRIPT_SECRET = sessionStorage.getItem('password') || '';
 // ── State ──────────────────────────────────────────────────────
 let annotations  = [];
 let possession   = 'Team 1';
-let wallStart    = null; // Date.now() when first event is tagged
+let wallStart    = null;
 let liveMode     = false;
 let liveInterval = null;
 
@@ -446,22 +505,16 @@ function tag(type, name, possessionOwner) {
   const actionOwner = inferActionOwner(type, possessionOwner);
   annotations.push({ id: Date.now() + Math.random(), type, name, possessionOwner, actionOwner, comment: '', time: t, timeStr: fmt(t) });
 
-  // Auto-switch possession after try, turnover, or penalty attack
-  if (type === 'Try')                              setPossession(otherTeam(possessionOwner));
-  if (type === 'Turnover' && name !== '6 Again')   setPossession(otherTeam(possessionOwner));
-  if (type === 'Penalty Attack')                   setPossession(otherTeam(possessionOwner));
+  if (type === 'Try')                             setPossession(otherTeam(possessionOwner));
+  if (type === 'Turnover' && name !== '6 Again')  setPossession(otherTeam(possessionOwner));
+  if (type === 'Penalty Attack')                  setPossession(otherTeam(possessionOwner));
 
   updateUI();
   if (liveMode) pushLiveUpdate();
 }
 
-function tagWithPossession(type, name) {
-  tag(type, name, possession);
-}
-
-function tagGameEvent(name) {
-  tag('Game Event', name, possession);
-}
+function tagWithPossession(type, name) { tag(type, name, possession); }
+function tagGameEvent(name)            { tag('Game Event', name, possession); }
 
 function tagToReview() {
   const t = nowSeconds();
@@ -484,7 +537,6 @@ function eventLabel(a) {
 }
 
 function updateUI() {
-  // Score
   const t1 = document.getElementById('metaTeam1').value.trim() || 'Team 1';
   const t2 = document.getElementById('metaTeam2').value.trim() || 'Team 2';
   document.getElementById('scoreName1').textContent = t1;
@@ -492,13 +544,11 @@ function updateUI() {
   document.getElementById('scoreVal1').textContent  = annotations.filter(a => a.type === 'Try' && a.actionOwner === 'Team 1').length;
   document.getElementById('scoreVal2').textContent  = annotations.filter(a => a.type === 'Try' && a.actionOwner === 'Team 2').length;
 
-  // Clock
   const gameStart = annotations.find(a => a.name === 'Game Start');
   const lastTime  = annotations.length ? annotations[annotations.length - 1].time : 0;
   const elapsed   = gameStart ? Math.max(0, lastTime - gameStart.time) : lastTime;
   document.getElementById('gameClock').textContent = fmtClock(elapsed);
 
-  // Recent events (last 5, newest first)
   const COLORS = { 'Try': '#22c55e', 'Turnover': '#f97316', 'Penalty Attack': '#ef4444', 'Penalty Defence': '#b91c1c', 'Game Event': '#3b82f6', 'To Review': '#7c3aed' };
   const el = document.getElementById('recentList');
   if (!annotations.length) {
@@ -507,10 +557,9 @@ function updateUI() {
   }
   const recent = [...annotations].reverse().slice(0, 5);
   el.innerHTML = recent.map(a => {
-    const color = COLORS[a.type] || '#888';
-    const team  = a.actionOwner === 'Team 1'
-      ? (document.getElementById('metaTeam1').value.trim() || 'Team 1')
-      : (document.getElementById('metaTeam2').value.trim() || 'Team 2');
+    const color   = COLORS[a.type] || '#888';
+    const team    = a.actionOwner === 'Team 1' ? (document.getElementById('metaTeam1').value.trim() || 'Team 1')
+                                                : (document.getElementById('metaTeam2').value.trim() || 'Team 2');
     const teamStr = a.type !== 'Game Event' ? ` · ${team}` : '';
     return `<div class="recent-item">
       <div class="recent-dot" style="background:${color}"></div>
@@ -520,7 +569,6 @@ function updateUI() {
   }).join('');
 }
 
-// Update possession button labels when team names change
 function onMetaChange() {
   const t1 = document.getElementById('metaTeam1').value.trim() || 'Team 1';
   const t2 = document.getElementById('metaTeam2').value.trim() || 'Team 2';
@@ -557,8 +605,7 @@ setInterval(() => {
   if (!wallStart || !annotations.length) return;
   const gameStart     = annotations.find(a => a.name === 'Game Start');
   const gameStartWall = gameStart ? wallStart + gameStart.time * 1000 : wallStart;
-  const live = (Date.now() - gameStartWall) / 1000;
-  document.getElementById('gameClock').textContent = fmtClock(Math.max(0, live));
+  document.getElementById('gameClock').textContent = fmtClock(Math.max(0, (Date.now() - gameStartWall) / 1000));
 }, 1000);
 
 // ── Live mode ──────────────────────────────────────────────────
@@ -601,9 +648,9 @@ function pushLiveUpdate() {
   const team2 = document.getElementById('metaTeam2').value.trim() || 'Team 2';
   const score1 = annotations.filter(a => a.type === 'Try' && a.actionOwner === 'Team 1').length;
   const score2 = annotations.filter(a => a.type === 'Try' && a.actionOwner === 'Team 2').length;
-  const gameStart = annotations.find(a => a.name === 'Game Start');
+  const gameStart     = annotations.find(a => a.name === 'Game Start');
   const gameStartWall = gameStart ? wallStart + gameStart.time * 1000 : (wallStart || Date.now());
-  const timeSeconds = Math.max(0, (Date.now() - gameStartWall) / 1000);
+  const timeSeconds   = Math.max(0, (Date.now() - gameStartWall) / 1000);
   fetch(APPS_SCRIPT_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain' },
@@ -612,6 +659,8 @@ function pushLiveUpdate() {
 }
 
 // ── Stats modal ────────────────────────────────────────────────
+let statsRefreshInterval = null;
+
 function computeStats() {
   const t1name = document.getElementById('metaTeam1').value.trim() || 'Team 1';
   const t2name = document.getElementById('metaTeam2').value.trim() || 'Team 2';
@@ -631,16 +680,16 @@ function computeStats() {
   }
   if (cur) segs.push(cur);
 
-  // Assign durations: each possession starts where the previous ended
+  // Each possession starts where the previous ended (or from Game Start)
   const gameStart = annotations.find(a => a.name === 'Game Start');
   const t0 = gameStart ? gameStart.time : (evts.length ? evts[0].time : 0);
   for (let i = 0; i < segs.length; i++) {
-    const last = segs[i].events[segs[i].events.length - 1];
-    segs[i].endType  = last.type;
-    segs[i].endName  = last.name;
-    segs[i].end      = last.time;
-    segs[i].start    = i === 0 ? t0 : segs[i - 1].end;
-    segs[i].duration = Math.max(0, segs[i].end - segs[i].start);
+    const last      = segs[i].events[segs[i].events.length - 1];
+    segs[i].endType = last.type;
+    segs[i].endName = last.name;
+    segs[i].end     = last.time;
+    segs[i].start   = i === 0 ? t0 : segs[i - 1].end;
+    segs[i].duration= Math.max(0, segs[i].end - segs[i].start);
   }
 
   const statFor = key => {
@@ -651,52 +700,146 @@ function computeStats() {
     const penDef = annotations.filter(a => a.type === 'Penalty Defence' && a.actionOwner === key).length;
     const total  = mine.reduce((s, p) => s + p.duration, 0);
     const avg    = mine.length ? total / mine.length : 0;
-    const pct    = (n, d) => d ? ` (${Math.round(n / d * 100)}%)` : '';
     return {
-      score:        annotations.filter(a => a.type === 'Try' && a.actionOwner === key).length,
-      possessions:  mine.length,
-      tries:        tries + pct(tries, mine.length),  triesRaw:    tries,
-      comps:        comps + pct(comps, mine.length),  compsRaw:    comps,
-      penAtk, penDef,
-      avgTime:      avg.toFixed(1),    avgTimeRaw:   avg,
-      totalTime:    total.toFixed(1),  totalTimeRaw: total,
+      score:       annotations.filter(a => a.type === 'Try' && a.actionOwner === key).length,
+      possessions: mine.length,
+      triesNum:    tries,
+      compsNum:    comps,
+      compsPct:    mine.length ? Math.round(comps  / mine.length * 100) : null,
+      penAtk,      penAtkPct: mine.length ? Math.round(penAtk / mine.length * 100) : null,
+      penDef,
+      avgTime:     avg.toFixed(1),    avgTimeRaw:  avg,
+      totalTime:   total.toFixed(1),  totalTimeRaw:total,
     };
   };
 
-  return { t1: { name: t1name, ...statFor('Team 1') }, t2: { name: t2name, ...statFor('Team 2') } };
+  const t1 = { name: t1name, ...statFor('Team 1') };
+  const t2 = { name: t2name, ...statFor('Team 2') };
+  t1.penDefPct = t2.possessions ? Math.round(t1.penDef / t2.possessions * 100) : null;
+  t2.penDefPct = t1.possessions ? Math.round(t2.penDef / t1.possessions * 100) : null;
+  return { t1, t2 };
 }
 
 function openStats() {
-  const { t1, t2 } = computeStats();
-  document.getElementById('statsTitle').textContent = `${t1.name} vs ${t2.name}`;
-
-  // [label, t1 display, t2 display, t1 raw, t2 raw, higherIsBetter: true/false/null]
-  const rows = [
-    ['Score',          t1.score,      t2.score,      t1.score,       t2.score,       true ],
-    ['Possessions',    t1.possessions,t2.possessions,t1.possessions, t2.possessions, null ],
-    ['Tries',          t1.tries,      t2.tries,      t1.triesRaw,    t2.triesRaw,    true ],
-    ['Completions',    t1.comps,      t2.comps,      t1.compsRaw,    t2.compsRaw,    true ],
-    ['Pen Attack',     t1.penAtk,     t2.penAtk,     t1.penAtk,      t2.penAtk,      false],
-    ['Pen Defence',    t1.penDef,     t2.penDef,     t1.penDef,      t2.penDef,      false],
-    ['Avg Time (s)',   t1.avgTime,    t2.avgTime,    t1.avgTimeRaw,  t2.avgTimeRaw,  null ],
-    ['Total Time (s)', t1.totalTime,  t2.totalTime,  t1.totalTimeRaw,t2.totalTimeRaw,null ],
-  ];
-
-  const tbody = rows.map(([label, d1, d2, r1, r2, hib]) => {
-    let c1 = '', c2 = '';
-    if (hib === true)  { if (r1 > r2) c1 = 'stats-win'; else if (r2 > r1) c2 = 'stats-win'; }
-    if (hib === false) { if (r1 < r2) c1 = 'stats-win'; else if (r2 < r1) c2 = 'stats-win'; }
-    return `<tr><td>${label}</td><td class="${c1}">${d1}</td><td class="${c2}">${d2}</td></tr>`;
-  }).join('');
-
-  document.getElementById('statsTable').innerHTML =
-    `<thead><tr><th></th><th>${t1.name}</th><th>${t2.name}</th></tr></thead><tbody>${tbody}</tbody>`;
-
+  refreshStats();
   document.getElementById('statsOverlay').classList.add('open');
+  statsRefreshInterval = setInterval(refreshStats, 5000);
 }
 
 function closeStats() {
   document.getElementById('statsOverlay').classList.remove('open');
+  clearInterval(statsRefreshInterval);
+  statsRefreshInterval = null;
+}
+
+function refreshStats() {
+  const { t1, t2 } = computeStats();
+
+  // Hero scores
+  document.getElementById('heroName1').textContent  = t1.name;
+  document.getElementById('heroName2').textContent  = t2.name;
+  document.getElementById('heroScore1').textContent = t1.score;
+  document.getElementById('heroScore2').textContent = t2.score;
+  document.getElementById('heroScore1').className   = 'stats-hero-score' + (t1.score > t2.score ? ' win' : '');
+  document.getElementById('heroScore2').className   = 'stats-hero-score' + (t2.score > t1.score ? ' win' : '');
+
+  // Game status
+  const hasStart  = annotations.some(a => a.name === 'Game Start');
+  const hasEnd    = annotations.some(a => a.name === 'Game End');
+  const gsAnnot   = annotations.find(a => a.name === 'Game Start');
+  const gsWall    = gsAnnot && wallStart ? wallStart + gsAnnot.time * 1000 : null;
+  let statusHtml  = '';
+  if (!hasStart) {
+    statusHtml = 'No game started';
+  } else if (hasEnd) {
+    statusHtml = 'Full time';
+  } else {
+    const elapsed = gsWall ? Math.max(0, (Date.now() - gsWall) / 1000) : 0;
+    statusHtml = `<span class="dot-live"></span>In progress · ${fmtClock(elapsed)}`;
+  }
+  document.getElementById('statsStatus').innerHTML = statusHtml;
+
+  // Stat sections
+  // Each row: { label, n1, pct1, n2, pct2, r1, r2, hib }
+  // hib: true = higher better, false = lower better, null = informational
+  const sections = [
+    {
+      label: 'Scoring',
+      rows: [
+        { label: 'Tries',        n1: t1.triesNum, pct1: null, n2: t2.triesNum, pct2: null, r1: t1.triesNum, r2: t2.triesNum, hib: true  },
+        { label: 'Completions',  n1: t1.compsNum, pct1: t1.compsPct, n2: t2.compsNum, pct2: t2.compsPct, r1: t1.compsNum, r2: t2.compsNum, hib: true  },
+      ],
+    },
+    {
+      label: 'Possession',
+      rows: [
+        { label: 'Possessions',  n1: t1.possessions, pct1: null, n2: t2.possessions, pct2: null, r1: t1.possessions,  r2: t2.possessions,  hib: null  },
+        { label: 'Avg Time (s)', n1: t1.avgTime,     pct1: null, n2: t2.avgTime,     pct2: null, r1: t1.avgTimeRaw,   r2: t2.avgTimeRaw,   hib: null  },
+        { label: 'Total Time (s)',n1: t1.totalTime,  pct1: null, n2: t2.totalTime,   pct2: null, r1: t1.totalTimeRaw, r2: t2.totalTimeRaw, hib: null  },
+      ],
+    },
+    {
+      label: 'Discipline',
+      rows: [
+        { label: 'Pen Attack',   n1: t1.penAtk, pct1: t1.penAtkPct, n2: t2.penAtk, pct2: t2.penAtkPct, r1: t1.penAtk, r2: t2.penAtk, hib: false },
+        { label: 'Pen Defence',  n1: t1.penDef, pct1: t1.penDefPct, n2: t2.penDef, pct2: t2.penDefPct, r1: t1.penDef, r2: t2.penDef, hib: false },
+      ],
+    },
+  ];
+
+  const html = sections.map(sec => {
+    const rowsHtml = sec.rows.map(({ label, n1, pct1, n2, pct2, r1, r2, hib }) => {
+      // Value colours
+      let c1 = '', c2 = '';
+      if (hib === true)  { if (r1 > r2) c1 = 'win'; else if (r2 > r1) c2 = 'win'; }
+      if (hib === false) { if (r1 < r2) c1 = 'win'; else if (r2 < r1) c2 = 'bad'; }
+
+      // Proportion bar: left = Team 1's share, right = Team 2's share
+      const total   = r1 + r2;
+      const share1  = total > 0 ? (r1 / total * 100).toFixed(1) : 50;
+      const share2  = total > 0 ? (100 - share1) : 50;
+
+      // Bar segment colours
+      let bc1, bc2;
+      if (hib === null) {
+        bc1 = 'rgba(59,130,246,0.35)'; bc2 = 'rgba(59,130,246,0.2)';
+      } else if (r1 === r2) {
+        bc1 = 'var(--surface-2)'; bc2 = 'var(--surface-2)';
+      } else if (hib === true) {
+        bc1 = r1 > r2 ? 'var(--green)' : 'var(--surface-2)';
+        bc2 = r2 > r1 ? 'var(--green)' : 'var(--surface-2)';
+      } else {
+        bc1 = r1 < r2 ? 'var(--green)' : 'var(--red)';
+        bc2 = r2 < r1 ? 'var(--green)' : 'var(--red)';
+      }
+
+      const pctStr1 = pct1 != null ? `<div class="stat-pct">${pct1}%</div>` : '';
+      const pctStr2 = pct2 != null ? `<div class="stat-pct">${pct2}%</div>` : '';
+
+      return `<div class="stat-row">
+        <div class="stat-row-label">${label}</div>
+        <div class="stat-row-values">
+          <div class="stat-cell">
+            <div class="stat-num ${c1}">${n1}</div>
+            ${pctStr1}
+            <div class="stat-team">${t1.name}</div>
+          </div>
+          <div class="stat-cell">
+            <div class="stat-num ${c2}">${n2}</div>
+            ${pctStr2}
+            <div class="stat-team">${t2.name}</div>
+          </div>
+        </div>
+        <div class="stat-bar">
+          <div class="stat-bar-seg" style="width:${share1}%;background:${bc1}"></div>
+          <div class="stat-bar-seg" style="width:${share2}%;background:${bc2}"></div>
+        </div>
+      </div>`;
+    }).join('');
+    return `<div class="stats-section">${sec.label}</div>${rowsHtml}`;
+  }).join('');
+
+  document.getElementById('statsBody').innerHTML = html;
 }
 
 // ── Push to sheet ──────────────────────────────────────────────
@@ -709,10 +852,7 @@ async function pushToSheet(override = false) {
   btn.disabled = true;
   btn.textContent = '⏳ Pushing…';
 
-  // Columns: Time, Possession Owner, Type, Name, To Review, Comment, Action Owner
-  const rows = annotations.map(a => [
-    a.timeStr, a.possessionOwner, a.type, a.name, '', a.comment, a.actionOwner,
-  ]);
+  const rows = annotations.map(a => [a.timeStr, a.possessionOwner, a.type, a.name, '', a.comment, a.actionOwner]);
 
   try {
     const names      = annotations.map(a => a.name);
@@ -742,14 +882,10 @@ async function pushToSheet(override = false) {
         } else {
           alert(`Tab "${sheetName}" already exists. Admin access required to override.`);
         }
-        btn.disabled = false;
-        btn.textContent = '⬆ Push';
-        return;
+        btn.disabled = false; btn.textContent = '⬆ Push'; return;
       }
       alert('Error: ' + result.error);
-      btn.disabled = false;
-      btn.textContent = override ? '⚠ Override' : '⬆ Push';
-      return;
+      btn.disabled = false; btn.textContent = override ? '⚠ Override' : '⬆ Push'; return;
     }
 
     document.getElementById('overrideBtn').style.display = 'none';
@@ -757,8 +893,7 @@ async function pushToSheet(override = false) {
     setTimeout(() => { btn.disabled = false; btn.textContent = override ? '⚠ Override' : '⬆ Push'; }, 2500);
   } catch (err) {
     alert('Network error: ' + err.message);
-    btn.disabled = false;
-    btn.textContent = override ? '⚠ Override' : '⬆ Push';
+    btn.disabled = false; btn.textContent = override ? '⚠ Override' : '⬆ Push';
   }
 }
 </script>

@@ -400,25 +400,38 @@ function buildPossessionData(events, teamNames, baseUrl) {
 }
 
 function buildMetrics(possessions, teamNames, events) {
-  return teamNames.map(team => {
-    const g        = possessions.filter(p => p.Team === team);
-    const tries    = g.filter(p => p.End_Type === 'Try').length;
-    const comps    = g.filter(p => p.End_Type === 'Try' || p.End_Event === '6th Touch').length;
-    const avg      = g.length ? g.reduce((s, p) => s + p.Duration_Sec, 0) / g.length : 0;
-    const total    = g.reduce((s, p) => s + p.Duration_Sec, 0);
+  const rows = teamNames.map(team => {
+    const g          = possessions.filter(p => p.Team === team);
+    const tries      = g.filter(p => p.End_Type === 'Try').length;
+    const comps      = g.filter(p => p.End_Type === 'Try' || p.End_Event === '6th Touch').length;
+    const avg        = g.length ? g.reduce((s, p) => s + p.Duration_Sec, 0) / g.length : 0;
+    const total      = g.reduce((s, p) => s + p.Duration_Sec, 0);
     const teamPens   = events.filter(e => (e.Type === 'Penalty' || e.Type === 'Penalty Attack' || e.Type === 'Penalty Defence') && e['Action Owner'] === team);
     const penAttack  = teamPens.filter(e => e['Action Owner'] === e['Possession Owner']).length;
     const penDefence = teamPens.filter(e => e['Action Owner'] !== e['Possession Owner']).length;
-    const successRate  = g.length ? `${(tries / g.length * 100).toFixed(1)}%` : '—';
-    const compsRate    = g.length ? `${(comps / g.length * 100).toFixed(1)}%` : '—';
+    const successRate = g.length ? `${Math.round(tries     / g.length * 100)}%` : '—';
+    const compsRate   = g.length ? `${Math.round(comps     / g.length * 100)}%` : '—';
+    const atkRate     = g.length ? `${Math.round(penAttack / g.length * 100)}%` : '—';
     return {
       Team: team, Possessions: g.length,
       Tries: g.length ? `${tries} (${successRate})` : tries,
       Completions: g.length ? `${comps} (${compsRate})` : comps,
-      'Pen Attack': penAttack, 'Pen Defence': penDefence,
+      'Pen Attack': g.length ? `${penAttack} (${atkRate})` : penAttack,
+      _penDef: penDefence,
+      'Pen Defence': penDefence,
       'Avg Time (s)': avg.toFixed(1), 'Total Time (s)': total.toFixed(1),
     };
   });
+
+  // Pen Defence %: own def penalties / opponent's possessions
+  rows.forEach((row, i) => {
+    const oppPoss  = rows[1 - i].Possessions;
+    const defRate  = oppPoss ? `${Math.round(row._penDef / oppPoss * 100)}%` : '—';
+    row['Pen Defence'] = oppPoss ? `${row._penDef} (${defRate})` : row._penDef;
+    delete row._penDef;
+  });
+
+  return rows;
 }
 
 // ── Vega-Lite spec builders ────────────────────────────────────
