@@ -274,7 +274,7 @@
       <div class="vc-row">
         <button class="btn-nav" id="prevRowBtn" disabled onclick="navigateRow(-1)">◀ Prev</button>
         <button class="btn btn-primary" id="playBtn" disabled onclick="togglePlay()">▶ Play</button>
-        <button class="btn btn-ghost" id="skipBk" disabled onclick="skip(-5)">−5s</button>
+        <button class="btn btn-ghost" id="skipBk" disabled onclick="skip(-5)" style="padding-left:18px;padding-right:18px">−5s</button>
         <button class="btn btn-ghost" id="skipFw" disabled onclick="skip(5)">+5s</button>
         <span class="time-display" id="timeCurrent">0:00:00</span>
         <span style="color:var(--text-dim);font-size:0.8rem">/</span>
@@ -363,7 +363,7 @@ const LS = {
   set(k, v) { try { localStorage.setItem('trl2_' + k, JSON.stringify(v)); } catch {} },
 };
 
-const FILTERABLE  = ['Type', 'Name', 'Action Owner'];
+const FILTERABLE  = ['Type', 'Name', 'Action Owner', 'Division'];
 const HIDDEN_COLS = new Set(['Team 1', 'Team 2', 'Video Name', 'To Review', 'Youtube Link', 'Possession Owner', 'Analyzable']);
 const TYPE_BADGE  = { 'try':'badge-try', 'penalty':'badge-penalty', 'penalty attack':'badge-penalty', 'penalty defence':'badge-penalty', 'turnover':'badge-turnover', 'to review':'badge-toreview' };
 
@@ -628,6 +628,7 @@ function selectGame(val) {
   if (val) url.searchParams.set('game', val);
   else url.searchParams.delete('game');
   history.replaceState(null, '', url);
+  renderHeaders();
   applyFilters();
 }
 
@@ -756,6 +757,7 @@ function renderHeaders() {
   thead.innerHTML = '';
   const tr = document.createElement('tr');
   headers.forEach((h, i) => {
+    if (selectedGame && i === colGame) return;
     const th = document.createElement('th');
     th.textContent = h || '#';
     th.onclick = () => sortBy(i);
@@ -784,6 +786,7 @@ function renderRows(rows) {
     tr.dataset.filteredIdx = filteredIdx;
 
     row.forEach((cell, i) => {
+      if (selectedGame && i === colGame) return;
       const td  = document.createElement('td');
       const col = (headers[i] || '').toLowerCase();
 

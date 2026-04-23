@@ -497,12 +497,11 @@ function cumulativeSpec(data, title, yTitle, teamNames) {
       },
       {
         transform: [{ filter: "datum.Event !== 'Game Start' && datum.Event !== 'Game End'" }],
-        mark: { type: 'circle', size: 100 },
+        mark: { type: 'circle', size: 100, cursor: 'pointer' },
         encoding: {
           x: timeEnc,
           y: { field: 'Count', type: 'quantitative' },
           color,
-          href:    { field: 'Link' },
           tooltip: [
             { field: 'GameTime', type: 'quantitative', format: '.0f', title: 'Game Time (s)' },
             { field: 'Team',  type: 'nominal' },
@@ -521,7 +520,7 @@ function possessionSpec(data, teamNames, rangeStart, rangeEnd) {
     width: 'container', height: 140, title: 'Possession Timeline',
     autosize: { type: 'fit', contains: 'padding' },
     data: { values: data },
-    mark: 'bar',
+    mark: { type: 'bar', cursor: 'pointer' },
     encoding: {
       x:     { field: 'Start', type: 'quantitative', scale: { domain: [rangeStart, rangeEnd] }, axis: { labelExpr: MM_SS, title: 'Game Time' } },
       x2:    { field: 'End' },
@@ -531,7 +530,6 @@ function possessionSpec(data, teamNames, rangeStart, rangeEnd) {
         scale: { domain: ['Try', 'Penalty', '6th Touch', 'Other'],
                  range:  ['#00c853', '#f44336', '#ffd600', '#ff9800'] },
       },
-      href: { field: 'Link' },
       tooltip: [
         { field: 'Start',        type: 'quantitative', format: '.0f', title: 'Start (s)' },
         { field: 'End',          type: 'quantitative', format: '.0f', title: 'End (s)' },
@@ -633,9 +631,16 @@ async function renderStats(halfValue) {
   const metrics   = buildMetrics(possData, teamNames, filtered);
 
   const opts = { config: VEGA_CONFIG, actions: false };
-  await vegaEmbed('#vis-tries',      cumulativeSpec(triesData, 'Tries vs Time',     'Cumulative Tries',     teamNames), opts);
-  await vegaEmbed('#vis-penalties',  cumulativeSpec(penData,   'Penalties vs Time', 'Cumulative Penalties', teamNames), opts);
-  await vegaEmbed('#vis-possession', possessionSpec(possData, teamNames, rangeStart, rangeEnd), opts);
+  const embedResults = await Promise.all([
+    vegaEmbed('#vis-tries',      cumulativeSpec(triesData, 'Tries vs Time',     'Cumulative Tries',     teamNames), opts),
+    vegaEmbed('#vis-penalties',  cumulativeSpec(penData,   'Penalties vs Time', 'Cumulative Penalties', teamNames), opts),
+    vegaEmbed('#vis-possession', possessionSpec(possData, teamNames, rangeStart, rangeEnd), opts),
+  ]);
+  for (const { view } of embedResults) {
+    view.addEventListener('click', (event, item) => {
+      if (item && item.datum && item.datum.Link) window.open(item.datum.Link, '_blank');
+    });
+  }
 
   const cols = ['Team', 'Possessions', 'Tries', 'Completions', 'Pen Attack', 'Pen Defence', 'Avg Time (s)', 'Total Time (s)'];
   document.getElementById('metricsTable').innerHTML =
