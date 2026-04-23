@@ -141,13 +141,12 @@ function fmtTime(seconds) {
 }
 
 function renderCard(g, isLive) {
-  const hasStats = g.poss1 > 0 || g.poss2 > 0;
   const fmt = (n, d) => d > 0 ? `${n}/${d}` : '–';
   const badge = isLive
     ? `<span class="live-badge">LIVE</span>`
     : `<span class="ended-badge">FT</span>`;
   return `
-  <div class="card" onclick="this.querySelector('.stats-panel')?.classList.toggle('open')">
+  <div class="card" onclick="this.querySelector('.stats-panel').classList.toggle('open')">
     <div class="card-header">
       ${badge}
       <span class="game-time">${fmtTime(g.timeSeconds)}</span>
@@ -163,7 +162,6 @@ function renderCard(g, isLive) {
         <div class="score">${g.score2}</div>
       </div>
     </div>
-    ${hasStats ? `
     <div class="stats-panel">
       <div class="stats-row">
         <div class="stats-label">Tries</div>
@@ -175,7 +173,7 @@ function renderCard(g, isLive) {
         <div class="stats-val">${fmt(g.comps1, g.poss1)}</div>
         <div class="stats-val">${fmt(g.comps2, g.poss2)}</div>
       </div>
-    </div>` : ''}
+    </div>
   </div>`;
 }
 
