@@ -153,6 +153,12 @@
   .play-icon { opacity: 0; font-size: 0.75rem; color: var(--accent); margin-right: 4px; transition: opacity 0.1s; }
   tr.playable:hover .play-icon { opacity: 1; }
 
+  /* Copy-link button */
+  .copy-link-btn { opacity: 0; border: none; background: none; cursor: pointer; padding: 0 0 0 5px; color: var(--text-dim); vertical-align: middle; line-height: 1; transition: opacity 0.1s, color 0.15s; }
+  tr.playable:hover .copy-link-btn { opacity: 1; }
+  .copy-link-btn:hover { color: var(--accent); }
+  .copy-link-btn.copied { color: #00c853 !important; opacity: 1; }
+
   /* Admin inline editing */
   .edit-select, .edit-input {
     background: var(--surface-2);
@@ -168,7 +174,7 @@
   .edit-select.dirty, .edit-input.dirty { border-color: #f97316; }
   #saveBtn { background: #f97316; color: #fff; border: none; border-radius: 6px; padding: 5px 12px; font-size: 0.78rem; font-weight: 600; cursor: pointer; display: none; }
   #saveBtn:hover { background: #ea6e00; }
-  #saveBtn:disabled { opacity: 0.6; cursor: default; }
+  #saveBtn:disabled { opacity: 0.4; cursor: default; }
   tr.active-row .play-icon { opacity: 1; color: #22c55e; }
 
   .empty { text-align: center; padding: 40px; color: var(--text-dim); font-size: 0.85rem; }
@@ -221,8 +227,16 @@
   </a>
   <span id="rowCount"></span>
   <button id="toggleVideoBtn" class="active" onclick="toggleVideoPanel()" title="Toggle video player">&#9654; Video</button>
+  <label style="display:flex;align-items:center;gap:4px;font-size:0.78rem;color:var(--text-muted);white-space:nowrap" title="Seconds before event to start video / copy link">
+    ⏪
+    <input id="linkOffsetInput" type="number" min="0" max="120" value="5"
+      style="width:42px;background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:5px;padding:3px 5px;font-size:0.78rem;text-align:center;outline:none"
+      oninput="setLinkOffset(this.value)">
+    s
+  </label>
   <button id="layoutBtn" style="background:var(--surface-2);color:var(--text-muted);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:0.78rem;cursor:pointer;white-space:nowrap;transition:all 0.15s" onclick="toggleLayout()" title="Toggle video layout">↕ Stack</button>
   <button id="editModeBtn" style="display:none;background:var(--surface-2);color:var(--text-muted);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:0.78rem;cursor:pointer;white-space:nowrap;transition:all 0.15s" onclick="toggleEditMode()" title="Toggle edit mode">✏ Edit</button>
+  <button id="saveBtn" onclick="saveEdits()">💾 Save</button>
   <nav class="header-nav">
     <a href="games.html">Games</a>
     <a href="dashboard.html">Dashboard</a>
@@ -298,7 +312,6 @@
           <input id="searchInput" class="search-input" type="text" placeholder="Search…">
         </div>
         <button class="btn btn-ghost" onclick="resetFilters()">↺ Reset</button>
-        <button id="saveBtn" onclick="saveEdits()">💾 Save</button>
       </div>
       <div class="filter-row" id="filterRow"></div>
     </div>
@@ -352,7 +365,8 @@ const HIDDEN_COLS = new Set(['Team 1', 'Team 2', 'Video Name', 'To Review', 'You
 const TYPE_BADGE  = { 'try':'badge-try', 'penalty':'badge-penalty', 'penalty attack':'badge-penalty', 'penalty defence':'badge-penalty', 'turnover':'badge-turnover', 'to review':'badge-toreview' };
 
 const isAdmin = sessionStorage.getItem('password') === 'm30-admin';
-let editMode = false;
+let editMode   = false;
+let linkOffset = parseInt(localStorage.getItem('linkOffset') ?? '5', 10) || 5;
 
 const NAMES_BY_TYPE = {
   'Try':             ['Scoop', 'Other', '32 - Long', '33 Quicky', '33', '32 Cut', 'French Flair'],
@@ -370,6 +384,7 @@ function toggleEditMode() {
   btn.textContent = editMode ? '👁 View' : '✏ Edit';
   btn.style.color       = editMode ? 'var(--accent)'  : 'var(--text-muted)';
   btn.style.borderColor = editMode ? 'var(--accent)'  : 'var(--border)';
+  updateSaveBtn();
   renderHeaders();
   updatePagination();
 }
@@ -395,9 +410,11 @@ function markDirty(row, field, value) {
 function updateSaveBtn() {
   const btn = document.getElementById('saveBtn');
   if (!btn) return;
+  if (!editMode) { btn.style.display = 'none'; return; }
   const n = pendingEdits.size;
-  btn.style.display  = n > 0 ? '' : 'none';
-  btn.textContent    = `💾 Save ${n} change${n !== 1 ? 's' : ''}`;
+  btn.style.display = 'inline-block';
+  btn.disabled      = n === 0;
+  btn.textContent   = n > 0 ? `💾 Save ${n} change${n !== 1 ? 's' : ''}` : '💾 Save';
 }
 
 async function saveEdits() {
@@ -452,6 +469,7 @@ let activeRowIdx      = -1;   // index in `filtered`
 
 // ── Bootstrap ───────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('linkOffsetInput').value = linkOffset;
   setupSeekbar();
   setupResizeHandle();
   fetchAll();
@@ -734,8 +752,9 @@ function renderRows(rows) {
       const col = (headers[i] || '').toLowerCase();
 
       if (i === colTime && hasYt) {
-        // Time cell: show play icon + time
         td.innerHTML = `<span class="play-icon">▶</span>${cell || ''}`;
+        const copyBtn = makeCopyLinkBtn(row[colGame] || '', cell || '');
+        if (copyBtn) td.appendChild(copyBtn);
       } else if (col === 'type' && cell) {
         const span = document.createElement('span');
         span.textContent = cell;
@@ -878,7 +897,7 @@ function playFilteredRow(filteredIdx) {
   const parts   = timeStr.split(':').map(Number);
   const secs    = parts.length === 3 ? parts[0]*3600 + parts[1]*60 + parts[2]
                 : parts.length === 2 ? parts[0]*60 + parts[1] : 0;
-  const seekTo  = Math.max(0, secs - 5);
+  const seekTo  = Math.max(0, secs - linkOffset);
 
   // Extract YouTube video ID from game metadata
   const gameKey = colGame >= 0 ? (row[colGame] || '') : '';
@@ -968,6 +987,11 @@ function updateNowPlaying(row) {
     s.className = 'np-time';
     s.textContent = time;
     info.appendChild(s);
+    const copyBtn = makeCopyLinkBtn(game, time);
+    if (copyBtn) {
+      copyBtn.style.opacity = '1';
+      info.appendChild(copyBtn);
+    }
   }
   if (game) {
     const s = document.createElement('span');
@@ -1182,6 +1206,44 @@ document.addEventListener('keydown', e => {
 });
 
 function enc(s) { return encodeURIComponent(s); }
+
+function setLinkOffset(val) {
+  const n = Math.max(0, parseInt(val, 10) || 0);
+  linkOffset = n;
+  localStorage.setItem('linkOffset', n);
+}
+
+// ── YouTube link helpers ─────────────────────────────────────────
+function makeYtTimestampUrl(gameKey, timeStr) {
+  const baseUrl = gameYtMap[gameKey || ''] || '';
+  const m = baseUrl.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/);
+  if (!m) return '';
+  const parts  = (timeStr || '').split(':').map(Number);
+  const secs   = parts.length === 3 ? parts[0]*3600 + parts[1]*60 + parts[2]
+               : parts.length === 2 ? parts[0]*60 + parts[1] : 0;
+  return `https://www.youtube.com/watch?v=${m[1]}&t=${Math.max(0, secs - linkOffset)}s`;
+}
+
+function makeCopyLinkBtn(gameKey, timeStr) {
+  const url = makeYtTimestampUrl(gameKey, timeStr);
+  if (!url) return null;
+  const btn = document.createElement('button');
+  btn.className = 'copy-link-btn';
+  btn.title     = 'Copy YouTube link';
+  btn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>';
+  btn.onclick = e => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(url).then(() => {
+      btn.classList.add('copied');
+      btn.innerHTML = '✓';
+      setTimeout(() => {
+        btn.classList.remove('copied');
+        btn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>';
+      }, 1500);
+    }).catch(() => {});
+  };
+  return btn;
+}
 </script>
 </body>
 </html>
