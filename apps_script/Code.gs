@@ -119,19 +119,25 @@ function doGet(e) {
       const metaNames = new Set(Object.keys(meta));
       const sheets = ss.getSheets().filter(s => metaNames.has(s.getName()));
       const allRows = [];
-      let headerSent = false;
+
+      // Always emit a canonical header regardless of each sheet's column order
+      allRows.push([...HEADERS, 'Game', ...META_COLS]);
 
       for (const sheet of sheets) {
         const values = sheet.getDataRange().getDisplayValues();
         if (values.length < 2) continue;
-        if (!headerSent) {
-          allRows.push([...values[0], 'Game', ...META_COLS]);
-          headerSent = true;
-        }
+
+        // Map each canonical header to its index in this sheet (by name, case-insensitive)
+        const sheetHeaders = values[0].map(h => h.trim().toLowerCase());
+        const colIndices   = HEADERS.map(h => sheetHeaders.indexOf(h.toLowerCase()));
+
         const name = sheet.getName();
         const m    = meta[name] || {};
         const metaValues = [m.team1 || '', m.team2 || '', m.competition || '', m.year || '', m.division || '', m.video || '', m.analyzable || ''];
-        values.slice(1).forEach(row => allRows.push([...row, name, ...metaValues]));
+        values.slice(1).forEach(row => {
+          const mapped = colIndices.map(i => i >= 0 ? row[i] : '');
+          allRows.push([...mapped, name, ...metaValues]);
+        });
       }
 
       const result = JSON.stringify({ ok: true, rows: allRows });
