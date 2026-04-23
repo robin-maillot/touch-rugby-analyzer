@@ -437,7 +437,10 @@ async function saveEdits() {
     btn.textContent = `✓ Saved ${result.updated}`;
     setTimeout(() => { btn.disabled = false; updateSaveBtn(); }, 2000);
   } catch (err) {
-    alert('Save failed: ' + err.message);
+    const msg = err.message === 'Failed to fetch'
+      ? 'Save failed: could not reach the server. Check that the Apps Script deployment URL is correct and the script is deployed as a web app accessible to anyone.'
+      : 'Save failed: ' + err.message;
+    alert(msg);
     btn.disabled = false;
     updateSaveBtn();
   }
@@ -519,10 +522,13 @@ async function fetchAll() {
 
     processRows(allResult.rows);
   } catch (err) {
+    document.getElementById('loadingMsg').style.display = 'none';
+    const el = document.getElementById('errorMsg');
     if (!cachedAll) {
-      document.getElementById('loadingMsg').style.display = 'none';
-      const el = document.getElementById('errorMsg');
       el.textContent = 'Failed to load events: ' + err.message;
+      el.style.display = 'block';
+    } else {
+      el.textContent = '⚠ Showing cached data — could not reach server (' + err.message + '). Save will not work until the connection is restored.';
       el.style.display = 'block';
     }
   }
