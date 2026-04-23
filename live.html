@@ -30,7 +30,25 @@
     header h1 { font-size: 1rem; font-weight: 600; }
     .dot { width: 10px; height: 10px; border-radius: 50%; background: #ef4444; animation: pulse 1.4s ease-in-out infinite; flex-shrink: 0; }
     @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
-    .refresh-info { margin-left: auto; font-size: 0.75rem; color: var(--text-muted); }
+    .header-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+    .refresh-info { font-size: 0.75rem; color: var(--text-muted); }
+    .refresh-btn {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.75rem;
+      padding: 4px 10px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .refresh-btn:hover { color: var(--text); border-color: var(--accent); }
+    .refresh-btn svg { width: 12px; height: 12px; flex-shrink: 0; }
+    .refresh-btn.spinning svg { animation: spin 0.6s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
     main { padding: 32px 24px; max-width: 900px; margin: 0 auto; }
 
@@ -112,7 +130,16 @@
 <header>
   <div class="dot"></div>
   <h1>Live Games</h1>
-  <span class="refresh-info" id="refreshInfo">refreshing every 30s</span>
+  <div class="header-right">
+    <span class="refresh-info" id="refreshInfo">refresh in 30s</span>
+    <button class="refresh-btn" id="refreshBtn" onclick="manualRefresh()">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M13.5 2.5A7 7 0 1 0 14.5 9"/>
+        <polyline points="14.5 2 14.5 6 10.5 6"/>
+      </svg>
+      Refresh
+    </button>
+  </div>
 </header>
 
 <main>
@@ -217,15 +244,49 @@ async function fetchLive() {
     const result = await resp.json();
     if (result.ok) {
       render(result.games);
-      document.getElementById('refreshInfo').textContent = `updated ${new Date().toLocaleTimeString()}`;
     }
   } catch (err) {
     // keep showing last state on network error
   }
 }
 
-fetchLive();
-setInterval(fetchLive, 30000);
+const REFRESH_INTERVAL = 30;
+let countdown = REFRESH_INTERVAL;
+let tickTimer  = null;
+
+function setRefreshInfo(text) {
+  document.getElementById('refreshInfo').textContent = text;
+}
+
+function startCountdown() {
+  clearInterval(tickTimer);
+  countdown = REFRESH_INTERVAL;
+  tickTimer = setInterval(() => {
+    countdown--;
+    if (countdown <= 0) {
+      clearInterval(tickTimer);
+      doRefresh();
+    } else {
+      setRefreshInfo(`refresh in ${countdown}s`);
+    }
+  }, 1000);
+}
+
+async function doRefresh() {
+  const btn = document.getElementById('refreshBtn');
+  btn.classList.add('spinning');
+  setRefreshInfo('updating…');
+  await fetchLive();
+  btn.classList.remove('spinning');
+  startCountdown();
+}
+
+function manualRefresh() {
+  clearInterval(tickTimer);
+  doRefresh();
+}
+
+doRefresh();
 </script>
 </body>
 </html>
