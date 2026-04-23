@@ -382,8 +382,8 @@ function updateRow(sheetName, time, name, comment) {
   const sheet = ss.getSheetByName(sheetName);
   if (!sheet) return false;
 
-  const values  = sheet.getDataRange().getValues();
-  const headers = values[0].map(h => String(h).toLowerCase().trim());
+  const values  = sheet.getDataRange().getDisplayValues();
+  const headers = values[0].map(h => h.toLowerCase().trim());
   const timeIdx    = headers.indexOf('time');
   const nameIdx    = headers.indexOf('name');
   const commentIdx = headers.indexOf('comment');
