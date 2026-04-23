@@ -84,15 +84,23 @@ function doGet(e) {
       const ni  = col('sheet name'), t1i = col('team 1'), t2i = col('team 2');
       const s1i = col('score 1'),    s2i = col('score 2');
       const tsi = col('time seconds'), uai = col('updated at');
+      const po1i = col('poss 1'),  po2i = col('poss 2');
+      const cm1i = col('comps 1'), cm2i = col('comps 2');
+      const fini = col('finished');
       const games = values.slice(1)
         .map(row => ({
           name:        row[ni]  || '',
-          team1:       t1i >= 0 ? row[t1i] : '',
-          team2:       t2i >= 0 ? row[t2i] : '',
-          score1:      s1i >= 0 ? Number(row[s1i]) : 0,
-          score2:      s2i >= 0 ? Number(row[s2i]) : 0,
-          timeSeconds: tsi >= 0 ? Number(row[tsi]) : 0,
-          updatedAt:   uai >= 0 ? row[uai] : '',
+          team1:       t1i  >= 0 ? row[t1i]  : '',
+          team2:       t2i  >= 0 ? row[t2i]  : '',
+          score1:      s1i  >= 0 ? Number(row[s1i])  : 0,
+          score2:      s2i  >= 0 ? Number(row[s2i])  : 0,
+          timeSeconds: tsi  >= 0 ? Number(row[tsi])  : 0,
+          updatedAt:   uai  >= 0 ? row[uai]  : '',
+          poss1:       po1i >= 0 ? Number(row[po1i]) : 0,
+          poss2:       po2i >= 0 ? Number(row[po2i]) : 0,
+          comps1:      cm1i >= 0 ? Number(row[cm1i]) : 0,
+          comps2:      cm2i >= 0 ? Number(row[cm2i]) : 0,
+          finished:    fini >= 0 ? row[fini] === 'true' : false,
         }))
         .filter(g => g.name);
       return json({ ok: true, games });
@@ -195,7 +203,7 @@ function doPost(e) {
 
     // action=live_update → upsert a row in _live
     if (data.action === 'live_update') {
-      writeLiveRow(data.sheetName, data.team1, data.team2, data.score1, data.score2, data.timeSeconds);
+      writeLiveRow(data.sheetName, data.team1, data.team2, data.score1, data.score2, data.timeSeconds, data.poss1, data.poss2, data.comps1, data.comps2);
       return json({ ok: true });
     }
 
@@ -342,16 +350,35 @@ function backfillMetadata() {
 }
 
 // ── Live game state helpers ─────────────────────────────────────
-function writeLiveRow(sheetName, team1, team2, score1, score2, timeSeconds) {
+const LIVE_HEADERS = ['Sheet Name', 'Team 1', 'Team 2', 'Score 1', 'Score 2', 'Time Seconds', 'Updated At', 'Poss 1', 'Poss 2', 'Comps 1', 'Comps 2', 'Finished'];
+
+function writeLiveRow(sheetName, team1, team2, score1, score2, timeSeconds, poss1, poss2, comps1, comps2) {
   const ss = SpreadsheetApp.openById(SHEET_ID);
   let sheet = ss.getSheetByName(LIVE_SHEET);
+
   if (!sheet) {
     sheet = ss.insertSheet(LIVE_SHEET);
-    sheet.appendRow(['Sheet Name', 'Team 1', 'Team 2', 'Score 1', 'Score 2', 'Time Seconds', 'Updated At']);
+    sheet.appendRow(LIVE_HEADERS);
+  } else if (sheet.getLastColumn() < LIVE_HEADERS.length) {
+    const existing = sheet.getLastColumn();
+    sheet.getRange(1, existing + 1, 1, LIVE_HEADERS.length - existing).setValues([LIVE_HEADERS.slice(existing)]);
   }
 
-  const now    = new Date().toISOString();
-  const newRow = [sheetName, team1 || '', team2 || '', score1 || 0, score2 || 0, timeSeconds || 0, now];
+  // Clean up rows older than 1 week
+  const ONE_WEEK = 7 * 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  const allVals = sheet.getDataRange().getValues();
+  const hdrs = allVals[0].map(h => String(h).toLowerCase().trim());
+  const uaIdx = hdrs.indexOf('updated at');
+  if (uaIdx >= 0) {
+    for (let i = allVals.length - 1; i >= 1; i--) {
+      const ua = allVals[i][uaIdx];
+      if (ua && (now - new Date(ua).getTime()) > ONE_WEEK) sheet.deleteRow(i + 1);
+    }
+  }
+
+  const nowStr = new Date().toISOString();
+  const newRow = [sheetName, team1 || '', team2 || '', score1 || 0, score2 || 0, timeSeconds || 0, nowStr, poss1 || 0, poss2 || 0, comps1 || 0, comps2 || 0, ''];
   const values = sheet.getDataRange().getValues();
 
   for (let i = 1; i < values.length; i++) {
@@ -368,9 +395,13 @@ function clearLiveRow(sheetName) {
   const sheet = ss.getSheetByName(LIVE_SHEET);
   if (!sheet) return;
   const values = sheet.getDataRange().getValues();
+  const hdrs   = values[0].map(h => String(h).toLowerCase().trim());
+  const fi     = hdrs.indexOf('finished');
+  const uai    = hdrs.indexOf('updated at');
   for (let i = 1; i < values.length; i++) {
     if (String(values[i][0]) === sheetName) {
-      sheet.deleteRow(i + 1);
+      if (fi  >= 0) sheet.getRange(i + 1, fi  + 1).setValue('true');
+      if (uai >= 0) sheet.getRange(i + 1, uai + 1).setValue(new Date().toISOString());
       return;
     }
   }

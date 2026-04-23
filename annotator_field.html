@@ -651,10 +651,11 @@ function pushLiveUpdate() {
   const gameStart     = annotations.find(a => a.name === 'Game Start');
   const gameStartWall = gameStart ? wallStart + gameStart.time * 1000 : (wallStart || Date.now());
   const timeSeconds   = Math.max(0, (Date.now() - gameStartWall) / 1000);
+  const { t1, t2 } = computeStats();
   fetch(APPS_SCRIPT_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify({ secret: APPS_SCRIPT_SECRET, action: 'live_update', sheetName, team1, team2, score1, score2, timeSeconds }),
+    body: JSON.stringify({ secret: APPS_SCRIPT_SECRET, action: 'live_update', sheetName, team1, team2, score1, score2, timeSeconds, poss1: t1.possessions, poss2: t2.possessions, comps1: t1.compsNum, comps2: t2.compsNum }),
   }).catch(() => {});
 }
 
@@ -766,14 +767,13 @@ function refreshStats() {
     {
       label: 'Scoring',
       rows: [
-        { label: 'Tries',        n1: t1.triesNum, pct1: null, n2: t2.triesNum, pct2: null, r1: t1.triesNum, r2: t2.triesNum, hib: true  },
-        { label: 'Completions',  n1: t1.compsNum, pct1: t1.compsPct, n2: t2.compsNum, pct2: t2.compsPct, r1: t1.compsNum, r2: t2.compsNum, hib: true  },
+        { label: 'Tries',        n1: t1.triesNum + ' / ' + t1.possessions, pct1: null, n2: t2.triesNum + ' / ' + t2.possessions, pct2: null, r1: t1.triesNum, r2: t2.triesNum, hib: true  },
+        { label: 'Completions',  n1: t1.compsNum + ' / ' + t1.possessions, pct1: t1.compsPct, n2: t2.compsNum + ' / ' + t2.possessions, pct2: t2.compsPct, r1: t1.compsNum, r2: t2.compsNum, hib: true  },
       ],
     },
     {
       label: 'Possession',
       rows: [
-        { label: 'Possessions',  n1: t1.possessions, pct1: null, n2: t2.possessions, pct2: null, r1: t1.possessions,  r2: t2.possessions,  hib: null  },
         { label: 'Avg Time (s)', n1: t1.avgTime,     pct1: null, n2: t2.avgTime,     pct2: null, r1: t1.avgTimeRaw,   r2: t2.avgTimeRaw,   hib: null  },
         { label: 'Total Time (s)',n1: t1.totalTime,  pct1: null, n2: t2.totalTime,   pct2: null, r1: t1.totalTimeRaw, r2: t2.totalTimeRaw, hib: null  },
       ],
@@ -781,7 +781,7 @@ function refreshStats() {
     {
       label: 'Discipline',
       rows: [
-        { label: 'Pen Attack',   n1: t1.penAtk, pct1: t1.penAtkPct, n2: t2.penAtk, pct2: t2.penAtkPct, r1: t1.penAtk, r2: t2.penAtk, hib: false },
+        { label: 'Pen Attack',   n1: t1.penAtk + '/' + t1.possessions, pct1: t1.penAtkPct, n2: t2.penAtk + '/' + t2.possessions, pct2: t2.penAtkPct, r1: t1.penAtk, r2: t2.penAtk, hib: false },
         { label: 'Pen Defence',  n1: t1.penDef, pct1: t1.penDefPct, n2: t2.penDef, pct2: t2.penDefPct, r1: t1.penDef, r2: t2.penDef, hib: false },
       ],
     },

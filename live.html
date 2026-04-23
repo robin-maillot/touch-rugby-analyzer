@@ -44,11 +44,21 @@
 
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
 
+    .section-label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin: 36px 0 16px;
+    }
+
     .card {
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 12px;
       padding: 24px;
+      cursor: pointer;
     }
     .card-header {
       display: flex;
@@ -66,6 +76,16 @@
       border-radius: 4px;
       padding: 2px 7px;
     }
+    .ended-badge {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 2px 7px;
+    }
     .game-time { margin-left: auto; font-size: 0.78rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 
     .scoreboard {
@@ -78,6 +98,13 @@
     .team-name { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .score { font-size: 2.8rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
     .divider { font-size: 1.4rem; color: var(--border); flex-shrink: 0; }
+
+    .stats-panel { display: none; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+    .stats-panel.open { display: block; }
+    .stats-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; margin-bottom: 6px; font-size: 0.8rem; align-items: center; }
+    .stats-row:last-child { margin-bottom: 0; }
+    .stats-label { color: var(--text-muted); }
+    .stats-val { text-align: center; font-variant-numeric: tabular-nums; font-weight: 500; }
   </style>
 </head>
 <body>
@@ -94,12 +121,16 @@
     <p>Games appear here when an annotator enables live mode.</p>
   </div>
   <div class="grid" id="grid"></div>
+  <div id="recent-section" style="display:none">
+    <div class="section-label">Recent</div>
+    <div class="grid" id="recent-grid"></div>
+  </div>
 </main>
 
 <script>
 const APPS_SCRIPT_URL    = 'https://script.google.com/macros/s/AKfycbzhMw4nQr2nVW0MLfPWVXRPXsvImerpzshQ5GnJ3873qQkGMz0bcJQdmTRXCxwygfFm/exec';
 const APPS_SCRIPT_SECRET = sessionStorage.getItem('password') || 'm30';
-const STALE_MS           = 2 * 60 * 1000; // hide games not updated in last 2 minutes
+const STALE_MS           = 2 * 60 * 1000;
 
 function fmtTime(seconds) {
   const s = Math.floor(seconds);
@@ -109,42 +140,77 @@ function fmtTime(seconds) {
   return `${m}:${String(s % 60).padStart(2,'0')}`;
 }
 
+function renderCard(g, isLive) {
+  const hasStats = g.poss1 > 0 || g.poss2 > 0;
+  const fmt = (n, d) => d > 0 ? `${n}/${d}` : '–';
+  const badge = isLive
+    ? `<span class="live-badge">LIVE</span>`
+    : `<span class="ended-badge">FT</span>`;
+  return `
+  <div class="card" onclick="this.querySelector('.stats-panel')?.classList.toggle('open')">
+    <div class="card-header">
+      ${badge}
+      <span class="game-time">${fmtTime(g.timeSeconds)}</span>
+    </div>
+    <div class="scoreboard">
+      <div class="team">
+        <div class="team-name">${g.team1 || 'Team 1'}</div>
+        <div class="score">${g.score1}</div>
+      </div>
+      <div class="divider">–</div>
+      <div class="team">
+        <div class="team-name">${g.team2 || 'Team 2'}</div>
+        <div class="score">${g.score2}</div>
+      </div>
+    </div>
+    ${hasStats ? `
+    <div class="stats-panel">
+      <div class="stats-row">
+        <div class="stats-label">Tries</div>
+        <div class="stats-val">${fmt(g.score1, g.poss1)}</div>
+        <div class="stats-val">${fmt(g.score2, g.poss2)}</div>
+      </div>
+      <div class="stats-row">
+        <div class="stats-label">Completions</div>
+        <div class="stats-val">${fmt(g.comps1, g.poss1)}</div>
+        <div class="stats-val">${fmt(g.comps2, g.poss2)}</div>
+      </div>
+    </div>` : ''}
+  </div>`;
+}
+
 function render(games) {
-  const grid  = document.getElementById('grid');
-  const empty = document.getElementById('empty');
-  const now   = Date.now();
+  const grid          = document.getElementById('grid');
+  const empty         = document.getElementById('empty');
+  const recentSection = document.getElementById('recent-section');
+  const recentGrid    = document.getElementById('recent-grid');
+  const now           = Date.now();
 
   const active = games.filter(g => {
+    if (g.finished) return false;
     if (!g.updatedAt) return true;
     return (now - new Date(g.updatedAt).getTime()) < STALE_MS;
   });
 
-  if (!active.length) {
-    grid.innerHTML  = '';
-    empty.style.display = 'block';
-    return;
+  const recent = games.filter(g => {
+    const age = g.updatedAt ? (now - new Date(g.updatedAt).getTime()) : 0;
+    return g.finished || age >= STALE_MS;
+  });
+
+  if (active.length) {
+    empty.style.display = 'none';
+    grid.innerHTML = active.map(g => renderCard(g, true)).join('');
+  } else {
+    grid.innerHTML = '';
+    empty.style.display = recent.length ? 'none' : 'block';
   }
 
-  empty.style.display = 'none';
-  grid.innerHTML = active.map(g => `
-    <div class="card">
-      <div class="card-header">
-        <span class="live-badge">LIVE</span>
-        <span class="game-time">${fmtTime(g.timeSeconds)}</span>
-      </div>
-      <div class="scoreboard">
-        <div class="team">
-          <div class="team-name">${g.team1 || 'Team 1'}</div>
-          <div class="score">${g.score1}</div>
-        </div>
-        <div class="divider">–</div>
-        <div class="team">
-          <div class="team-name">${g.team2 || 'Team 2'}</div>
-          <div class="score">${g.score2}</div>
-        </div>
-      </div>
-    </div>
-  `).join('');
+  if (recent.length) {
+    recentSection.style.display = 'block';
+    recentGrid.innerHTML = recent.map(g => renderCard(g, false)).join('');
+  } else {
+    recentSection.style.display = 'none';
+  }
 }
 
 async function fetchLive() {
