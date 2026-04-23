@@ -26,8 +26,11 @@
 
     .card { background: #1a1d27; border: 1px solid #2a2d3a; border-radius: 10px; padding: 16px 20px; margin-bottom: 14px; }
 
+    .game-title-row { display: flex; align-items: center; gap: 10px; }
     #gameTitle    { font-size: 1.15rem; font-weight: 700; color: #fff; }
     #gameSubtitle { font-size: 0.78rem; color: #777; margin-top: 3px; }
+    #viewEventsBtn { margin-left: auto; text-decoration: none; background: none; border: 1px solid #3a3d4a; border-radius: 6px; padding: 4px 11px; font-size: 0.75rem; color: #aaa; cursor: pointer; white-space: nowrap; transition: border-color 0.12s, color 0.12s; }
+    #viewEventsBtn:hover { border-color: var(--accent, #3b82f6); color: #fff; }
 
     table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
     th { background: #0f1117; color: #aaa; padding: 8px 12px; text-align: left; font-weight: 600; border-bottom: 1px solid #2a2d3a; }
@@ -53,6 +56,22 @@
     .half-btn { background: #0f1117; border: 1px solid #2a2d3a; color: #888; border-radius: 5px; padding: 4px 12px; font-size: 0.78rem; cursor: pointer; transition: background 0.15s, color 0.15s; }
     .half-btn:hover { background: #22253a; color: #e0e0e0; }
     .half-btn.active { background: #22253a; color: #3b82f6; border-color: #3b82f6; }
+
+    /* Vega tooltip override */
+    .vega-tooltip {
+      background: #1e2130 !important;
+      border: 1px solid #3a3d4a !important;
+      border-radius: 7px !important;
+      padding: 8px 12px !important;
+      font-family: 'Segoe UI', sans-serif !important;
+      font-size: 0.78rem !important;
+      color: #e0e0e0 !important;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.5) !important;
+      pointer-events: none;
+    }
+    .vega-tooltip td { color: #e0e0e0 !important; border: none !important; padding: 2px 6px 2px 0 !important; }
+    .vega-tooltip td.key { color: #888 !important; font-weight: 500; padding-right: 10px !important; white-space: nowrap; }
+    .vega-tooltip td.value { color: #fff !important; font-weight: 600; }
   </style>
 </head>
 <body>
@@ -72,7 +91,7 @@
   <nav class="header-nav" style="margin-left:auto">
     <a href="games.html" class="active">Games</a>
     <a href="dashboard.html">Dashboard</a>
-    <a href="viewer.html">Events</a>
+    <a href="viewer.html" id="eventsLink">Events</a>
     <a href="annotator.html" id="annotatorLink" style="display:none">Annotator</a>
   </nav>
 </header>
@@ -89,7 +108,10 @@
 
   <div id="gameContent">
     <div class="card">
-      <div id="gameTitle"></div>
+      <div class="game-title-row">
+        <div id="gameTitle"></div>
+        <a id="viewEventsBtn" href="viewer.html">View Events</a>
+      </div>
       <div id="gameSubtitle"></div>
       <div id="halfSelector" style="display:none">
         <div class="half-toggle" id="halfToggle"></div>
@@ -160,6 +182,11 @@ function applyGameList(result) {
     sel.appendChild(opt);
   });
   setStatus(`${analyzable.length} game${analyzable.length !== 1 ? 's' : ''}`);
+  const urlGame = new URLSearchParams(location.search).get('game');
+  if (urlGame && !sel.value) {
+    sel.value = urlGame;
+    if (sel.value) loadGame();
+  }
 }
 
 async function fetchGameList() {
@@ -196,7 +223,13 @@ function sheetNameToLabel(entry) {
 // ── Load & render a game ───────────────────────────────────────
 async function loadGame() {
   const sheetName = document.getElementById('gameSelect').value;
-  if (!sheetName) return;
+  if (!sheetName) {
+    document.getElementById('eventsLink').href = 'viewer.html';
+    return;
+  }
+  document.getElementById('eventsLink').href    = `viewer.html?game=${enc(sheetName)}`;
+  document.getElementById('viewEventsBtn').href = `viewer.html?game=${enc(sheetName)}`;
+  history.replaceState(null, '', `?game=${enc(sheetName)}`);
 
   document.getElementById('gameContent').style.display   = 'none';
   document.getElementById('errMsg').style.display        = 'none';
@@ -482,7 +515,7 @@ function cumulativeSpec(data, title, yTitle, teamNames) {
   };
 }
 
-function possessionSpec(data, teamNames) {
+function possessionSpec(data, teamNames, rangeStart, rangeEnd) {
   return {
     $schema: 'https://vega.github.io/schema/vega-lite/v5.json',
     width: 'container', height: 140, title: 'Possession Timeline',
@@ -490,7 +523,7 @@ function possessionSpec(data, teamNames) {
     data: { values: data },
     mark: 'bar',
     encoding: {
-      x:     { field: 'Start', type: 'quantitative', axis: { labelExpr: MM_SS, title: 'Game Time' } },
+      x:     { field: 'Start', type: 'quantitative', scale: { domain: [rangeStart, rangeEnd] }, axis: { labelExpr: MM_SS, title: 'Game Time' } },
       x2:    { field: 'End' },
       y:     { field: 'Team', type: 'nominal', title: 'Possession Owner', sort: teamNames },
       color: {
@@ -602,7 +635,7 @@ async function renderStats(halfValue) {
   const opts = { config: VEGA_CONFIG, actions: false };
   await vegaEmbed('#vis-tries',      cumulativeSpec(triesData, 'Tries vs Time',     'Cumulative Tries',     teamNames), opts);
   await vegaEmbed('#vis-penalties',  cumulativeSpec(penData,   'Penalties vs Time', 'Cumulative Penalties', teamNames), opts);
-  await vegaEmbed('#vis-possession', possessionSpec(possData, teamNames), opts);
+  await vegaEmbed('#vis-possession', possessionSpec(possData, teamNames, rangeStart, rangeEnd), opts);
 
   const cols = ['Team', 'Possessions', 'Tries', 'Completions', 'Pen Attack', 'Pen Defence', 'Avg Time (s)', 'Total Time (s)'];
   document.getElementById('metricsTable').innerHTML =

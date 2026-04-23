@@ -40,8 +40,28 @@
     main { padding: 20px 24px; max-width: 1120px; margin: 0 auto; }
     .section { margin-bottom: 28px; }
     .section-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.09em; color: var(--dim); font-weight: 700; margin-bottom: 12px; }
+    .section-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; cursor: pointer; user-select: none; }
+    .section-header .section-label { margin-bottom: 0; }
+    .section-filter { margin-left: auto; background: var(--surface-2, #22253a); border: 1px solid var(--border); border-radius: 5px; padding: 3px 9px; font-size: 0.73rem; color: var(--text); outline: none; width: 140px; cursor: text; }
+    .section-filter::placeholder { color: var(--dim); }
+    .section-filter:focus { border-color: var(--accent); }
+    .section-toggle { font-size: 0.65rem; color: var(--dim); transition: transform 0.2s; display: inline-block; }
+    .section-header.collapsed .section-toggle { transform: rotate(-90deg); }
+    .section-body.collapsed { display: none; }
     .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; }
     .two-col { display: grid; grid-template-columns: 3fr 2fr; gap: 16px; }
+
+    /* ── Team Detail ────────────────────────────────────────── */
+    .team-detail-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+    .team-detail-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+    .td-name { font-size: 0.78rem; font-weight: 700; color: var(--text); text-transform: capitalize; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+    .td-row { display: flex; align-items: center; gap: 6px; padding: 4px 0; font-size: 0.75rem; }
+    .td-rank { color: var(--dim); font-size: 0.65rem; width: 12px; flex-shrink: 0; }
+    .td-try-name { color: var(--text); flex: 1; }
+    .td-bar-wrap { width: 52px; height: 5px; background: var(--border); border-radius: 3px; flex-shrink: 0; }
+    .td-bar { height: 100%; border-radius: 3px; background: var(--green); }
+    .td-pct { color: var(--muted); font-size: 0.68rem; width: 34px; text-align: right; flex-shrink: 0; }
+    .td-empty { color: var(--dim); font-size: 0.75rem; }
 
     /* ── Loading ────────────────────────────────────────────── */
     #loadingArea { text-align: center; padding: 80px; color: var(--muted); font-size: 0.9rem; }
@@ -131,8 +151,8 @@
 
     /* ── Game results ───────────────────────────────────────── */
     .results-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
-    .result-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; transition: border-color 0.12s; }
-    .result-card:hover { border-color: #3a3d4a; }
+    .result-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; transition: border-color 0.12s, background 0.12s; cursor: pointer; }
+    .result-card:hover { border-color: var(--accent); background: var(--surface-2); }
     .result-teams { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; }
     .rt { flex: 1; }
     .rt.home { text-align: left; }
@@ -227,22 +247,27 @@
 
     <!-- Rankings + Charts -->
     <div class="section">
-      <div class="section-label">Team Rankings</div>
-      <div class="two-col">
-        <div class="card">
-          <table class="rtable" id="rankTable">
-            <thead></thead>
-            <tbody></tbody>
-          </table>
-        </div>
-        <div class="card" style="display:flex;flex-direction:column;gap:20px">
-          <div>
-            <div class="chart-sublabel">Avg tries per game</div>
-            <div class="chart-wrap" id="vis-tries"></div>
+      <div class="section-header" onclick="toggleSection('body-rankings')">
+        <div class="section-label">Team Rankings</div>
+        <span class="section-toggle">▾</span>
+      </div>
+      <div class="section-body" id="body-rankings">
+        <div class="two-col">
+          <div class="card">
+            <table class="rtable" id="rankTable">
+              <thead></thead>
+              <tbody></tbody>
+            </table>
           </div>
-          <div>
-            <div class="chart-sublabel">Avg penalties per game</div>
-            <div class="chart-wrap" id="vis-pens"></div>
+          <div class="card" style="display:flex;flex-direction:column;gap:20px">
+            <div>
+              <div class="chart-sublabel">Avg tries per game</div>
+              <div class="chart-wrap" id="vis-tries"></div>
+            </div>
+            <div>
+              <div class="chart-sublabel">Avg penalties per game</div>
+              <div class="chart-wrap" id="vis-pens"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -250,14 +275,33 @@
 
     <!-- Head-to-Head -->
     <div class="section">
-      <div class="section-label">Head-to-Head Comparison</div>
-      <div class="card">
-        <div class="h2h-controls">
-          <select id="h2h-a" onchange="renderH2H()"><option value="">Select team…</option></select>
-          <span class="h2h-vs">vs</span>
-          <select id="h2h-b" onchange="renderH2H()"><option value="">Select team…</option></select>
+      <div class="section-header" onclick="toggleSection('body-h2h')">
+        <div class="section-label">Head-to-Head Comparison</div>
+        <span class="section-toggle">▾</span>
+      </div>
+      <div class="section-body" id="body-h2h">
+        <div class="card">
+          <div class="h2h-controls">
+            <select id="h2h-a" onchange="renderH2H()"><option value="">Select team…</option></select>
+            <span class="h2h-vs">vs</span>
+            <select id="h2h-b" onchange="renderH2H()"><option value="">Select team…</option></select>
+          </div>
+          <div id="h2h-body"></div>
         </div>
-        <div id="h2h-body"></div>
+      </div>
+    </div>
+
+    <!-- Team Detail -->
+    <div class="section">
+      <div class="section-header" onclick="toggleSection('body-team-detail')">
+        <div class="section-label">Team Detail</div>
+        <input id="td-filter" class="section-filter" type="text" placeholder="Filter teams…"
+               onclick="event.stopPropagation()"
+               oninput="renderTeamDetail(this.value)">
+        <span class="section-toggle">▾</span>
+      </div>
+      <div class="section-body" id="body-team-detail">
+        <div id="team-detail-grid" class="team-detail-grid"></div>
       </div>
     </div>
 
@@ -366,9 +410,10 @@ function processData(rows) {
     const pens   = { [t1]: 0, [t2]: 0 };
     const turns  = { [t1]: 0, [t2]: 0 };
     const poss   = { [t1]: 0, [t2]: 0 };
-    const penTypes  = {};
-    const turnTypes = {};
-    const tryTypes  = {};
+    const penTypes      = {};
+    const turnTypes     = {};
+    const tryTypes      = {};
+    const teamTryTypes  = { [t1]: {}, [t2]: {} };
     let prevOwner = null, hasStart = false, hasEnd = false;
 
     gRows.forEach(row => {
@@ -382,9 +427,12 @@ function processData(rows) {
 
       if (type === 'Try' && tries[action] !== undefined) {
         tries[action]++;
-        if (name) tryTypes[name] = (tryTypes[name] || 0) + 1;
+        if (name) {
+          tryTypes[name] = (tryTypes[name] || 0) + 1;
+          teamTryTypes[action][name] = (teamTryTypes[action][name] || 0) + 1;
+        }
       }
-      if (type === 'Penalty' && pens[action] !== undefined) {
+      if ((type === 'Penalty Attack' || type === 'Penalty Defence') && pens[action] !== undefined) {
         pens[action]++;
         if (name) penTypes[name] = (penTypes[name] || 0) + 1;
       }
@@ -404,7 +452,7 @@ function processData(rows) {
       year: (f[YEARI] || '').trim(),
       division: (f[DIVI] || '').trim().toUpperCase(),
       tries, pens, turns, poss,
-      penTypes, turnTypes, tryTypes,
+      penTypes, turnTypes, tryTypes, teamTryTypes,
       winner: s1 > s2 ? t1 : s2 > s1 ? t2 : null,
       analysed: hasStart && hasEnd,
     };
@@ -418,6 +466,7 @@ function aggregateTeams(games) {
       if (!map[team]) map[team] = {
         name: team, games: 0, wins: 0, losses: 0, draws: 0,
         triesFor: 0, triesAgt: 0, pens: 0, turns: 0, poss: 0,
+        tryTypes: {},
       };
       const opp = team === g.t1 ? g.t2 : g.t1;
       const t = map[team];
@@ -427,6 +476,9 @@ function aggregateTeams(games) {
       t.pens     += g.pens[team]  || 0;
       t.turns    += g.turns[team] || 0;
       t.poss     += g.poss[team]  || 0;
+      Object.entries(g.teamTryTypes[team] || {}).forEach(([n, c]) => {
+        t.tryTypes[n] = (t.tryTypes[n] || 0) + c;
+      });
       if      (g.winner === team) t.wins++;
       else if (g.winner === opp)  t.losses++;
       else if (g.analysed)        t.draws++;
@@ -451,7 +503,49 @@ function renderDashboard() {
   renderCharts();
   populateH2H();
   renderH2H();
+  renderTeamDetail();
   renderResults();
+}
+
+function toggleSection(bodyId) {
+  const body   = document.getElementById(bodyId);
+  const header = body.previousElementSibling;
+  body.classList.toggle('collapsed');
+  header.classList.toggle('collapsed');
+}
+
+// ── Team Detail ───────────────────────────────────────────────────
+function renderTeamDetail(filter) {
+  const grid  = document.getElementById('team-detail-grid');
+  if (!teamStats.length) { grid.innerHTML = ''; return; }
+  const query = (filter ?? document.getElementById('td-filter')?.value ?? '').toLowerCase().trim();
+  const teams = query ? teamStats.filter(t => t.name.toLowerCase().includes(query)) : teamStats;
+
+  grid.innerHTML = teams.map(t => {
+    const total = t.triesFor;
+    const top3  = Object.entries(t.tryTypes)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3);
+    const maxCount = top3.length ? top3[0][1] : 1;
+
+    const rows = top3.length
+      ? top3.map(([name, count], i) => {
+          const pct     = total ? Math.round(count / total * 100) : 0;
+          const barPct  = Math.round(count / maxCount * 100);
+          return `<div class="td-row">
+            <span class="td-rank">${i + 1}</span>
+            <span class="td-try-name">${name}</span>
+            <div class="td-bar-wrap"><div class="td-bar" style="width:${barPct}%"></div></div>
+            <span class="td-pct">${pct}%</span>
+          </div>`;
+        }).join('')
+      : `<div class="td-empty">No try data</div>`;
+
+    return `<div class="team-detail-card">
+      <div class="td-name">${cap(t.name)} <span style="color:var(--dim);font-weight:400;font-size:0.68rem">${total} tries</span></div>
+      ${rows}
+    </div>`;
+  }).join('');
 }
 
 // ── KPIs ─────────────────────────────────────────────────────────
@@ -707,7 +801,7 @@ function renderResults() {
     const t2Win = g.winner === g.t2;
     const meta = [g.year, g.division, g.competition].filter(Boolean);
     return `
-      <div class="result-card">
+      <div class="result-card" onclick="location.href='games.html?game=${enc(g.id)}'" title="View game stats">
         <div class="result-teams">
           <div class="rt home"><div class="rt-name ${t1Win ? 'win' : ''}">${cap(g.t1)}</div></div>
           <div class="score-mid">${s1} – ${s2}</div>

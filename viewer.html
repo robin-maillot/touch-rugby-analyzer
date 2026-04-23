@@ -307,6 +307,9 @@
 
     <div class="controls" id="controls" style="display:none">
       <div class="top-row">
+        <select id="gameFilter" class="col-select" style="min-width:160px;max-width:260px" onchange="selectGame(this.value)">
+          <option value="">All games</option>
+        </select>
         <div class="search-group">
           <select id="searchCol" class="col-select"></select>
           <input id="searchInput" class="search-input" type="text" placeholder="Search…">
@@ -360,13 +363,14 @@ const LS = {
   set(k, v) { try { localStorage.setItem('trl2_' + k, JSON.stringify(v)); } catch {} },
 };
 
-const FILTERABLE  = ['Type', 'Name', 'Action Owner', 'Game'];
+const FILTERABLE  = ['Type', 'Name', 'Action Owner'];
 const HIDDEN_COLS = new Set(['Team 1', 'Team 2', 'Video Name', 'To Review', 'Youtube Link', 'Possession Owner', 'Analyzable']);
 const TYPE_BADGE  = { 'try':'badge-try', 'penalty':'badge-penalty', 'penalty attack':'badge-penalty', 'penalty defence':'badge-penalty', 'turnover':'badge-turnover', 'to review':'badge-toreview' };
 
 const isAdmin = sessionStorage.getItem('password') === 'm30-admin';
-let editMode   = false;
-let linkOffset = parseInt(localStorage.getItem('linkOffset') ?? '5', 10) || 5;
+let editMode    = false;
+let linkOffset  = parseInt(localStorage.getItem('linkOffset') ?? '5', 10) || 5;
+let selectedGame = new URLSearchParams(location.search).get('game') || '';
 
 const NAMES_BY_TYPE = {
   'Try':             ['Scoop', 'Other', '32 - Long', '33 Quicky', '33', '32 Cut', 'French Flair'],
@@ -587,6 +591,7 @@ function processRows(rows) {
   filtered = [...allData];
   buildSearchColSelect();
   buildFilterDropdowns();
+  populateGameFilter();
   renderHeaders();
   applyFilters();
 
@@ -603,6 +608,27 @@ function buildSearchColSelect() {
     opt.value = i; opt.textContent = h || '#';
     sel.appendChild(opt);
   });
+}
+
+function populateGameFilter() {
+  const sel = document.getElementById('gameFilter');
+  const games = [...new Set(allData.map(r => colGame >= 0 ? r[colGame] : '').filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">All games</option>';
+  games.forEach(g => {
+    const opt = document.createElement('option');
+    opt.value = opt.textContent = g;
+    sel.appendChild(opt);
+  });
+  if (selectedGame) sel.value = selectedGame;
+}
+
+function selectGame(val) {
+  selectedGame = val;
+  const url = new URL(location.href);
+  if (val) url.searchParams.set('game', val);
+  else url.searchParams.delete('game');
+  history.replaceState(null, '', url);
+  applyFilters();
 }
 
 function buildFilterDropdowns() {
@@ -659,6 +685,7 @@ function applyFilters() {
       ? row.some(c => String(c).toLowerCase().includes(query))
       : String(row[colIdx]).toLowerCase().includes(query);
     if (!match) return false;
+    if (selectedGame && colGame >= 0 && row[colGame] !== selectedGame) return false;
     for (const col of FILTERABLE) {
       const set = activeFilters[col];
       if (!set || !set.size) continue;
@@ -709,6 +736,9 @@ function updateFilterOptions() {
 }
 
 function resetFilters() {
+  selectedGame = '';
+  document.getElementById('gameFilter').value = '';
+  history.replaceState(null, '', location.pathname);
   document.getElementById('searchInput').value = '';
   document.querySelectorAll('.filter-dropdown input[type=checkbox]').forEach(cb => { cb.checked = false; });
   document.querySelectorAll('.filter-btn').forEach(btn => {
