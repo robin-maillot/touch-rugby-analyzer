@@ -55,7 +55,7 @@
     .btn-icon:active   { background: var(--surface-2); }
     .btn-icon:disabled { opacity: 0.5; }
     .btn-hdr-push     { background: var(--accent); color: #fff; border-color: var(--accent); }
-    .btn-hdr-override { background: #7f1d1d; color: #fff; border-color: #7f1d1d; display: none; }
+    .btn-hdr-override { background: #7f1d1d; color: #fff; border-color: #7f1d1d; }
     .btn-live.active  { color: var(--red); border-color: var(--red); background: rgba(239,68,68,0.08); }
     .btn-hdr-swap.active { color: var(--accent); border-color: var(--accent); }
 
@@ -104,8 +104,10 @@
     .score-team { flex: 1; text-align: center; }
     .score-name { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .score-val  { font-size: 3rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
-    .score-sep  { font-size: 1.5rem; color: var(--border); padding: 0 8px; }
-    #gameClock  { font-size: 0.75rem; color: var(--text-muted); font-variant-numeric: tabular-nums; margin-top: 2px; }
+    .score-sep        { font-size: 1.5rem; color: var(--border); padding: 0 8px; }
+    .clock-half-label { font-size: 0.62rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 4px; }
+    #halfClock        { font-size: 0.9rem; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; margin-top: 1px; }
+    #totalClock       { font-size: 0.62rem; color: var(--text-muted); font-variant-numeric: tabular-nums; margin-top: 2px; }
 
     /* ── Main content ───────────────────────────────────────────── */
     main {
@@ -347,14 +349,14 @@
     <a href="index.html" class="btn-icon">← Back</a>
     <button class="btn-icon btn-hdr-push" id="pushBtn"     onclick="pushToSheet()">⬆ Push</button>
     <button class="btn-icon btn-hdr-swap" id="swapBtn"     onclick="toggleSwap()">⇆ Swap</button>
-    <button class="btn-icon btn-hdr-override" id="overrideBtn" onclick="pushToSheet(true)">⚠ Override</button>
+    <button class="btn-icon btn-hdr-override" id="overrideBtn" style="display:none" onclick="pushToSheet(true)">⚠ Override</button>
     <button class="btn-icon"              onclick="openStats()">Stats</button>
     <button class="btn-icon btn-live"     id="liveBtn"     onclick="toggleLive()">⚫ Live</button>
     <button class="btn-icon"              onclick="toggleSettings()" id="settingsBtn">⚙ Setup</button>
   </div>
 </header>
 
-<div id="settingsPanel">
+<div id="settingsPanel" class="open">
   <div>
     <div class="settings-label">Teams</div>
     <div class="settings-row">
@@ -380,7 +382,9 @@
   </div>
   <div style="text-align:center">
     <div class="score-sep">–</div>
-    <div id="gameClock">00:00</div>
+    <div class="clock-half-label" id="halfLabel">—</div>
+    <div id="halfClock">00:00</div>
+    <div id="totalClock">00:00</div>
   </div>
   <div class="score-team">
     <div class="score-name" id="scoreName2">Team 2</div>
@@ -485,6 +489,12 @@ function fmtClock(s) {
   return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
 }
 
+function ordinal(n) {
+  const s = ['th','st','nd','rd'];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
 // ── Team swap ──────────────────────────────────────────────────
 let teamsSwapped = false;
 function toggleSwap() {
@@ -573,10 +583,16 @@ function updateUI() {
   document.getElementById('scoreVal1').textContent  = annotations.filter(a => a.type === 'Try' && a.actionOwner === 'Team 1').length;
   document.getElementById('scoreVal2').textContent  = annotations.filter(a => a.type === 'Try' && a.actionOwner === 'Team 2').length;
 
-  const gameStart = annotations.find(a => a.name === 'Game Start');
-  const lastTime  = annotations.length ? annotations[annotations.length - 1].time : 0;
-  const elapsed   = gameStart ? Math.max(0, lastTime - gameStart.time) : lastTime;
-  document.getElementById('gameClock').textContent = fmtClock(elapsed);
+  const gameStarts   = annotations.filter(a => a.name === 'Game Start');
+  const firstStart   = gameStarts[0];
+  const lastStart    = gameStarts[gameStarts.length - 1];
+  const lastTime     = annotations.length ? annotations[annotations.length - 1].time : 0;
+  const halfElapsed  = lastStart  ? Math.max(0, lastTime - lastStart.time)  : 0;
+  const totalElapsed = firstStart ? Math.max(0, lastTime - firstStart.time) : 0;
+  const isOnBreak = lastStart && annotations.some(a => a.name === 'Game End' && a.time > lastStart.time);
+  document.getElementById('halfLabel').textContent  = !gameStarts.length ? '—' : isOnBreak ? 'Break' : ordinal(gameStarts.length) + ' Half';
+  document.getElementById('halfClock').textContent  = fmtClock(halfElapsed);
+  document.getElementById('totalClock').textContent = 'Total ' + fmtClock(totalElapsed);
 
   const COLORS = { 'Try': '#22c55e', 'Turnover': '#f97316', 'Penalty Attack': '#ef4444', 'Penalty Defence': '#b91c1c', 'Game Event': '#3b82f6', 'To Review': '#7c3aed' };
   const el = document.getElementById('recentList');
@@ -631,10 +647,14 @@ function updateSheetPreview() {
 
 // ── Clock ticker ───────────────────────────────────────────────
 setInterval(() => {
-  if (!wallStart || !annotations.length) return;
-  const gameStart     = annotations.find(a => a.name === 'Game Start');
-  const gameStartWall = gameStart ? wallStart + gameStart.time * 1000 : wallStart;
-  document.getElementById('gameClock').textContent = fmtClock(Math.max(0, (Date.now() - gameStartWall) / 1000));
+  if (!wallStart) return;
+  const gameStarts = annotations.filter(a => a.name === 'Game Start');
+  if (!gameStarts.length) return;
+  const now            = Date.now();
+  const firstStartWall = wallStart + gameStarts[0].time * 1000;
+  const lastStartWall  = wallStart + gameStarts[gameStarts.length - 1].time * 1000;
+  document.getElementById('halfClock').textContent  = fmtClock(Math.max(0, (now - lastStartWall)  / 1000));
+  document.getElementById('totalClock').textContent = 'Total ' + fmtClock(Math.max(0, (now - firstStartWall) / 1000));
 }, 1000);
 
 // ── Live mode ──────────────────────────────────────────────────
