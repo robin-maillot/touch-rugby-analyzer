@@ -287,6 +287,8 @@
     <span id="sixthTouchSep" style="width:1px;height:20px;background:#2a2d3a;margin:0 4px;flex-shrink:0"></span>
     <button id="sixthTouchBtn" class="tag-btn" style="background:#c2410c;color:#fff" onclick="quickTag('Turnover','6th Touch')">6th Touch <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">6</kbd></button>
     <button id="sixAgainBtn" class="tag-btn" style="background:#c2410c;color:#fff" onclick="quickTag('Turnover','6 Again')">6 Again <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">5</kbd></button>
+    <span style="width:1px;height:20px;background:#2a2d3a;margin:0 4px;flex-shrink:0"></span>
+    <button class="tag-btn" style="background:#3b82f6;color:#fff" onclick="quickBallLive()">Ball Live <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">L</kbd></button>
   </div>
 
   <!-- Sub-action buttons -->
@@ -706,6 +708,14 @@ function quickTag(type, name) {
   if (wasPlaying) doPause();
   document.querySelectorAll('.tag-btn').forEach(b => b.classList.toggle('active', b.dataset.type === type));
   selectSubType(type, name);
+}
+
+function quickBallLive() {
+  if (!videoLoaded) return;
+  wasPlaying = !isPaused();
+  if (wasPlaying) doPause();
+  const poss = isFullGame() ? (inferPossessionOwner() || '') : '';
+  tag('Game Event', 'Ball Live', poss);
 }
 
 function selectType(type) {
@@ -1260,6 +1270,7 @@ document.addEventListener('keydown', e => {
     if (wasPlaying) { wasPlaying = false; doPlay(); }
     return;
   }
+  if (k === 'l') { quickBallLive(); return; }
   if (TYPE_KEYS[k]) { selectType(TYPE_KEYS[k]); return; }
   if (k === '6' && isDefaultOther()) { quickTag('Turnover', '6th Touch'); return; }
   if (k === '5' && isDefaultOther()) { quickTag('Turnover', '6 Again'); return; }

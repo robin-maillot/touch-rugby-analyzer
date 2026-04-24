@@ -417,7 +417,7 @@
   <div>
     <div class="section-label">Game Events</div>
     <div class="event-grid two-col">
-      <button class="evt-btn btn-game" id="gameEventBtn" onclick="tagGameEventToggle()">Game Start</button>
+      <button class="evt-btn btn-game" id="gameEventBtn" onclick="tagGameEventToggle()">Start</button>
       <button class="evt-btn btn-game" onclick="tagGameEvent('Ball Live')">Ball Live</button>
     </div>
   </div>
@@ -556,7 +556,9 @@ function tagWithPossession(type, name) { tag(type, name, possession); }
 function tagGameEvent(name)            { tag('Game Event', name, possession); }
 
 function tagGameEventToggle() {
-  tagGameEvent(document.getElementById('gameEventBtn').textContent);
+  const gameEventAnnots = annotations.filter(a => a.name === 'Game Start' || a.name === 'Game End');
+  const last = gameEventAnnots[gameEventAnnots.length - 1];
+  tagGameEvent(last && last.name === 'Game Start' ? 'Game End' : 'Game Start');
 }
 
 function tagToReview() {
@@ -602,7 +604,7 @@ function updateUI() {
   const el = document.getElementById('recentList');
   const gameEventAnnots = annotations.filter(a => a.name === 'Game Start' || a.name === 'Game End');
   const lastGameEvent   = gameEventAnnots[gameEventAnnots.length - 1];
-  document.getElementById('gameEventBtn').textContent = (lastGameEvent && lastGameEvent.name === 'Game Start') ? 'Game End' : 'Game Start';
+  document.getElementById('gameEventBtn').textContent = (lastGameEvent && lastGameEvent.name === 'Game Start') ? 'End' : 'Start';
 
   if (!annotations.length) {
     el.innerHTML = '<div style="color:var(--text-muted);font-size:0.82rem;padding:8px 0">No events yet</div>';
