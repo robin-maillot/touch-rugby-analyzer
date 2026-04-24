@@ -448,7 +448,28 @@ function buildPossessionData(events, teamNames, baseUrl) {
   });
 }
 
+function computeAvgTurnoverTimes(events, possessions, teamNames) {
+  const TRIGGERS = new Set(['Turnover', 'Penalty Attack', 'Penalty Defence']);
+  const sorted   = [...events].sort((a, b) => a.GameTime - b.GameTime);
+  const times    = Object.fromEntries(teamNames.map(t => [t, []]));
+  let pIdx = 0;
+  for (let i = 0; i < sorted.length; i++) {
+    const evt = sorted[i];
+    if (!TRIGGERS.has(evt.Type)) continue;
+    if (evt.Type === 'Turnover' && evt.Name === '6 Again') continue;
+    while (pIdx < possessions.length - 1 && possessions[pIdx].End < evt.GameTime) pIdx++;
+    const nextPoss = possessions[pIdx + 1];
+    if (!nextPoss) continue;
+    const next = sorted[i + 1];
+    const dt = (next && next.Name === 'Ball Live') ? Math.max(0, next.GameTime - evt.GameTime) : 0;
+    if (times[nextPoss.Team]) times[nextPoss.Team].push(dt);
+  }
+  const avg = arr => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+  return Object.fromEntries(teamNames.map(t => [t, avg(times[t])]));
+}
+
 function buildMetrics(possessions, teamNames, events) {
+  const turnoverAvgs = computeAvgTurnoverTimes(events, possessions, teamNames);
   const rows = teamNames.map(team => {
     const g          = possessions.filter(p => p.Team === team);
     const tries      = g.filter(p => p.End_Type === 'Try').length;
@@ -470,6 +491,7 @@ function buildMetrics(possessions, teamNames, events) {
       'Pen Defence': penDefence,
       'Avg Time (s)': avg.toFixed(1), 'Total Time (s)': total.toFixed(1),
       'Dead Ball (s)': g.reduce((s, p) => s + Math.max(0, (p.End - p.Start) - p.Duration_Sec), 0).toFixed(1),
+      'Avg Turnover (s)': turnoverAvgs[team].toFixed(1),
     };
   });
 
@@ -667,7 +689,7 @@ async function renderStats(halfValue) {
     `<span>Game time: <span class="timing-val">${fmtSecs(gameTime)}</span></span>` +
     `<span>Dead ball: <span class="timing-val">${fmtSecs(totalDeadBall)}</span></span>`;
 
-  const cols = ['Team', 'Possessions', 'Tries', 'Completions', 'Pen Attack', 'Pen Defence', 'Avg Time (s)', 'Total Time (s)', 'Dead Ball (s)'];
+  const cols = ['Team', 'Possessions', 'Tries', 'Completions', 'Pen Attack', 'Pen Defence', 'Avg Time (s)', 'Total Time (s)', 'Dead Ball (s)', 'Avg Turnover (s)'];
   document.getElementById('metricsTable').innerHTML =
     `<table>
        <thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead>

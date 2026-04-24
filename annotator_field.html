@@ -765,6 +765,23 @@ function computeStats() {
     segs[i].duration = Math.max(0, segs[i].end - segs[i].start - deadTime);
   }
 
+  // Avg turnover time: dead ball gap after each turnover trigger, attributed to receiving team
+  const TO_TRIGGERS = new Set(['Turnover', 'Penalty Attack', 'Penalty Defence']);
+  const turnoverTimes = { 'Team 1': [], 'Team 2': [] };
+  let sIdx = 0;
+  for (let i = 0; i < sorted.length; i++) {
+    const evt = sorted[i];
+    if (!TO_TRIGGERS.has(evt.type)) continue;
+    if (evt.type === 'Turnover' && evt.name === '6 Again') continue;
+    while (sIdx < segs.length - 1 && segs[sIdx].end < evt.time) sIdx++;
+    const nextSeg = segs[sIdx + 1];
+    if (!nextSeg) continue;
+    const next = sorted[i + 1];
+    const dt = (next && next.name === 'Ball Live') ? Math.max(0, next.time - evt.time) : 0;
+    if (turnoverTimes[nextSeg.owner]) turnoverTimes[nextSeg.owner].push(dt);
+  }
+  const avgTO = arr => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+
   const statFor = key => {
     const mine   = segs.filter(s => s.owner === key);
     const tries  = mine.filter(s => s.endType === 'Try').length;
@@ -777,6 +794,7 @@ function computeStats() {
       const inSeg = deadSlots.filter(d => d.start >= seg.start && d.end <= seg.end);
       return sum + inSeg.reduce((s, d) => s + (d.end - d.start), 0);
     }, 0);
+    const avgTurnoverRaw = avgTO(turnoverTimes[key]);
     return {
       score:       annotations.filter(a => a.type === 'Try' && a.actionOwner === key).length,
       possessions: mine.length,
@@ -788,6 +806,7 @@ function computeStats() {
       avgTime:     avg.toFixed(1),    avgTimeRaw:  avg,
       totalTime:   total.toFixed(1),  totalTimeRaw:total,
       deadBall:    deadBallRaw.toFixed(1), deadBallRaw,
+      avgTurnover: avgTurnoverRaw.toFixed(1), avgTurnoverRaw,
     };
   };
 
@@ -855,6 +874,7 @@ function refreshStats() {
         { label: 'Avg Time (s)',  n1: tL.avgTime,   pct1: null, n2: tR.avgTime,   pct2: null, r1: tL.avgTimeRaw,   r2: tR.avgTimeRaw,   hib: null  },
         { label: 'Total Time (s)',n1: tL.totalTime, pct1: null, n2: tR.totalTime, pct2: null, r1: tL.totalTimeRaw, r2: tR.totalTimeRaw, hib: null  },
         { label: 'Dead Ball (s)', n1: tL.deadBall,  pct1: null, n2: tR.deadBall,  pct2: null, r1: tL.deadBallRaw,  r2: tR.deadBallRaw,  hib: false },
+        { label: 'Avg Turnover (s)', n1: tL.avgTurnover, pct1: null, n2: tR.avgTurnover, pct2: null, r1: tL.avgTurnoverRaw, r2: tR.avgTurnoverRaw, hib: false },
       ],
     },
     {
