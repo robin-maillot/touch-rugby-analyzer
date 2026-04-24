@@ -29,6 +29,8 @@
     .game-title-row { display: flex; align-items: center; gap: 10px; }
     #gameTitle    { font-size: 1.15rem; font-weight: 700; color: #fff; }
     #gameSubtitle { font-size: 0.78rem; color: #777; margin-top: 3px; }
+    #gameTimingRow { display: flex; gap: 16px; margin-top: 8px; font-size: 0.78rem; color: #888; flex-wrap: wrap; }
+    #gameTimingRow .timing-val { color: #ccc; font-weight: 600; }
     #viewEventsBtn { margin-left: auto; text-decoration: none; background: none; border: 1px solid #3a3d4a; border-radius: 6px; padding: 4px 11px; font-size: 0.75rem; color: #aaa; cursor: pointer; white-space: nowrap; transition: border-color 0.12s, color 0.12s; }
     #viewEventsBtn:hover { border-color: var(--accent, #3b82f6); color: #fff; }
 
@@ -113,6 +115,7 @@
         <a id="viewEventsBtn" href="viewer.html">View Events</a>
       </div>
       <div id="gameSubtitle"></div>
+      <div id="gameTimingRow"></div>
       <div id="halfSelector" style="display:none">
         <div class="half-toggle" id="halfToggle"></div>
       </div>
@@ -656,6 +659,14 @@ async function renderStats(halfValue) {
     });
   }
 
+  const totalDeadBall = metrics.reduce((s, m) => s + parseFloat(m['Dead Ball (s)']), 0);
+  const gameTime = halfValue === 'all'
+    ? starts.reduce((s, st, i) => s + (ends[i] ? ends[i].GameTime - st.GameTime : 0), 0)
+    : rangeEnd - rangeStart;
+  document.getElementById('gameTimingRow').innerHTML =
+    `<span>Game time: <span class="timing-val">${fmtSecs(gameTime)}</span></span>` +
+    `<span>Dead ball: <span class="timing-val">${fmtSecs(totalDeadBall)}</span></span>`;
+
   const cols = ['Team', 'Possessions', 'Tries', 'Completions', 'Pen Attack', 'Pen Defence', 'Avg Time (s)', 'Total Time (s)', 'Dead Ball (s)'];
   document.getElementById('metricsTable').innerHTML =
     `<table>
@@ -668,6 +679,11 @@ async function renderStats(halfValue) {
 function setStatus(msg) { document.getElementById('status').textContent = msg; }
 function showErr(msg)   { const el = document.getElementById('errMsg'); el.textContent = msg; el.style.display = 'block'; }
 function enc(s)         { return encodeURIComponent(s); }
+function fmtSecs(s) {
+  s = Math.round(s);
+  const m = Math.floor(s / 60), sec = s % 60;
+  return `${m}:${String(sec).padStart(2, '0')}`;
+}
 </script>
 </body>
 </html>
