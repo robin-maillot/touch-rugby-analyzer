@@ -57,6 +57,7 @@
     .btn-hdr-push     { background: var(--accent); color: #fff; border-color: var(--accent); }
     .btn-hdr-override { background: #7f1d1d; color: #fff; border-color: #7f1d1d; display: none; }
     .btn-live.active  { color: var(--red); border-color: var(--red); background: rgba(239,68,68,0.08); }
+    .btn-hdr-swap.active { color: var(--accent); border-color: var(--accent); }
 
     /* ── Settings panel ─────────────────────────────────────────── */
     #settingsPanel {
@@ -345,6 +346,7 @@
   <div class="header-actions">
     <a href="index.html" class="btn-icon">← Back</a>
     <button class="btn-icon btn-hdr-push" id="pushBtn"     onclick="pushToSheet()">⬆ Push</button>
+    <button class="btn-icon btn-hdr-swap" id="swapBtn"     onclick="toggleSwap()">⇆ Swap</button>
     <button class="btn-icon btn-hdr-override" id="overrideBtn" onclick="pushToSheet(true)">⚠ Override</button>
     <button class="btn-icon"              onclick="openStats()">Stats</button>
     <button class="btn-icon btn-live"     id="liveBtn"     onclick="toggleLive()">⚫ Live</button>
@@ -481,6 +483,33 @@ function fmt(s) {
 function fmtClock(s) {
   const m = Math.floor(s / 60), sec = Math.floor(s % 60);
   return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+}
+
+// ── Team swap ──────────────────────────────────────────────────
+let teamsSwapped = false;
+function toggleSwap() {
+  teamsSwapped = !teamsSwapped;
+
+  // Possession buttons
+  const poss = document.querySelector('.poss-toggle');
+  const btn1 = document.getElementById('possBtn1');
+  const btn2 = document.getElementById('possBtn2');
+  if (teamsSwapped) poss.appendChild(btn1);
+  else poss.insertBefore(btn1, btn2);
+
+  // Scoreboard (flex order; center div stays at default order:0)
+  const s1 = document.getElementById('scoreName1').closest('.score-team');
+  const s2 = document.getElementById('scoreName2').closest('.score-team');
+  s1.style.order = teamsSwapped ? '1' : '-1';
+  s2.style.order = teamsSwapped ? '-1' : '1';
+
+  // Stats hero (same technique)
+  const h1 = document.getElementById('heroName1').closest('.stats-hero-team');
+  const h2 = document.getElementById('heroName2').closest('.stats-hero-team');
+  h1.style.order = teamsSwapped ? '1' : '-1';
+  h2.style.order = teamsSwapped ? '-1' : '1';
+
+  document.getElementById('swapBtn').classList.toggle('active', teamsSwapped);
 }
 
 // ── Possession ─────────────────────────────────────────────────
@@ -760,29 +789,30 @@ function refreshStats() {
   }
   document.getElementById('statsStatus').innerHTML = statusHtml;
 
-  // Stat sections
+  // Stat sections — tL/tR respects the swap toggle
   // Each row: { label, n1, pct1, n2, pct2, r1, r2, hib }
   // hib: true = higher better, false = lower better, null = informational
+  const [tL, tR] = teamsSwapped ? [t2, t1] : [t1, t2];
   const sections = [
     {
       label: 'Scoring',
       rows: [
-        { label: 'Tries',        n1: t1.triesNum + ' / ' + t1.possessions, pct1: null, n2: t2.triesNum + ' / ' + t2.possessions, pct2: null, r1: t1.triesNum, r2: t2.triesNum, hib: true  },
-        { label: 'Completions',  n1: t1.compsNum + ' / ' + t1.possessions, pct1: t1.compsPct, n2: t2.compsNum + ' / ' + t2.possessions, pct2: t2.compsPct, r1: t1.compsNum, r2: t2.compsNum, hib: true  },
+        { label: 'Tries',        n1: tL.triesNum + ' / ' + tL.possessions, pct1: null, n2: tR.triesNum + ' / ' + tR.possessions, pct2: null, r1: tL.triesNum, r2: tR.triesNum, hib: true  },
+        { label: 'Completions',  n1: tL.compsNum + ' / ' + tL.possessions, pct1: tL.compsPct, n2: tR.compsNum + ' / ' + tR.possessions, pct2: tR.compsPct, r1: tL.compsNum, r2: tR.compsNum, hib: true  },
       ],
     },
     {
       label: 'Possession',
       rows: [
-        { label: 'Avg Time (s)', n1: t1.avgTime,     pct1: null, n2: t2.avgTime,     pct2: null, r1: t1.avgTimeRaw,   r2: t2.avgTimeRaw,   hib: null  },
-        { label: 'Total Time (s)',n1: t1.totalTime,  pct1: null, n2: t2.totalTime,   pct2: null, r1: t1.totalTimeRaw, r2: t2.totalTimeRaw, hib: null  },
+        { label: 'Avg Time (s)', n1: tL.avgTime,    pct1: null, n2: tR.avgTime,    pct2: null, r1: tL.avgTimeRaw,   r2: tR.avgTimeRaw,   hib: null  },
+        { label: 'Total Time (s)',n1: tL.totalTime,  pct1: null, n2: tR.totalTime,  pct2: null, r1: tL.totalTimeRaw, r2: tR.totalTimeRaw, hib: null  },
       ],
     },
     {
       label: 'Discipline',
       rows: [
-        { label: 'Pen Attack',   n1: t1.penAtk + '/' + t1.possessions, pct1: t1.penAtkPct, n2: t2.penAtk + '/' + t2.possessions, pct2: t2.penAtkPct, r1: t1.penAtk, r2: t2.penAtk, hib: false },
-        { label: 'Pen Defence',  n1: t1.penDef, pct1: t1.penDefPct, n2: t2.penDef, pct2: t2.penDefPct, r1: t1.penDef, r2: t2.penDef, hib: false },
+        { label: 'Pen Attack',   n1: tL.penAtk + '/' + tL.possessions, pct1: tL.penAtkPct, n2: tR.penAtk + '/' + tR.possessions, pct2: tR.penAtkPct, r1: tL.penAtk, r2: tR.penAtk, hib: false },
+        { label: 'Pen Defence',  n1: tL.penDef, pct1: tL.penDefPct, n2: tR.penDef, pct2: tR.penDefPct, r1: tL.penDef, r2: tR.penDef, hib: false },
       ],
     },
   ];
@@ -822,12 +852,12 @@ function refreshStats() {
           <div class="stat-cell">
             <div class="stat-num ${c1}">${n1}</div>
             ${pctStr1}
-            <div class="stat-team">${t1.name}</div>
+            <div class="stat-team">${tL.name}</div>
           </div>
           <div class="stat-cell">
             <div class="stat-num ${c2}">${n2}</div>
             ${pctStr2}
-            <div class="stat-team">${t2.name}</div>
+            <div class="stat-team">${tR.name}</div>
           </div>
         </div>
         <div class="stat-bar">
