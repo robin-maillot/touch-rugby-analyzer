@@ -466,6 +466,7 @@ function buildMetrics(possessions, teamNames, events) {
       _penDef: penDefence,
       'Pen Defence': penDefence,
       'Avg Time (s)': avg.toFixed(1), 'Total Time (s)': total.toFixed(1),
+      'Dead Ball (s)': g.reduce((s, p) => s + Math.max(0, (p.End - p.Start) - p.Duration_Sec), 0).toFixed(1),
     };
   });
 
@@ -655,7 +656,7 @@ async function renderStats(halfValue) {
     });
   }
 
-  const cols = ['Team', 'Possessions', 'Tries', 'Completions', 'Pen Attack', 'Pen Defence', 'Avg Time (s)', 'Total Time (s)'];
+  const cols = ['Team', 'Possessions', 'Tries', 'Completions', 'Pen Attack', 'Pen Defence', 'Avg Time (s)', 'Total Time (s)', 'Dead Ball (s)'];
   document.getElementById('metricsTable').innerHTML =
     `<table>
        <thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead>
