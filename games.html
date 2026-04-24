@@ -419,15 +419,28 @@ function buildPossessionData(events, teamNames, baseUrl) {
     Link:       makeYtUrl(baseUrl, g[g.length - 1]._raw),
   }));
 
+  // Pre-compute dead-ball intervals from Ball Live events
+  const allSorted = [...events].sort((a, b) => a.GameTime - b.GameTime);
+  const deadSlots = allSorted
+    .filter(e => e.Name === 'Ball Live')
+    .map(bl => {
+      const idx  = allSorted.indexOf(bl);
+      const prev = idx > 0 ? allSorted[idx - 1] : null;
+      return prev ? { start: prev.GameTime, end: bl.GameTime } : null;
+    })
+    .filter(Boolean);
+
   return raw.map((p, i) => {
     const start = i === 0 ? p.rawStart : (raw[i-1].endEvent === 'Game End' ? p.rawStart : raw[i-1].rawEnd);
+    const deadInSeg = deadSlots.filter(d => d.start >= start && d.end <= p.rawEnd);
+    const deadTime  = deadInSeg.reduce((s, d) => s + (d.end - d.start), 0);
     let cat;
     if      (p.endType  === 'Try')      cat = 'Try';
     else if (p.endType === 'Penalty' || p.endType === 'Penalty Attack' || p.endType === 'Penalty Defence') cat = 'Penalty';
     else if (p.endEvent === '6th Touch') cat = '6th Touch';
     else                                cat = 'Other';
     return { Team: p.Team, Start: start, End: p.rawEnd,
-             Duration_Sec: p.rawEnd - start, End_Type: p.endType,
+             Duration_Sec: Math.max(0, p.rawEnd - start - deadTime), End_Type: p.endType,
              End_Event: p.endEvent, Color_Category: cat, Link: p.Link };
   });
 }
