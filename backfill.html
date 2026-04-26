@@ -210,7 +210,9 @@ async function loadFirstTime(btn, sheetName) {
     if (!result.ok) throw new Error(result.error);
     const rows = result.rows;
     if (!rows || rows.length < 2) throw new Error('No events found');
-    const timeStr = rows[1][0];  // Time is column A
+    const timeIdx = rows[0].map(h => h.toLowerCase().trim()).indexOf('time');
+    if (timeIdx < 0) throw new Error('No Time column found in sheet');
+    const timeStr = rows[1][timeIdx];
     const input = card.querySelector('.first-time-input');
     input.value = timeStr;
     input.dataset.original = timeStr;
@@ -233,10 +235,15 @@ async function submit(btn, sheetName) {
   const newTimeStr  = firstTimeInput?.value.trim();
   const origTimeStr = firstTimeInput?.dataset.original;
   let offsetSeconds = 0;
+  if (newTimeStr && !origTimeStr) {
+    alert('Press "Load time" first so the current first-event time is known, then edit it to set the offset.');
+    return;
+  }
   if (newTimeStr && origTimeStr && newTimeStr !== origTimeStr) {
     const newSecs  = parseHMS(newTimeStr);
     const origSecs = parseHMS(origTimeStr);
-    if (!isNaN(newSecs) && !isNaN(origSecs)) offsetSeconds = newSecs - origSecs;
+    if (isNaN(newSecs)) { alert(`Invalid time format "${newTimeStr}" — use h:mm:ss or m:ss.`); return; }
+    offsetSeconds = newSecs - origSecs;
   }
 
   btn.disabled    = true;

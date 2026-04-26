@@ -20,6 +20,33 @@ The password is stored in `sessionStorage` and used as the API secret for all ca
 
 ---
 
+## Development
+
+No build step. Open pages directly in a browser, or use a local HTTP server (required now that shared JS lives in `js/`):
+
+```bash
+python3 -m http.server
+# → http://localhost:8000
+```
+
+Any equivalent works: `npx serve .`, `php -S localhost:8000`, etc.
+
+**Unit tests** (pure JS utilities, no browser needed):
+
+```bash
+node test.js
+```
+
+**Browser tests** (same assertions via QUnit, with the server running):
+
+```
+http://localhost:8000/tests.html
+```
+
+Tests also run automatically in CI and must pass before each deployment.
+
+---
+
 ## Pages
 
 ### Game Analysis (`games.html`)
