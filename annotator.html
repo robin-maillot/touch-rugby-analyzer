@@ -884,7 +884,13 @@ function recomputeOwnersFrom(startTime) {
   for (let i = 0; i < annotations.length; i++) {
     const ann = annotations[i];
     if (ann.time < startTime) continue;
-    if (ann.type === 'Game Event' || ann.type === 'To Review') continue;
+    if (ann.type === 'To Review') continue;
+    // Game Event rows keep their explicit possessionOwner (set at tag time) —
+    // only recompute non-Game-Event rows that derive possession from prior events.
+    if (ann.type === 'Game Event') {
+      ann.actionOwner = TR.inferActionOwner(ann.possessionOwner, ann.type, ann.name);
+      continue;
+    }
     let inferred = '';
     for (let j = i - 1; j >= 0; j--) {
       const prev = annotations[j];
