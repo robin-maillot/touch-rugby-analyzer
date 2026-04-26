@@ -82,7 +82,15 @@
       display: flex;
       align-items: center;
       gap: 8px;
-      margin-bottom: 20px;
+      margin-bottom: 4px;
+    }
+    .card-meta {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .live-badge {
       font-size: 0.65rem;
@@ -191,12 +199,22 @@ function renderCard(g, isLive) {
   const badge = isLive
     ? `<span class="live-badge">LIVE</span>`
     : `<span class="ended-badge">FT</span>`;
+  const metaLine = (() => {
+    const parts = (g.name || '').split('_');
+    if (parts.length < 3) return '';
+    const year        = parts[0];
+    const division    = parts[1];
+    const competition = parts.slice(2, parts.length - 2).join(' ');
+    const labels = [competition, year, division].filter(Boolean);
+    return labels.length ? `<div class="card-meta">${labels.join(' · ')}</div>` : '';
+  })();
   return `
   <div class="card" onclick="this.querySelector('.stats-panel').classList.toggle('open')">
     <div class="card-header">
       ${badge}
       <span class="game-time">${fmtTime(g.timeSeconds)}</span>
     </div>
+    ${metaLine}
     <div class="scoreboard">
       <div class="team">
         <div class="team-name">${g.team1 || 'Team 1'}</div>
