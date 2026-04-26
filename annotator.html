@@ -327,6 +327,10 @@
   <div class="list-section">
     <div class="list-header">
       <h2>Annotations (<span id="annCount">0</span>)</h2>
+      <label class="full-game-toggle" style="font-size:0.72rem;padding:4px 8px;border-color:#2a2d3a">
+        <input type="checkbox" id="hideBallLiveToggle">
+        Hide Ball Live
+      </label>
       <button class="btn btn-danger" onclick="clearAll()" style="font-size:0.72rem;padding:3px 9px">Clear All</button>
     </div>
     <div class="annotations-list" id="annList">
@@ -401,6 +405,7 @@ async function fetchGameList() {
 }
 window.addEventListener('DOMContentLoaded', () => {
   fetchGameList();
+  document.getElementById('hideBallLiveToggle').addEventListener('change', renderList);
   const list = document.getElementById('annList');
   const btn  = document.getElementById('scrollBottomBtn');
   function updateScrollBtn() {
@@ -833,10 +838,14 @@ function displayTeam(v) {
 
 function renderList() {
   const el = document.getElementById('annList');
-  document.getElementById('annCount').textContent = annotations.length;
+  const hideBallLive = document.getElementById('hideBallLiveToggle')?.checked;
+  const visible = hideBallLive ? annotations.filter(a => !(a.type === 'Game Event' && a.name === 'Ball Live')) : annotations;
+  document.getElementById('annCount').textContent = hideBallLive && visible.length !== annotations.length
+    ? `${visible.length} / ${annotations.length}`
+    : annotations.length;
   if (annotations.length === 0) { el.innerHTML = '<div class="empty-state">No annotations yet</div>'; return; }
   setTimeout(() => window._updateScrollBtn && window._updateScrollBtn(), 0);
-  el.innerHTML = annotations.map(a => {
+  el.innerHTML = visible.map(a => {
     const yt = ytLink(a.time);
     const ytCell = yt ? `<a href="${yt}" target="_blank" title="Open YouTube -5s">▶ YT</a>` : '<span style="color:#333">—</span>';
     const commentTitle = (a.comment || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/\n/g,'&#10;');
