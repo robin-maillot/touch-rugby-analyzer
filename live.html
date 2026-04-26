@@ -167,6 +167,25 @@ function fmtTime(seconds) {
   return `${m}:${String(s % 60).padStart(2,'0')}`;
 }
 
+function tryTimeline(g) {
+  if (!g.tries || !g.tries.length) return '';
+  let s1 = 0, s2 = 0;
+  const rows = g.tries.map(t => {
+    const isT1 = t.scorer === 'Team 1';
+    if (isT1) s1++; else s2++;
+    const name = isT1 ? (g.team1 || 'Team 1') : (g.team2 || 'Team 2');
+    return `<div style="display:flex;align-items:center;font-size:0.78rem;padding:3px 0">
+      <span style="color:var(--text-muted);font-variant-numeric:tabular-nums;min-width:44px">${fmtTime(t.time)}</span>
+      <span style="flex:1">${name}</span>
+      <span style="font-variant-numeric:tabular-nums;font-weight:600">${s1}–${s2}</span>
+    </div>`;
+  }).join('');
+  return `<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
+    <div style="font-size:0.65rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px">Try Log</div>
+    ${rows}
+  </div>`;
+}
+
 function renderCard(g, isLive) {
   const fmt = (n, d) => d > 0 ? `${n}/${d}` : '–';
   const badge = isLive
@@ -200,6 +219,7 @@ function renderCard(g, isLive) {
         <div class="stats-val">${fmt(g.comps1, g.poss1)}</div>
         <div class="stats-val">${fmt(g.comps2, g.poss2)}</div>
       </div>
+      ${tryTimeline(g)}
     </div>
   </div>`;
 }

@@ -87,6 +87,7 @@ function doGet(e) {
       const po1i = col('poss 1'),  po2i = col('poss 2');
       const cm1i = col('comps 1'), cm2i = col('comps 2');
       const fini = col('finished');
+      const trji = col('tries json');
       const games = values.slice(1)
         .map(row => ({
           name:        row[ni]  || '',
@@ -101,6 +102,7 @@ function doGet(e) {
           comps1:      cm1i >= 0 ? Number(row[cm1i]) : 0,
           comps2:      cm2i >= 0 ? Number(row[cm2i]) : 0,
           finished:    fini >= 0 ? row[fini] === 'true' : false,
+          tries:       trji >= 0 && row[trji] ? (() => { try { return JSON.parse(row[trji]); } catch(e) { return []; } })() : [],
         }))
         .filter(g => g.name);
       return json({ ok: true, games });
@@ -203,7 +205,7 @@ function doPost(e) {
 
     // action=live_update → upsert a row in _live
     if (data.action === 'live_update') {
-      writeLiveRow(data.sheetName, data.team1, data.team2, data.score1, data.score2, data.timeSeconds, data.poss1, data.poss2, data.comps1, data.comps2);
+      writeLiveRow(data.sheetName, data.team1, data.team2, data.score1, data.score2, data.timeSeconds, data.poss1, data.poss2, data.comps1, data.comps2, data.triesJson);
       return json({ ok: true });
     }
 
@@ -350,9 +352,9 @@ function backfillMetadata() {
 }
 
 // ── Live game state helpers ─────────────────────────────────────
-const LIVE_HEADERS = ['Sheet Name', 'Team 1', 'Team 2', 'Score 1', 'Score 2', 'Time Seconds', 'Updated At', 'Poss 1', 'Poss 2', 'Comps 1', 'Comps 2', 'Finished'];
+const LIVE_HEADERS = ['Sheet Name', 'Team 1', 'Team 2', 'Score 1', 'Score 2', 'Time Seconds', 'Updated At', 'Poss 1', 'Poss 2', 'Comps 1', 'Comps 2', 'Finished', 'Tries JSON'];
 
-function writeLiveRow(sheetName, team1, team2, score1, score2, timeSeconds, poss1, poss2, comps1, comps2) {
+function writeLiveRow(sheetName, team1, team2, score1, score2, timeSeconds, poss1, poss2, comps1, comps2, triesJson) {
   const ss = SpreadsheetApp.openById(SHEET_ID);
   let sheet = ss.getSheetByName(LIVE_SHEET);
 
@@ -378,7 +380,7 @@ function writeLiveRow(sheetName, team1, team2, score1, score2, timeSeconds, poss
   }
 
   const nowStr = new Date().toISOString();
-  const newRow = [sheetName, team1 || '', team2 || '', score1 || 0, score2 || 0, timeSeconds || 0, nowStr, poss1 || 0, poss2 || 0, comps1 || 0, comps2 || 0, ''];
+  const newRow = [sheetName, team1 || '', team2 || '', score1 || 0, score2 || 0, timeSeconds || 0, nowStr, poss1 || 0, poss2 || 0, comps1 || 0, comps2 || 0, '', triesJson || '[]'];
   const values = sheet.getDataRange().getValues();
 
   for (let i = 1; i < values.length; i++) {

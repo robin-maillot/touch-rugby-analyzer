@@ -338,6 +338,34 @@
       flex-shrink: 0;
     }
     .stats-close-btn:active { background: var(--border); }
+
+    /* ── Edit event modal ───────────────────────────────────────── */
+    #editOverlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      z-index: 100;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    #editOverlay.open { display: flex; }
+    #editCard {
+      background: var(--surface);
+      border-radius: 20px 20px 0 0;
+      width: 100%;
+      max-height: 90dvh;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    @media (min-width: 600px) {
+      #editOverlay { align-items: center; padding: 24px; }
+      #editCard { border-radius: 16px; max-width: 520px; }
+    }
+    .recent-item { cursor: pointer; }
+    .recent-item:active { background: var(--surface-2); }
   </style>
 </head>
 <body>
@@ -435,6 +463,32 @@
   </div>
 
 </main>
+
+<!-- Edit event modal -->
+<div id="editOverlay" onclick="if(event.target===this)closeEdit()">
+  <div id="editCard">
+    <div class="stats-handle"></div>
+    <div style="padding:16px 20px 12px;border-bottom:1px solid var(--border)">
+      <div style="font-size:0.7rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Change Event</div>
+      <div id="editCurrentLabel" style="font-size:1rem;font-weight:600"></div>
+    </div>
+    <div style="padding:16px">
+      <div class="event-grid two-col">
+        <button class="evt-btn btn-try1"    onclick="applyEdit('Try','Other')">Try</button>
+        <button class="evt-btn btn-turn"    onclick="applyEdit('Turnover','Other')">Turnover</button>
+        <button class="evt-btn btn-pen-atk" onclick="applyEdit('Penalty Attack','Other')">Pen Attack</button>
+        <button class="evt-btn btn-turn"    onclick="applyEdit('Turnover','6th Touch')">6th Touch</button>
+        <button class="evt-btn btn-pen-def" onclick="applyEdit('Penalty Defence','Other')">Pen Defence</button>
+        <button class="evt-btn btn-turn"    style="opacity:0.65" onclick="applyEdit('Turnover','6 Again')">6 Again</button>
+        <button class="evt-btn btn-game"    onclick="applyEdit('Game Event','Ball Live')">Ball Live</button>
+        <button class="evt-btn btn-review"  onclick="applyEdit('To Review','To Review')">To Review</button>
+        <button class="evt-btn btn-game"    onclick="applyEdit('Game Event','Game Start')">Game Start</button>
+        <button class="evt-btn btn-game"    onclick="applyEdit('Game Event','Game End')">Game End</button>
+      </div>
+    </div>
+    <button class="stats-close-btn" onclick="closeEdit()">Cancel</button>
+  </div>
+</div>
 
 <!-- Stats modal -->
 <div id="statsOverlay" onclick="if(event.target===this)closeStats()">
@@ -570,7 +624,51 @@ function tagToReview() {
 
 function undoLast() {
   if (!annotations.length) return;
-  annotations.pop();
+  const removed = annotations.pop();
+  setPossession(removed.possessionOwner);
+  updateUI();
+}
+
+// ── Edit event ─────────────────────────────────────────────────
+let editingIndex = null;
+
+function computePossAfter(a) {
+  if (a.type === 'Try') return otherTeam(a.possessionOwner);
+  if (a.type === 'Turnover' && a.name !== '6 Again') return otherTeam(a.possessionOwner);
+  if (a.type === 'Penalty Attack') return otherTeam(a.possessionOwner);
+  return a.possessionOwner;
+}
+
+function replayPossessionFrom(startIndex) {
+  for (let i = startIndex; i < annotations.length; i++) {
+    const newPoss = computePossAfter(annotations[i - 1]);
+    annotations[i].possessionOwner = newPoss;
+    annotations[i].actionOwner = inferActionOwner(annotations[i].type, newPoss);
+  }
+  const last = annotations[annotations.length - 1];
+  setPossession(last ? computePossAfter(last) : 'Team 1');
+}
+
+function openEdit(index) {
+  editingIndex = index;
+  const a = annotations[index];
+  document.getElementById('editCurrentLabel').textContent = eventLabel(a) + ' · ' + fmtClock(a.time);
+  document.getElementById('editOverlay').classList.add('open');
+}
+
+function closeEdit() {
+  editingIndex = null;
+  document.getElementById('editOverlay').classList.remove('open');
+}
+
+function applyEdit(type, name) {
+  if (editingIndex === null) return;
+  const a = annotations[editingIndex];
+  a.type = type;
+  a.name = name;
+  a.actionOwner = inferActionOwner(type, a.possessionOwner);
+  replayPossessionFrom(editingIndex + 1);
+  closeEdit();
   updateUI();
 }
 
@@ -611,15 +709,17 @@ function updateUI() {
     return;
   }
   const recent = [...annotations].reverse().slice(0, 5);
-  el.innerHTML = recent.map(a => {
+  el.innerHTML = recent.map((a, ri) => {
+    const idx     = annotations.length - 1 - ri;
     const color   = COLORS[a.type] || '#888';
     const team    = a.actionOwner === 'Team 1' ? (document.getElementById('metaTeam1').value.trim() || 'Team 1')
                                                 : (document.getElementById('metaTeam2').value.trim() || 'Team 2');
     const teamStr = a.type !== 'Game Event' ? ` · ${team}` : '';
-    return `<div class="recent-item">
+    return `<div class="recent-item" onclick="openEdit(${idx})">
       <div class="recent-dot" style="background:${color}"></div>
       <span class="recent-time">${fmtClock(a.time)}</span>
       <span class="recent-text">${eventLabel(a)}${teamStr}</span>
+      <span style="color:var(--border);font-size:0.9rem;flex-shrink:0">›</span>
     </div>`;
   }).join('');
 }
@@ -711,10 +811,13 @@ function pushLiveUpdate() {
   const gameStartWall = gameStart ? wallStart + gameStart.time * 1000 : (wallStart || Date.now());
   const timeSeconds   = Math.max(0, (Date.now() - gameStartWall) / 1000);
   const { t1, t2 } = computeStats();
+  const tries = annotations
+    .filter(a => a.type === 'Try')
+    .map(a => ({ scorer: a.actionOwner, time: Math.floor(a.time) }));
   fetch(APPS_SCRIPT_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify({ secret: APPS_SCRIPT_SECRET, action: 'live_update', sheetName, team1, team2, score1, score2, timeSeconds, poss1: t1.possessions, poss2: t2.possessions, comps1: t1.compsNum, comps2: t2.compsNum }),
+    body: JSON.stringify({ secret: APPS_SCRIPT_SECRET, action: 'live_update', sheetName, team1, team2, score1, score2, timeSeconds, poss1: t1.possessions, poss2: t2.possessions, comps1: t1.compsNum, comps2: t2.compsNum, triesJson: JSON.stringify(tries) }),
   }).catch(() => {});
 }
 
