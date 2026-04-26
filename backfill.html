@@ -127,6 +127,8 @@
       display: none;
     }
   </style>
+<script src="js/config.js"></script>
+<script src="js/utils.js"></script>
 </head>
 <body>
 
@@ -144,12 +146,7 @@
 </main>
 
 <script>
-// ── Access gate (admin only) ───────────────────────────────────
-if (sessionStorage.getItem('password') !== 'm30-admin') window.location.replace('index.html');
-
-const APPS_SCRIPT_URL    = 'https://script.google.com/macros/s/AKfycbzhMw4nQr2nVW0MLfPWVXRPXsvImerpzshQ5GnJ3873qQkGMz0bcJQdmTRXCxwygfFm/exec';
-const APPS_SCRIPT_SECRET = 'm30-admin';
-
+TR.auth('admin');
 
 function gameLabel(g) {
   if (g.team1 && g.team2) {
@@ -208,7 +205,7 @@ async function loadFirstTime(btn, sheetName) {
   btn.textContent = '⏳';
   const card = document.getElementById('card-' + sheetName);
   try {
-    const resp   = await fetch(`${APPS_SCRIPT_URL}?secret=${encodeURIComponent(APPS_SCRIPT_SECRET)}&sheetName=${encodeURIComponent(sheetName)}`);
+    const resp   = await fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&sheetName=${TR.enc(sheetName)}`);
     const result = await resp.json();
     if (!result.ok) throw new Error(result.error);
     const rows = result.rows;
@@ -246,10 +243,10 @@ async function submit(btn, sheetName) {
   btn.textContent = '⏳ Saving…';
 
   try {
-    const resp   = await fetch(APPS_SCRIPT_URL, {
+    const resp   = await fetch(TR.APPS_SCRIPT_URL, {
       method:  'POST',
       headers: { 'Content-Type': 'text/plain' },
-      body:    JSON.stringify({ secret: APPS_SCRIPT_SECRET, action: 'backfill_youtube', sheetName, youtubeUrl: url, offsetSeconds }),
+      body:    JSON.stringify({ secret: TR.secret(), action: 'backfill_youtube', sheetName, youtubeUrl: url, offsetSeconds }),
     });
     const result = await resp.json();
     if (!result.ok) throw new Error(result.error);
@@ -276,7 +273,7 @@ async function submit(btn, sheetName) {
 
 async function load() {
   try {
-    const resp   = await fetch(`${APPS_SCRIPT_URL}?secret=${encodeURIComponent(APPS_SCRIPT_SECRET)}&action=list`);
+    const resp   = await fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&action=list`);
     const result = await resp.json();
     if (!result.ok) throw new Error(result.error);
 

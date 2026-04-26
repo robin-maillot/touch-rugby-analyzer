@@ -178,6 +178,10 @@
     .scroll-bottom-btn { display: none !important; }
   }
 </style>
+<script src="js/config.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/events.js"></script>
+<script src="js/possession.js"></script>
 </head>
 <body>
 
@@ -356,8 +360,7 @@
 </div>
 
 <script>
-// ── Access gate ────────────────────────────────────────────────
-{ const p = sessionStorage.getItem('password'); if (p !== 'm30-staff' && p !== 'm30-admin') window.location.replace('index.html'); }
+TR.auth('staff');
 
 // ── Status bar helper ──────────────────────────────────────────
 function setStatus(msg, isError = false) {
@@ -373,10 +376,6 @@ function setStatus(msg, isError = false) {
   el.textContent = msg;
   if (msg) setTimeout(() => { el.style.opacity = '0'; }, 3000);
 }
-// ── Apps Script config ─────────────────────────────────────────
-// Set these after deploying apps_script/Code.gs as a Web App
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzhMw4nQr2nVW0MLfPWVXRPXsvImerpzshQ5GnJ3873qQkGMz0bcJQdmTRXCxwygfFm/exec';
-const APPS_SCRIPT_SECRET = sessionStorage.getItem('password') || '';
 
 const COLORS = { 'Try':'#22c55e', 'Turnover':'#f97316', 'Penalty Attack':'#ef4444', 'Penalty Defence':'#b91c1c', 'Penalty':'#ef4444', 'Game Event':'#3b82f6', 'To Review':'#a855f7' };
 
@@ -384,7 +383,7 @@ const COLORS = { 'Try':'#22c55e', 'Turnover':'#f97316', 'Penalty Attack':'#ef444
 async function fetchGameList() {
   const sel = document.getElementById('sheetSelect');
   try {
-    const resp   = await fetch(`${APPS_SCRIPT_URL}?secret=${encodeURIComponent(APPS_SCRIPT_SECRET)}&action=list`);
+    const resp   = await fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&action=list`);
     const result = await resp.json();
     if (!result.ok) throw new Error(result.error);
     sel.innerHTML = '<option value="">— Select a game —</option>';
@@ -417,14 +416,6 @@ window.addEventListener('DOMContentLoaded', () => {
   window._updateScrollBtn = updateScrollBtn;
 });
 
-const MENU = {
-  "Penalty Attack":  ["Forward Pass","Touch and Pass","Off the Mark","Not Moving Forward","Delay of Play","Hard Touch","Other"],
-  "Penalty Defence": ["Offside","Hard Touch","In the Ruck","Not Moving Forward","Other"],
-  "Turnover":   ["Ball Down","6th Touch","Dummy Touch","Bad Roll","6 Again","Interception","Other"],
-  "Game Event": ["Game Start","Game End"],
-  "Try":        ["Scoop","Other","32 - Long","33 Quicky","33","32 Cut","French Flair"],
-  "To Review":  []
-};
 const DEFAULT_OTHER_TYPES = new Set(["Try","Turnover","Penalty Attack","Penalty Defence"]);
 
 let annotations = [];
@@ -452,7 +443,7 @@ function setRate(r)    { if (videoMode === 'youtube') { if (ytPlayer) ytPlayer.s
 
 function onVideoReady() {
   videoLoaded = true;
-  document.getElementById('timeDuration').textContent = fmt(getDuration());
+  document.getElementById('timeDuration').textContent = TR.fmt(getDuration());
   ['playBtn','skipBk','skipFw','speedSel'].forEach(id => document.getElementById(id).removeAttribute('disabled'));
   renderMarkers();
 }
@@ -612,11 +603,6 @@ function createYTPlayer(videoId) {
 }
 
 // ── Playback ───────────────────────────────────────────────────
-function fmt(s) {
-  if (!s || isNaN(s)) return '0:00:00';
-  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = Math.floor(s%60);
-  return `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
-}
 function togglePlay() {
   if (!videoLoaded) return;
   if (isPaused()) doPlay(); else doPause();
@@ -628,7 +614,7 @@ function updateProgress() {
   const pct = dur ? (cur / dur * 100) : 0;
   document.getElementById('seekFill').style.width = pct + '%';
   document.getElementById('seekThumb').style.left = pct + '%';
-  document.getElementById('timeCurrent').textContent = fmt(cur);
+  document.getElementById('timeCurrent').textContent = TR.fmt(cur);
 }
 function gotoLastAnnotation() {
   if (!videoLoaded || annotations.length === 0) return;
@@ -660,22 +646,6 @@ function showTeamMenu() { document.getElementById('teamMenu').style.display = 'f
 function hideTeamMenu() { document.getElementById('teamMenu').style.display = 'none'; }
 function selectTeam(team) { if (pendingType !== null) tag(pendingType, pendingName, team, pendingComment || ''); }
 
-function isJsTurnover(type, name) {
-  if (type === 'Try') return true;
-  if (type === 'Penalty Attack') return true;
-  if (type === 'Penalty Defence') return false;
-  if (type === 'Turnover' && name !== '6 Again') return true;
-  return false;
-}
-
-function inferActionOwner(possessionOwner, type, name) {
-  if (type === 'Penalty Defence')
-    return possessionOwner === 'Team 1' ? 'Team 2' : 'Team 1';
-  if (type === 'Turnover' && !isJsTurnover(type, name))
-    return possessionOwner === 'Team 1' ? 'Team 2' : 'Team 1';
-  return possessionOwner;
-}
-
 function inferPossessionOwner() {
   // Walk back through annotations strictly before the current video time
   // (annotations are sorted by time, so this correctly handles mid-game insertions).
@@ -685,10 +655,7 @@ function inferPossessionOwner() {
     if (ann.time >= now) continue;
     if (ann.type === 'To Review') continue;
     if (!ann.possessionOwner) continue;
-    const wasTurnover = isJsTurnover(ann.type, ann.name);
-    return wasTurnover
-      ? (ann.possessionOwner === 'Team 1' ? 'Team 2' : 'Team 1')
-      : ann.possessionOwner;
+    return TR.inferPossessionAfter(ann.possessionOwner, ann.type, ann.name);
   }
   return '';
 }
@@ -737,7 +704,7 @@ function selectType(type) {
     return;
   }
   renderSubmenu(type);
-  if (type !== 'To Review' && MENU[type].length === 0) {
+  if (type !== 'To Review' && TR.MENU[type].length === 0) {
     if (needsTeamSelection(type)) { pendingType = type; pendingName = ''; showTeamMenu(); }
     else tag(type, '', '');
   }
@@ -757,7 +724,7 @@ function renderSubmenu(type) {
     setTimeout(() => document.getElementById('freeTextInput')?.focus(), 0);
     return;
   }
-  const opts = MENU[type];
+  const opts = TR.MENU[type];
   if (!opts || opts.length === 0) {
     el.innerHTML = `<span class="submenu-empty" style="color:#666">Tagging <strong style="color:${COLORS[type]}">${type}</strong> — no sub-type needed</span>`;
     return;
@@ -793,8 +760,8 @@ function selectSubType(type, name, comment = '') {
 function tag(type, name, possessionOwner, comment = '') {
   if (!videoLoaded) return;
   const t = getTime();
-  const actionOwner = inferActionOwner(possessionOwner, type, name);
-  annotations.push({ id: Date.now() + Math.random(), type, name, possessionOwner, actionOwner, comment, time: t, timeStr: fmt(t) });
+  const actionOwner = TR.inferActionOwner(possessionOwner, type, name);
+  annotations.push({ id: Date.now() + Math.random(), type, name, possessionOwner, actionOwner, comment, time: t, timeStr: TR.fmt(t) });
   annotations.sort((a,b) => a.time - b.time);
   recomputeOwnersFrom(t);
   renderList();
@@ -853,7 +820,7 @@ function renderList() {
     return `<div class="annotation-row" style="border-color:${COLORS[a.type]}" onclick="seekTo(${a.time})">
       <span class="ann-time">${a.timeStr}</span>
       <span class="ann-type" style="color:${COLORS[a.type]}">${a.type}</span>
-      <span class="ann-name${MENU[a.type] && MENU[a.type].length ? ' ann-name-editable' : ''}" id="ann-name-${a.id}" onclick="event.stopPropagation();editAnnotationName(${a.id})" title="${MENU[a.type] && MENU[a.type].length ? 'Click to change' : ''}">${a.name || '—'}</span>
+      <span class="ann-name${TR.MENU[a.type] && TR.MENU[a.type].length ? ' ann-name-editable' : ''}" id="ann-name-${a.id}" onclick="event.stopPropagation();editAnnotationName(${a.id})" title="${TR.MENU[a.type] && TR.MENU[a.type].length ? 'Click to change' : ''}">${a.name || '—'}</span>
       <span class="ann-possession">${displayTeam(a.possessionOwner)}</span>
       <span class="ann-comment" title="${commentTitle}">${commentDisplay || ''}</span>
       <span class="ann-yt">${ytCell}</span>
@@ -880,7 +847,7 @@ function seekTo(t) { if (videoLoaded) setCurrentTime(t); }
 function editAnnotationName(id) {
   const ann = annotations.find(a => a.id === id);
   if (!ann) return;
-  const opts = MENU[ann.type];
+  const opts = TR.MENU[ann.type];
   if (!opts || opts.length === 0) return;
 
   const span = document.getElementById(`ann-name-${id}`);
@@ -898,7 +865,7 @@ function editAnnotationName(id) {
 
   const commit = () => {
     ann.name = sel.value;
-    ann.actionOwner = inferActionOwner(ann.possessionOwner, ann.type, ann.name);
+    ann.actionOwner = TR.inferActionOwner(ann.possessionOwner, ann.type, ann.name);
     recomputeOwnersFrom(ann.time);
     renderList();
     renderMarkers();
@@ -922,13 +889,11 @@ function recomputeOwnersFrom(startTime) {
     for (let j = i - 1; j >= 0; j--) {
       const prev = annotations[j];
       if (prev.type === 'To Review' || !prev.possessionOwner) continue;
-      inferred = isJsTurnover(prev.type, prev.name)
-        ? (prev.possessionOwner === 'Team 1' ? 'Team 2' : 'Team 1')
-        : prev.possessionOwner;
+      inferred = TR.inferPossessionAfter(prev.possessionOwner, prev.type, prev.name);
       break;
     }
     ann.possessionOwner = inferred;
-    ann.actionOwner = inferActionOwner(inferred, ann.type, ann.name);
+    ann.actionOwner = TR.inferActionOwner(inferred, ann.type, ann.name);
   }
 }
 
@@ -953,14 +918,14 @@ function clearAll() {
 async function loadFromSheet() {
   const sheetName = document.getElementById('sheetSelect').value;
   if (!sheetName) { alert('Select a game first.'); return; }
-  if (APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_URL_HERE') { alert('APPS_SCRIPT_URL is not configured in annotator.html.'); return; }
+
 
   const btn = document.getElementById('loadSheetBtn');
   btn.disabled = true;
   btn.textContent = '⏳ Loading…';
 
   try {
-    const url = `${APPS_SCRIPT_URL}?secret=${encodeURIComponent(APPS_SCRIPT_SECRET)}&sheetName=${encodeURIComponent(sheetName)}`;
+    const url = `${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&sheetName=${TR.enc(sheetName)}`;
     const resp = await fetch(url);
     const result = await resp.json();
 
@@ -979,7 +944,7 @@ async function loadFromSheet() {
       const time    = parts.length === 3 ? parts[0]*3600 + parts[1]*60 + parts[2] : 0;
       const possessionOwner = possIdx >= 0 ? (r[possIdx] || '') : '';
       const type = r[typeIdx], name = r[nameIdx] || '';
-      const actionOwner = actionOwnerIdx >= 0 && r[actionOwnerIdx] ? r[actionOwnerIdx] : inferActionOwner(possessionOwner, type, name);
+      const actionOwner = actionOwnerIdx >= 0 && r[actionOwnerIdx] ? r[actionOwnerIdx] : TR.inferActionOwner(possessionOwner, type, name);
       return { id: Date.now() + Math.random(), type, name, possessionOwner, actionOwner,
                comment: commentIdx >= 0 ? (r[commentIdx] || '') : '',
                time, timeStr };
@@ -1065,10 +1030,10 @@ function stopLive() {
   if (btn) { btn.textContent = '⚫ Go Live'; btn.style.color = ''; }
   const sheetName = metaToSheetName();
   if (sheetName) {
-    fetch(APPS_SCRIPT_URL, {
+    fetch(TR.APPS_SCRIPT_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ secret: APPS_SCRIPT_SECRET, action: 'live_clear', sheetName }),
+      body: JSON.stringify({ secret: TR.secret(), action: 'live_clear', sheetName }),
     }).catch(() => {});
   }
 }
@@ -1083,10 +1048,10 @@ async function pushLiveUpdate() {
   const last   = annotations.length ? annotations[annotations.length - 1].time : 0;
   const gameStart = annotations.find(a => a.name === 'Game Start');
   const timeSeconds = gameStart ? Math.max(0, last - gameStart.time) : last;
-  fetch(APPS_SCRIPT_URL, {
+  fetch(TR.APPS_SCRIPT_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify({ secret: APPS_SCRIPT_SECRET, action: 'live_update', sheetName, team1, team2, score1, score2, timeSeconds }),
+    body: JSON.stringify({ secret: TR.secret(), action: 'live_update', sheetName, team1, team2, score1, score2, timeSeconds }),
   }).catch(() => {});
 }
 
@@ -1094,7 +1059,7 @@ async function pushToSheet(override = false) {
   if (annotations.length === 0) { alert('No annotations to push.'); return; }
   const sheetName = metaToSheetName();
   if (!sheetName) { alert('Fill in the metadata fields — the sheet tab name is derived from them.'); return; }
-  if (APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_URL_HERE') { alert('APPS_SCRIPT_URL is not configured in annotator.html.'); return; }
+
 
   const btn = override ? document.getElementById('overrideBtn') : document.getElementById('pushBtn');
   btn.disabled = true;
@@ -1118,7 +1083,7 @@ async function pushToSheet(override = false) {
     const names = annotations.map(a => a.name || '');
     const analyzable = names.includes('Game Start') && names.includes('Game End') ? 'TRUE' : 'FALSE';
     const body = {
-      secret: APPS_SCRIPT_SECRET, sheetName, rows,
+      secret: TR.secret(), sheetName, rows,
       meta: {
         team1:       document.getElementById('metaTeam1').value.trim(),
         team2:       document.getElementById('metaTeam2').value.trim(),
@@ -1132,7 +1097,7 @@ async function pushToSheet(override = false) {
     };
     if (override) body.override = true;
 
-    const resp = await fetch(APPS_SCRIPT_URL, {
+    const resp = await fetch(TR.APPS_SCRIPT_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify(body)
@@ -1141,7 +1106,7 @@ async function pushToSheet(override = false) {
 
     if (!result.ok) {
       if (result.tabExists && !override) {
-        if (APPS_SCRIPT_SECRET === 'm30-admin') {
+        if (TR.secret() === 'm30-admin') {
           document.getElementById('overrideBtn').style.display = '';
           alert(`Tab "${sheetName}" already exists. Click ⚠ Override Tab to replace it.`);
         } else {
@@ -1180,7 +1145,7 @@ function exportCSV() {
       const toReview = a.type === 'To Review' ? 'Yes' : '';
       const outType = a.type;
       const cols = [a.timeStr, outType, a.name, a.possessionOwner || ''];
-      if (fullGame) cols.push(isJsTurnover(a.type, a.name) ? 'Yes' : '');
+      if (fullGame) cols.push(TR.isTurnover(a.type, a.name) ? 'Yes' : '');
       cols.push(toReview, a.comment || '', a.actionOwner || '');
       return cols.join(',');
     })
@@ -1211,7 +1176,7 @@ function loadCSV(e) {
       const timeStr = parts[timeIdx]?.trim(), type = parts[typeIdx]?.trim(), name = parts[nameIdx]?.trim() || '';
       const possessionOwner = possessionIdx >= 0 && parts[possessionIdx] ? parts[possessionIdx].trim() : '';
       const comment = commentIdx >= 0 && parts[commentIdx] ? parts[commentIdx].trim() : '';
-      const actionOwner = actionOwnerIdx >= 0 && parts[actionOwnerIdx] ? parts[actionOwnerIdx].trim() : inferActionOwner(possessionOwner, type, name);
+      const actionOwner = actionOwnerIdx >= 0 && parts[actionOwnerIdx] ? parts[actionOwnerIdx].trim() : TR.inferActionOwner(possessionOwner, type, name);
       if (!timeStr || !COLORS[type]) continue;
       const cleanTime = timeStr.includes(' ') ? timeStr.split(' ')[1] : timeStr;
       const tp = cleanTime.split(':').map(Number);
@@ -1289,7 +1254,7 @@ document.addEventListener('keydown', e => {
   }
   // Sub-type by number
   if (selectedType && /^[1-9]$/.test(e.key)) {
-    const opts = MENU[selectedType];
+    const opts = TR.MENU[selectedType];
     const idx = parseInt(e.key) - 1;
     if (idx < opts.length) { e.preventDefault(); selectSubType(selectedType, opts[idx]); }
   }

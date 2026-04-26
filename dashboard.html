@@ -175,6 +175,8 @@
       .h2h-header-row, .h2h-data-row, .h2h-bar-row { grid-template-columns: 1fr 120px 1fr; }
     }
   </style>
+<script src="js/config.js"></script>
+<script src="js/utils.js"></script>
 </head>
 <body>
 
@@ -315,9 +317,6 @@
 </main>
 
 <script>
-// ── Config ──────────────────────────────────────────────────────
-const APPS_SCRIPT_URL    = 'https://script.google.com/macros/s/AKfycbzhMw4nQr2nVW0MLfPWVXRPXsvImerpzshQ5GnJ3873qQkGMz0bcJQdmTRXCxwygfFm/exec';
-const APPS_SCRIPT_SECRET = sessionStorage.getItem('password') || '';
 const VEGA_CONFIG = {
   background: '#1a1d27',
   title:  { color: '#ccc', fontSize: 12, font: 'Segoe UI' },
@@ -353,7 +352,7 @@ async function init() {
   if (cached) applyData(cached);
 
   try {
-    const resp   = await fetch(`${APPS_SCRIPT_URL}?secret=${enc(APPS_SCRIPT_SECRET)}&action=all`);
+    const resp   = await fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&action=all`);
     const result = await resp.json();
     if (!result.ok) throw new Error(result.error);
     LS.set('all', result);
@@ -801,7 +800,7 @@ function renderResults() {
     const t2Win = g.winner === g.t2;
     const meta = [g.year, g.division, g.competition].filter(Boolean);
     return `
-      <div class="result-card" onclick="location.href='games.html?game=${enc(g.id)}'" title="View game stats">
+      <div class="result-card" onclick="location.href='games.html?game=${TR.enc(g.id)}'" title="View game stats">
         <div class="result-teams">
           <div class="rt home"><div class="rt-name ${t1Win ? 'win' : ''}">${cap(g.t1)}</div></div>
           <div class="score-mid">${s1} – ${s2}</div>
@@ -819,7 +818,6 @@ function renderResults() {
 function set(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
 function cap(s) { return (s || '').replace(/\b\w/g, c => c.toUpperCase()); }
 function f1(n)  { return Number(n).toFixed(1); }
-function enc(s) { return encodeURIComponent(s); }
 </script>
 </body>
 </html>

@@ -132,6 +132,7 @@
     .stats-label { color: var(--text-muted); }
     .stats-val { text-align: center; font-variant-numeric: tabular-nums; font-weight: 500; }
   </style>
+<script src="js/config.js"></script>
 </head>
 <body>
 
@@ -163,8 +164,6 @@
 </main>
 
 <script>
-const APPS_SCRIPT_URL    = 'https://script.google.com/macros/s/AKfycbzhMw4nQr2nVW0MLfPWVXRPXsvImerpzshQ5GnJ3873qQkGMz0bcJQdmTRXCxwygfFm/exec';
-const APPS_SCRIPT_SECRET = sessionStorage.getItem('password') || 'm30';
 const STALE_MS           = 2 * 60 * 1000;
 
 function fmtTime(seconds) {
@@ -278,7 +277,7 @@ function render(games) {
 
 async function fetchLive() {
   try {
-    const resp   = await fetch(`${APPS_SCRIPT_URL}?secret=${encodeURIComponent(APPS_SCRIPT_SECRET)}&action=live`);
+    const resp   = await fetch(`${TR.APPS_SCRIPT_URL}?secret=${encodeURIComponent(TR.secret() || 'm30')}&action=live`);
     const result = await resp.json();
     if (result.ok) {
       render(result.games);

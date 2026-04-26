@@ -213,6 +213,9 @@
     table { min-width: 600px; }
   }
 </style>
+<script src="js/config.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/events.js"></script>
 </head>
 <body>
 
@@ -354,10 +357,6 @@
 </div>
 
 <script>
-// ── Config ──────────────────────────────────────────────────────
-const APPS_SCRIPT_URL    = 'https://script.google.com/macros/s/AKfycbzhMw4nQr2nVW0MLfPWVXRPXsvImerpzshQ5GnJ3873qQkGMz0bcJQdmTRXCxwygfFm/exec';
-const APPS_SCRIPT_SECRET = sessionStorage.getItem('password') || '';
-
 const LS = {
   get(k)    { try { return JSON.parse(localStorage.getItem('trl2_' + k)); } catch { return null; } },
   set(k, v) { try { localStorage.setItem('trl2_' + k, JSON.stringify(v)); } catch {} },
@@ -372,14 +371,6 @@ let editMode    = false;
 let linkOffset  = parseInt(localStorage.getItem('linkOffset') ?? '5', 10) || 5;
 let selectedGame = new URLSearchParams(location.search).get('game') || '';
 
-const NAMES_BY_TYPE = {
-  'Try':             ['Scoop', 'Other', '32 - Long', '33 Quicky', '33', '32 Cut', 'French Flair'],
-  'Turnover':        ['Ball Down', '6th Touch', 'Dummy Touch', 'Bad Roll', '6 Again', 'Interception', 'Other'],
-  'Penalty Attack':  ['Forward Pass', 'Obstruction', 'Wrong Ball', 'Other'],
-  'Penalty Defence': ['Forward Pass', 'Obstruction', 'Wrong Ball', 'Offside', 'Early Rush', 'Other'],
-  'Game Event':      ['Game Start', 'Game End'],
-  'To Review':       [],
-};
 
 // ── Edit mode toggle ────────────────────────────────────────────
 function toggleEditMode() {
@@ -428,10 +419,10 @@ async function saveEdits() {
   btn.textContent = '⏳ Saving…';
   const changes = [...pendingEdits.values()];
   try {
-    const resp   = await fetch(APPS_SCRIPT_URL, {
+    const resp   = await fetch(TR.APPS_SCRIPT_URL, {
       method:  'POST',
       headers: { 'Content-Type': 'text/plain' },
-      body:    JSON.stringify({ secret: APPS_SCRIPT_SECRET, action: 'update_rows', changes }),
+      body:    JSON.stringify({ secret: TR.secret(), action: 'update_rows', changes }),
     });
     const result = await resp.json();
     if (!result.ok) throw new Error(result.error);
@@ -511,8 +502,8 @@ async function fetchAll() {
 
   try {
     const [allResp, listResp] = await Promise.all([
-      fetch(`${APPS_SCRIPT_URL}?secret=${enc(APPS_SCRIPT_SECRET)}&action=all`),
-      fetch(`${APPS_SCRIPT_URL}?secret=${enc(APPS_SCRIPT_SECRET)}&action=list`),
+      fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&action=all`),
+      fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&action=list`),
     ]);
     const [allResult, listResult] = await Promise.all([allResp.json(), listResp.json()]);
 
@@ -811,7 +802,7 @@ function renderRows(rows) {
         td.appendChild(span);
       } else if (col === 'name' && isAdmin && editMode) {
         const type    = colType >= 0 ? row[colType] : '';
-        const options = NAMES_BY_TYPE[type] || [];
+        const options = TR.NAMES_BY_TYPE[type] || [];
         const allOpts = options.includes(cell) || !cell ? options : [cell, ...options];
         const isDirty = pendingEdits.has(row) && pendingEdits.get(row).name !== (allData.indexOf(row) >= 0 ? row[colName] : cell);
         if (allOpts.length) {
@@ -1085,7 +1076,7 @@ function createYTPlayer(videoId) {
       onReady: () => {
         videoReady = true;
         const dur = ytPlayer.getDuration();
-        document.getElementById('timeDuration').textContent = fmt(dur);
+        document.getElementById('timeDuration').textContent = TR.fmt(dur);
         ['playBtn','skipBk','skipFw','speedSel'].forEach(id => document.getElementById(id).removeAttribute('disabled'));
         if (pendingSeekTime !== null) {
           ytPlayer.seekTo(pendingSeekTime, true);
@@ -1105,12 +1096,6 @@ function createYTPlayer(videoId) {
 }
 
 // ── Playback helpers ─────────────────────────────────────────────
-function fmt(s) {
-  if (!s || isNaN(s)) return '0:00:00';
-  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = Math.floor(s%60);
-  return `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
-}
-
 function toggleVideoPanel() {
   const panel = document.getElementById('videoPanel');
   const handle = document.getElementById('resizeHandle');
@@ -1144,7 +1129,7 @@ function updateProgress() {
   const pct = dur ? (cur / dur * 100) : 0;
   document.getElementById('seekFill').style.width  = pct + '%';
   document.getElementById('seekThumb').style.left  = pct + '%';
-  document.getElementById('timeCurrent').textContent = fmt(cur);
+  document.getElementById('timeCurrent').textContent = TR.fmt(cur);
 }
 
 // ── Seekbar ──────────────────────────────────────────────────────
@@ -1243,8 +1228,6 @@ document.addEventListener('keydown', e => {
   if (e.key === 'ArrowUp')     { e.preventDefault(); navigateRow(-1); }
   if (e.key === 'ArrowDown')   { e.preventDefault(); navigateRow(1); }
 });
-
-function enc(s) { return encodeURIComponent(s); }
 
 function setLinkOffset(val) {
   const n = Math.max(0, parseInt(val, 10) || 0);

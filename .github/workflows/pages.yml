@@ -15,7 +15,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: node test.js
+
   deploy:
+    needs: test
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}

@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>TR Shared Utils — Tests</title>
+  <link rel="stylesheet" href="https://code.jquery.com/qunit/qunit-2.21.0.css">
+</head>
+<body>
+  <div id="qunit"></div>
+  <div id="qunit-fixture"></div>
+
+  <!-- Shared modules under test -->
+  <script src="js/config.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/events.js"></script>
+  <script src="js/possession.js"></script>
+
+  <script src="https://code.jquery.com/qunit/qunit-2.21.0.js"></script>
+  <script>
+  // ── TR.fmt ─────────────────────────────────────────────────────
+  QUnit.module('TR.fmt', () => {
+    QUnit.test('zero / falsy input', t => {
+      t.equal(TR.fmt(0),         '0:00:00');
+      t.equal(TR.fmt(null),      '0:00:00');
+      t.equal(TR.fmt(undefined), '0:00:00');
+      t.equal(TR.fmt(NaN),       '0:00:00');
+    });
+    QUnit.test('sub-minute', t => {
+      t.equal(TR.fmt(5),  '0:00:05');
+      t.equal(TR.fmt(59), '0:00:59');
+    });
+    QUnit.test('minutes', t => {
+      t.equal(TR.fmt(60),  '0:01:00');
+      t.equal(TR.fmt(65),  '0:01:05');
+      t.equal(TR.fmt(599), '0:09:59');
+    });
+    QUnit.test('hours', t => {
+      t.equal(TR.fmt(3600),  '1:00:00');
+      t.equal(TR.fmt(3661),  '1:01:01');
+      t.equal(TR.fmt(36000), '10:00:00');
+    });
+  });
+
+  // ── TR.enc ─────────────────────────────────────────────────────
+  QUnit.module('TR.enc', () => {
+    QUnit.test('encodes special chars', t => {
+      t.equal(TR.enc('a b'), 'a%20b');
+      t.equal(TR.enc('m30-staff'), 'm30-staff');
+      t.equal(TR.enc('a&b=c'), 'a%26b%3Dc');
+    });
+  });
+
+  // ── TR.extractVideoId ──────────────────────────────────────────
+  QUnit.module('TR.extractVideoId', () => {
+    QUnit.test('standard watch URL', t => {
+      t.equal(TR.extractVideoId('https://www.youtube.com/watch?v=dQw4w9WgXcQ'), 'dQw4w9WgXcQ');
+    });
+    QUnit.test('short youtu.be URL', t => {
+      t.equal(TR.extractVideoId('https://youtu.be/dQw4w9WgXcQ'), 'dQw4w9WgXcQ');
+    });
+    QUnit.test('embed URL', t => {
+      t.equal(TR.extractVideoId('https://www.youtube.com/embed/dQw4w9WgXcQ'), 'dQw4w9WgXcQ');
+    });
+    QUnit.test('live URL', t => {
+      t.equal(TR.extractVideoId('https://www.youtube.com/live/dQw4w9WgXcQ'), 'dQw4w9WgXcQ');
+    });
+    QUnit.test('invalid / null input', t => {
+      t.equal(TR.extractVideoId('https://example.com'), null);
+      t.equal(TR.extractVideoId(''),   null);
+      t.equal(TR.extractVideoId(null), null);
+    });
+  });
+
+  // ── TR.substituteTeams ─────────────────────────────────────────
+  QUnit.module('TR.substituteTeams', () => {
+    QUnit.test('replaces Team 1 and Team 2', t => {
+      const rows = [['Team 1', 'Team 2'], ['Team 2', 'Team 1'], ['other', 'Team 1']];
+      TR.substituteTeams(rows, 'France', 'England', [0, 1]);
+      t.deepEqual(rows[0], ['France', 'England']);
+      t.deepEqual(rows[1], ['England', 'France']);
+      t.deepEqual(rows[2], ['other', 'France']);
+    });
+    QUnit.test('skips negative column indices', t => {
+      const rows = [['Team 1', 'Team 2']];
+      TR.substituteTeams(rows, 'France', 'England', [-1, 1]);
+      t.deepEqual(rows[0], ['Team 1', 'England']);
+    });
+    QUnit.test('leaves unmatched values untouched', t => {
+      const rows = [['Try', 'France']];
+      TR.substituteTeams(rows, 'France', 'England', [0, 1]);
+      t.deepEqual(rows[0], ['Try', 'France']);
+    });
+  });
+
+  // ── TR.isTurnover ─────────────────────────────────────────────
+  QUnit.module('TR.isTurnover', () => {
+    QUnit.test('Try always switches', t => {
+      t.true(TR.isTurnover('Try', 'Scoop'));
+      t.true(TR.isTurnover('Try', 'Other'));
+    });
+    QUnit.test('Penalty Attack switches', t => {
+      t.true(TR.isTurnover('Penalty Attack', 'Forward Pass'));
+    });
+    QUnit.test('Penalty Defence does NOT switch', t => {
+      t.false(TR.isTurnover('Penalty Defence', 'Offside'));
+    });
+    QUnit.test('Turnover switches (except 6 Again)', t => {
+      t.true(TR.isTurnover('Turnover', '6th Touch'));
+      t.true(TR.isTurnover('Turnover', 'Ball Down'));
+      t.false(TR.isTurnover('Turnover', '6 Again'));
+    });
+    QUnit.test('Game Event and To Review do not switch', t => {
+      t.false(TR.isTurnover('Game Event', 'Game Start'));
+      t.false(TR.isTurnover('To Review', ''));
+    });
+  });
+
+  // ── TR.inferPossessionAfter ────────────────────────────────────
+  QUnit.module('TR.inferPossessionAfter', () => {
+    QUnit.test('Try → other team gets possession', t => {
+      t.equal(TR.inferPossessionAfter('Team 1', 'Try', 'Scoop'),  'Team 2');
+      t.equal(TR.inferPossessionAfter('Team 2', 'Try', 'Scoop'),  'Team 1');
+    });
+    QUnit.test('Penalty Attack → switches', t => {
+      t.equal(TR.inferPossessionAfter('Team 1', 'Penalty Attack', 'Forward Pass'), 'Team 2');
+    });
+    QUnit.test('Penalty Defence → stays', t => {
+      t.equal(TR.inferPossessionAfter('Team 1', 'Penalty Defence', 'Offside'), 'Team 1');
+    });
+    QUnit.test('Turnover / 6th Touch → switches', t => {
+      t.equal(TR.inferPossessionAfter('Team 1', 'Turnover', '6th Touch'), 'Team 2');
+    });
+    QUnit.test('Turnover / 6 Again → stays', t => {
+      t.equal(TR.inferPossessionAfter('Team 1', 'Turnover', '6 Again'), 'Team 1');
+    });
+  });
+
+  // ── TR.inferActionOwner ───────────────────────────────────────
+  QUnit.module('TR.inferActionOwner', () => {
+    QUnit.test('Try → possession owner', t => {
+      t.equal(TR.inferActionOwner('Team 1', 'Try', 'Scoop'), 'Team 1');
+    });
+    QUnit.test('Turnover (normal) → possession owner', t => {
+      t.equal(TR.inferActionOwner('Team 1', 'Turnover', '6th Touch'), 'Team 1');
+    });
+    QUnit.test('Turnover / 6 Again → other team (defence conceded)', t => {
+      t.equal(TR.inferActionOwner('Team 1', 'Turnover', '6 Again'), 'Team 2');
+    });
+    QUnit.test('Penalty Attack → possession owner', t => {
+      t.equal(TR.inferActionOwner('Team 1', 'Penalty Attack', 'Forward Pass'), 'Team 1');
+    });
+    QUnit.test('Penalty Defence → other team (defence gave away penalty)', t => {
+      t.equal(TR.inferActionOwner('Team 1', 'Penalty Defence', 'Offside'), 'Team 2');
+      t.equal(TR.inferActionOwner('Team 2', 'Penalty Defence', 'Offside'), 'Team 1');
+    });
+  });
+  </script>
+</body>
+</html>

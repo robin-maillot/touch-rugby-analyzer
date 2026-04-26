@@ -128,6 +128,8 @@
     .vega-tooltip td.key { color: #888 !important; font-weight: 500; padding-right: 10px !important; white-space: nowrap; }
     .vega-tooltip td.value { color: #fff !important; font-weight: 600; }
   </style>
+<script src="js/config.js"></script>
+<script src="js/utils.js"></script>
 </head>
 <body>
 
@@ -214,10 +216,6 @@
 </div>
 
 <script>
-// ── Config ─────────────────────────────────────────────────────
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzhMw4nQr2nVW0MLfPWVXRPXsvImerpzshQ5GnJ3873qQkGMz0bcJQdmTRXCxwygfFm/exec';
-const APPS_SCRIPT_SECRET = sessionStorage.getItem('password') || '';
-
 // ── localStorage cache (stale-while-revalidate) ─────────────────
 const LS = {
   get(k)    { try { return JSON.parse(localStorage.getItem('trl2_' + k)); } catch { return null; } },
@@ -271,7 +269,7 @@ async function fetchGameList() {
   }
 
   try {
-    const resp   = await fetch(`${APPS_SCRIPT_URL}?secret=${enc(APPS_SCRIPT_SECRET)}&action=list`);
+    const resp   = await fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&action=list`);
     const result = await resp.json();
     if (!result.ok) throw new Error(result.error);
     LS.set('list', result);
@@ -300,9 +298,9 @@ async function loadGame() {
     document.getElementById('eventsLink').href = 'viewer.html';
     return;
   }
-  document.getElementById('eventsLink').href    = `viewer.html?game=${enc(sheetName)}`;
-  document.getElementById('viewEventsBtn').href = `viewer.html?game=${enc(sheetName)}`;
-  history.replaceState(null, '', `?game=${enc(sheetName)}`);
+  document.getElementById('eventsLink').href    = `viewer.html?game=${TR.enc(sheetName)}`;
+  document.getElementById('viewEventsBtn').href = `viewer.html?game=${TR.enc(sheetName)}`;
+  history.replaceState(null, '', `?game=${TR.enc(sheetName)}`);
 
   document.getElementById('gameContent').style.display   = 'none';
   document.getElementById('errMsg').style.display        = 'none';
@@ -338,7 +336,7 @@ async function loadGame() {
   }
 
   try {
-    const url    = `${APPS_SCRIPT_URL}?secret=${enc(APPS_SCRIPT_SECRET)}&sheetName=${enc(sheetName)}`;
+    const url    = `${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&sheetName=${TR.enc(sheetName)}`;
     const resp   = await fetch(url);
     const result = await resp.json();
     if (!result.ok) throw new Error(result.error);
@@ -772,7 +770,6 @@ async function renderStats(halfValue) {
 // ── Helpers ────────────────────────────────────────────────────
 function setStatus(msg) { document.getElementById('status').textContent = msg; }
 function showErr(msg)   { const el = document.getElementById('errMsg'); el.textContent = msg; el.style.display = 'block'; }
-function enc(s)         { return encodeURIComponent(s); }
 function fmtSecs(s) {
   s = Math.round(s);
   const m = Math.floor(s / 60), sec = s % 60;

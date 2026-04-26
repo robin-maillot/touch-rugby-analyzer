@@ -367,6 +367,10 @@
     .recent-item { cursor: pointer; }
     .recent-item:active { background: var(--surface-2); }
   </style>
+<script src="js/config.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/events.js"></script>
+<script src="js/possession.js"></script>
 </head>
 <body>
 
@@ -512,12 +516,7 @@
 </div>
 
 <script>
-// ── Access gate ────────────────────────────────────────────────
-{ const p = sessionStorage.getItem('password'); if (p !== 'm30-staff' && p !== 'm30-admin') window.location.replace('index.html'); }
-
-// ── Config ─────────────────────────────────────────────────────
-const APPS_SCRIPT_URL    = 'https://script.google.com/macros/s/AKfycbzhMw4nQr2nVW0MLfPWVXRPXsvImerpzshQ5GnJ3873qQkGMz0bcJQdmTRXCxwygfFm/exec';
-const APPS_SCRIPT_SECRET = sessionStorage.getItem('password') || '';
+TR.auth('staff');
 
 // ── State ──────────────────────────────────────────────────────
 let annotations  = [];
@@ -530,12 +529,6 @@ let liveInterval = null;
 function nowSeconds() {
   if (wallStart === null) { wallStart = Date.now(); return 0; }
   return (Date.now() - wallStart) / 1000;
-}
-
-function fmt(s) {
-  if (!s || isNaN(s)) return '0:00:00';
-  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = Math.floor(s % 60);
-  return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
 }
 
 function fmtClock(s) {
@@ -583,24 +576,14 @@ function setPossession(team) {
   document.getElementById('possBtn2').classList.toggle('active', team === 'Team 2');
 }
 
-function otherTeam(team) {
-  return team === 'Team 1' ? 'Team 2' : 'Team 1';
-}
-
 // ── Tagging ────────────────────────────────────────────────────
-function inferActionOwner(type, possessionOwner) {
-  if (type === 'Penalty Defence') return otherTeam(possessionOwner);
-  return possessionOwner;
-}
-
 function tag(type, name, possessionOwner) {
   const t = nowSeconds();
-  const actionOwner = inferActionOwner(type, possessionOwner);
-  annotations.push({ id: Date.now() + Math.random(), type, name, possessionOwner, actionOwner, comment: '', time: t, timeStr: fmt(t) });
+  const actionOwner = TR.inferActionOwner(possessionOwner, type, name);
+  annotations.push({ id: Date.now() + Math.random(), type, name, possessionOwner, actionOwner, comment: '', time: t, timeStr: TR.fmt(t) });
 
-  if (type === 'Try')                             setPossession(otherTeam(possessionOwner));
-  if (type === 'Turnover' && name !== '6 Again')  setPossession(otherTeam(possessionOwner));
-  if (type === 'Penalty Attack')                  setPossession(otherTeam(possessionOwner));
+  const next = TR.inferPossessionAfter(possessionOwner, type, name);
+  if (next !== possessionOwner) setPossession(next);
 
   updateUI();
   if (liveMode) pushLiveUpdate();
@@ -617,7 +600,7 @@ function tagGameEventToggle() {
 
 function tagToReview() {
   const t = nowSeconds();
-  annotations.push({ id: Date.now() + Math.random(), type: 'To Review', name: 'To Review', possessionOwner: possession, actionOwner: possession, comment: '?', time: t, timeStr: fmt(t) });
+  annotations.push({ id: Date.now() + Math.random(), type: 'To Review', name: 'To Review', possessionOwner: possession, actionOwner: possession, comment: '?', time: t, timeStr: TR.fmt(t) });
   updateUI();
   if (liveMode) pushLiveUpdate();
 }
@@ -633,10 +616,7 @@ function undoLast() {
 let editingIndex = null;
 
 function computePossAfter(a) {
-  if (a.type === 'Try') return otherTeam(a.possessionOwner);
-  if (a.type === 'Turnover' && a.name !== '6 Again') return otherTeam(a.possessionOwner);
-  if (a.type === 'Penalty Attack') return otherTeam(a.possessionOwner);
-  return a.possessionOwner;
+  return TR.inferPossessionAfter(a.possessionOwner, a.type, a.name);
 }
 
 function replayPossessionFrom(startIndex) {
@@ -792,10 +772,10 @@ function stopLive() {
   if (btn) { btn.textContent = '⚫ Live'; btn.classList.remove('active'); }
   const sheetName = metaToSheetName();
   if (sheetName) {
-    fetch(APPS_SCRIPT_URL, {
+    fetch(TR.APPS_SCRIPT_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ secret: APPS_SCRIPT_SECRET, action: 'live_clear', sheetName }),
+      body: JSON.stringify({ secret: TR.secret(), action: 'live_clear', sheetName }),
     }).catch(() => {});
   }
 }
@@ -814,10 +794,10 @@ function pushLiveUpdate() {
   const tries = annotations
     .filter(a => a.type === 'Try')
     .map(a => ({ scorer: a.actionOwner, time: Math.floor(a.time) }));
-  fetch(APPS_SCRIPT_URL, {
+  fetch(TR.APPS_SCRIPT_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify({ secret: APPS_SCRIPT_SECRET, action: 'live_update', sheetName, team1, team2, score1, score2, timeSeconds, poss1: t1.possessions, poss2: t2.possessions, comps1: t1.compsNum, comps2: t2.compsNum, triesJson: JSON.stringify(tries) }),
+    body: JSON.stringify({ secret: TR.secret(), action: 'live_update', sheetName, team1, team2, score1, score2, timeSeconds, poss1: t1.possessions, poss2: t2.possessions, comps1: t1.compsNum, comps2: t2.compsNum, triesJson: JSON.stringify(tries) }),
   }).catch(() => {});
 }
 
@@ -1060,7 +1040,7 @@ async function pushToSheet(override = false) {
     const names      = annotations.map(a => a.name);
     const analyzable = names.includes('Game Start') && names.includes('Game End') ? 'TRUE' : 'FALSE';
     const body = {
-      secret: APPS_SCRIPT_SECRET, sheetName, rows,
+      secret: TR.secret(), sheetName, rows,
       meta: {
         team1:       document.getElementById('metaTeam1').value.trim(),
         team2:       document.getElementById('metaTeam2').value.trim(),
@@ -1073,12 +1053,12 @@ async function pushToSheet(override = false) {
     };
     if (override) body.override = true;
 
-    const resp   = await fetch(APPS_SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(body) });
+    const resp   = await fetch(TR.APPS_SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(body) });
     const result = await resp.json();
 
     if (!result.ok) {
       if (result.tabExists && !override) {
-        if (APPS_SCRIPT_SECRET === 'm30-admin') {
+        if (TR.secret() === 'm30-admin') {
           document.getElementById('overrideBtn').style.display = '';
           alert(`Tab "${sheetName}" already exists. Tap ⚠ Override to replace it.`);
         } else {
