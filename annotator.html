@@ -264,7 +264,16 @@
     <input class="yt-input meta-input" id="metaTeam2" placeholder="Team 2" oninput="updateSheetPreview()">
     <span class="meta-sep">|</span>
     <input class="yt-input meta-input" id="metaYear" placeholder="Year" style="width:70px !important" oninput="updateSheetPreview()">
-    <input class="yt-input meta-input" id="metaDivision" placeholder="Division" style="width:80px !important" oninput="updateSheetPreview()">
+    <select class="yt-input meta-input" id="metaDivision" style="width:80px !important" onchange="updateSheetPreview()">
+      <option value="MXO">MXO</option>
+      <option value="MO">MO</option>
+      <option value="WO">WO</option>
+      <option value="M30">M30</option>
+      <option value="W27">W27</option>
+      <option value="M40">M40</option>
+      <option value="W35">W35</option>
+      <option value="" selected>NONE</option>
+    </select>
     <input class="yt-input meta-input" id="metaCompetition" placeholder="Competition" oninput="updateSheetPreview()">
     <span class="meta-sep">→</span>
     <span id="sheetPreview" style="font-family:monospace;font-size:0.72rem;color:#555;white-space:nowrap">fill metadata to generate tab name</span>
@@ -403,6 +412,7 @@ async function fetchGameList() {
   }
 }
 window.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('metaYear').value = String(new Date().getFullYear());
   fetchGameList();
   document.getElementById('hideBallLiveToggle').addEventListener('change', renderList);
   const list = document.getElementById('annList');

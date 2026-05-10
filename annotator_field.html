@@ -70,7 +70,8 @@
     }
     #settingsPanel.open { display: flex; }
     .settings-row { display: flex; gap: 8px; flex-wrap: wrap; }
-    .settings-row input {
+    .settings-row input,
+    .settings-row select {
       flex: 1;
       min-width: 80px;
       background: var(--bg);
@@ -81,7 +82,8 @@
       font-size: 0.85rem;
       outline: none;
     }
-    .settings-row input:focus { border-color: var(--accent); }
+    .settings-row input:focus,
+    .settings-row select:focus { border-color: var(--accent); }
     .settings-row input::placeholder { color: #444; }
     .settings-label { font-size: 0.72rem; color: var(--text-muted); margin-bottom: 2px; }
     #sheetPreview {
@@ -400,7 +402,16 @@
     <div class="settings-label">Competition</div>
     <div class="settings-row">
       <input id="metaYear"        placeholder="Year"        style="max-width:80px" oninput="onMetaChange()">
-      <input id="metaDivision"    placeholder="Division"    style="max-width:90px" oninput="onMetaChange()">
+      <select id="metaDivision" style="max-width:90px" onchange="onMetaChange()">
+        <option value="MXO">MXO</option>
+        <option value="MO">MO</option>
+        <option value="WO">WO</option>
+        <option value="M30">M30</option>
+        <option value="W27">W27</option>
+        <option value="M40">M40</option>
+        <option value="W35">W35</option>
+        <option value="" selected>NONE</option>
+      </select>
       <input id="metaCompetition" placeholder="Competition" oninput="onMetaChange()">
     </div>
   </div>
@@ -517,6 +528,10 @@
 
 <script>
 TR.auth('staff');
+
+window.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('metaYear').value = String(new Date().getFullYear());
+});
 
 // ── State ──────────────────────────────────────────────────────
 let annotations  = [];
