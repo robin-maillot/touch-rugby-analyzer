@@ -51,7 +51,12 @@
 
   /* ── Video area ───────────────────────────────────────────── */
   .video-area { flex: 1; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; min-height: 0; }
-  #ytContainer { width: 100%; height: 100%; display: none; }
+  #ytContainer { width: 100%; height: 100%; display: none; position: relative; }
+  #ytZoom { width: 100%; height: 100%; transform-origin: 0 0; will-change: transform; }
+  #ytZoomOverlay { position: absolute; inset: 0; z-index: 5; cursor: grab; touch-action: none; background: transparent; }
+  #ytZoomOverlay.dragging { cursor: grabbing; }
+  #zoomToggle.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .zoom-level { font-family: monospace; font-size: 0.73rem; color: var(--text-muted); min-width: 36px; text-align: right; }
   .no-video-msg { color: #555; font-size: 0.8rem; text-align: center; padding: 24px 16px; line-height: 1.8; }
   .no-video-msg svg { opacity: 0.2; display: block; margin: 0 auto 10px; }
 
@@ -264,7 +269,10 @@
         </svg>
         Click any row to start watching
       </div>
-      <div id="ytContainer"></div>
+      <div id="ytContainer">
+        <div id="ytZoom"></div>
+        <div id="ytZoomOverlay" hidden></div>
+      </div>
     </div>
 
     <div class="video-controls">
@@ -290,6 +298,9 @@
           <option value="2">2×</option>
         </select>
         <button class="btn-nav" id="nextRowBtn" disabled onclick="navigateRow(1)">Next ▶</button>
+        <button class="btn btn-ghost" id="zoomToggle" title="Zoom video (Z)">🔍</button>
+        <span class="zoom-level" id="zoomLevel" hidden>1.0×</span>
+        <button class="btn btn-ghost" id="zoomReset" title="Reset zoom" hidden>⟲</button>
       </div>
     </div>
 
@@ -470,6 +481,7 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('linkOffsetInput').value = linkOffset;
   setupSeekbar();
   setupResizeHandle();
+  setupVideoZoom();
   fetchAll();
 
   const wrap = document.querySelector('.table-wrap');
@@ -1065,8 +1077,8 @@ window.onYouTubeIframeAPIReady = function() {
 
 function createYTPlayer(videoId) {
   if (ytPlayer) { ytPlayer.destroy(); ytPlayer = null; }
-  const container = document.getElementById('ytContainer');
-  container.innerHTML = '<div id="ytInner"></div>';
+  const zoom = document.getElementById('ytZoom');
+  zoom.innerHTML = '<div id="ytInner"></div>';
   ytPlayer = new YT.Player('ytInner', {
     videoId,
     width: '100%',
@@ -1197,6 +1209,101 @@ function setupResizeHandle() {
   });
 }
 
+// ── Video zoom + pan ─────────────────────────────────────────────
+function setupVideoZoom() {
+  const ZOOM_MIN = 1, ZOOM_MAX = 6, ZOOM_STEP = 1.15;
+  let zScale = 1, zX = 0, zY = 0, zoomMode = false;
+  const zoomEl    = document.getElementById('ytZoom');
+  const overlay   = document.getElementById('ytZoomOverlay');
+  const toggleBtn = document.getElementById('zoomToggle');
+  const levelEl   = document.getElementById('zoomLevel');
+  const resetBtn  = document.getElementById('zoomReset');
+
+  function applyZoom() {
+    zoomEl.style.transform = `translate(${zX}px, ${zY}px) scale(${zScale})`;
+    levelEl.textContent = zScale.toFixed(1) + '×';
+  }
+  function clampPan() {
+    const r = overlay.getBoundingClientRect();
+    const minX = r.width  * (1 - zScale), minY = r.height * (1 - zScale);
+    zX = Math.min(0, Math.max(minX, zX));
+    zY = Math.min(0, Math.max(minY, zY));
+  }
+  function resetZoom() { zScale = 1; zX = 0; zY = 0; applyZoom(); }
+  function setZoomMode(on) {
+    zoomMode = on;
+    overlay.hidden = !on; levelEl.hidden = !on; resetBtn.hidden = !on;
+    toggleBtn.classList.toggle('active', on);
+    if (!on) resetZoom();
+  }
+
+  overlay.addEventListener('wheel', e => {
+    e.preventDefault();
+    const r = overlay.getBoundingClientRect();
+    const cx = e.clientX - r.left, cy = e.clientY - r.top;
+    const factor = e.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
+    const newScale = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zScale * factor));
+    if (newScale === zScale) return;
+    const k = newScale / zScale;
+    zX = cx - k * (cx - zX);
+    zY = cy - k * (cy - zY);
+    zScale = newScale;
+    clampPan(); applyZoom();
+  }, { passive: false });
+
+  const pointers = new Map();
+  let pinchDist = 0;
+  overlay.addEventListener('pointerdown', e => {
+    overlay.setPointerCapture(e.pointerId);
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    overlay.classList.add('dragging');
+    if (pointers.size === 2) {
+      const [a, b] = [...pointers.values()];
+      pinchDist = Math.hypot(a.x - b.x, a.y - b.y);
+    }
+  });
+  overlay.addEventListener('pointermove', e => {
+    const prev = pointers.get(e.pointerId); if (!prev) return;
+    if (pointers.size === 1) {
+      zX += e.clientX - prev.x; zY += e.clientY - prev.y;
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      clampPan(); applyZoom();
+    } else if (pointers.size === 2) {
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      const [a, b] = [...pointers.values()];
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      if (pinchDist) {
+        const newScale = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zScale * (d / pinchDist)));
+        if (newScale !== zScale) {
+          const r = overlay.getBoundingClientRect();
+          const cx = (a.x + b.x) / 2 - r.left, cy = (a.y + b.y) / 2 - r.top;
+          const k = newScale / zScale;
+          zX = cx - k * (cx - zX); zY = cy - k * (cy - zY);
+          zScale = newScale; clampPan(); applyZoom();
+        }
+      }
+      pinchDist = d;
+    }
+  });
+  function endPointer(e) {
+    pointers.delete(e.pointerId);
+    if (pointers.size < 2) pinchDist = 0;
+    if (pointers.size === 0) overlay.classList.remove('dragging');
+  }
+  overlay.addEventListener('pointerup', endPointer);
+  overlay.addEventListener('pointercancel', endPointer);
+  overlay.addEventListener('dblclick', resetZoom);
+
+  toggleBtn.addEventListener('click', () => setZoomMode(!zoomMode));
+  resetBtn.addEventListener('click', resetZoom);
+  document.addEventListener('keydown', e => {
+    if (e.key === 'z' && !e.ctrlKey && !e.metaKey && !e.altKey
+        && !e.target.matches('input, textarea, select')) {
+      setZoomMode(!zoomMode);
+    }
+  });
+}
+
 function toggleLayout() {
   const split    = document.getElementById('split');
   const btn      = document.getElementById('layoutBtn');
@@ -1227,6 +1334,12 @@ document.addEventListener('keydown', e => {
   if (e.key === 'ArrowRight')  { skip(5); }
   if (e.key === 'ArrowUp')     { e.preventDefault(); navigateRow(-1); }
   if (e.key === 'ArrowDown')   { e.preventDefault(); navigateRow(1); }
+  if (e.key === 'a' || e.key === 'A') {
+    if (!ytPlayer || !videoReady) return;
+    const sel = document.getElementById('speedSel');
+    sel.value = sel.value === '0.5' ? '1' : '0.5';
+    setSpeed();
+  }
 });
 
 function setLinkOffset(val) {
