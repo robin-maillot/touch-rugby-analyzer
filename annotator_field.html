@@ -638,7 +638,7 @@ function replayPossessionFrom(startIndex) {
   for (let i = startIndex; i < annotations.length; i++) {
     const newPoss = computePossAfter(annotations[i - 1]);
     annotations[i].possessionOwner = newPoss;
-    annotations[i].actionOwner = inferActionOwner(annotations[i].type, newPoss);
+    annotations[i].actionOwner = TR.inferActionOwner(newPoss, annotations[i].type, annotations[i].name);
   }
   const last = annotations[annotations.length - 1];
   setPossession(last ? computePossAfter(last) : 'Team 1');
@@ -661,7 +661,7 @@ function applyEdit(type, name) {
   const a = annotations[editingIndex];
   a.type = type;
   a.name = name;
-  a.actionOwner = inferActionOwner(type, a.possessionOwner);
+  a.actionOwner = TR.inferActionOwner(a.possessionOwner, type, name);
   replayPossessionFrom(editingIndex + 1);
   closeEdit();
   updateUI();
