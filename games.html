@@ -31,8 +31,8 @@
     #gameSubtitle { font-size: 0.78rem; color: #777; margin-top: 3px; }
     #gameTimingRow { display: flex; gap: 16px; margin-top: 8px; font-size: 0.78rem; color: #888; flex-wrap: wrap; }
     #gameTimingRow .timing-val { color: #ccc; font-weight: 600; }
-    #viewEventsBtn, #compareHalvesBtn { text-decoration: none; background: none; border: 1px solid #3a3d4a; border-radius: 6px; padding: 4px 11px; font-size: 0.75rem; color: #aaa; cursor: pointer; white-space: nowrap; transition: border-color 0.12s, color 0.12s; }
-    #viewEventsBtn:hover, #compareHalvesBtn:hover { border-color: var(--accent, #3b82f6); color: #fff; }
+    #viewEventsBtn, #compareHalvesBtn, #turnoverDistBtn { text-decoration: none; background: none; border: 1px solid #3a3d4a; border-radius: 6px; padding: 4px 11px; font-size: 0.75rem; color: #aaa; cursor: pointer; white-space: nowrap; transition: border-color 0.12s, color 0.12s; }
+    #viewEventsBtn:hover, #compareHalvesBtn:hover, #turnoverDistBtn:hover { border-color: var(--accent, #3b82f6); color: #fff; }
 
     table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
     th { background: #0f1117; color: #aaa; padding: 8px 12px; text-align: left; font-weight: 600; border-bottom: 1px solid #2a2d3a; }
@@ -112,6 +112,19 @@
     .compare-table tbody tr.section-row:first-child td { border-top: none; }
     .compare-table tr.row-a td { border-bottom: none; }
     .compare-table tr.row-b td { border-bottom: 1px solid #1f2230; }
+    /* ── Turnover Distribution Modal ───────────────────────────── */
+    #turnoverOverlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 200;
+      display: flex; align-items: center; justify-content: center;
+      padding: 16px; overflow-y: auto;
+    }
+    #turnoverCard {
+      background: #1a1d27; border: 1px solid #2a2d3a; border-radius: 12px;
+      max-width: 600px; width: 100%; max-height: 85dvh;
+      display: flex; flex-direction: column;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.6); flex-shrink: 0;
+    }
+    #turnoverBody { padding: 16px 20px 20px; overflow-y: auto; }
     /* Vega tooltip override */
     .vega-tooltip {
       background: #1e2130 !important;
@@ -168,6 +181,7 @@
       <div class="game-title-row">
         <div id="gameTitle"></div>
         <div style="display:flex;gap:6px;margin-left:auto">
+          <button id="turnoverDistBtn" onclick="openTurnoverModal()" style="display:none">Turnover Distribution</button>
           <button id="compareHalvesBtn" onclick="openCompareModal()" style="display:none">Compare Halves</button>
           <a id="viewEventsBtn" href="viewer.html">View Events</a>
         </div>
@@ -200,6 +214,18 @@
     </div>
   </div>
 </main>
+
+<div id="turnoverOverlay" onclick="if(event.target===this)closeTurnoverModal()" style="display:none">
+  <div id="turnoverCard">
+    <div class="compare-header">
+      <span class="compare-title" id="turnoverTitle">Turnover Time Distribution</span>
+      <button class="compare-close" onclick="closeTurnoverModal()">✕</button>
+    </div>
+    <div id="turnoverBody">
+      <div class="chart-wrap" id="vis-turnover-dist"></div>
+    </div>
+  </div>
+</div>
 
 <div id="compareOverlay" onclick="if(event.target===this)closeCompareModal()" style="display:none">
   <div id="compareCard">
@@ -234,6 +260,8 @@ const VEGA_CONFIG = {
   legend: { labelColor: '#ccc', titleColor: '#888', labelFont: 'Segoe UI' },
   view:   { stroke: '#2a2d3a' },
 };
+
+let _turnoverData = null; // { data: [{Team, Time}], teamNames } — refreshed per renderStats() call
 
 // ── Bootstrap ──────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', fetchGameList);
@@ -536,6 +564,62 @@ function computeAvgTurnoverTimes(events, possessions, teamNames) {
   return Object.fromEntries(teamNames.map(t => [t, avg(times[t])]));
 }
 
+function getTurnoverTimeData(events, possessions, teamNames) {
+  const TRIGGERS = new Set(['Turnover', 'Penalty Attack', 'Penalty Defence']);
+  const sorted   = [...events].sort((a, b) => a.GameTime - b.GameTime);
+  const rows     = [];
+  let pIdx = 0;
+  for (let i = 0; i < sorted.length; i++) {
+    const evt = sorted[i];
+    if (!TRIGGERS.has(evt.Type)) continue;
+    if (evt.Type === 'Turnover' && evt.Name === '6 Again') continue;
+    while (pIdx < possessions.length - 1 && possessions[pIdx].End < evt.GameTime) pIdx++;
+    const nextPoss = possessions[pIdx + 1];
+    if (!nextPoss) continue;
+    const next = sorted[i + 1];
+    const dt = (next && next.Name === 'Ball Live') ? Math.max(0, next.GameTime - evt.GameTime) : 0;
+    if (teamNames.includes(nextPoss.Team)) rows.push({ Team: nextPoss.Team, Time: dt });
+  }
+  return rows;
+}
+
+function turnoverDistSpec(data, teamNames) {
+  const color = teamColorScale(teamNames);
+  const cdfTransform = [
+    { window: [{ op: 'count', as: 'count' }], sort: [{ field: 'Time' }], groupby: ['Team'], frame: [null, 0] },
+    { joinaggregate: [{ op: 'count', as: 'total' }], groupby: ['Team'] },
+    { calculate: 'datum.count / datum.total', as: 'cumulative' },
+  ];
+  return {
+    $schema: 'https://vega.github.io/schema/vega-lite/v5.json',
+    vconcat: [
+      {
+        width: 'container', height: 220,
+        data: { values: data },
+        transform: cdfTransform,
+        mark: { type: 'line', interpolate: 'monotone', strokeWidth: 2 },
+        encoding: {
+          x: { field: 'Time', type: 'quantitative', title: null, axis: { labels: false, ticks: false, grid: true } },
+          y: { field: 'cumulative', type: 'quantitative', title: 'Cumulative %', axis: { format: '%' } },
+          color,
+        },
+      },
+      {
+        width: 'container', height: 120,
+        data: { values: data },
+        mark: { type: 'bar', opacity: 0.55 },
+        encoding: {
+          x: { field: 'Time', type: 'quantitative', bin: { step: 2 }, title: 'Dead Ball Time (s)' },
+          y: { aggregate: 'count', type: 'quantitative', title: 'Count', stack: null },
+          color,
+        },
+      },
+    ],
+    resolve: { scale: { x: 'shared' } },
+    spacing: 2,
+  };
+}
+
 function buildMetrics(possessions, teamNames, events) {
   const turnoverAvgs = computeAvgTurnoverTimes(events, possessions, teamNames);
   const rows = teamNames.map(team => {
@@ -759,7 +843,13 @@ async function renderStats(halfValue) {
     `<span>Game time: <span class="timing-val">${fmtSecs(gameTime)}</span></span>` +
     `<span>Dead ball: <span class="timing-val">${fmtSecs(totalDeadBall)}</span></span>`;
 
-  const cols = ['Team', 'Possessions', 'Tries', 'Completions', 'Pen Attack', 'Pen Defence', 'Avg Time (s)', 'Total Time (s)', 'Dead Ball (s)', 'Avg Turnover (s)'];
+  const hasDead = totalDeadBall > 0;
+  _turnoverData = hasDead ? { data: getTurnoverTimeData(filtered, possData, teamNames), teamNames } : null;
+  document.getElementById('turnoverDistBtn').style.display = hasDead ? '' : 'none';
+
+  const cols = ['Team', 'Possessions', 'Tries', 'Completions', 'Pen Attack', 'Pen Defence',
+    'Avg Time (s)', 'Total Time (s)',
+    ...(hasDead ? ['Dead Ball (s)', 'Avg Turnover (s)'] : [])];
   document.getElementById('metricsTable').innerHTML =
     `<table>
        <thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead>
@@ -774,6 +864,20 @@ function fmtSecs(s) {
   s = Math.round(s);
   const m = Math.floor(s / 60), sec = s % 60;
   return `${m}:${String(sec).padStart(2, '0')}`;
+}
+
+// ── Turnover Distribution Modal ─────────────────────────────────
+function openTurnoverModal() {
+  if (!_turnoverData || !currentGame) return;
+  const { team1, team2 } = currentGame;
+  document.getElementById('turnoverTitle').textContent = `${team1} vs ${team2} — Turnover Time Distribution`;
+  const opts = { config: VEGA_CONFIG, actions: false };
+  vegaEmbed('#vis-turnover-dist', turnoverDistSpec(_turnoverData.data, _turnoverData.teamNames), opts);
+  document.getElementById('turnoverOverlay').style.display = 'flex';
+}
+
+function closeTurnoverModal() {
+  document.getElementById('turnoverOverlay').style.display = 'none';
 }
 
 // ── Compare Halves Modal ────────────────────────────────────────
@@ -791,7 +895,7 @@ function closeCompareModal() {
 }
 
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closeCompareModal();
+  if (e.key === 'Escape') { closeCompareModal(); closeTurnoverModal(); }
 });
 
 function buildPeriodMetrics() {
