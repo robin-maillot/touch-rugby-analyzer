@@ -248,6 +248,18 @@ const LS = {
   set(k, v) { try { localStorage.setItem('trl2_' + k, JSON.stringify(v)); } catch {} },
 };
 
+// Spreadsheet version (last-modified ms) used to skip refetches when nothing changed.
+let _liveVersion = null;
+async function getLiveVersion() {
+  if (_liveVersion !== null) return _liveVersion;
+  try {
+    const resp = await fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&action=version`);
+    const res  = await resp.json();
+    if (res.ok) _liveVersion = res.version;
+  } catch {}
+  return _liveVersion;
+}
+
 // Charts use container width (responsive)
 
 // MM:SS axis label expression (mirrors Python _MM_SS in generate_html_v2.py)
@@ -297,6 +309,11 @@ async function fetchGameList() {
   }
 
   try {
+    if (cached?.version != null) {
+      const live = await getLiveVersion();
+      if (live != null && live === cached.version) return;
+    }
+
     const resp   = await fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&action=list`);
     const result = await resp.json();
     if (!result.ok) throw new Error(result.error);
@@ -364,6 +381,11 @@ async function loadGame() {
   }
 
   try {
+    if (cachedGame?.version != null) {
+      const live = await getLiveVersion();
+      if (live != null && live === cachedGame.version) return;
+    }
+
     const url    = `${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&sheetName=${TR.enc(sheetName)}`;
     const resp   = await fetch(url);
     const result = await resp.json();

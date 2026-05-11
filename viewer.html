@@ -373,6 +373,18 @@ const LS = {
   set(k, v) { try { localStorage.setItem('trl2_' + k, JSON.stringify(v)); } catch {} },
 };
 
+// Spreadsheet version (last-modified ms) used to skip refetches when nothing changed.
+let _liveVersion = null;
+async function getLiveVersion() {
+  if (_liveVersion !== null) return _liveVersion;
+  try {
+    const resp = await fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&action=version`);
+    const res  = await resp.json();
+    if (res.ok) _liveVersion = res.version;
+  } catch {}
+  return _liveVersion;
+}
+
 const FILTERABLE  = ['Type', 'Name', 'Action Owner', 'Division'];
 const HIDDEN_COLS = new Set(['Team 1', 'Team 2', 'Video Name', 'To Review', 'Youtube Link', 'Possession Owner', 'Analyzable']);
 const TYPE_BADGE  = { 'try':'badge-try', 'penalty':'badge-penalty', 'penalty attack':'badge-penalty', 'penalty defence':'badge-penalty', 'turnover':'badge-turnover', 'to review':'badge-toreview' };
@@ -513,6 +525,12 @@ async function fetchAll() {
   }
 
   try {
+    // Skip the full refetch if the spreadsheet hasn't changed since both caches were built.
+    if (cachedAll?.version != null && cachedList?.version != null) {
+      const live = await getLiveVersion();
+      if (live != null && live === cachedAll.version && live === cachedList.version) return;
+    }
+
     const [allResp, listResp] = await Promise.all([
       fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&action=all`),
       fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&action=list`),

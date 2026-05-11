@@ -62,6 +62,14 @@ function cacheClear() {
   try { CacheService.getScriptCache().removeAll(['list', 'all']); } catch(e) {}
 }
 
+// Spreadsheet-wide last-modified timestamp (ms since epoch). Drive updates this
+// on every cell change, so it's a reliable "did anything change" signal.
+// Must be read BEFORE the data it stamps — see doGet handlers.
+function getSheetVersion() {
+  try { return DriveApp.getFileById(SHEET_ID).getLastUpdated().getTime(); }
+  catch (e) { return 0; }
+}
+
 function rawJson(str) {
   return ContentService.createTextOutput(str).setMimeType(ContentService.MimeType.JSON);
 }
@@ -71,6 +79,12 @@ function doGet(e) {
   try {
     if (!VALID_SECRETS.has(e.parameter.secret)) {
       return json({ ok: false, error: 'Unauthorized' });
+    }
+
+    // action=version → live spreadsheet-modified timestamp (never cached server-side).
+    // Clients use this to skip the heavy action=all / action=list refetches when nothing changed.
+    if (e.parameter.action === 'version') {
+      return json({ ok: true, version: getSheetVersion() });
     }
 
     // action=live → current live game states
@@ -113,8 +127,9 @@ function doGet(e) {
       const hit = cacheGet('list');
       if (hit) return rawJson(hit);
 
-      const meta   = getMetadata();
-      const result = JSON.stringify({ ok: true, sheets: Object.entries(meta).map(([name, m]) => ({ name, ...m })) });
+      const version = getSheetVersion();   // capture BEFORE reading data
+      const meta    = getMetadata();
+      const result  = JSON.stringify({ ok: true, version, sheets: Object.entries(meta).map(([name, m]) => ({ name, ...m })) });
       cachePut('list', result);
       return rawJson(result);
     }
@@ -124,7 +139,8 @@ function doGet(e) {
       const hit = cacheGet('all');
       if (hit) return rawJson(hit);
 
-      const meta   = getMetadata();
+      const version = getSheetVersion();   // capture BEFORE reading data
+      const meta    = getMetadata();
       const ss     = SpreadsheetApp.openById(SHEET_ID);
       const metaNames = new Set(Object.keys(meta));
       const sheets = ss.getSheets().filter(s => metaNames.has(s.getName()));
@@ -150,7 +166,7 @@ function doGet(e) {
         });
       }
 
-      const result = JSON.stringify({ ok: true, rows: allRows });
+      const result = JSON.stringify({ ok: true, version, rows: allRows });
       cachePut('all', result);
       return rawJson(result);
     }
@@ -166,9 +182,10 @@ function doGet(e) {
     }
 
     // getDisplayValues avoids Date-object conversion on time-formatted cells
-    const values = sheet.getDataRange().getDisplayValues();
-    const meta   = getMetadata();
-    return json({ ok: true, rows: values, meta: meta[sheetName] || {} });
+    const version = getSheetVersion();   // capture BEFORE reading data
+    const values  = sheet.getDataRange().getDisplayValues();
+    const meta    = getMetadata();
+    return json({ ok: true, version, rows: values, meta: meta[sheetName] || {} });
 
   } catch (err) {
     return json({ ok: false, error: err.toString() });
