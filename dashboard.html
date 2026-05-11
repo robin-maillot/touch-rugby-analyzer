@@ -481,13 +481,15 @@ function aggregateTeams(games) {
   const map = {};
   games.forEach(g => {
     [g.t1, g.t2].forEach(team => {
-      if (!map[team]) map[team] = {
-        name: team, games: 0, wins: 0, losses: 0, draws: 0,
+      const key = `${team}|${g.division || ''}`;
+      if (!map[key]) map[key] = {
+        key, name: team, division: g.division || '',
+        games: 0, wins: 0, losses: 0, draws: 0,
         triesFor: 0, triesAgt: 0, pens: 0, turns: 0, poss: 0,
         tryTypes: {},
       };
       const opp = team === g.t1 ? g.t2 : g.t1;
-      const t = map[team];
+      const t = map[key];
       t.games++;
       t.triesFor += g.tries[team] || 0;
       t.triesAgt += g.tries[opp]  || 0;
@@ -537,7 +539,7 @@ function renderTeamDetail(filter) {
   const grid  = document.getElementById('team-detail-grid');
   if (!teamStats.length) { grid.innerHTML = ''; return; }
   const query = (filter ?? document.getElementById('td-filter')?.value ?? '').toLowerCase().trim();
-  const teams = query ? teamStats.filter(t => t.name.toLowerCase().includes(query)) : teamStats;
+  const teams = query ? teamStats.filter(t => labelOf(t).toLowerCase().includes(query)) : teamStats;
 
   grid.innerHTML = teams.map(t => {
     const total = t.triesFor;
@@ -560,7 +562,7 @@ function renderTeamDetail(filter) {
       : `<div class="td-empty">No try data</div>`;
 
     return `<div class="team-detail-card">
-      <div class="td-name">${cap(t.name)} <span style="color:var(--dim);font-weight:400;font-size:0.68rem">${total} tries</span></div>
+      <div class="td-name">${labelOf(t)} <span style="color:var(--dim);font-weight:400;font-size:0.68rem">${total} tries</span></div>
       ${rows}
     </div>`;
   }).join('');
@@ -595,11 +597,11 @@ function renderKPIs() {
 
   if (bestAtk) {
     set('kpi-atk-val',  f1(bestAtk.avgFor));
-    document.getElementById('kpi-atk-team').innerHTML = `tries/g &mdash; <strong>${cap(bestAtk.name)}</strong>`;
+    document.getElementById('kpi-atk-team').innerHTML = `tries/g &mdash; <strong>${labelOf(bestAtk)}</strong>`;
   }
   if (bestDef) {
     set('kpi-def-val',  f1(bestDef.avgAgt));
-    document.getElementById('kpi-def-team').innerHTML = `conceded/g &mdash; <strong>${cap(bestDef.name)}</strong>`;
+    document.getElementById('kpi-def-team').innerHTML = `conceded/g &mdash; <strong>${labelOf(bestDef)}</strong>`;
   }
 }
 
@@ -607,7 +609,7 @@ function renderKPIs() {
 const COLS = [
   { key: 'name',     label: 'Team',     left: true, fmt: (v, r, ri) => {
     const cls = ri === 0 ? 'r1' : ri === 1 ? 'r2' : ri === 2 ? 'r3' : '';
-    return `<span class="rank-num ${cls}">${ri + 1}</span><span class="team-name-cell">${cap(v)}</span>`;
+    return `<span class="rank-num ${cls}">${ri + 1}</span><span class="team-name-cell">${labelOf(r)}</span>`;
   }},
   { key: 'games',    label: 'GP',  fmt: v => v },
   { key: 'wins',     label: 'W',   fmt: v => `<span class="w-val">${v}</span>` },
@@ -654,17 +656,17 @@ function renderRankings() {
 async function renderCharts() {
   if (!teamStats.length) return;
 
-  const triesOrder = [...teamStats].sort((a, b) => b.avgFor - a.avgFor).map(t => cap(t.name));
-  const pensOrder  = [...teamStats].sort((a, b) => a.avgPens - b.avgPens).map(t => cap(t.name));
+  const triesOrder = [...teamStats].sort((a, b) => b.avgFor - a.avgFor).map(labelOf);
+  const pensOrder  = [...teamStats].sort((a, b) => a.avgPens - b.avgPens).map(labelOf);
 
   // Grouped bar: scored + conceded
   const triesData = teamStats.flatMap(t => [
-    { team: cap(t.name), metric: 'Scored',   value: +f1(t.avgFor) },
-    { team: cap(t.name), metric: 'Conceded', value: +f1(t.avgAgt) },
+    { team: labelOf(t), metric: 'Scored',   value: +f1(t.avgFor) },
+    { team: labelOf(t), metric: 'Conceded', value: +f1(t.avgAgt) },
   ]);
 
   const pensData = teamStats.map(t => ({
-    team: cap(t.name), value: +f1(t.avgPens),
+    team: labelOf(t), value: +f1(t.avgPens),
   }));
 
   const base = { $schema: 'https://vega.github.io/schema/vega-lite/v5.json', width: 'container', autosize: { type: 'fit', contains: 'padding' } };
@@ -708,13 +710,13 @@ function populateH2H() {
     const sel = document.getElementById(id);
     teamStats.forEach(t => {
       const opt = document.createElement('option');
-      opt.value = t.name; opt.textContent = cap(t.name);
+      opt.value = t.key; opt.textContent = labelOf(t);
       sel.appendChild(opt);
     });
   });
   if (teamStats.length >= 2) {
-    document.getElementById('h2h-a').value = teamStats[0].name;
-    document.getElementById('h2h-b').value = teamStats[1].name;
+    document.getElementById('h2h-a').value = teamStats[0].key;
+    document.getElementById('h2h-b').value = teamStats[1].key;
   }
 }
 
@@ -727,13 +729,16 @@ function renderH2H() {
     el.innerHTML = '<div class="h2h-empty">Select two different teams to compare.</div>';
     return;
   }
-  const ta = teamStats.find(t => t.name === a);
-  const tb = teamStats.find(t => t.name === b);
+  const ta = teamStats.find(t => t.key === a);
+  const tb = teamStats.find(t => t.key === b);
   if (!ta || !tb) return;
 
-  const h2hGames = gameStats.filter(g => (g.t1 === a && g.t2 === b) || (g.t1 === b && g.t2 === a));
-  const aH2HWins = h2hGames.filter(g => g.winner === a).length;
-  const bH2HWins = h2hGames.filter(g => g.winner === b).length;
+  const h2hGames = gameStats.filter(g =>
+    g.division === ta.division && g.division === tb.division &&
+    ((g.t1 === ta.name && g.t2 === tb.name) || (g.t1 === tb.name && g.t2 === ta.name))
+  );
+  const aH2HWins = h2hGames.filter(g => g.winner === ta.name).length;
+  const bH2HWins = h2hGames.filter(g => g.winner === tb.name).length;
 
   // Stat definitions: label, a-value, b-value, highlight direction
   const statDefs = [
@@ -795,9 +800,9 @@ function renderH2H() {
   el.innerHTML = `
     <div class="h2h-table">
       <div class="h2h-header-row">
-        <div class="h2h-a-head">${cap(a)}</div>
+        <div class="h2h-a-head">${labelOf(ta)}</div>
         <div class="h2h-mid-head">vs</div>
-        <div class="h2h-b-head">${cap(b)}</div>
+        <div class="h2h-b-head">${labelOf(tb)}</div>
       </div>
       ${dataRows}
       <div class="h2h-data-row"><div style="grid-column:1/-1;padding:8px 0 2px"><div class="h2h-divider" style="padding:0">Direct Matchup</div></div></div>
@@ -836,6 +841,7 @@ function renderResults() {
 // ── Helpers ──────────────────────────────────────────────────────
 function set(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
 function cap(s) { return (s || '').replace(/\b\w/g, c => c.toUpperCase()); }
+function labelOf(t) { return t.division ? `${cap(t.name)} · ${t.division}` : cap(t.name); }
 function f1(n)  { return Number(n).toFixed(1); }
 </script>
 </body>
