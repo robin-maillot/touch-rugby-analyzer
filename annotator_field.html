@@ -380,7 +380,7 @@
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><path d="M2 12h20"/></svg>
   <h1>Field Annotator</h1>
   <div class="header-actions">
-    <a href="index.html" class="btn-icon">← Back</a>
+    <a href="index.html" class="btn-icon" onclick="return confirmLeave()">← Back</a>
     <button class="btn-icon btn-hdr-push" id="pushBtn"     onclick="pushToSheet()">⬆ Push</button>
     <button class="btn-icon btn-hdr-swap" id="swapBtn"     onclick="toggleSwap()">⇆ Swap</button>
     <button class="btn-icon btn-hdr-override" id="overrideBtn" style="display:none" onclick="pushToSheet(true)">⚠ Override</button>
@@ -539,6 +539,12 @@ let possession   = 'Team 1';
 let wallStart    = null;
 let liveMode     = false;
 let liveInterval = null;
+
+function confirmLeave() {
+  if (!annotations.length) return true;
+  const n = annotations.length;
+  return confirm(`You have ${n} event${n === 1 ? '' : 's'} on this page. Leaving will discard them. Continue?`);
+}
 
 // ── Time helpers ───────────────────────────────────────────────
 function nowSeconds() {

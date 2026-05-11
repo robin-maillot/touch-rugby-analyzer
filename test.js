@@ -24,10 +24,11 @@ function test(name, fn) {
 
 // ── TR.fmt ────────────────────────────────────────────────────
 console.log('TR.fmt');
-test('zero/falsy',  () => { assert.equal(TR.fmt(0), '0:00:00'); assert.equal(TR.fmt(null), '0:00:00'); assert.equal(TR.fmt(NaN), '0:00:00'); });
+test('zero/falsy',  () => { assert.equal(TR.fmt(0), '0:00:00'); assert.equal(TR.fmt(null), '0:00:00'); assert.equal(TR.fmt(undefined), '0:00:00'); assert.equal(TR.fmt(NaN), '0:00:00'); });
 test('sub-minute',  () => { assert.equal(TR.fmt(5), '0:00:05'); assert.equal(TR.fmt(59), '0:00:59'); });
-test('minutes',     () => { assert.equal(TR.fmt(65), '0:01:05'); assert.equal(TR.fmt(600), '0:10:00'); });
+test('minutes',     () => { assert.equal(TR.fmt(60), '0:01:00'); assert.equal(TR.fmt(65), '0:01:05'); assert.equal(TR.fmt(599), '0:09:59'); assert.equal(TR.fmt(600), '0:10:00'); });
 test('hours',       () => { assert.equal(TR.fmt(3600), '1:00:00'); assert.equal(TR.fmt(3661), '1:01:01'); assert.equal(TR.fmt(36000), '10:00:00'); });
+test('fractional seconds floor', () => { assert.equal(TR.fmt(5.9), '0:00:05'); assert.equal(TR.fmt(59.9), '0:00:59'); });
 
 // ── TR.enc ────────────────────────────────────────────────────
 console.log('TR.enc');
@@ -62,14 +63,30 @@ test('leaves non-placeholder values', () => {
   assert.deepEqual(rows[0], ['Try', 'France']);
 });
 
+// ── TR.MENU ───────────────────────────────────────────────────
+console.log('TR.MENU');
+test('canonical types present',   () => { ['Penalty Attack','Penalty Defence','Turnover','Game Event','Try','To Review'].forEach(t => assert.ok(Array.isArray(TR.MENU[t]), `missing ${t}`)); });
+test('Turnover has 6 Again',      () => assert.ok(TR.MENU['Turnover'].includes('6 Again')));
+test('Game Event has Start/End',  () => { assert.ok(TR.MENU['Game Event'].includes('Game Start')); assert.ok(TR.MENU['Game Event'].includes('Game End')); });
+test('NAMES_BY_TYPE alias',       () => assert.equal(TR.NAMES_BY_TYPE, TR.MENU));
+
 // ── TR.isTurnover ─────────────────────────────────────────────
 console.log('TR.isTurnover');
-test('Try → true',              () => assert.equal(TR.isTurnover('Try', 'Scoop'), true));
+test('Try → true',              () => { assert.equal(TR.isTurnover('Try', 'Scoop'), true); assert.equal(TR.isTurnover('Try', 'Other'), true); });
 test('Penalty Attack → true',   () => assert.equal(TR.isTurnover('Penalty Attack', 'Forward Pass'), true));
 test('Penalty Defence → false', () => assert.equal(TR.isTurnover('Penalty Defence', 'Offside'), false));
 test('Turnover 6th Touch → true', () => assert.equal(TR.isTurnover('Turnover', '6th Touch'), true));
+test('Turnover Ball Down → true', () => assert.equal(TR.isTurnover('Turnover', 'Ball Down'), true));
 test('Turnover 6 Again → false',  () => assert.equal(TR.isTurnover('Turnover', '6 Again'), false));
-test('Game Event → false',       () => assert.equal(TR.isTurnover('Game Event', 'Game Start'), false));
+test('Game Event Game Start → false', () => assert.equal(TR.isTurnover('Game Event', 'Game Start'), false));
+test('Game Event Game End → false',   () => assert.equal(TR.isTurnover('Game Event', 'Game End'),   false));
+test('Game Event Ball Live → false',  () => assert.equal(TR.isTurnover('Game Event', 'Ball Live'),  false));
+test('To Review → false',             () => assert.equal(TR.isTurnover('To Review', ''), false));
+
+// ── TR.otherTeam ──────────────────────────────────────────────
+console.log('TR.otherTeam');
+test('Team 1 → Team 2',  () => assert.equal(TR.otherTeam('Team 1'), 'Team 2'));
+test('Team 2 → Team 1',  () => assert.equal(TR.otherTeam('Team 2'), 'Team 1'));
 
 // ── TR.inferPossessionAfter ───────────────────────────────────
 console.log('TR.inferPossessionAfter');
@@ -78,6 +95,8 @@ test('Penalty Attack → other',  () => assert.equal(TR.inferPossessionAfter('Te
 test('Penalty Defence → same',  () => assert.equal(TR.inferPossessionAfter('Team 1', 'Penalty Defence', 'Offside'), 'Team 1'));
 test('Turnover → other',        () => assert.equal(TR.inferPossessionAfter('Team 1', 'Turnover', '6th Touch'), 'Team 2'));
 test('6 Again → same',          () => assert.equal(TR.inferPossessionAfter('Team 1', 'Turnover', '6 Again'), 'Team 1'));
+test('Ball Live → same',        () => { assert.equal(TR.inferPossessionAfter('Team 1', 'Game Event', 'Ball Live'), 'Team 1'); assert.equal(TR.inferPossessionAfter('Team 2', 'Game Event', 'Ball Live'), 'Team 2'); });
+test('Game Start → same',       () => assert.equal(TR.inferPossessionAfter('Team 1', 'Game Event', 'Game Start'), 'Team 1'));
 
 // ── TR.inferActionOwner ───────────────────────────────────────
 console.log('TR.inferActionOwner');
@@ -86,6 +105,7 @@ test('Turnover → possession owner',  () => assert.equal(TR.inferActionOwner('T
 test('6 Again → other (defence)',    () => assert.equal(TR.inferActionOwner('Team 1', 'Turnover', '6 Again'), 'Team 2'));
 test('Penalty Attack → same',        () => assert.equal(TR.inferActionOwner('Team 1', 'Penalty Attack', 'Forward Pass'), 'Team 1'));
 test('Penalty Defence → other',      () => { assert.equal(TR.inferActionOwner('Team 1', 'Penalty Defence', 'Offside'), 'Team 2'); assert.equal(TR.inferActionOwner('Team 2', 'Penalty Defence', 'Offside'), 'Team 1'); });
+test('Ball Live → possession owner', () => assert.equal(TR.inferActionOwner('Team 1', 'Game Event', 'Ball Live'), 'Team 1'));
 
 // ─────────────────────────────────────────────────────────────
 console.log(`\n${passed} passed, ${failed} failed`);

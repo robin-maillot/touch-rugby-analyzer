@@ -39,6 +39,36 @@
       t.equal(TR.fmt(3661),  '1:01:01');
       t.equal(TR.fmt(36000), '10:00:00');
     });
+    QUnit.test('fractional seconds floor', t => {
+      t.equal(TR.fmt(5.9),  '0:00:05');
+      t.equal(TR.fmt(59.9), '0:00:59');
+    });
+  });
+
+  // ── TR.MENU ────────────────────────────────────────────────────
+  QUnit.module('TR.MENU', () => {
+    QUnit.test('canonical types present', t => {
+      ['Penalty Attack', 'Penalty Defence', 'Turnover', 'Game Event', 'Try', 'To Review']
+        .forEach(type => t.true(Array.isArray(TR.MENU[type]), `missing ${type}`));
+    });
+    QUnit.test('Turnover includes 6 Again', t => {
+      t.true(TR.MENU['Turnover'].includes('6 Again'));
+    });
+    QUnit.test('Game Event includes Game Start and Game End', t => {
+      t.true(TR.MENU['Game Event'].includes('Game Start'));
+      t.true(TR.MENU['Game Event'].includes('Game End'));
+    });
+    QUnit.test('NAMES_BY_TYPE aliases MENU', t => {
+      t.strictEqual(TR.NAMES_BY_TYPE, TR.MENU);
+    });
+  });
+
+  // ── TR.otherTeam ───────────────────────────────────────────────
+  QUnit.module('TR.otherTeam', () => {
+    QUnit.test('Team 1 ↔ Team 2', t => {
+      t.equal(TR.otherTeam('Team 1'), 'Team 2');
+      t.equal(TR.otherTeam('Team 2'), 'Team 1');
+    });
   });
 
   // ── TR.enc ─────────────────────────────────────────────────────
@@ -111,6 +141,8 @@
     });
     QUnit.test('Game Event and To Review do not switch', t => {
       t.false(TR.isTurnover('Game Event', 'Game Start'));
+      t.false(TR.isTurnover('Game Event', 'Game End'));
+      t.false(TR.isTurnover('Game Event', 'Ball Live'));
       t.false(TR.isTurnover('To Review', ''));
     });
   });
@@ -133,6 +165,10 @@
     QUnit.test('Turnover / 6 Again → stays', t => {
       t.equal(TR.inferPossessionAfter('Team 1', 'Turnover', '6 Again'), 'Team 1');
     });
+    QUnit.test('Ball Live → stays (Game Event never switches)', t => {
+      t.equal(TR.inferPossessionAfter('Team 1', 'Game Event', 'Ball Live'), 'Team 1');
+      t.equal(TR.inferPossessionAfter('Team 2', 'Game Event', 'Ball Live'), 'Team 2');
+    });
   });
 
   // ── TR.inferActionOwner ───────────────────────────────────────
@@ -152,6 +188,9 @@
     QUnit.test('Penalty Defence → other team (defence gave away penalty)', t => {
       t.equal(TR.inferActionOwner('Team 1', 'Penalty Defence', 'Offside'), 'Team 2');
       t.equal(TR.inferActionOwner('Team 2', 'Penalty Defence', 'Offside'), 'Team 1');
+    });
+    QUnit.test('Ball Live → possession owner', t => {
+      t.equal(TR.inferActionOwner('Team 1', 'Game Event', 'Ball Live'), 'Team 1');
     });
   });
   </script>
