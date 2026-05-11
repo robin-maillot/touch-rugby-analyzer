@@ -151,7 +151,8 @@ TR.auth('admin');
 function gameLabel(g) {
   if (g.team1 && g.team2) {
     const sub = [g.year, g.division, g.competition].filter(Boolean).join(' ');
-    return { title: `${g.team1} vs ${g.team2}`, sub };
+    const id  = g.id ? ` #${g.id}` : '';
+    return { title: `${g.team1} vs ${g.team2}${id}`, sub };
   }
   return { title: g.name, sub: '' };
 }

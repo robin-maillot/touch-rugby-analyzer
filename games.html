@@ -328,12 +328,13 @@ async function fetchGameList() {
 function sheetNameToLabel(entry) {
   const t1   = entry.team1;
   const t2   = entry.team2;
-  const comp = [entry.year, entry.division, entry.competition].filter(Boolean).join(' ');
-  if (t1 && t2) return `${t1} vs ${t2}${comp ? '  (' + comp + ')' : ''}`;
+  const tail = [entry.year, entry.division, entry.competition].filter(Boolean).join(' ');
+  const id   = entry.id ? ` #${entry.id}` : '';
+  if (t1 && t2) return `${t1} vs ${t2}${id}${tail ? '  (' + tail + ')' : ''}`;
   // Fallback: parse from tab name
   const parts = entry.name.split('_');
   if (parts.length < 5) return entry.name;
-  return `${parts[parts.length - 2]} vs ${parts[parts.length - 1]}  (${parts.slice(0, -2).join(' ')})`;
+  return `${parts[parts.length - 2]} vs ${parts[parts.length - 1]}${id}  (${parts.slice(0, -2).join(' ')})`;
 }
 
 // ── Load & render a game ───────────────────────────────────────

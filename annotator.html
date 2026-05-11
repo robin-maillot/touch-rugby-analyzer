@@ -275,6 +275,7 @@
       <option value="" selected>NONE</option>
     </select>
     <input class="yt-input meta-input" id="metaCompetition" placeholder="Competition" oninput="updateSheetPreview()">
+    <input class="yt-input meta-input" id="metaId" placeholder="ID" style="width:70px !important" title="Optional disambiguator when same teams/comp/year/division play more than once" oninput="updateSheetPreview()">
     <span class="meta-sep">→</span>
     <span id="sheetPreview" style="font-family:monospace;font-size:0.72rem;color:#555;white-space:nowrap">fill metadata to generate tab name</span>
   </div>
@@ -977,6 +978,7 @@ async function loadFromSheet() {
     document.getElementById('metaYear').value        = m.year        || '';
     document.getElementById('metaDivision').value    = m.division    || '';
     document.getElementById('metaCompetition').value = m.competition || '';
+    document.getElementById('metaId').value          = m.id          || '';
     updateSheetPreview();
 
     // Auto-load YouTube video from game metadata
@@ -1005,7 +1007,9 @@ function metaToSheetName() {
   const comp  = slug(document.getElementById('metaCompetition').value);
   const t1    = slug(document.getElementById('metaTeam1').value);
   const t2    = slug(document.getElementById('metaTeam2').value);
-  return [year, div, comp, t1, t2].filter(Boolean).join('_');
+  const id    = slug(document.getElementById('metaId').value);
+  const base  = [year, div, comp, t1, t2].filter(Boolean).join('_');
+  return id ? `${base}_${id}` : base;
 }
 
 function updateSheetPreview() {
@@ -1106,6 +1110,7 @@ async function pushToSheet(override = false) {
         year:        document.getElementById('metaYear').value.trim(),
         division:    document.getElementById('metaDivision').value.trim(),
         competition: document.getElementById('metaCompetition').value.trim(),
+        id:          document.getElementById('metaId').value.trim(),
         video:       videoBaseName,
         analyzable,
         youtubelink: document.getElementById('ytUrl').value.trim(),
@@ -1203,7 +1208,7 @@ function loadCSV(e) {
     if (!loaded.length) { alert('No valid annotations found in CSV.'); return; }
     annotations = loaded.sort((a,b)=>a.time-b.time);
     // Clear metadata fields
-    ['metaTeam1','metaTeam2','metaYear','metaDivision','metaCompetition'].forEach(id => {
+    ['metaTeam1','metaTeam2','metaYear','metaDivision','metaCompetition','metaId'].forEach(id => {
       document.getElementById(id).value = '';
     });
     renderList(); renderMarkers();

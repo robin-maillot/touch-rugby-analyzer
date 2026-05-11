@@ -413,6 +413,7 @@
         <option value="" selected>NONE</option>
       </select>
       <input id="metaCompetition" placeholder="Competition" oninput="onMetaChange()">
+      <input id="metaId" placeholder="ID" style="max-width:70px" title="Optional disambiguator for repeat fixtures" oninput="onMetaChange()">
     </div>
   </div>
   <div id="sheetPreview">fill metadata to generate tab name</div>
@@ -746,7 +747,9 @@ function metaToSheetName() {
   const comp  = slug(document.getElementById('metaCompetition').value);
   const t1    = slug(document.getElementById('metaTeam1').value);
   const t2    = slug(document.getElementById('metaTeam2').value);
-  return [year, div, comp, t1, t2].filter(Boolean).join('_');
+  const id    = slug(document.getElementById('metaId').value);
+  const base  = [year, div, comp, t1, t2].filter(Boolean).join('_');
+  return id ? `${base}_${id}` : base;
 }
 
 function updateSheetPreview() {
@@ -1068,6 +1071,7 @@ async function pushToSheet(override = false) {
         year:        document.getElementById('metaYear').value.trim(),
         division:    document.getElementById('metaDivision').value.trim(),
         competition: document.getElementById('metaCompetition').value.trim(),
+        id:          document.getElementById('metaId').value.trim(),
         video:       '',
         analyzable,
       },

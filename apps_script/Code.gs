@@ -9,7 +9,7 @@ const LIVE_SHEET      = '_live';      // reserved tab name for live game state
 const HEADERS = ['Time', 'Possession Owner', 'Type', 'Name', 'To Review', 'Comment', 'Action Owner'];
 
 // Metadata columns appended to action=all rows
-const META_COLS = ['Team 1', 'Team 2', 'Competition', 'Year', 'Division', 'Video Name', 'Analyzable'];
+const META_COLS = ['Team 1', 'Team 2', 'Competition', 'Year', 'Division', 'Video Name', 'Analyzable', 'ID'];
 
 // ── Metadata helper ────────────────────────────────────────────
 // Reads _metadata sheet and returns { [sheetName]: { team1, team2, competition, year, division } }
@@ -25,6 +25,7 @@ function getMetadata() {
   const ni   = col('sheet name'), t1i = col('team 1'), t2i = col('team 2');
   const ci   = col('competition'), yi = col('year'), di = col('division');
   const vi   = col('video name'), ai = col('analyzable'), yui = col('youtube link');
+  const idi  = col('id');
 
   const meta = {};
   values.slice(1).forEach(row => {
@@ -39,6 +40,7 @@ function getMetadata() {
       video:       vi  >= 0 ? row[vi]  : '',
       analyzable:  ai  >= 0 ? row[ai]  : '',
       youtubelink: yui >= 0 ? row[yui] : '',
+      id:          idi >= 0 ? row[idi] : '',
     };
   });
   return meta;
@@ -159,7 +161,7 @@ function doGet(e) {
 
         const name = sheet.getName();
         const m    = meta[name] || {};
-        const metaValues = [m.team1 || '', m.team2 || '', m.competition || '', m.year || '', m.division || '', m.video || '', m.analyzable || ''];
+        const metaValues = [m.team1 || '', m.team2 || '', m.competition || '', m.year || '', m.division || '', m.video || '', m.analyzable || '', m.id || ''];
         values.slice(1).forEach(row => {
           const mapped = colIndices.map(i => i >= 0 ? row[i] : '');
           allRows.push([...mapped, name, ...metaValues]);
@@ -274,7 +276,7 @@ function writeMeta(sheetName, meta) {
   let sheet = ss.getSheetByName(METADATA_SHEET);
   if (!sheet) {
     sheet = ss.insertSheet(METADATA_SHEET);
-    sheet.appendRow(['Sheet Name', 'Team 1', 'Team 2', 'Competition', 'Year', 'Division', 'Video Name', 'Analyzable', 'Youtube Link']);
+    sheet.appendRow(['Sheet Name', 'Team 1', 'Team 2', 'Competition', 'Year', 'Division', 'Video Name', 'Analyzable', 'Youtube Link', 'ID']);
   }
 
   const values  = sheet.getDataRange().getValues();
@@ -290,6 +292,7 @@ function writeMeta(sheetName, meta) {
   const vi   = col('video name');
   const ai   = col('analyzable');
   let yui    = col('youtube link');
+  let idi    = col('id');
 
   // Add 'Youtube Link' column if missing and we have a value to write
   if (yui < 0 && meta.youtubelink != null) {
@@ -297,6 +300,14 @@ function writeMeta(sheetName, meta) {
     headers.push('youtube link');
     yui = headers.length - 1;
     // Refresh values to include the new column in subsequent reads
+    values.forEach(row => { while (row.length < headers.length) row.push(''); });
+  }
+
+  // Add 'ID' column if missing and we have a value to write
+  if (idi < 0 && meta.id != null) {
+    sheet.getRange(1, headers.length + 1).setValue('ID');
+    headers.push('id');
+    idi = headers.length - 1;
     values.forEach(row => { while (row.length < headers.length) row.push(''); });
   }
 
@@ -322,6 +333,7 @@ function writeMeta(sheetName, meta) {
   if (vi  >= 0 && meta.video       != null) row[vi]  = meta.video;
   if (ai  >= 0 && meta.analyzable  != null) row[ai]  = meta.analyzable;
   if (yui >= 0 && meta.youtubelink != null) row[yui] = meta.youtubelink;
+  if (idi >= 0 && meta.id          != null) row[idi] = meta.id;
 
   if (existingRow > 0) {
     sheet.getRange(existingRow, 1, 1, numCols).setValues([row]);
