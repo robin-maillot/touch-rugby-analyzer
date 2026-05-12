@@ -16,6 +16,21 @@ TR.extractVideoId = (url) => {
   return m ? m[1] : null;
 };
 
+// Human-readable label for a sheet entry (from action=list), preferring
+// metadata over tab-name parsing. Used by the game pickers in games.html
+// and viewer.html so both surfaces show the same pretty name.
+TR.sheetNameToLabel = (entry) => {
+  if (!entry) return '';
+  const t1   = entry.team1;
+  const t2   = entry.team2;
+  const tail = [entry.year, entry.division, entry.competition].filter(Boolean).join(' ');
+  const id   = entry.id ? ` #${entry.id}` : '';
+  if (t1 && t2) return `${t1} vs ${t2}${id}${tail ? '  (' + tail + ')' : ''}`;
+  const parts = (entry.name || '').split('_');
+  if (parts.length < 5) return entry.name || '';
+  return `${parts[parts.length - 2]} vs ${parts[parts.length - 1]}${id}  (${parts.slice(0, -2).join(' ')})`;
+};
+
 // Replace "Team 1"/"Team 2" placeholder strings with actual team names.
 // rows: array of arrays; team1/team2: actual names; cols: array of column indices to check.
 TR.substituteTeams = (rows, team1, team2, cols) => {

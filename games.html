@@ -289,7 +289,7 @@ function applyGameList(result) {
     gamesMeta[entry.name] = entry;
     const opt = document.createElement('option');
     opt.value = entry.name;
-    opt.textContent = sheetNameToLabel(entry);
+    opt.textContent = TR.sheetNameToLabel(entry);
     sel.appendChild(opt);
   });
   setStatus(`${analyzable.length} game${analyzable.length !== 1 ? 's' : ''}`);
@@ -322,19 +322,6 @@ async function fetchGameList() {
   } catch (err) {
     if (!cached) setStatus('Could not load game list: ' + err.message);
   }
-}
-
-// Build a human-readable label, preferring metadata over tab name parsing
-function sheetNameToLabel(entry) {
-  const t1   = entry.team1;
-  const t2   = entry.team2;
-  const tail = [entry.year, entry.division, entry.competition].filter(Boolean).join(' ');
-  const id   = entry.id ? ` #${entry.id}` : '';
-  if (t1 && t2) return `${t1} vs ${t2}${id}${tail ? '  (' + tail + ')' : ''}`;
-  // Fallback: parse from tab name
-  const parts = entry.name.split('_');
-  if (parts.length < 5) return entry.name;
-  return `${parts[parts.length - 2]} vs ${parts[parts.length - 1]}${id}  (${parts.slice(0, -2).join(' ')})`;
 }
 
 // ── Load & render a game ───────────────────────────────────────

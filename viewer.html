@@ -479,6 +479,8 @@ let colTime = -1, colType = -1, colName = -1, colGame = -1, colComment = -1, col
 
 // YouTube base URLs from metadata, keyed by game sheet name
 let gameYtMap = {};
+// Pretty labels from metadata, keyed by game sheet name
+let gameLabelMap = {};
 
 // ── Video state ─────────────────────────────────────────────────
 let ytPlayer          = null;
@@ -509,8 +511,12 @@ window.addEventListener('DOMContentLoaded', () => {
 // ── Data fetching ───────────────────────────────────────────────
 function buildGameYtMap(sheets) {
   gameYtMap = {};
+  gameLabelMap = {};
   if (!sheets) return;
-  sheets.forEach(entry => { if (entry.youtubelink) gameYtMap[entry.name] = entry.youtubelink; });
+  sheets.forEach(entry => {
+    if (entry.youtubelink) gameYtMap[entry.name] = entry.youtubelink;
+    gameLabelMap[entry.name] = TR.sheetNameToLabel(entry);
+  });
 }
 
 async function fetchAll() {
@@ -633,11 +639,13 @@ function buildSearchColSelect() {
 
 function populateGameFilter() {
   const sel = document.getElementById('gameFilter');
-  const games = [...new Set(allData.map(r => colGame >= 0 ? r[colGame] : '').filter(Boolean))].sort();
+  const games = [...new Set(allData.map(r => colGame >= 0 ? r[colGame] : '').filter(Boolean))];
+  games.sort((a, b) => (gameLabelMap[a] || a).localeCompare(gameLabelMap[b] || b));
   sel.innerHTML = '<option value="">All games</option>';
   games.forEach(g => {
     const opt = document.createElement('option');
-    opt.value = opt.textContent = g;
+    opt.value = g;
+    opt.textContent = gameLabelMap[g] || g;
     sel.appendChild(opt);
   });
   if (selectedGame) sel.value = selectedGame;
