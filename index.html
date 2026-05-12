@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <title>Touch Rugby Analyzer (alpha version)</title>
+  <script defer src="https://cloud.umami.is/script.js" data-website-id="cb7fd4f2-fcd5-44d7-a8e4-70e9068870bb"></script>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
     body {
@@ -165,6 +166,8 @@
     const level = PASSWORDS[pwd];
     if (level) {
       sessionStorage.setItem('password', pwd);
+      const role = level === 'basic' ? 'viewer' : level;
+      if (window.umami) umami.identify({ role });
       initApp(level);
     } else {
       errorMsg.style.display = 'block';
