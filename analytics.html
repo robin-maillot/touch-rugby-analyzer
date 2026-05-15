@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Analytics — Touch Rugby Analyzer</title>
+  <script defer src="https://cloud.umami.is/script.js" data-website-id="cb7fd4f2-fcd5-44d7-a8e4-70e9068870bb"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+  <style>
+    :root {
+      --bg:        #0f1117;
+      --surface:   #1a1d27;
+      --surface-2: #22253a;
+      --border:    #2a2d3a;
+      --border-l:  #1c1f2e;
+      --text:      #e0e0e0;
+      --muted:     #888;
+      --dim:       #555;
+      --accent:    #3b82f6;
+      --green:     #22c55e;
+      --red:       #ef4444;
+      --red-dark:  #b91c1c;
+      --orange:    #f97316;
+      --purple:    #7c3aed;
+      --yellow:    #f59e0b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* Header (matches dashboard) */
+    header { background: var(--surface); padding: 10px 20px; display: flex; align-items: center; gap: 14px; border-bottom: 1px solid var(--border); }
+    .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
+    .logo span { font-size: 1rem; font-weight: 600; color: #fff; white-space: nowrap; }
+    .header-sep { width: 1px; height: 20px; background: var(--border); align-self: center; }
+    .header-nav { display: flex; gap: 4px; margin-left: auto; }
+    .header-nav a { color: var(--muted); text-decoration: none; font-size: 0.8rem; padding: 5px 10px; border-radius: 6px; transition: background 0.15s, color 0.15s; }
+    .header-nav a:hover { background: var(--surface-2); color: var(--text); }
+    .header-nav a.active { background: var(--surface-2); color: var(--accent); }
+
+    /* Layout */
+    main { padding: 20px 24px 60px; max-width: 1180px; margin: 0 auto; }
+    .section { margin-bottom: 36px; }
+    .section-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.09em; color: var(--dim); font-weight: 700; margin-bottom: 12px; }
+    .section-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+    .section-title { font-size: 0.95rem; font-weight: 700; color: #fff; }
+    .section-sub   { font-size: 0.72rem; color: var(--muted); }
+    .divider { border: none; border-top: 1px solid var(--border); margin: 40px 0 28px; }
+
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .three-col { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+
+    /* KPI strip */
+    .kpi-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+    .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+    .kpi-label { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin-bottom: 6px; }
+    .kpi-value { font-size: 1.5rem; font-weight: 800; color: #fff; line-height: 1.1; }
+    .kpi-value.accent { color: var(--accent); }
+    .kpi-value.green  { color: var(--green); }
+    .kpi-value.orange { color: var(--orange); }
+    .kpi-sub  { font-size: 0.68rem; color: var(--dim); margin-top: 5px; }
+    .kpi-lead { font-size: 0.72rem; color: var(--muted); margin-top: 4px; text-transform: capitalize; }
+
+    /* Tables w/ bars */
+    .b-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    .b-table th { padding: 7px 10px; text-align: right; color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    .b-table th:first-child { text-align: left; padding-left: 0; }
+    .b-table th.sort-asc::after  { content: ' ▲'; font-size: 0.6em; color: var(--accent); }
+    .b-table th.sort-desc::after { content: ' ▼'; font-size: 0.6em; color: var(--accent); }
+    .b-table td { padding: 8px 10px; text-align: right; border-bottom: 1px solid var(--border-l); }
+    .b-table td:first-child { text-align: left; padding-left: 0; color: #fff; font-weight: 600; }
+    .b-table tr:last-child td { border-bottom: none; }
+    .b-table tbody tr:hover td { background: var(--surface-2); }
+    .b-table tbody tr.muted td { color: var(--muted); }
+    .b-table tbody tr.muted td:first-child { color: var(--muted); font-weight: 400; }
+
+    /* Cell with embedded bar */
+    .bar-cell { position: relative; min-width: 80px; }
+    .bar-bg { position: absolute; inset: 0; display: flex; align-items: center; padding: 0 10px; }
+    .bar-fg { height: 16px; border-radius: 3px; opacity: 0.18; }
+    .bar-val { position: relative; font-variant-numeric: tabular-nums; }
+
+    /* Pill / chip */
+    .chip { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 0.66rem; background: var(--surface-2); color: var(--muted); margin-left: 4px; }
+    .chip.try   { background: rgba(34,197,94,.15); color: var(--green); }
+    .chip.turn  { background: rgba(249,115,22,.15); color: var(--orange); }
+    .chip.patk  { background: rgba(239,68,68,.15); color: var(--red); }
+    .chip.pdef  { background: rgba(185,28,28,.15); color: #fca5a5; }
+    .chip.game  { background: rgba(59,130,246,.15); color: var(--accent); }
+    .chip.review{ background: rgba(124,58,237,.15); color: #c4b5fd; }
+
+    /* Filters bar */
+    .filters { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 18px; }
+    .filter-group { display: flex; flex-direction: column; gap: 4px; }
+    .filter-group label { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); }
+    .filter-group select { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 0.82rem; outline: none; min-width: 140px; cursor: pointer; }
+    .filter-group select:focus { border-color: var(--accent); }
+    .filter-reset { background: none; color: var(--muted); border: 1px solid var(--border); border-radius: 6px; padding: 7px 12px; font-size: 0.75rem; cursor: pointer; align-self: end; }
+    .filter-reset:hover { color: var(--text); border-color: var(--accent); }
+    .filter-summary { margin-left: auto; font-size: 0.75rem; color: var(--muted); }
+    .filter-summary strong { color: var(--text); }
+
+    /* Vega */
+    .chart-wrap { width: 100%; }
+    .vega-embed { width: 100% !important; }
+
+    /* Combos list */
+    .combo-list { display: flex; flex-direction: column; gap: 6px; }
+    .combo-row { display: grid; grid-template-columns: 22px 1fr auto; gap: 10px; align-items: center; padding: 7px 10px; background: var(--surface); border: 1px solid var(--border-l); border-radius: 6px; font-size: 0.8rem; }
+    .combo-rank { color: var(--dim); font-size: 0.7rem; text-align: right; font-variant-numeric: tabular-nums; }
+    .combo-label { color: var(--text); }
+    .combo-team { color: var(--muted); text-transform: capitalize; }
+    .combo-count { font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; }
+
+    /* Loading / errors */
+    #loadingArea { text-align: center; padding: 80px; color: var(--muted); font-size: 0.9rem; }
+    #errorMsg    { color: var(--red); padding: 20px 0; font-size: 0.85rem; display: none; }
+    #analytics   { display: none; }
+    .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 8px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    @media (max-width: 900px) {
+      .three-col { grid-template-columns: 1fr; }
+      .two-col { grid-template-columns: 1fr; }
+      .kpi-strip { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+<script src="js/config.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/events.js"></script>
+</head>
+<body>
+
+<header>
+  <a class="logo" href="index.html">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2">
+      <circle cx="12" cy="12" r="10"/>
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+      <path d="M2 12h20"/>
+    </svg>
+    <span>Touch Rugby Analyzer</span>
+  </a>
+  <div class="header-sep"></div>
+  <nav class="header-nav">
+    <a href="games.html">Games</a>
+    <a href="dashboard.html">Dashboard</a>
+    <a href="viewer.html">Events</a>
+    <a href="analytics.html" class="active">Analytics</a>
+    <a href="annotator.html" id="annotatorLink" style="display:none">Annotator</a>
+  </nav>
+</header>
+<script>{ const p = sessionStorage.getItem('password'); if (p === 'm30-staff' || p === 'm30-admin') document.getElementById('annotatorLink').style.display = ''; }</script>
+
+<main>
+  <div id="loadingArea">
+    <div class="spinner"></div>
+    <span>Loading event data…</span>
+    <div id="loadHint" style="margin-top:14px;font-size:0.78rem;color:var(--dim)"></div>
+  </div>
+  <div id="errorMsg"></div>
+
+  <div id="analytics">
+
+    <!-- ─── TOP: Event-centric overview ────────────────────── -->
+    <div class="section">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Event Overview</div>
+          <div class="section-sub">All annotated events across every analysable game</div>
+        </div>
+      </div>
+
+      <div class="kpi-strip" id="kpiStrip"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">Event types · counts &amp; share</div>
+      <div class="two-col">
+        <div class="card">
+          <table class="b-table" id="typeTable">
+            <thead>
+              <tr>
+                <th data-sort="type">Type</th>
+                <th data-sort="count" class="sort-desc">Count</th>
+                <th data-sort="pct">% of total</th>
+                <th data-sort="topSub">Most common</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="card"><div id="typeChart" class="chart-wrap"></div></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">Sub-type breakdown</div>
+      <div class="three-col" id="subTypeGrid"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">Team × event linkage <span style="color:var(--dim);text-transform:none;letter-spacing:0;font-weight:400">— events credited to each team (action owner)</span></div>
+      <div class="card" style="overflow:auto">
+        <table class="b-table" id="teamMatrix">
+          <thead><tr id="teamMatrixHead"></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">Top combinations <span style="color:var(--dim);text-transform:none;letter-spacing:0;font-weight:400">— most common (team, event, sub-type) triples</span></div>
+      <div class="two-col">
+        <div class="card">
+          <div style="font-size:0.7rem;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em">Top 15 overall</div>
+          <div class="combo-list" id="comboListAll"></div>
+        </div>
+        <div class="card">
+          <div style="font-size:0.7rem;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em">Top sub-type per team</div>
+          <div class="combo-list" id="comboListByTeam"></div>
+        </div>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- ─── BOTTOM: Filtered deep dive ─────────────────────── -->
+    <div class="section">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Filtered Deep Dive</div>
+          <div class="section-sub">Slice the data by year, competition, or division</div>
+        </div>
+      </div>
+
+      <div class="filters">
+        <div class="filter-group">
+          <label for="fYear">Year</label>
+          <select id="fYear"><option value="">All</option></select>
+        </div>
+        <div class="filter-group">
+          <label for="fComp">Competition</label>
+          <select id="fComp"><option value="">All</option></select>
+        </div>
+        <div class="filter-group">
+          <label for="fDiv">Division</label>
+          <select id="fDiv"><option value="">All</option></select>
+        </div>
+        <button class="filter-reset" onclick="resetFilters()">Reset</button>
+        <div class="filter-summary" id="filterSummary"></div>
+      </div>
+
+      <div class="kpi-strip" id="fKpiStrip" style="margin-bottom:18px"></div>
+
+      <div class="two-col" style="margin-bottom:18px">
+        <div class="card"><div id="fTypeChart" class="chart-wrap"></div></div>
+        <div class="card"><div id="fTrendChart" class="chart-wrap"></div></div>
+      </div>
+
+      <div class="card" style="margin-bottom:18px">
+        <div style="font-size:0.7rem;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em">Team × event type heatmap</div>
+        <div id="fHeatmap" class="chart-wrap"></div>
+      </div>
+
+      <div class="two-col">
+        <div class="card">
+          <div style="font-size:0.7rem;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em">Top combinations (filtered)</div>
+          <div class="combo-list" id="fComboList"></div>
+        </div>
+        <div class="card" style="overflow:auto">
+          <div style="font-size:0.7rem;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em">Filtered team matrix</div>
+          <table class="b-table" id="fTeamMatrix">
+            <thead><tr id="fTeamMatrixHead"></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+TR.auth('admin');
+
+// ── Constants ────────────────────────────────────────────────
+const TYPE_ORDER  = ['Try', 'Penalty Attack', 'Penalty Defence', 'Turnover', 'Game Event', 'To Review'];
+const TYPE_COLORS = {
+  'Try':             '#22c55e',
+  'Turnover':        '#f97316',
+  'Penalty Attack':  '#ef4444',
+  'Penalty Defence': '#b91c1c',
+  'Game Event':      '#3b82f6',
+  'To Review':       '#7c3aed',
+};
+const TYPE_CHIP = {
+  'Try': 'try', 'Turnover': 'turn', 'Penalty Attack': 'patk',
+  'Penalty Defence': 'pdef', 'Game Event': 'game', 'To Review': 'review',
+};
+
+const VEGA_CONFIG = {
+  background: 'transparent',
+  axis:   { labelColor: '#aaa', titleColor: '#888', domainColor: '#444', gridColor: '#1c1f2e', tickColor: '#444', labelFont: 'Segoe UI', titleFont: 'Segoe UI', labelFontSize: 10, titleFontSize: 11 },
+  legend: { labelColor: '#ccc', titleColor: '#888', labelFont: 'Segoe UI', labelFontSize: 10, titleFontSize: 11 },
+  view:   { stroke: 'transparent' },
+};
+const VEGA_OPTS = { config: VEGA_CONFIG, actions: false };
+
+// ── localStorage cache ───────────────────────────────────────
+const LS = {
+  get(k)    { try { return JSON.parse(localStorage.getItem('trl2_' + k)); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem('trl2_' + k, JSON.stringify(v)); } catch {} },
+};
+
+let _liveVersion = null;
+async function getLiveVersion() {
+  if (_liveVersion !== null) return _liveVersion;
+  try {
+    const resp = await fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&action=version`);
+    const res  = await resp.json();
+    if (res.ok) _liveVersion = res.version;
+  } catch {}
+  return _liveVersion;
+}
+
+// ── State ────────────────────────────────────────────────────
+let ALL_EVENTS = [];   // flat array of event objects: { time, type, name, owner, actionOwner, game, team1, team2, comp, year, division, analyzable }
+
+// ── Bootstrap ────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  setTimeout(() => {
+    if (document.getElementById('loadingArea').style.display !== 'none')
+      document.getElementById('loadHint').textContent = 'This may take a moment — fetching every game…';
+  }, 3000);
+  init();
+});
+
+async function init() {
+  const cached = LS.get('all');
+  if (cached) applyData(cached);
+
+  try {
+    if (cached?.version != null) {
+      const live = await getLiveVersion();
+      if (live != null && live === cached.version) return;
+    }
+    const resp   = await fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&action=all`);
+    const result = await resp.json();
+    if (!result.ok) throw new Error(result.error);
+    LS.set('all', result);
+    applyData(result);
+  } catch (err) {
+    if (!cached) {
+      document.getElementById('loadingArea').style.display = 'none';
+      const el = document.getElementById('errorMsg');
+      el.textContent = 'Failed to load data: ' + err.message;
+      el.style.display = 'block';
+    }
+  }
+}
+
+function applyData(result) {
+  ALL_EVENTS = parseEvents(result.rows);
+  document.getElementById('loadingArea').style.display = 'none';
+  document.getElementById('analytics').style.display   = 'block';
+  populateFilters();
+  renderTop();
+  renderBottom();
+}
+
+// ── Data parsing ─────────────────────────────────────────────
+function parseEvents(rows) {
+  if (!rows || rows.length < 2) return [];
+  const H = rows[0].map(h => h.trim().toLowerCase());
+  const idx = name => H.findIndex(h => h === name);
+  const I = {
+    time: idx('time'),
+    poss: idx('possession owner'),
+    type: idx('type'),
+    name: idx('name'),
+    action: idx('action owner'),
+    game: idx('game'),
+    t1: idx('team 1'),
+    t2: idx('team 2'),
+    comp: idx('competition'),
+    year: idx('year'),
+    div: idx('division'),
+    analyzable: idx('analyzable'),
+  };
+
+  // Resolve "Team 1"/"Team 2" to actual team name
+  const resolve = (val, team1, team2) => {
+    const s = (val || '').trim();
+    if (s === 'Team 1') return team1;
+    if (s === 'Team 2') return team2;
+    return s.toLowerCase();
+  };
+
+  return rows.slice(1).map(r => {
+    const team1 = (r[I.t1] || '').toLowerCase().trim();
+    const team2 = (r[I.t2] || '').toLowerCase().trim();
+    const type  = (r[I.type] || '').trim();
+    const name  = (r[I.name] || '').trim();
+    if (!type) return null;
+    return {
+      type, name,
+      owner:       resolve(r[I.poss],   team1, team2),
+      actionOwner: resolve(r[I.action], team1, team2),
+      game:  r[I.game],
+      team1, team2,
+      comp:  (r[I.comp] || '').trim(),
+      year:  String(r[I.year] || '').trim(),
+      div:   (r[I.div]  || '').trim(),
+      analyzable: String(r[I.analyzable] || '').toUpperCase() === 'TRUE',
+    };
+  }).filter(Boolean);
+}
+
+// ── TOP: Event overview ──────────────────────────────────────
+function renderTop() {
+  const evs = ALL_EVENTS.filter(e => e.analyzable);
+  const games = new Set(evs.map(e => e.game));
+
+  // KPI strip
+  const byType = countBy(evs, e => e.type);
+  const subCount = countBy(evs, e => `${e.type}::${e.name}`);
+  const topType = Object.entries(byType).sort((a,b) => b[1] - a[1])[0];
+  const topSub  = Object.entries(subCount).sort((a,b) => b[1] - a[1])[0];
+
+  document.getElementById('kpiStrip').innerHTML = `
+    ${kpi('Total events', evs.length.toLocaleString(), '', 'accent')}
+    ${kpi('Games', String(games.size), 'analysable', '')}
+    ${kpi('Events / game', games.size ? (evs.length / games.size).toFixed(1) : '0', 'mean', '')}
+    ${kpi('Most common type', topType ? topType[0] : '—', topType ? topType[1] + ' events' : '', 'green')}
+    ${kpi('Most common sub-type', topSub ? topSub[0].split('::')[1] : '—', topSub ? `${topSub[0].split('::')[0]} · ${topSub[1]}` : '', 'orange')}
+  `;
+
+  renderTypeTable(byType, evs.length);
+  renderTypeChart(byType);
+  renderSubTypeGrid(evs);
+  renderTeamMatrix(evs);
+  renderCombosAll(evs);
+  renderCombosByTeam(evs);
+}
+
+function kpi(label, value, sub, klass) {
+  return `<div class="kpi-card">
+    <div class="kpi-label">${label}</div>
+    <div class="kpi-value ${klass}">${value}</div>
+    ${sub ? `<div class="kpi-sub">${escapeHtml(sub)}</div>` : ''}
+  </div>`;
+}
+
+let typeTableSort = { key: 'count', dir: 'desc' };
+function renderTypeTable(byType, total) {
+  const rows = TYPE_ORDER.filter(t => byType[t]).map(type => {
+    const count = byType[type] || 0;
+    const subs = countBy(ALL_EVENTS.filter(e => e.analyzable && e.type === type), e => e.name);
+    const top = Object.entries(subs).sort((a,b) => b[1] - a[1])[0];
+    return { type, count, pct: total ? (count / total) * 100 : 0, topSub: top ? top[0] : '', topSubCount: top ? top[1] : 0 };
+  });
+
+  rows.sort((a, b) => {
+    const { key, dir } = typeTableSort;
+    const va = a[key], vb = b[key];
+    const cmp = typeof va === 'number' ? va - vb : String(va).localeCompare(String(vb));
+    return dir === 'desc' ? -cmp : cmp;
+  });
+
+  const max = Math.max(...rows.map(r => r.count), 1);
+  const tbody = document.querySelector('#typeTable tbody');
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td><span class="chip ${TYPE_CHIP[r.type]}">${r.type}</span></td>
+      <td class="bar-cell">
+        <div class="bar-bg"><div class="bar-fg" style="width:${(r.count/max)*100}%;background:${TYPE_COLORS[r.type]}"></div></div>
+        <span class="bar-val">${r.count.toLocaleString()}</span>
+      </td>
+      <td>${r.pct.toFixed(1)}%</td>
+      <td style="color:var(--muted)">${escapeHtml(r.topSub)} <span style="color:var(--dim);font-size:0.72rem">(${r.topSubCount})</span></td>
+    </tr>
+  `).join('');
+
+  // Header sort indicators
+  document.querySelectorAll('#typeTable th').forEach(th => {
+    th.classList.remove('sort-asc', 'sort-desc');
+    if (th.dataset.sort === typeTableSort.key) th.classList.add('sort-' + typeTableSort.dir);
+  });
+  document.querySelectorAll('#typeTable th').forEach(th => {
+    th.onclick = () => {
+      const k = th.dataset.sort;
+      if (typeTableSort.key === k) typeTableSort.dir = typeTableSort.dir === 'desc' ? 'asc' : 'desc';
+      else { typeTableSort.key = k; typeTableSort.dir = k === 'type' ? 'asc' : 'desc'; }
+      renderTypeTable(byType, total);
+    };
+  });
+}
+
+function renderTypeChart(byType) {
+  const data = TYPE_ORDER.filter(t => byType[t]).map(t => ({ type: t, count: byType[t] }));
+  vegaEmbed('#typeChart', {
+    width: 'container', height: 220,
+    data: { values: data },
+    mark: { type: 'bar', cornerRadiusEnd: 3 },
+    encoding: {
+      y: { field: 'type', type: 'nominal', sort: '-x', axis: { title: null } },
+      x: { field: 'count', type: 'quantitative', axis: { title: 'Events' } },
+      color: { field: 'type', type: 'nominal',
+               scale: { domain: TYPE_ORDER, range: TYPE_ORDER.map(t => TYPE_COLORS[t]) },
+               legend: null },
+      tooltip: [{ field: 'type' }, { field: 'count' }],
+    },
+  }, VEGA_OPTS);
+}
+
+function renderSubTypeGrid(evs) {
+  const grid = document.getElementById('subTypeGrid');
+  grid.innerHTML = '';
+  TYPE_ORDER.forEach(type => {
+    if (type === 'To Review') return;
+    const subEvts = evs.filter(e => e.type === type);
+    if (!subEvts.length) return;
+    const subCount = countBy(subEvts, e => e.name || '(blank)');
+    const total = subEvts.length;
+    const sorted = Object.entries(subCount).sort((a, b) => b[1] - a[1]);
+    const max = sorted[0]?.[1] || 1;
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px">
+        <span class="chip ${TYPE_CHIP[type]}" style="font-size:0.75rem">${type}</span>
+        <span style="color:var(--dim);font-size:0.7rem;font-variant-numeric:tabular-nums">${total} events</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;font-size:0.78rem">
+        ${sorted.map(([name, n]) => `
+          <div style="display:grid;grid-template-columns:1fr 70px 38px;gap:8px;align-items:center">
+            <span>${escapeHtml(name)}</span>
+            <div class="bar-cell" style="height:6px;background:var(--border);border-radius:3px;overflow:hidden">
+              <div style="height:100%;width:${(n/max)*100}%;background:${TYPE_COLORS[type]};opacity:0.7"></div>
+            </div>
+            <span style="color:var(--muted);text-align:right;font-variant-numeric:tabular-nums">${n}</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+let teamMatrixSort = { key: 'total', dir: 'desc' };
+function renderTeamMatrix(evs) {
+  const teams = [...new Set(evs.map(e => e.actionOwner).filter(Boolean))].sort();
+  if (!teams.length) return;
+  const types = TYPE_ORDER.filter(t => t !== 'To Review' && t !== 'Game Event');
+
+  // Build matrix
+  const matrix = {};
+  teams.forEach(t => {
+    matrix[t] = { team: t, total: 0 };
+    types.forEach(ty => matrix[t][ty] = 0);
+  });
+  evs.forEach(e => {
+    if (!matrix[e.actionOwner]) return;
+    if (!types.includes(e.type)) return;
+    matrix[e.actionOwner][e.type]++;
+    matrix[e.actionOwner].total++;
+  });
+
+  // Games played per team (for per-game rate)
+  const gamesByTeam = {};
+  teams.forEach(t => gamesByTeam[t] = new Set());
+  evs.forEach(e => {
+    if (gamesByTeam[e.actionOwner]) gamesByTeam[e.actionOwner].add(e.game);
+  });
+  teams.forEach(t => matrix[t].games = gamesByTeam[t].size);
+
+  // Header
+  const head = document.getElementById('teamMatrixHead');
+  head.innerHTML = `
+    <th data-sort="team">Team</th>
+    <th data-sort="games">G</th>
+    ${types.map(t => `<th data-sort="${t}"><span class="chip ${TYPE_CHIP[t]}" style="margin:0">${t}</span></th>`).join('')}
+    <th data-sort="total">Total</th>
+    <th data-sort="rate">/ game</th>
+  `;
+
+  const data = teams.map(t => {
+    const m = matrix[t];
+    return { ...m, rate: m.games ? m.total / m.games : 0 };
+  });
+  data.sort((a, b) => {
+    const { key, dir } = teamMatrixSort;
+    const va = a[key], vb = b[key];
+    const cmp = typeof va === 'number' ? va - vb : String(va).localeCompare(String(vb));
+    return dir === 'desc' ? -cmp : cmp;
+  });
+
+  const maxes = {};
+  types.forEach(t => maxes[t] = Math.max(...data.map(r => r[t]), 1));
+  const maxTotal = Math.max(...data.map(r => r.total), 1);
+
+  const tbody = document.querySelector('#teamMatrix tbody');
+  tbody.innerHTML = data.map(r => `
+    <tr>
+      <td style="text-transform:capitalize">${escapeHtml(r.team)}</td>
+      <td style="color:var(--muted)">${r.games}</td>
+      ${types.map(t => `
+        <td class="bar-cell">
+          <div class="bar-bg"><div class="bar-fg" style="width:${(r[t]/maxes[t])*100}%;background:${TYPE_COLORS[t]}"></div></div>
+          <span class="bar-val">${r[t]}</span>
+        </td>
+      `).join('')}
+      <td class="bar-cell">
+        <div class="bar-bg"><div class="bar-fg" style="width:${(r.total/maxTotal)*100}%;background:var(--accent)"></div></div>
+        <span class="bar-val">${r.total}</span>
+      </td>
+      <td style="color:var(--muted)">${r.rate.toFixed(1)}</td>
+    </tr>
+  `).join('');
+
+  document.querySelectorAll('#teamMatrix th').forEach(th => {
+    th.classList.remove('sort-asc', 'sort-desc');
+    if (th.dataset.sort === teamMatrixSort.key) th.classList.add('sort-' + teamMatrixSort.dir);
+    th.onclick = () => {
+      const k = th.dataset.sort;
+      if (teamMatrixSort.key === k) teamMatrixSort.dir = teamMatrixSort.dir === 'desc' ? 'asc' : 'desc';
+      else { teamMatrixSort.key = k; teamMatrixSort.dir = k === 'team' ? 'asc' : 'desc'; }
+      renderTeamMatrix(evs);
+    };
+  });
+}
+
+function renderCombosAll(evs) {
+  const subset = evs.filter(e => e.type !== 'Game Event' && e.type !== 'To Review' && e.actionOwner);
+  const combos = {};
+  subset.forEach(e => {
+    const k = `${e.actionOwner}|||${e.type}|||${e.name || '(blank)'}`;
+    combos[k] = (combos[k] || 0) + 1;
+  });
+  const top = Object.entries(combos).sort((a,b) => b[1] - a[1]).slice(0, 15);
+  document.getElementById('comboListAll').innerHTML = top.map(([k, n], i) => {
+    const [team, type, name] = k.split('|||');
+    return `<div class="combo-row">
+      <div class="combo-rank">${i+1}</div>
+      <div class="combo-label">
+        <span class="combo-team">${escapeHtml(team)}</span> ·
+        <span class="chip ${TYPE_CHIP[type]}">${type}</span>
+        <span style="color:var(--muted)">${escapeHtml(name)}</span>
+      </div>
+      <div class="combo-count">${n}</div>
+    </div>`;
+  }).join('') || '<div style="color:var(--dim);font-size:0.8rem">No data</div>';
+}
+
+function renderCombosByTeam(evs) {
+  const teams = [...new Set(evs.map(e => e.actionOwner).filter(Boolean))].sort();
+  const out = [];
+  teams.forEach(team => {
+    const teamEvs = evs.filter(e => e.actionOwner === team && e.type !== 'Game Event' && e.type !== 'To Review');
+    if (!teamEvs.length) return;
+    const subCount = countBy(teamEvs, e => `${e.type}|||${e.name || '(blank)'}`);
+    const [topKey, topN] = Object.entries(subCount).sort((a, b) => b[1] - a[1])[0];
+    const [type, name] = topKey.split('|||');
+    out.push({ team, type, name, count: topN });
+  });
+  out.sort((a, b) => b.count - a.count);
+  document.getElementById('comboListByTeam').innerHTML = out.map((r, i) => `
+    <div class="combo-row">
+      <div class="combo-rank">${i+1}</div>
+      <div class="combo-label">
+        <span class="combo-team">${escapeHtml(r.team)}</span> ·
+        <span class="chip ${TYPE_CHIP[r.type]}">${r.type}</span>
+        <span style="color:var(--muted)">${escapeHtml(r.name)}</span>
+      </div>
+      <div class="combo-count">${r.count}</div>
+    </div>
+  `).join('') || '<div style="color:var(--dim);font-size:0.8rem">No data</div>';
+}
+
+// ── BOTTOM: Filtered deep dive ───────────────────────────────
+function populateFilters() {
+  const evs = ALL_EVENTS.filter(e => e.analyzable);
+  const fill = (id, vals) => {
+    const sel = document.getElementById(id);
+    [...new Set(vals.filter(Boolean))].sort().forEach(v => {
+      const opt = document.createElement('option');
+      opt.value = v; opt.textContent = v;
+      sel.appendChild(opt);
+    });
+    sel.addEventListener('change', renderBottom);
+  };
+  fill('fYear', evs.map(e => e.year));
+  fill('fComp', evs.map(e => e.comp));
+  fill('fDiv',  evs.map(e => e.div));
+}
+
+function resetFilters() {
+  ['fYear', 'fComp', 'fDiv'].forEach(id => { document.getElementById(id).value = ''; });
+  renderBottom();
+}
+
+function getFilteredEvents() {
+  const y = document.getElementById('fYear').value;
+  const c = document.getElementById('fComp').value;
+  const d = document.getElementById('fDiv').value;
+  return ALL_EVENTS.filter(e => e.analyzable
+    && (!y || e.year === y)
+    && (!c || e.comp === c)
+    && (!d || e.div  === d));
+}
+
+function renderBottom() {
+  const evs = getFilteredEvents();
+  const games = new Set(evs.map(e => e.game));
+
+  // Filter summary
+  const y = document.getElementById('fYear').value;
+  const c = document.getElementById('fComp').value;
+  const d = document.getElementById('fDiv').value;
+  const parts = [y, c, d].filter(Boolean);
+  document.getElementById('filterSummary').innerHTML = parts.length
+    ? `<strong>${evs.length.toLocaleString()}</strong> events · <strong>${games.size}</strong> games matching <strong>${parts.join(' · ')}</strong>`
+    : `<strong>${evs.length.toLocaleString()}</strong> events across <strong>${games.size}</strong> games`;
+
+  // KPIs
+  const byType = countBy(evs, e => e.type);
+  const subCount = countBy(evs, e => `${e.type}::${e.name}`);
+  const topType = Object.entries(byType).sort((a,b) => b[1] - a[1])[0];
+  const topSub  = Object.entries(subCount).sort((a,b) => b[1] - a[1])[0];
+
+  document.getElementById('fKpiStrip').innerHTML = `
+    ${kpi('Events', evs.length.toLocaleString(), '', 'accent')}
+    ${kpi('Games', String(games.size), '', '')}
+    ${kpi('Events / game', games.size ? (evs.length / games.size).toFixed(1) : '0', '', '')}
+    ${kpi('Top type', topType ? topType[0] : '—', topType ? topType[1] + ' events' : '', 'green')}
+    ${kpi('Top sub-type', topSub ? topSub[0].split('::')[1] : '—', topSub ? topSub[0].split('::')[0] : '', 'orange')}
+  `;
+
+  renderFilteredTypeChart(byType);
+  renderTrendChart(evs);
+  renderHeatmap(evs);
+  renderFilteredCombos(evs);
+  renderFilteredMatrix(evs);
+}
+
+function renderFilteredTypeChart(byType) {
+  const data = TYPE_ORDER.filter(t => byType[t]).map(t => ({ type: t, count: byType[t] }));
+  if (!data.length) { document.getElementById('fTypeChart').innerHTML = emptyMsg(); return; }
+  vegaEmbed('#fTypeChart', {
+    width: 'container', height: 220,
+    title: { text: 'Event types', color: '#aaa', fontSize: 11, fontWeight: 600, anchor: 'start' },
+    data: { values: data },
+    mark: { type: 'bar', cornerRadiusEnd: 3 },
+    encoding: {
+      x: { field: 'type', type: 'nominal', sort: '-y', axis: { title: null, labelAngle: -25 } },
+      y: { field: 'count', type: 'quantitative', axis: { title: 'Events' } },
+      color: { field: 'type', type: 'nominal',
+               scale: { domain: TYPE_ORDER, range: TYPE_ORDER.map(t => TYPE_COLORS[t]) },
+               legend: null },
+      tooltip: [{ field: 'type' }, { field: 'count' }],
+    },
+  }, VEGA_OPTS);
+}
+
+function renderTrendChart(evs) {
+  // Year × type stacked bar (only if multiple years in the filtered set)
+  const years = [...new Set(evs.map(e => e.year).filter(Boolean))].sort();
+  if (years.length < 2) {
+    // Fall back: count by competition
+    const comps = [...new Set(evs.map(e => e.comp).filter(Boolean))];
+    if (comps.length < 2) {
+      document.getElementById('fTrendChart').innerHTML = '<div style="padding:30px;text-align:center;color:var(--dim);font-size:0.78rem">Not enough variation to show a trend. Widen filters to compare across years/competitions.</div>';
+      return;
+    }
+    const data = [];
+    comps.forEach(comp => {
+      const sub = evs.filter(e => e.comp === comp);
+      const t = countBy(sub, e => e.type);
+      TYPE_ORDER.forEach(ty => { if (t[ty]) data.push({ bucket: comp, type: ty, count: t[ty] }); });
+    });
+    vegaEmbed('#fTrendChart', {
+      width: 'container', height: 220,
+      title: { text: 'Events by competition', color: '#aaa', fontSize: 11, fontWeight: 600, anchor: 'start' },
+      data: { values: data },
+      mark: { type: 'bar' },
+      encoding: {
+        x: { field: 'bucket', type: 'nominal', axis: { title: null, labelAngle: -25 } },
+        y: { field: 'count', type: 'quantitative', stack: 'zero', axis: { title: 'Events' } },
+        color: { field: 'type', type: 'nominal',
+                 scale: { domain: TYPE_ORDER, range: TYPE_ORDER.map(t => TYPE_COLORS[t]) },
+                 legend: { title: null, orient: 'top', symbolSize: 80 } },
+        tooltip: [{ field: 'bucket' }, { field: 'type' }, { field: 'count' }],
+      },
+    }, VEGA_OPTS);
+    return;
+  }
+  const data = [];
+  years.forEach(year => {
+    const sub = evs.filter(e => e.year === year);
+    const t = countBy(sub, e => e.type);
+    TYPE_ORDER.forEach(ty => { if (t[ty]) data.push({ bucket: year, type: ty, count: t[ty] }); });
+  });
+  vegaEmbed('#fTrendChart', {
+    width: 'container', height: 220,
+    title: { text: 'Events by year', color: '#aaa', fontSize: 11, fontWeight: 600, anchor: 'start' },
+    data: { values: data },
+    mark: { type: 'bar' },
+    encoding: {
+      x: { field: 'bucket', type: 'ordinal', axis: { title: null } },
+      y: { field: 'count', type: 'quantitative', stack: 'zero', axis: { title: 'Events' } },
+      color: { field: 'type', type: 'nominal',
+               scale: { domain: TYPE_ORDER, range: TYPE_ORDER.map(t => TYPE_COLORS[t]) },
+               legend: { title: null, orient: 'top', symbolSize: 80 } },
+      tooltip: [{ field: 'bucket' }, { field: 'type' }, { field: 'count' }],
+    },
+  }, VEGA_OPTS);
+}
+
+function renderHeatmap(evs) {
+  const teams = [...new Set(evs.map(e => e.actionOwner).filter(Boolean))].sort();
+  const types = TYPE_ORDER.filter(t => t !== 'To Review' && t !== 'Game Event');
+  if (!teams.length) { document.getElementById('fHeatmap').innerHTML = emptyMsg(); return; }
+
+  const data = [];
+  teams.forEach(team => {
+    types.forEach(type => {
+      const count = evs.filter(e => e.actionOwner === team && e.type === type).length;
+      data.push({ team, type, count });
+    });
+  });
+
+  vegaEmbed('#fHeatmap', {
+    width: 'container',
+    height: Math.max(160, teams.length * 22),
+    data: { values: data },
+    mark: { type: 'rect', tooltip: true },
+    encoding: {
+      x: { field: 'type', type: 'nominal', sort: types, axis: { title: null, labelAngle: -25, orient: 'top' } },
+      y: { field: 'team', type: 'nominal', sort: teams, axis: { title: null } },
+      color: {
+        field: 'count', type: 'quantitative',
+        scale: { scheme: 'blues' },
+        legend: { title: 'Events', orient: 'right' },
+      },
+      tooltip: [{ field: 'team' }, { field: 'type' }, { field: 'count' }],
+    },
+    config: { axis: { domain: false, ticks: false }, view: { stroke: null } },
+  }, VEGA_OPTS);
+}
+
+function renderFilteredCombos(evs) {
+  const subset = evs.filter(e => e.type !== 'Game Event' && e.type !== 'To Review' && e.actionOwner);
+  const combos = {};
+  subset.forEach(e => {
+    const k = `${e.actionOwner}|||${e.type}|||${e.name || '(blank)'}`;
+    combos[k] = (combos[k] || 0) + 1;
+  });
+  const top = Object.entries(combos).sort((a,b) => b[1] - a[1]).slice(0, 12);
+  document.getElementById('fComboList').innerHTML = top.map(([k, n], i) => {
+    const [team, type, name] = k.split('|||');
+    return `<div class="combo-row">
+      <div class="combo-rank">${i+1}</div>
+      <div class="combo-label">
+        <span class="combo-team">${escapeHtml(team)}</span> ·
+        <span class="chip ${TYPE_CHIP[type]}">${type}</span>
+        <span style="color:var(--muted)">${escapeHtml(name)}</span>
+      </div>
+      <div class="combo-count">${n}</div>
+    </div>`;
+  }).join('') || '<div style="color:var(--dim);font-size:0.8rem">No events match the current filters.</div>';
+}
+
+let fMatrixSort = { key: 'total', dir: 'desc' };
+function renderFilteredMatrix(evs) {
+  const teams = [...new Set(evs.map(e => e.actionOwner).filter(Boolean))].sort();
+  const types = TYPE_ORDER.filter(t => t !== 'To Review' && t !== 'Game Event');
+  if (!teams.length) {
+    document.getElementById('fTeamMatrixHead').innerHTML = '';
+    document.querySelector('#fTeamMatrix tbody').innerHTML = '<tr><td style="color:var(--dim);font-size:0.8rem">No teams match the current filters.</td></tr>';
+    return;
+  }
+
+  const matrix = {};
+  teams.forEach(t => {
+    matrix[t] = { team: t, total: 0 };
+    types.forEach(ty => matrix[t][ty] = 0);
+  });
+  evs.forEach(e => {
+    if (!matrix[e.actionOwner] || !types.includes(e.type)) return;
+    matrix[e.actionOwner][e.type]++;
+    matrix[e.actionOwner].total++;
+  });
+
+  document.getElementById('fTeamMatrixHead').innerHTML = `
+    <th data-sort="team">Team</th>
+    ${types.map(t => `<th data-sort="${t}"><span class="chip ${TYPE_CHIP[t]}" style="margin:0">${t}</span></th>`).join('')}
+    <th data-sort="total">Total</th>
+  `;
+
+  const data = teams.map(t => matrix[t]);
+  data.sort((a, b) => {
+    const { key, dir } = fMatrixSort;
+    const va = a[key], vb = b[key];
+    const cmp = typeof va === 'number' ? va - vb : String(va).localeCompare(String(vb));
+    return dir === 'desc' ? -cmp : cmp;
+  });
+
+  const maxes = {};
+  types.forEach(t => maxes[t] = Math.max(...data.map(r => r[t]), 1));
+  const maxTotal = Math.max(...data.map(r => r.total), 1);
+
+  document.querySelector('#fTeamMatrix tbody').innerHTML = data.map(r => `
+    <tr>
+      <td style="text-transform:capitalize">${escapeHtml(r.team)}</td>
+      ${types.map(t => `
+        <td class="bar-cell">
+          <div class="bar-bg"><div class="bar-fg" style="width:${(r[t]/maxes[t])*100}%;background:${TYPE_COLORS[t]}"></div></div>
+          <span class="bar-val">${r[t]}</span>
+        </td>
+      `).join('')}
+      <td class="bar-cell">
+        <div class="bar-bg"><div class="bar-fg" style="width:${(r.total/maxTotal)*100}%;background:var(--accent)"></div></div>
+        <span class="bar-val">${r.total}</span>
+      </td>
+    </tr>
+  `).join('');
+
+  document.querySelectorAll('#fTeamMatrix th').forEach(th => {
+    th.classList.remove('sort-asc', 'sort-desc');
+    if (th.dataset.sort === fMatrixSort.key) th.classList.add('sort-' + fMatrixSort.dir);
+    th.onclick = () => {
+      const k = th.dataset.sort;
+      if (fMatrixSort.key === k) fMatrixSort.dir = fMatrixSort.dir === 'desc' ? 'asc' : 'desc';
+      else { fMatrixSort.key = k; fMatrixSort.dir = k === 'team' ? 'asc' : 'desc'; }
+      renderFilteredMatrix(evs);
+    };
+  });
+}
+
+// ── Utilities ────────────────────────────────────────────────
+function countBy(items, keyFn) {
+  return items.reduce((acc, x) => {
+    const k = keyFn(x);
+    acc[k] = (acc[k] || 0) + 1;
+    return acc;
+  }, {});
+}
+
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+}
+
+function emptyMsg() {
+  return '<div style="padding:30px;text-align:center;color:var(--dim);font-size:0.78rem">No data for the current filters.</div>';
+}
+</script>
+
+</body>
+</html>

@@ -250,9 +250,10 @@
     <a href="games.html">Games</a>
     <a href="dashboard.html">Dashboard</a>
     <a href="viewer.html" class="active">Events</a>
+    <a href="analytics.html" id="analyticsLink" style="display:none">Analytics</a>
     <a href="annotator.html" id="annotatorLink" style="display:none">Annotator</a>
   </nav>
-  <script>{ const p = sessionStorage.getItem('password'); if (p === 'm30-staff' || p === 'm30-admin') document.getElementById('annotatorLink').style.display = ''; if (p === 'm30-admin') document.getElementById('editModeBtn').style.display = ''; }</script>
+  <script>{ const p = sessionStorage.getItem('password'); if (p === 'm30-staff' || p === 'm30-admin') document.getElementById('annotatorLink').style.display = ''; if (p === 'm30-admin') { document.getElementById('editModeBtn').style.display = ''; document.getElementById('analyticsLink').style.display = ''; } }</script>
 </header>
 
 <div id="errorMsg"></div>
