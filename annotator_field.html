@@ -159,6 +159,8 @@
       user-select: none;
     }
     .evt-btn:active { filter: brightness(0.85); transform: scale(0.97); }
+    .evt-btn:disabled { opacity: 0.35 !important; cursor: not-allowed; }
+    .evt-btn:disabled:active { filter: none; transform: none; }
 
     .btn-try1    { background: var(--green);      color: #000; }
     .btn-turn    { background: var(--orange);     color: #fff; }
@@ -450,12 +452,12 @@
   <div>
     <div class="section-label">Events</div>
     <div class="event-grid two-col">
-      <button class="evt-btn btn-try1"    onclick="tagWithPossession('Try','Other')">Try</button>
-      <button class="evt-btn btn-turn"    onclick="tagWithPossession('Turnover','Other')">Turnover</button>
-      <button class="evt-btn btn-pen-atk" onclick="tagWithPossession('Penalty Attack','Other')">Pen Attack</button>
-      <button class="evt-btn btn-turn"    onclick="tagWithPossession('Turnover','6th Touch')">6th Touch</button>
-      <button class="evt-btn btn-pen-def" onclick="tagWithPossession('Penalty Defence','Other')">Pen Defence</button>
-      <button class="evt-btn btn-turn"    style="opacity:0.65" onclick="tagWithPossession('Turnover','6 Again')">6 Again</button>
+      <button class="evt-btn btn-try1"    data-gated onclick="tagWithPossession('Try','Other')">Try</button>
+      <button class="evt-btn btn-turn"    data-gated onclick="tagWithPossession('Turnover','Other')">Turnover</button>
+      <button class="evt-btn btn-pen-atk" data-gated onclick="tagWithPossession('Penalty Attack','Other')">Pen Attack</button>
+      <button class="evt-btn btn-turn"    data-gated onclick="tagWithPossession('Turnover','6th Touch')">6th Touch</button>
+      <button class="evt-btn btn-pen-def" data-gated onclick="tagWithPossession('Penalty Defence','Other')">Pen Defence</button>
+      <button class="evt-btn btn-turn"    data-gated style="opacity:0.65" onclick="tagWithPossession('Turnover','6 Again')">6 Again</button>
     </div>
   </div>
 
@@ -463,13 +465,13 @@
     <div class="section-label">Game Events</div>
     <div class="event-grid two-col">
       <button class="evt-btn btn-game" id="gameEventBtn" onclick="tagGameEventToggle()">Start</button>
-      <button class="evt-btn btn-game" onclick="tagGameEvent('Ball Live')">Ball Live</button>
+      <button class="evt-btn btn-game" data-gated onclick="tagGameEvent('Ball Live')">Ball Live</button>
     </div>
   </div>
 
   <div>
     <div class="event-grid two-col">
-      <button class="evt-btn btn-review"   onclick="tagToReview()">To Review</button>
+      <button class="evt-btn btn-review"   data-gated onclick="tagToReview()">To Review</button>
       <button class="evt-btn btn-undo-big" onclick="undoLast()">↩ Undo</button>
     </div>
   </div>
@@ -533,6 +535,7 @@ TR.auth('staff');
 
 window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('metaYear').value = String(new Date().getFullYear());
+  updateUI();
 });
 
 // ── State ──────────────────────────────────────────────────────
@@ -705,7 +708,9 @@ function updateUI() {
   const el = document.getElementById('recentList');
   const gameEventAnnots = annotations.filter(a => a.name === 'Game Start' || a.name === 'Game End');
   const lastGameEvent   = gameEventAnnots[gameEventAnnots.length - 1];
-  document.getElementById('gameEventBtn').textContent = (lastGameEvent && lastGameEvent.name === 'Game Start') ? 'End' : 'Start';
+  const gameRunning     = !!(lastGameEvent && lastGameEvent.name === 'Game Start');
+  document.getElementById('gameEventBtn').textContent = gameRunning ? 'End' : 'Start';
+  document.querySelectorAll('.evt-btn[data-gated]').forEach(b => { b.disabled = !gameRunning; });
 
   if (!annotations.length) {
     el.innerHTML = '<div style="color:var(--text-muted);font-size:0.82rem;padding:8px 0">No events yet</div>';
