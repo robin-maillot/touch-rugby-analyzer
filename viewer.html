@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Event Viewer — Touch Rugby Analyzer</title>
-<script defer src="https://cloud.umami.is/script.js" data-website-id="cb7fd4f2-fcd5-44d7-a8e4-70e9068870bb"></script>
+<script defer src="https://cloud.umami.is/script.js" data-website-id="cb7fd4f2-fcd5-44d7-a8e4-70e9068870bb" data-auto-track="false"></script>
 <style>
   :root {
     --bg:           #0f1117;
@@ -136,6 +136,78 @@
   tr.active-row td { background: rgba(59,130,246,0.13) !important; }
   tr.active-row { outline: none; }
 
+  /* Compact number stepper (used for seconds before/after) */
+  .num-stepper {
+    display: inline-flex; align-items: center; gap: 2px;
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px;
+    padding: 2px 6px; font-size: 0.78rem; color: var(--text-muted);
+    white-space: nowrap; transition: border-color 0.15s;
+  }
+  .num-stepper:focus-within { border-color: var(--accent); }
+  .num-stepper .num-icon { font-size: 0.85rem; line-height: 1; }
+  .num-stepper input {
+    width: 26px; background: transparent; border: none; outline: none;
+    color: var(--text); font-size: 0.78rem; font-variant-numeric: tabular-nums;
+    text-align: center; padding: 2px 0; -moz-appearance: textfield;
+  }
+  .num-stepper input::-webkit-outer-spin-button,
+  .num-stepper input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .num-stepper .num-btn {
+    background: none; border: none; cursor: pointer; padding: 0 4px;
+    color: var(--text-muted); font-size: 0.95rem; line-height: 1; font-weight: 600;
+    transition: color 0.15s;
+  }
+  .num-stepper .num-btn:hover { color: var(--accent); }
+  .num-stepper .num-unit { color: var(--text-dim); }
+
+  tr.active-row.looping td { background: rgba(34,197,94,0.18) !important; box-shadow: inset 3px 0 0 #22c55e; }
+
+  /* Shortcuts modal */
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(2px);
+    display: flex; align-items: center; justify-content: center; z-index: 1000;
+    animation: modalFade 0.12s ease-out;
+  }
+  .modal-backdrop[hidden] { display: none; }
+  @keyframes modalFade { from { opacity: 0; } to { opacity: 1; } }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    width: min(460px, calc(100vw - 32px)); max-height: calc(100vh - 64px); overflow: auto;
+    color: var(--text);
+  }
+  .modal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px 10px; border-bottom: 1px solid var(--border);
+  }
+  .modal-header h2 { margin: 0; font-size: 0.95rem; font-weight: 600; letter-spacing: 0.01em; }
+  .modal-close {
+    background: none; border: none; color: var(--text-muted); cursor: pointer;
+    font-size: 1rem; line-height: 1; padding: 4px 8px; border-radius: 5px; transition: all 0.15s;
+  }
+  .modal-close:hover { background: var(--surface-2); color: var(--text); }
+  .modal-body { padding: 12px 18px 18px; }
+  .kbd-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  .kbd-table td { padding: 7px 6px; border-bottom: 1px solid var(--border-light); vertical-align: middle; }
+  .kbd-table tr:last-child td { border-bottom: none; }
+  .kbd-table td:first-child { width: 130px; white-space: nowrap; }
+  .kbd-table td:last-child  { color: var(--text-muted); }
+  .kbd-sep { color: var(--text-dim); margin: 0 2px; font-size: 0.78rem; }
+  kbd {
+    display: inline-block; min-width: 22px; padding: 2px 7px; border-radius: 5px;
+    background: var(--surface-2); border: 1px solid var(--border); border-bottom-width: 2px;
+    color: var(--text); font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.74rem; text-align: center; line-height: 1.3;
+  }
+  .modal-foot { margin: 12px 0 0; font-size: 0.72rem; color: var(--text-dim); }
+  tr.active-row.looping td:first-child { position: relative; }
+  tr.active-row.looping td:first-child::before {
+    content: '🔁';
+    position: absolute; left: 2px; top: 50%; transform: translateY(-50%);
+    font-size: 0.7rem; opacity: 0.85; animation: looppulse 1.4s ease-in-out infinite;
+  }
+  @keyframes looppulse { 0%,100% { opacity: 0.5; } 50% { opacity: 1; } }
+
   /* Type badges */
   .badge { padding: 2px 7px; border-radius: 10px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
   .badge-try      { background: rgba(0,200,83,0.15);   color: #00c853; }
@@ -236,15 +308,24 @@
   </a>
   <span id="rowCount"></span>
   <button id="toggleVideoBtn" class="active" onclick="toggleVideoPanel()" title="Toggle video player">&#9654; Video</button>
-  <label style="display:flex;align-items:center;gap:4px;font-size:0.78rem;color:var(--text-muted);white-space:nowrap" title="Seconds before event to start video / copy link">
-    ⏪
-    <input id="linkOffsetInput" type="number" min="0" max="120" value="5"
-      style="width:42px;background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:5px;padding:3px 5px;font-size:0.78rem;text-align:center;outline:none"
-      oninput="setLinkOffset(this.value)">
-    s
-  </label>
+  <div class="num-stepper" title="Seconds before event to start video / copy link">
+    <span class="num-icon">⏪</span>
+    <button type="button" class="num-btn" onclick="adjustLinkOffset(-1)" aria-label="Decrease">−</button>
+    <input id="linkOffsetInput" type="number" min="0" max="120" value="5" oninput="setLinkOffset(this.value)">
+    <button type="button" class="num-btn" onclick="adjustLinkOffset(1)" aria-label="Increase">+</button>
+    <span class="num-unit">s</span>
+  </div>
+  <div class="num-stepper" title="Seconds after event (loop window end)">
+    <span class="num-icon">⏩</span>
+    <button type="button" class="num-btn" onclick="adjustLinkOffsetAfter(-1)" aria-label="Decrease">−</button>
+    <input id="linkOffsetAfterInput" type="number" min="0" max="120" value="2" oninput="setLinkOffsetAfter(this.value)">
+    <button type="button" class="num-btn" onclick="adjustLinkOffsetAfter(1)" aria-label="Increase">+</button>
+    <span class="num-unit">s</span>
+  </div>
+  <button id="loopBtn" style="background:var(--surface-2);color:var(--text-muted);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:0.78rem;cursor:pointer;white-space:nowrap;transition:all 0.15s" onclick="toggleLoopMode()" title="Toggle loop playback (R)">🔁 Loop</button>
   <button id="layoutBtn" style="background:var(--surface-2);color:var(--text-muted);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:0.78rem;cursor:pointer;white-space:nowrap;transition:all 0.15s" onclick="toggleLayout()" title="Toggle video layout">↕ Stack</button>
   <button id="editModeBtn" style="display:none;background:var(--surface-2);color:var(--text-muted);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:0.78rem;cursor:pointer;white-space:nowrap;transition:all 0.15s" onclick="toggleEditMode()" title="Toggle edit mode">✏ Edit</button>
+  <button id="helpBtn" style="background:var(--surface-2);color:var(--text-muted);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:0.78rem;cursor:pointer;white-space:nowrap;transition:all 0.15s" onclick="openHelpModal()" title="Keyboard shortcuts (?)" aria-label="Show keyboard shortcuts">⌨ Shortcuts</button>
   <button id="saveBtn" onclick="saveEdits()">💾 Save</button>
   <nav class="header-nav">
     <a href="games.html">Games</a>
@@ -255,6 +336,30 @@
   </nav>
   <script>{ const p = sessionStorage.getItem('password'); if (p === 'm30-staff' || p === 'm30-admin') document.getElementById('annotatorLink').style.display = ''; if (p === 'm30-admin') { document.getElementById('editModeBtn').style.display = ''; document.getElementById('analyticsLink').style.display = ''; } }</script>
 </header>
+
+<div id="helpModal" class="modal-backdrop" hidden onclick="if (event.target === this) closeHelpModal()">
+  <div class="modal" role="dialog" aria-labelledby="helpModalTitle" aria-modal="true">
+    <div class="modal-header">
+      <h2 id="helpModalTitle">Keyboard shortcuts</h2>
+      <button class="modal-close" onclick="closeHelpModal()" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body">
+      <table class="kbd-table">
+        <tbody>
+          <tr><td><kbd>Space</kbd></td><td>Play / pause</td></tr>
+          <tr><td><kbd>←</kbd> <span class="kbd-sep">/</span> <kbd>→</kbd></td><td>Skip 5 s back / forward</td></tr>
+          <tr><td><kbd>↑</kbd> <span class="kbd-sep">/</span> <kbd>↓</kbd></td><td>Previous / next event</td></tr>
+          <tr><td><kbd>A</kbd></td><td>Toggle 0.5× / 1× playback speed</td></tr>
+          <tr><td><kbd>R</kbd></td><td>Toggle loop playback (seconds before → seconds after)</td></tr>
+          <tr><td><kbd>Z</kbd></td><td>Toggle video zoom &amp; pan mode</td></tr>
+          <tr><td><kbd>?</kbd></td><td>Open this shortcuts panel</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>Close this panel</td></tr>
+        </tbody>
+      </table>
+      <p class="modal-foot">Shortcuts are disabled while typing in inputs or text fields.</p>
+    </div>
+  </div>
+</div>
 
 <div id="errorMsg"></div>
 
@@ -393,7 +498,13 @@ const TYPE_BADGE  = { 'try':'badge-try', 'penalty':'badge-penalty', 'penalty att
 
 const isAdmin = sessionStorage.getItem('password') === 'm30-admin';
 let editMode    = false;
-let linkOffset  = parseInt(localStorage.getItem('linkOffset') ?? '5', 10) || 5;
+let linkOffset      = parseInt(localStorage.getItem('linkOffset') ?? '5', 10) || 5;
+let linkOffsetAfter = parseInt(localStorage.getItem('linkOffsetAfter') ?? '2', 10);
+if (isNaN(linkOffsetAfter)) linkOffsetAfter = 2;
+let loopMode    = localStorage.getItem('loopMode') === '1';
+let loopStart   = null;
+let loopEnd     = null;
+let activeEventSecs = null;
 let selectedGame = new URLSearchParams(location.search).get('game') || '';
 
 
@@ -495,6 +606,8 @@ let activeRowIdx      = -1;   // index in `filtered`
 // ── Bootstrap ───────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('linkOffsetInput').value = linkOffset;
+  document.getElementById('linkOffsetAfterInput').value = linkOffsetAfter;
+  applyLoopButtonState();
   setupSeekbar();
   setupResizeHandle();
   setupVideoZoom();
@@ -813,7 +926,10 @@ function renderRows(rows) {
     const tr = document.createElement('tr');
     const hasYt = colGame >= 0 && !!(gameYtMap[row[colGame]]);
     if (hasYt) tr.classList.add('playable');
-    if (filteredIdx === activeRowIdx) tr.classList.add('active-row');
+    if (filteredIdx === activeRowIdx) {
+      tr.classList.add('active-row');
+      if (loopMode) tr.classList.add('looping');
+    }
     tr.dataset.filteredIdx = filteredIdx;
 
     row.forEach((cell, i) => {
@@ -959,7 +1075,9 @@ function playFilteredRow(filteredIdx) {
 
   // Highlight row
   document.querySelectorAll('#dataTable tbody tr').forEach(tr => {
-    tr.classList.toggle('active-row', parseInt(tr.dataset.filteredIdx) === filteredIdx);
+    const isActive = parseInt(tr.dataset.filteredIdx) === filteredIdx;
+    tr.classList.toggle('active-row', isActive);
+    tr.classList.toggle('looping', isActive && loopMode);
   });
 
   // Parse time
@@ -968,6 +1086,9 @@ function playFilteredRow(filteredIdx) {
   const secs    = parts.length === 3 ? parts[0]*3600 + parts[1]*60 + parts[2]
                 : parts.length === 2 ? parts[0]*60 + parts[1] : 0;
   const seekTo  = Math.max(0, secs - linkOffset);
+  activeEventSecs = secs;
+  loopStart = seekTo;
+  loopEnd   = secs + linkOffsetAfter;
 
   // Extract YouTube video ID from game metadata
   const gameKey = colGame >= 0 ? (row[colGame] || '') : '';
@@ -1170,6 +1291,10 @@ function updateProgress() {
   document.getElementById('seekFill').style.width  = pct + '%';
   document.getElementById('seekThumb').style.left  = pct + '%';
   document.getElementById('timeCurrent').textContent = TR.fmt(cur);
+
+  if (loopMode && loopEnd != null && loopStart != null && cur >= loopEnd) {
+    ytPlayer.seekTo(loopStart, true);
+  }
 }
 
 // ── Seekbar ──────────────────────────────────────────────────────
@@ -1326,7 +1451,8 @@ function setupVideoZoom() {
   resetBtn.addEventListener('click', resetZoom);
   document.addEventListener('keydown', e => {
     if (e.key === 'z' && !e.ctrlKey && !e.metaKey && !e.altKey
-        && !e.target.matches('input, textarea, select')) {
+        && !e.target.matches('input, textarea, select')
+        && !isHelpModalOpen()) {
       setZoomMode(!zoomMode);
     }
   });
@@ -1354,9 +1480,21 @@ function toggleLayout() {
   }
 })();
 
+// ── Help / shortcuts modal ────────────────────────────────────────
+function isHelpModalOpen() {
+  const m = document.getElementById('helpModal');
+  return m && !m.hidden;
+}
+function openHelpModal()  { document.getElementById('helpModal').hidden = false; }
+function closeHelpModal() { document.getElementById('helpModal').hidden = true; }
+
 // ── Keyboard shortcuts ────────────────────────────────────────────
 document.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+  // Esc + ? are handled even while the modal is open
+  if (e.key === 'Escape' && isHelpModalOpen()) { e.preventDefault(); closeHelpModal(); return; }
+  if (e.key === '?')           { e.preventDefault(); isHelpModalOpen() ? closeHelpModal() : openHelpModal(); return; }
+  if (isHelpModalOpen()) return;
   if (e.key === ' ')            { e.preventDefault(); togglePlay(); }
   if (e.key === 'ArrowLeft')   { skip(-5); }
   if (e.key === 'ArrowRight')  { skip(5); }
@@ -1368,12 +1506,56 @@ document.addEventListener('keydown', e => {
     sel.value = sel.value === '0.5' ? '1' : '0.5';
     setSpeed();
   }
+  if (e.key === 'r' || e.key === 'R') { e.preventDefault(); toggleLoopMode(); }
 });
 
 function setLinkOffset(val) {
   const n = Math.max(0, parseInt(val, 10) || 0);
   linkOffset = n;
   localStorage.setItem('linkOffset', n);
+  if (activeEventSecs != null) loopStart = Math.max(0, activeEventSecs - linkOffset);
+}
+
+function setLinkOffsetAfter(val) {
+  const n = Math.max(0, parseInt(val, 10) || 0);
+  linkOffsetAfter = n;
+  localStorage.setItem('linkOffsetAfter', n);
+  if (activeEventSecs != null) loopEnd = activeEventSecs + linkOffsetAfter;
+}
+
+function adjustLinkOffset(delta) {
+  const input = document.getElementById('linkOffsetInput');
+  const next  = Math.max(0, Math.min(120, (parseInt(input.value, 10) || 0) + delta));
+  input.value = next;
+  setLinkOffset(next);
+}
+
+function adjustLinkOffsetAfter(delta) {
+  const input = document.getElementById('linkOffsetAfterInput');
+  const next  = Math.max(0, Math.min(120, (parseInt(input.value, 10) || 0) + delta));
+  input.value = next;
+  setLinkOffsetAfter(next);
+}
+
+function applyLoopButtonState() {
+  const btn = document.getElementById('loopBtn');
+  if (!btn) return;
+  btn.style.borderColor = loopMode ? '#22c55e' : 'var(--border)';
+  btn.style.color       = loopMode ? '#22c55e' : 'var(--text-muted)';
+  btn.style.background  = loopMode ? 'rgba(34,197,94,0.12)' : 'var(--surface-2)';
+}
+
+function toggleLoopMode() {
+  loopMode = !loopMode;
+  localStorage.setItem('loopMode', loopMode ? '1' : '0');
+  applyLoopButtonState();
+  document.querySelectorAll('#dataTable tbody tr.active-row').forEach(tr => {
+    tr.classList.toggle('looping', loopMode);
+  });
+  if (loopMode && ytPlayer && videoReady && loopStart != null && loopEnd != null) {
+    const cur = ytPlayer.getCurrentTime();
+    if (cur < loopStart || cur > loopEnd) ytPlayer.seekTo(loopStart, true);
+  }
 }
 
 // ── YouTube link helpers ─────────────────────────────────────────

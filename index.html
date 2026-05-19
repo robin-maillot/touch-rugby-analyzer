@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <title>Touch Rugby Analyzer (alpha version)</title>
-  <script defer src="https://cloud.umami.is/script.js" data-website-id="cb7fd4f2-fcd5-44d7-a8e4-70e9068870bb"></script>
+  <script defer src="https://cloud.umami.is/script.js" data-website-id="cb7fd4f2-fcd5-44d7-a8e4-70e9068870bb" data-auto-track="false"></script>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
     body {
@@ -157,6 +157,25 @@
   </div>
 
 <script>
+  // --- UMAMI MANUAL TRACKING ---
+  // index.html doesn't include js/config.js, so we inline the same role-tagged
+  // pageview logic. The umami <script> has data-auto-track="false".
+  function trUmamiTrack(extra) {
+    const p = sessionStorage.getItem('password');
+    const role = p === 'm30-admin' ? 'admin'
+              : p === 'm30-staff' ? 'staff'
+              : p === 'm30'       ? 'viewer' : 'anon';
+    const data = Object.assign({ role }, extra || {});
+    const send = () => {
+      if (!window.umami) return;
+      if (window.umami.identify) window.umami.identify(data);
+      if (window.umami.track) window.umami.track(props => Object.assign({}, props, data));
+    };
+    if (window.umami && window.umami.track) send();
+    else window.addEventListener('load', send);
+  }
+  trUmamiTrack();
+
   // --- PASSWORD LOGIC ---
   const PASSWORDS = { 'm30': 'basic', 'm30-staff': 'staff', 'm30-admin': 'admin' };
 
@@ -171,8 +190,7 @@
     const level = PASSWORDS[pwd];
     if (level) {
       sessionStorage.setItem('password', pwd);
-      const role = level === 'basic' ? 'viewer' : level;
-      if (window.umami) umami.identify({ role });
+      trUmamiTrack({ event: 'login' });
       initApp(level);
     } else {
       errorMsg.style.display = 'block';

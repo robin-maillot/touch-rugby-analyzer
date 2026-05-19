@@ -4,15 +4,24 @@ TR.APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzhMw4nQr2nVW0MLfP
 
 TR.secret = () => sessionStorage.getItem('password') || '';
 
-TR.umamiIdentify = (extra) => {
+TR.role = () => {
   const p = sessionStorage.getItem('password');
-  const role = p === 'm30-admin' ? 'admin'
-            : p === 'm30-staff' ? 'staff'
-            : p === 'm30'       ? 'viewer' : 'anon';
-  const data = Object.assign({ role }, extra || {});
-  const send = () => { if (window.umami && window.umami.identify) window.umami.identify(data); };
-  if (window.umami && window.umami.identify) send();
-  else window.addEventListener('load', send);
+  return p === 'm30-admin' ? 'admin'
+       : p === 'm30-staff' ? 'staff'
+       : p === 'm30'       ? 'viewer' : 'anon';
+};
+
+// Umami pages set data-auto-track="false" so we send pageviews manually with
+// role merged in. identify() tags the session; track() emits the pageview.
+TR.umamiIdentify = (extra) => {
+  const data = Object.assign({ role: TR.role() }, extra || {});
+  const send = () => {
+    if (!window.umami) return;
+    if (window.umami.identify) window.umami.identify(data);
+    if (window.umami.track) window.umami.track(props => Object.assign({}, props, data));
+  };
+  if (window.umami && window.umami.track) send();
+  else if (typeof window.addEventListener === 'function') window.addEventListener('load', send);
 };
 
 // Redirect to index.html if the stored password doesn't meet the required role.
@@ -25,5 +34,7 @@ TR.auth = (role) => {
     admin:  p === 'm30-admin',
   };
   if (!ok[role]) window.location.replace('index.html');
-  TR.umamiIdentify();
 };
+
+// Emit a single role-tagged pageview as soon as config.js loads.
+TR.umamiIdentify();
