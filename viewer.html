@@ -338,6 +338,7 @@
 <script src="js/config.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/events.js"></script>
+<script src="js/player.js"></script>
 </head>
 <body>
 
@@ -452,6 +453,8 @@
         <button class="btn btn-ghost" id="zoomToggle" title="Zoom video (Z)">🔍</button>
         <span class="zoom-level" id="zoomLevel" hidden>1.0×</span>
         <button class="btn btn-ghost" id="zoomReset" title="Reset zoom" hidden>⟲</button>
+        <button class="btn btn-ghost" id="clipDownloadBtn" title="Download current clip as MP4 (Cloudflare Stream only)" onclick="downloadCurrentClip()" hidden>⬇ Clip</button>
+        <span id="clipDownloadStatus" style="font-size:0.75rem;color:var(--text-muted);min-width:90px"></span>
       </div>
     </div>
 
@@ -634,18 +637,20 @@ let activeFilters = {};
 // Column indices (resolved after headers load)
 let colTime = -1, colType = -1, colName = -1, colGame = -1, colComment = -1, colAction = -1;
 
-// YouTube base URLs from metadata, keyed by game sheet name
-let gameYtMap = {};
+// Full metadata entry per game (provides youtubelink, streamuid, videoprovider, etc.)
+let gameMetaMap = {};
 // Pretty labels from metadata, keyed by game sheet name
 let gameLabelMap = {};
 
 // ── Video state ─────────────────────────────────────────────────
-let ytPlayer          = null;
-let ytProgressInterval = null;
-let currentVideoId    = null;
-let pendingSeekTime   = null;
-let videoReady        = false;
-let activeRowIdx      = -1;   // index in `filtered`
+let player           = null;   // TR.player handle
+let progressInterval = null;
+let currentVideoKey  = null;   // provider+id signature to detect "same video"
+let currentProvider  = null;   // 'youtube' | 'stream' | null — drives clip download button
+let currentSheetName = null;   // sheet name backing the currently loaded video
+let pendingSeekTime  = null;
+let videoReady       = false;
+let activeRowIdx     = -1;     // index in `filtered`
 
 // ── Bootstrap ───────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
@@ -668,21 +673,24 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 // ── Data fetching ───────────────────────────────────────────────
-function buildGameYtMap(sheets) {
-  gameYtMap = {};
+function buildGameMetaMap(sheets) {
+  gameMetaMap = {};
   gameLabelMap = {};
   if (!sheets) return;
   sheets.forEach(entry => {
-    if (entry.youtubelink) gameYtMap[entry.name] = entry.youtubelink;
+    gameMetaMap[entry.name] = entry;
     gameLabelMap[entry.name] = TR.sheetNameToLabel(entry);
   });
+}
+function gameHasVideo(name) {
+  return !!TR.player.providerFor(gameMetaMap[name]);
 }
 
 async function fetchAll() {
   const cachedAll  = LS.get('all');
   const cachedList = LS.get('list');
 
-  if (cachedList) buildGameYtMap(cachedList.sheets);
+  if (cachedList) buildGameMetaMap(cachedList.sheets);
   if (cachedAll) {
     processRows(cachedAll.rows);
   } else {
@@ -707,7 +715,7 @@ async function fetchAll() {
 
     if (listResult.ok) {
       LS.set('list', listResult);
-      buildGameYtMap(listResult.sheets);
+      buildGameMetaMap(listResult.sheets);
     }
 
     processRows(allResult.rows);
@@ -968,8 +976,8 @@ function renderRows(rows) {
   rows.forEach((row, pageIdx) => {
     const filteredIdx = pageOffset + pageIdx;
     const tr = document.createElement('tr');
-    const hasYt = colGame >= 0 && !!(gameYtMap[row[colGame]]);
-    if (hasYt) tr.classList.add('playable');
+    const hasVideo = colGame >= 0 && gameHasVideo(row[colGame]);
+    if (hasVideo) tr.classList.add('playable');
     if (filteredIdx === activeRowIdx) {
       tr.classList.add('active-row');
       if (loopMode) tr.classList.add('looping');
@@ -981,7 +989,7 @@ function renderRows(rows) {
       const td  = document.createElement('td');
       const col = (headers[i] || '').toLowerCase();
 
-      if (i === colTime && hasYt) {
+      if (i === colTime && hasVideo) {
         td.innerHTML = `<span class="play-icon">▶</span>${cell || ''}`;
         const copyBtn = makeCopyLinkBtn(row[colGame] || '', cell || '');
         if (copyBtn) td.appendChild(copyBtn);
@@ -1056,7 +1064,7 @@ function renderRows(rows) {
       tr.appendChild(td);
     });
 
-    if (hasYt) {
+    if (hasVideo) {
       tr.onclick = () => playFilteredRow(filteredIdx);
     }
     tbody.appendChild(tr);
@@ -1134,20 +1142,19 @@ function playFilteredRow(filteredIdx) {
   loopStart = seekTo;
   loopEnd   = secs + linkOffsetAfter;
 
-  // Extract YouTube video ID from game metadata
+  // Dispatch to the right backend (YouTube or Cloudflare Stream) per game.
   const gameKey = colGame >= 0 ? (row[colGame] || '') : '';
-  const baseUrl = gameYtMap[gameKey] || '';
-  const m       = baseUrl.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/);
-  const videoId = m ? m[1] : null;
+  const meta    = gameMetaMap[gameKey] || null;
+  const videoKey = videoKeyFor(meta);
 
-  if (videoId) {
-    if (videoId !== currentVideoId) {
-      currentVideoId  = videoId;
+  if (videoKey) {
+    if (videoKey !== currentVideoKey) {
+      currentVideoKey = videoKey;
       pendingSeekTime = seekTo;
-      loadYTPlayer(videoId, seekTo);
-    } else if (ytPlayer && videoReady) {
-      ytPlayer.seekTo(seekTo, true);
-      ytPlayer.playVideo();
+      loadPlayer(meta, seekTo);
+    } else if (player && videoReady) {
+      player.seek(seekTo);
+      player.play();
     }
   }
 
@@ -1243,61 +1250,156 @@ function updateNowPlaying(row) {
   }
 }
 
-// ── YouTube player ───────────────────────────────────────────────
-function loadYTPlayer(videoId, seekTime = 0) {
+// ── Video player ─────────────────────────────────────────────────
+// Stable signature for a meta entry so we can tell "same video" apart.
+function videoKeyFor(meta) {
+  const provider = TR.player.providerFor(meta);
+  if (provider === 'youtube') return 'yt:' + (TR.extractVideoId(meta.youtubelink) || '');
+  if (provider === 'stream')  return 'cf:' + (meta.streamuid || '');
+  return '';
+}
+
+async function loadPlayer(meta, seekTime = 0) {
+  const provider = TR.player.providerFor(meta);
+  if (!provider) return;
+  currentProvider  = provider;
+  currentSheetName = meta && meta.name || null;
+  document.getElementById('clipDownloadBtn').hidden = (provider !== 'stream');
+  document.getElementById('clipDownloadStatus').textContent = '';
   document.getElementById('noVideoMsg').style.display = 'none';
   document.getElementById('ytContainer').style.display = 'block';
   videoReady = false;
   pendingSeekTime = seekTime;
-  if (ytProgressInterval) { clearInterval(ytProgressInterval); ytProgressInterval = null; }
+  if (progressInterval) { clearInterval(progressInterval); progressInterval = null; }
+  if (player) { player.destroy(); player = null; }
 
-  if (window.YT && YT.Player) {
-    createYTPlayer(videoId);
-  } else {
-    window._ytPendingId = videoId;
-    if (!document.getElementById('ytApiScript')) {
-      const tag = document.createElement('script');
-      tag.id  = 'ytApiScript';
-      tag.src = 'https://www.youtube.com/iframe_api';
-      document.head.appendChild(tag);
-    }
-  }
-}
-
-window.onYouTubeIframeAPIReady = function() {
-  if (window._ytPendingId) { createYTPlayer(window._ytPendingId); window._ytPendingId = null; }
-};
-
-function createYTPlayer(videoId) {
-  if (ytPlayer) { ytPlayer.destroy(); ytPlayer = null; }
   const zoom = document.getElementById('ytZoom');
-  zoom.innerHTML = '<div id="ytInner"></div>';
-  ytPlayer = new YT.Player('ytInner', {
-    videoId,
-    width: '100%',
-    height: '100%',
-    playerVars: { rel: 0, modestbranding: 1 },
-    events: {
-      onReady: () => {
-        videoReady = true;
-        const dur = ytPlayer.getDuration();
-        document.getElementById('timeDuration').textContent = TR.fmt(dur);
-        ['playBtn','skipBk','skipFw','speedSel'].forEach(id => document.getElementById(id).removeAttribute('disabled'));
-        if (pendingSeekTime !== null) {
-          ytPlayer.seekTo(pendingSeekTime, true);
-          ytPlayer.playVideo();
-          pendingSeekTime = null;
-        }
-        ytProgressInterval = setInterval(updateProgress, 250);
-      },
-      onStateChange: ev => {
-        const btn = document.getElementById('playBtn');
-        if (ev.data === YT.PlayerState.PLAYING)      btn.textContent = '⏸ Pause';
-        else if (ev.data === YT.PlayerState.PAUSED ||
-                 ev.data === YT.PlayerState.ENDED)   btn.textContent = '▶ Play';
+  zoom.innerHTML = '';
+
+  const playerOpts = {
+    provider,
+    container: zoom,
+    onReady: () => {
+      videoReady = true;
+      document.getElementById('timeDuration').textContent = TR.fmt(player.getDuration());
+      ['playBtn','skipBk','skipFw','speedSel'].forEach(id => document.getElementById(id).removeAttribute('disabled'));
+      if (pendingSeekTime !== null) {
+        player.seek(pendingSeekTime);
+        player.play();
+        pendingSeekTime = null;
+      }
+      progressInterval = setInterval(updateProgress, 250);
+    },
+    onStateChange: state => {
+      const btn = document.getElementById('playBtn');
+      if      (state === 'playing') btn.textContent = '⏸ Pause';
+      else if (state === 'paused' || state === 'ended') btn.textContent = '▶ Play';
+    },
+  };
+  if (provider === 'youtube') {
+    playerOpts.videoId = TR.extractVideoId(meta.youtubelink);
+  } else if (provider === 'stream') {
+    playerOpts.uid = meta.streamuid;
+    if (meta.streamsigned) {
+      try {
+        const resp = await fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&action=stream_token&sheetName=${TR.enc(meta.name)}`);
+        const result = await resp.json();
+        if (!result.ok) throw new Error(result.error);
+        playerOpts.signedToken = result.token;
+      } catch (err) {
+        document.getElementById('noVideoMsg').style.display = 'block';
+        document.getElementById('ytContainer').style.display = 'none';
+        console.error('Stream token fetch failed:', err);
+        return;
       }
     }
-  });
+  }
+  player = TR.player.create(playerOpts);
+}
+
+// ── Clip download (Cloudflare Stream only) ───────────────────────
+// Cuts a clip from the source Stream video using the current loop range
+// (or a fallback window around the current playhead), waits for Cloudflare
+// to encode it + render the MP4, then opens the download.
+async function downloadCurrentClip() {
+  if (currentProvider !== 'stream' || !currentSheetName) return;
+
+  // Pick the clip range. Prefer the active loop window (already populated when
+  // a row is clicked); fall back to a window around the playhead.
+  let start, end;
+  if (loopStart != null && loopEnd != null && loopEnd > loopStart) {
+    start = loopStart;
+    end   = loopEnd;
+  } else if (player && videoReady) {
+    const cur = player.getTime();
+    start = Math.max(0, cur - 5);
+    end   = cur + 15;
+  } else {
+    alert('Pick an event row first so we know which moment to clip.');
+    return;
+  }
+  // Cloudflare enforces a 60s minimum clip duration on some plans; pad if needed.
+  if (end - start < 1) end = start + 1;
+
+  const btn    = document.getElementById('clipDownloadBtn');
+  const status = document.getElementById('clipDownloadStatus');
+  btn.disabled = true;
+  status.textContent = 'Creating clip…';
+
+  let clipUid;
+  try {
+    const resp = await fetch(TR.APPS_SCRIPT_URL, {
+      method:  'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body:    JSON.stringify({
+        secret: TR.secret(),
+        action: 'stream_clip',
+        sheetName: currentSheetName,
+        startSeconds: start,
+        endSeconds:   end,
+      }),
+    });
+    const result = await resp.json();
+    if (!result.ok) throw new Error(result.error);
+    clipUid = result.clipUid;
+  } catch (err) {
+    status.textContent = 'Failed: ' + err.message;
+    btn.disabled = false;
+    return;
+  }
+
+  // Poll until the clip is encoded AND the MP4 download is rendered.
+  const deadline = Date.now() + 10 * 60 * 1000;  // 10 min max
+  while (Date.now() < deadline) {
+    await new Promise(r => setTimeout(r, 4000));
+    try {
+      const resp = await fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&action=stream_clip_status&clipUid=${TR.enc(clipUid)}`);
+      const result = await resp.json();
+      if (!result.ok) throw new Error(result.error);
+      // Cloudflare often leaves percent null during the 'queued' phase, so
+      // fall back to its sub-state label when there's no number to show.
+      const detail = (result.percent != null)
+        ? `${result.percent}%`
+        : (result.cfState || '…');
+      if      (result.state === 'clipping')     status.textContent = `Encoding clip — ${detail}`;
+      else if (result.state === 'mp4-encoding') status.textContent = `Rendering MP4 — ${detail}`;
+      else if (result.state === 'error')        { status.textContent = 'Error: ' + result.error; btn.disabled = false; return; }
+      else if (result.state === 'ready') {
+        status.textContent = '✓ Ready';
+        // Trigger download in a new tab. Cloudflare's MP4 URL serves with
+        // Content-Disposition: attachment, so the browser will save instead of stream.
+        window.open(result.downloadUrl, '_blank');
+        btn.disabled = false;
+        return;
+      }
+    } catch (err) {
+      status.textContent = 'Poll failed: ' + err.message;
+      btn.disabled = false;
+      return;
+    }
+  }
+  status.textContent = 'Timed out — try again later';
+  btn.disabled = false;
 }
 
 // ── Playback helpers ─────────────────────────────────────────────
@@ -1329,33 +1431,29 @@ function cycleVideoLayout() {
 })();
 
 function togglePlay() {
-  if (!ytPlayer || !videoReady) return;
-  if (ytPlayer.getPlayerState() === YT.PlayerState.PLAYING) {
-    ytPlayer.pauseVideo();
-  } else {
-    ytPlayer.playVideo();
-  }
+  if (!player || !videoReady) return;
+  if (player.isPaused()) player.play(); else player.pause();
 }
 
 function skip(s) {
-  if (!ytPlayer || !videoReady) return;
-  ytPlayer.seekTo(Math.max(0, ytPlayer.getCurrentTime() + s), true);
+  if (!player || !videoReady) return;
+  player.seek(Math.max(0, player.getTime() + s));
 }
 
 function setSpeed() {
-  if (ytPlayer && videoReady) ytPlayer.setPlaybackRate(parseFloat(document.getElementById('speedSel').value));
+  if (player && videoReady) player.setRate(parseFloat(document.getElementById('speedSel').value));
 }
 
 function updateProgress() {
-  if (!ytPlayer || !videoReady) return;
-  const cur = ytPlayer.getCurrentTime(), dur = ytPlayer.getDuration();
+  if (!player || !videoReady) return;
+  const cur = player.getTime(), dur = player.getDuration();
   const pct = dur ? (cur / dur * 100) : 0;
   document.getElementById('seekFill').style.width  = pct + '%';
   document.getElementById('seekThumb').style.left  = pct + '%';
   document.getElementById('timeCurrent').textContent = TR.fmt(cur);
 
   if (loopMode && loopEnd != null && loopStart != null && cur >= loopEnd) {
-    ytPlayer.seekTo(loopStart, true);
+    player.seek(loopStart);
   }
 }
 
@@ -1364,10 +1462,10 @@ function setupSeekbar() {
   const bar = document.getElementById('seekbar');
   let seeking = false;
   function doSeek(e) {
-    if (!ytPlayer || !videoReady) return;
+    if (!player || !videoReady) return;
     const r   = bar.getBoundingClientRect();
     const pct = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
-    ytPlayer.seekTo(pct * ytPlayer.getDuration(), true);
+    player.seek(pct * player.getDuration());
   }
   bar.addEventListener('pointerdown', e => {
     e.preventDefault();
@@ -1563,7 +1661,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'ArrowUp')     { e.preventDefault(); navigateRow(-1); }
   if (e.key === 'ArrowDown')   { e.preventDefault(); navigateRow(1); }
   if (e.key === 'a' || e.key === 'A') {
-    if (!ytPlayer || !videoReady) return;
+    if (!player || !videoReady) return;
     const sel = document.getElementById('speedSel');
     sel.value = sel.value === '0.5' ? '1' : '0.5';
     setSpeed();
@@ -1614,21 +1712,25 @@ function toggleLoopMode() {
   document.querySelectorAll('#dataTable tbody tr.active-row').forEach(tr => {
     tr.classList.toggle('looping', loopMode);
   });
-  if (loopMode && ytPlayer && videoReady && loopStart != null && loopEnd != null) {
-    const cur = ytPlayer.getCurrentTime();
-    if (cur < loopStart || cur > loopEnd) ytPlayer.seekTo(loopStart, true);
+  if (loopMode && player && videoReady && loopStart != null && loopEnd != null) {
+    const cur = player.getTime();
+    if (cur < loopStart || cur > loopEnd) player.seek(loopStart);
   }
 }
 
-// ── YouTube link helpers ─────────────────────────────────────────
+// ── Shareable seek link ─────────────────────────────────────────
+// Returns a deep-link URL into the right backend (YouTube/Stream), or '' if
+// the game has no video configured. Uses the user's linkOffset (lookback).
 function makeYtTimestampUrl(gameKey, timeStr) {
-  const baseUrl = gameYtMap[gameKey || ''] || '';
-  const m = baseUrl.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/);
-  if (!m) return '';
+  const meta = gameMetaMap[gameKey || ''];
+  if (!meta) return '';
   const parts  = (timeStr || '').split(':').map(Number);
   const secs   = parts.length === 3 ? parts[0]*3600 + parts[1]*60 + parts[2]
                : parts.length === 2 ? parts[0]*60 + parts[1] : 0;
-  return `https://www.youtube.com/watch?v=${m[1]}&t=${Math.max(0, secs - linkOffset)}s`;
+  // TR.player.seekLink applies a 5s default lookback; override here so we
+  // honor the user-configured linkOffset slider.
+  const t = Math.max(0, secs - linkOffset);
+  return TR.player.seekLink(meta, t + 5);
 }
 
 function makeCopyLinkBtn(gameKey, timeStr) {

@@ -4,6 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Video Backfill — Touch Rugby Analyzer</title>
+  <style>
+    .provider-tabs { display: inline-flex; gap: 0; background: #0f1117; border: 1px solid #2a2d3a; border-radius: 6px; padding: 2px; margin-bottom: 8px; }
+    .provider-tab { background: transparent; color: #888; border: 0; padding: 5px 12px; font-size: 0.78rem; border-radius: 4px; cursor: pointer; }
+    .provider-tab.active { background: #22253a; color: #3b82f6; }
+    .signed-row { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 0.75rem; color: #888; }
+    .signed-row input { accent-color: #3b82f6; }
+  </style>
   <script defer src="https://cloud.umami.is/script.js" data-website-id="cb7fd4f2-fcd5-44d7-a8e4-70e9068870bb" data-auto-track="false"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -130,6 +137,7 @@
   </style>
 <script src="js/config.js"></script>
 <script src="js/utils.js"></script>
+<script src="js/player.js"></script>
 </head>
 <body>
 
@@ -141,7 +149,7 @@
 
 <main>
   <div id="loading">Loading games…</div>
-  <div id="allDone">All games already have a YouTube link ✓</div>
+  <div id="allDone">All games already have a video linked ✓</div>
   <div id="needsVideo" style="margin-bottom:32px"></div>
   <div id="hasVideo"   style="margin-bottom:32px"></div>
 </main>
@@ -158,29 +166,59 @@ function gameLabel(g) {
   return { title: g.name, sub: '' };
 }
 
-function renderCard(g, container) {
-  const { title, sub } = gameLabel(g);
-  const card = document.createElement('div');
-  card.className = 'game-card' + (g.youtubelink ? ' done' : '');
-  card.id = 'card-' + g.name;
-
-  let existingHtml = '';
-  if (g.youtubelink) {
-    existingHtml = `<div class="done-badge">✓ Video linked</div>
+function existingHtmlFor(g) {
+  const provider = TR.player.providerFor(g);
+  if (provider === 'youtube') {
+    return `<div class="done-badge">✓ YouTube linked</div>
       <div class="existing-url"><a href="${g.youtubelink}" target="_blank" rel="noopener">${g.youtubelink}</a></div>`;
   }
+  if (provider === 'stream') {
+    const signedBadge = g.streamsigned ? ' (signed)' : '';
+    return `<div class="done-badge">✓ Stream linked${signedBadge}</div>
+      <div class="existing-url">UID: ${g.streamuid}</div>`;
+  }
+  return '';
+}
+
+function renderCard(g, container) {
+  const { title, sub } = gameLabel(g);
+  const current = TR.player.providerFor(g);
+  const card = document.createElement('div');
+  card.className = 'game-card' + (current ? ' done' : '');
+  card.id = 'card-' + g.name;
+
+  // Default the form to whichever provider this game already uses (or YouTube
+  // for new games).
+  const defaultProvider = current || 'youtube';
 
   card.innerHTML = `
     <div class="game-title">${title}</div>
     <div class="game-sub">${sub || g.name}</div>
-    ${existingHtml}
-    <div class="form-row">
+    ${existingHtmlFor(g)}
+    <div class="provider-tabs" data-provider="${defaultProvider}">
+      <button type="button" class="provider-tab ${defaultProvider === 'youtube' ? 'active' : ''}" data-pick="youtube" onclick="pickProvider(this)">YouTube</button>
+      <button type="button" class="provider-tab ${defaultProvider === 'stream' ? 'active' : ''}" data-pick="stream"  onclick="pickProvider(this)">Cloudflare Stream</button>
+    </div>
+    <div class="form-row provider-form provider-form-youtube" ${defaultProvider === 'youtube' ? '' : 'hidden'}>
       <div class="field">
         <label>YouTube URL</label>
-        <input type="url" class="url-input" placeholder="https://www.youtube.com/watch?v=..." value="${g.youtubelink || ''}">
+        <input type="url" class="yt-input" placeholder="https://www.youtube.com/watch?v=..." value="${g.youtubelink || ''}">
       </div>
-      <button class="submit-btn" onclick="submit(this, '${g.name}')">
-        ${g.youtubelink ? 'Update' : 'Apply'}
+      <button class="submit-btn" onclick="submit(this, '${g.name}', 'youtube')">
+        ${current ? 'Update' : 'Apply'}
+      </button>
+    </div>
+    <div class="form-row provider-form provider-form-stream" ${defaultProvider === 'stream' ? '' : 'hidden'}>
+      <div class="field">
+        <label>Stream UID</label>
+        <input type="text" class="stream-input" placeholder="32-char hex (e.g. ea95132c15732ca6abd6cc11696c3e2c)" value="${g.streamuid || ''}">
+        <div class="signed-row">
+          <input type="checkbox" class="signed-input" id="signed-${g.name}" ${g.streamsigned ? 'checked' : ''}>
+          <label for="signed-${g.name}">Require signed URLs (private video)</label>
+        </div>
+      </div>
+      <button class="submit-btn" onclick="submit(this, '${g.name}', 'stream')">
+        ${current ? 'Update' : 'Apply'}
       </button>
     </div>
     <div class="form-row" style="margin-top:8px">
@@ -192,6 +230,17 @@ function renderCard(g, container) {
     </div>
   `;
   container.appendChild(card);
+}
+
+function pickProvider(btn) {
+  const tabs = btn.parentElement;
+  const card = tabs.closest('.game-card');
+  const pick = btn.dataset.pick;
+  tabs.dataset.provider = pick;
+  tabs.querySelectorAll('.provider-tab').forEach(t => t.classList.toggle('active', t === btn));
+  card.querySelectorAll('.provider-form').forEach(f => {
+    f.hidden = !f.classList.contains('provider-form-' + pick);
+  });
 }
 
 function parseHMS(str) {
@@ -227,11 +276,18 @@ async function loadFirstTime(btn, sheetName) {
   }
 }
 
-async function submit(btn, sheetName) {
-  const card   = document.getElementById('card-' + sheetName);
-  const url    = card.querySelector('.url-input').value.trim();
-
-  if (!url) { alert('Enter a YouTube URL first.'); return; }
+async function submit(btn, sheetName, provider) {
+  const card = document.getElementById('card-' + sheetName);
+  let value, signed = false;
+  if (provider === 'youtube') {
+    value = card.querySelector('.yt-input').value.trim();
+    if (!value) { alert('Enter a YouTube URL first.'); return; }
+  } else {
+    value  = card.querySelector('.stream-input').value.trim();
+    signed = card.querySelector('.signed-input').checked;
+    if (!value) { alert('Enter a Cloudflare Stream UID first.'); return; }
+    if (!/^[a-f0-9]{32}$/i.test(value)) { alert('Stream UID must be 32 hex characters.'); return; }
+  }
 
   const firstTimeInput = card.querySelector('.first-time-input');
   const newTimeStr  = firstTimeInput?.value.trim();
@@ -252,25 +308,32 @@ async function submit(btn, sheetName) {
   btn.textContent = '⏳ Saving…';
 
   try {
-    const resp   = await fetch(TR.APPS_SCRIPT_URL, {
+    const resp = await fetch(TR.APPS_SCRIPT_URL, {
       method:  'POST',
       headers: { 'Content-Type': 'text/plain' },
-      body:    JSON.stringify({ secret: TR.secret(), action: 'backfill_youtube', sheetName, youtubeUrl: url, offsetSeconds }),
+      body:    JSON.stringify({
+        secret: TR.secret(),
+        action: 'backfill_video',
+        sheetName,
+        provider,
+        value,
+        signed,
+        offsetSeconds,
+      }),
     });
     const result = await resp.json();
     if (!result.ok) throw new Error(result.error);
     btn.textContent = '✓ Saved';
     btn.classList.add('success');
     card.classList.add('done');
-    card.querySelector('.game-sub') && (card.querySelector('.game-sub').textContent || '');
-    // Update existing URL display
     let existingEl = card.querySelector('.existing-url');
-    if (!existingEl) {
-      existingEl = document.createElement('div');
-      existingEl.className = 'existing-url';
-      card.querySelector('.game-sub').after(existingEl);
-    }
-    existingEl.innerHTML = `<a href="${url}" target="_blank" rel="noopener">${url}</a>`;
+    const badge    = card.querySelector('.done-badge');
+    const newBadgeHtml = provider === 'youtube'
+      ? '<div class="done-badge">✓ YouTube linked</div><div class="existing-url"><a href="' + value + '" target="_blank" rel="noopener">' + value + '</a></div>'
+      : '<div class="done-badge">✓ Stream linked' + (signed ? ' (signed)' : '') + '</div><div class="existing-url">UID: ' + value + '</div>';
+    if (badge) badge.remove();
+    if (existingEl) existingEl.remove();
+    card.querySelector('.game-sub').insertAdjacentHTML('afterend', newBadgeHtml);
     setTimeout(() => { btn.disabled = false; btn.textContent = 'Update'; btn.classList.remove('success'); }, 3000);
   } catch (err) {
     btn.textContent = '✗ Error';
@@ -288,8 +351,9 @@ async function load() {
 
     document.getElementById('loading').style.display = 'none';
 
-    const missing = result.sheets.filter(g => !g.youtubelink);
-    const linked  = result.sheets.filter(g =>  g.youtubelink);
+    const hasVideo = g => !!TR.player.providerFor(g);
+    const missing = result.sheets.filter(g => !hasVideo(g));
+    const linked  = result.sheets.filter(g =>  hasVideo(g));
 
     if (!missing.length && !linked.length) {
       document.getElementById('allDone').style.display = 'block';

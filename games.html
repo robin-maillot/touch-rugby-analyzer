@@ -39,6 +39,30 @@
     th { background: #0f1117; color: #aaa; padding: 8px 12px; text-align: left; font-weight: 600; border-bottom: 1px solid #2a2d3a; }
     td { padding: 8px 12px; border-bottom: 1px solid #1f2230; color: #ddd; }
     tr:last-child td { border-bottom: none; }
+    td.stat-hover { cursor: help; position: relative; }
+    td.stat-hover:hover { background: #1a1d27; color: #fff; }
+
+    /* ── Stat popover (penalty list on hover) ───────────────────── */
+    #statPopover {
+      position: fixed; z-index: 150; display: none;
+      background: #11131c; border: 1px solid #2a2d3a; border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      min-width: 240px; max-width: 360px; padding: 8px 0;
+      font-size: 0.8rem;
+    }
+    #statPopover .pop-head { padding: 4px 12px 8px; color: #888; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #1f2230; }
+    #statPopover .pop-empty { padding: 10px 12px; color: #555; font-style: italic; }
+    #statPopover .pop-row {
+      display: flex; gap: 10px; align-items: baseline;
+      padding: 6px 12px; color: #ddd; cursor: pointer; text-decoration: none;
+      border-left: 2px solid transparent;
+    }
+    #statPopover .pop-row:hover { background: #1a1d27; border-left-color: #3b82f6; color: #fff; }
+    #statPopover .pop-time { font-family: ui-monospace, monospace; font-size: 0.74rem; color: #888; min-width: 56px; }
+    #statPopover .pop-name { flex: 1; }
+    #statPopover .pop-comment { color: #666; font-size: 0.72rem; font-style: italic; margin-left: 4px; }
+    #statPopover .pop-extlink { color: #555; font-size: 0.7rem; }
+    #statPopover .pop-row:hover .pop-extlink { color: #3b82f6; }
 
     #loading      { text-align: center; padding: 60px 24px; color: #888; font-size: 0.9rem; display: none; }
     #errMsg       { color: #ef4444; font-size: 0.82rem; padding: 12px 0; display: none; }
@@ -144,6 +168,7 @@
   </style>
 <script src="js/config.js"></script>
 <script src="js/utils.js"></script>
+<script src="js/player.js"></script>
 </head>
 <body>
 
@@ -216,6 +241,8 @@
     </div>
   </div>
 </main>
+
+<div id="statPopover" onmouseenter="hoverHoldPopover()" onmouseleave="hidePopover()"></div>
 
 <div id="turnoverOverlay" onclick="if(event.target===this)closeTurnoverModal()" style="display:none">
   <div id="turnoverCard">
@@ -361,8 +388,7 @@ async function loadGame() {
         else if (e[col] === 'Team 2') e[col] = team2;
       }
     });
-    const youtubelink = listed.youtubelink || fetched.youtubelink || '';
-    renderGame(events, team1, team2, subtitle, m.analyzable, youtubelink);
+    renderGame(events, team1, team2, subtitle, m.analyzable, m);
   }
 
   const cachedGame = LS.get('game_' + sheetName);
@@ -392,12 +418,12 @@ async function loadGame() {
 }
 
 // ── Helpers ────────────────────────────────────────────────────
-function makeYtUrl(baseUrl, rawSeconds) {
-  if (!baseUrl) return '';
-  const m = baseUrl.match(/(?:v=|youtu\.be\/|embed\/|live\/)([A-Za-z0-9_-]{11})/);
-  if (!m) return '';
-  const t = Math.max(0, Math.floor(rawSeconds) - 5);
-  return `https://www.youtube.com/watch?v=${m[1]}&t=${t}s`;
+// Returns a deep-link URL into whichever video backend this game uses
+// (YouTube or Cloudflare Stream), seeking to `rawSeconds - 5` (the 5s lookback).
+// `meta` is a _metadata entry; pass null/undefined for games with no video.
+function makeYtUrl(meta, rawSeconds) {
+  if (!meta) return '';
+  return TR.player.seekLink(meta, rawSeconds);
 }
 
 // ── Sheet parsing ──────────────────────────────────────────────
@@ -407,7 +433,7 @@ function parseSheet(rows) {
   const col = name => headers.indexOf(name);
 
   const ti = col('time'), ty = col('type'), ni = col('name');
-  const pi = col('possession owner'), ai = col('action owner');
+  const pi = col('possession owner'), ai = col('action owner'), ci = col('comment');
 
   return rows.slice(1).map(r => ({
     Time:               r[ti]  || '',
@@ -415,6 +441,7 @@ function parseSheet(rows) {
     Name:               r[ni]  || '',
     'Possession Owner': pi >= 0 ? (r[pi] || '') : '',
     'Action Owner':     ai >= 0 ? (r[ai] || '') : '',
+    Comment:            ci >= 0 ? (r[ci] || '') : '',
   })).filter(e => e.Type);
 }
 
@@ -471,7 +498,7 @@ function processEvents(events) {
 }
 
 // ── Chart data builders — mirror generate_html_v2.py ──────────
-function buildCumulativeData(events, type, teamNames, globalStart, globalEnd, startLink, endLink, baseUrl) {
+function buildCumulativeData(events, type, teamNames, globalStart, globalEnd, startLink, endLink, meta) {
   const types = Array.isArray(type) ? type : [type];
   const data = [];
   for (const team of teamNames) {
@@ -482,14 +509,14 @@ function buildCumulativeData(events, type, teamNames, globalStart, globalEnd, st
       .sort((a, b) => a.GameTime - b.GameTime)
       .forEach(e => {
         count++;
-        data.push({ GameTime: e.GameTime, Team: team, Event: e.Name, Count: count, Link: makeYtUrl(baseUrl, e._raw) });
+        data.push({ GameTime: e.GameTime, Team: team, Event: e.Name, Count: count, Link: makeYtUrl(meta, e._raw) });
       });
     data.push({ GameTime: globalEnd, Team: team, Event: 'Game End', Count: count, Link: endLink });
   }
   return data;
 }
 
-function buildPossessionData(events, teamNames, baseUrl) {
+function buildPossessionData(events, teamNames, meta) {
   const other = t => t === teamNames[0] ? teamNames[1] : teamNames[0];
 
   // Use Possession Owner column as ground truth, but after a Try the other
@@ -527,7 +554,7 @@ function buildPossessionData(events, teamNames, baseUrl) {
     rawEnd:     Math.max(...g.map(e => e.GameTime)),
     endType:    g[g.length - 1].Type,
     endEvent:   g[g.length - 1].Name,
-    Link:       makeYtUrl(baseUrl, g[g.length - 1]._raw),
+    Link:       makeYtUrl(meta, g[g.length - 1]._raw),
   }));
 
   // Pre-compute dead-ball intervals from Ball Live events
@@ -653,6 +680,10 @@ function buildMetrics(possessions, teamNames, events) {
       'Pen Attack': g.length ? `${penAttack} (${atkRate})` : penAttack,
       _penDef: penDefence,
       'Pen Defence': penDefence,
+      // Stash the underlying events so the table can show a hover-overview
+      // of which penalties make up each cell.
+      _penAttackEvents:  teamPens.filter(e => e['Action Owner'] === e['Possession Owner']),
+      _penDefenceEvents: teamPens.filter(e => e['Action Owner'] !== e['Possession Owner']),
       'Avg Time (s)': avg.toFixed(1), 'Total Time (s)': total.toFixed(1),
       'Dead Ball (s)': g.reduce((s, p) => s + Math.max(0, (p.End - p.Start) - p.Duration_Sec), 0).toFixed(1),
       'Avg Turnover (s)': turnoverAvgs[team].toFixed(1),
@@ -762,7 +793,7 @@ async function selectHalf(halfValue) {
   await renderStats(halfValue);
 }
 
-async function renderGame(events, team1, team2, subtitle, analyzable, baseUrl) {
+async function renderGame(events, team1, team2, subtitle, analyzable, meta) {
   document.getElementById('loading').style.display = 'none';
 
   if (analyzable !== 'TRUE') {
@@ -773,7 +804,7 @@ async function renderGame(events, team1, team2, subtitle, analyzable, baseUrl) {
   const starts = events.filter(e => e.Name === 'Game Start').sort((a, b) => a.GameTime - b.GameTime);
   const ends   = events.filter(e => e.Name === 'Game End').sort((a, b) => a.GameTime - b.GameTime);
 
-  currentGame = { events, team1, team2, starts, ends, baseUrl: baseUrl || '' };
+  currentGame = { events, team1, team2, starts, ends, meta: meta || null };
 
   // Build half toggle buttons
   const toggleEl = document.getElementById('halfToggle');
@@ -814,25 +845,25 @@ async function renderStats(halfValue) {
   const { events, team1, team2, starts, ends } = currentGame;
   const teamNames = [team1, team2];
 
-  const baseUrl = currentGame.baseUrl || '';
+  const meta = currentGame.meta;
   let rangeStart, rangeEnd, startLink, endLink;
   if (halfValue === 'all') {
     rangeStart = starts[0].GameTime;
     rangeEnd   = ends[ends.length - 1].GameTime;
-    startLink  = makeYtUrl(baseUrl, starts[0]._raw);
-    endLink    = makeYtUrl(baseUrl, ends[ends.length - 1]._raw);
+    startLink  = makeYtUrl(meta, starts[0]._raw);
+    endLink    = makeYtUrl(meta, ends[ends.length - 1]._raw);
   } else {
     const hi   = parseInt(halfValue);
     rangeStart = starts[hi].GameTime;
     rangeEnd   = ends[hi].GameTime;
-    startLink  = makeYtUrl(baseUrl, starts[hi]._raw);
-    endLink    = makeYtUrl(baseUrl, ends[hi]._raw);
+    startLink  = makeYtUrl(meta, starts[hi]._raw);
+    endLink    = makeYtUrl(meta, ends[hi]._raw);
   }
 
   const filtered  = events.filter(e => e.GameTime >= rangeStart && e.GameTime <= rangeEnd);
-  const triesData = buildCumulativeData(filtered, 'Try', teamNames, rangeStart, rangeEnd, startLink, endLink, baseUrl);
-  const penData   = buildCumulativeData(filtered, ['Penalty', 'Penalty Attack', 'Penalty Defence'], teamNames, rangeStart, rangeEnd, startLink, endLink, baseUrl);
-  const possData  = buildPossessionData(filtered.filter(e => e.Type !== 'To Review'), teamNames, baseUrl);
+  const triesData = buildCumulativeData(filtered, 'Try', teamNames, rangeStart, rangeEnd, startLink, endLink, meta);
+  const penData   = buildCumulativeData(filtered, ['Penalty', 'Penalty Attack', 'Penalty Defence'], teamNames, rangeStart, rangeEnd, startLink, endLink, meta);
+  const possData  = buildPossessionData(filtered.filter(e => e.Type !== 'To Review'), teamNames, meta);
   const metrics   = buildMetrics(possData, teamNames, filtered);
 
   const opts = { config: VEGA_CONFIG, actions: false };
@@ -862,11 +893,86 @@ async function renderStats(halfValue) {
   const cols = ['Team', 'Possessions', 'Tries', 'Completions', 'Pen Attack', 'Pen Defence',
     'Avg Time (s)', 'Total Time (s)',
     ...(hasDead ? ['Dead Ball (s)', 'Avg Turnover (s)'] : [])];
+
+  // Stash the underlying penalty events for each cell so the hover popover
+  // can list them without re-running the filter logic.
+  _penEventsByCell = {};
+  const tbody = metrics.map((m, mi) => {
+    return `<tr>${cols.map(c => {
+      if (c === 'Pen Attack' || c === 'Pen Defence') {
+        const evtKey = `${mi}:${c}`;
+        _penEventsByCell[evtKey] = c === 'Pen Attack' ? m._penAttackEvents : m._penDefenceEvents;
+        return `<td class="stat-hover" data-pen-key="${evtKey}" data-team="${m.Team}" data-kind="${c}" onmouseenter="showPenPopover(event, this)" onmouseleave="schedulePopoverHide()">${m[c]}</td>`;
+      }
+      return `<td>${m[c]}</td>`;
+    }).join('')}</tr>`;
+  }).join('');
+
   document.getElementById('metricsTable').innerHTML =
     `<table>
        <thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead>
-       <tbody>${metrics.map(m => `<tr>${cols.map(c => `<td>${m[c]}</td>`).join('')}</tr>`).join('')}</tbody>
+       <tbody>${tbody}</tbody>
      </table>`;
+}
+
+// ── Penalty hover popover ────────────────────────────────────
+let _penEventsByCell = {};
+let _popoverHideTimer = null;
+
+function showPenPopover(ev, cell) {
+  if (_popoverHideTimer) { clearTimeout(_popoverHideTimer); _popoverHideTimer = null; }
+  const key    = cell.dataset.penKey;
+  const team   = cell.dataset.team;
+  const kind   = cell.dataset.kind;
+  const events = _penEventsByCell[key] || [];
+  const meta   = currentGame && currentGame.meta;
+
+  const pop = document.getElementById('statPopover');
+  const head = `<div class="pop-head">${team} — ${kind} (${events.length})</div>`;
+  let body;
+  if (!events.length) {
+    body = `<div class="pop-empty">No events.</div>`;
+  } else {
+    body = events
+      .slice()
+      .sort((a, b) => (a._raw || 0) - (b._raw || 0))
+      .map(e => {
+        const link = meta ? TR.player.seekLink(meta, e._raw || 0) : '';
+        const name = (e.Name || '').replace(/[<&>]/g, c => ({'<':'&lt;','&':'&amp;','>':'&gt;'}[c]));
+        const cmt  = (e.Comment || '').replace(/[<&>]/g, c => ({'<':'&lt;','&':'&amp;','>':'&gt;'}[c]));
+        const time = e.Time || '';
+        const ext  = link ? '<span class="pop-extlink">↗</span>' : '';
+        if (link) {
+          return `<a class="pop-row" href="${link}" target="_blank" rel="noopener"><span class="pop-time">${time}</span><span class="pop-name">${name}${cmt ? ` <span class="pop-comment">— ${cmt}</span>` : ''}</span>${ext}</a>`;
+        }
+        return `<div class="pop-row"><span class="pop-time">${time}</span><span class="pop-name">${name}${cmt ? ` <span class="pop-comment">— ${cmt}</span>` : ''}</span></div>`;
+      })
+      .join('');
+  }
+  pop.innerHTML = head + body;
+  pop.style.display = 'block';
+
+  // Position below the cell, clamped to viewport.
+  const r = cell.getBoundingClientRect();
+  const pr = pop.getBoundingClientRect();
+  let left = r.left;
+  let top  = r.bottom + 4;
+  if (left + pr.width > window.innerWidth - 8) left = window.innerWidth - pr.width - 8;
+  if (top + pr.height > window.innerHeight - 8) top  = r.top - pr.height - 4;
+  pop.style.left = Math.max(8, left) + 'px';
+  pop.style.top  = Math.max(8, top)  + 'px';
+}
+
+function schedulePopoverHide() {
+  // Delay so the user can move the cursor into the popover (e.g. to click
+  // a link) without it vanishing.
+  _popoverHideTimer = setTimeout(hidePopover, 150);
+}
+function hoverHoldPopover() {
+  if (_popoverHideTimer) { clearTimeout(_popoverHideTimer); _popoverHideTimer = null; }
+}
+function hidePopover() {
+  document.getElementById('statPopover').style.display = 'none';
 }
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -911,21 +1017,21 @@ document.addEventListener('keydown', e => {
 });
 
 function buildPeriodMetrics() {
-  const { events, team1, team2, starts, ends, baseUrl } = currentGame;
+  const { events, team1, team2, starts, ends, meta } = currentGame;
   const teamNames = [team1, team2];
   const periods = [];
 
   const fullStart = starts[0].GameTime;
   const fullEnd   = ends[ends.length - 1].GameTime;
   const fullEvt   = events.filter(e => e.GameTime >= fullStart && e.GameTime <= fullEnd);
-  const fullPoss  = buildPossessionData(fullEvt.filter(e => e.Type !== 'To Review'), teamNames, baseUrl);
+  const fullPoss  = buildPossessionData(fullEvt.filter(e => e.Type !== 'To Review'), teamNames, meta);
   periods.push({ label: 'Full Game', metrics: buildMetrics(fullPoss, teamNames, fullEvt) });
 
   for (let i = 0; i < starts.length; i++) {
     const halfStart = starts[i].GameTime;
     const halfEnd   = ends[i]?.GameTime ?? halfStart;
     const halfEvt   = events.filter(e => e.GameTime >= halfStart && e.GameTime <= halfEnd);
-    const halfPoss  = buildPossessionData(halfEvt.filter(e => e.Type !== 'To Review'), teamNames, baseUrl);
+    const halfPoss  = buildPossessionData(halfEvt.filter(e => e.Type !== 'To Review'), teamNames, meta);
     periods.push({ label: ordinal(i + 1) + ' Half', metrics: buildMetrics(halfPoss, teamNames, halfEvt) });
   }
 

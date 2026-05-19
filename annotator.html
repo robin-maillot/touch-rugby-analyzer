@@ -183,6 +183,7 @@
 <script src="js/utils.js"></script>
 <script src="js/events.js"></script>
 <script src="js/possession.js"></script>
+<script src="js/player.js"></script>
 </head>
 <body>
 
@@ -196,6 +197,9 @@
   <span class="yt-label">YouTube URL:</span>
   <input class="yt-input" id="ytUrl" type="text" placeholder="https://www.youtube.com/watch?v=..." onkeydown="if(event.key==='Enter')loadYouTube()">
   <button class="btn btn-primary" onclick="loadYouTube()" style="padding:4px 10px;font-size:0.76rem">▶ Load YT</button>
+  <span class="yt-label">Stream UID:</span>
+  <input class="yt-input" id="streamUid" type="text" placeholder="32-char Cloudflare Stream UID" style="width:200px" onkeydown="if(event.key==='Enter')loadStreamFromInput()">
+  <button class="btn btn-primary" onclick="loadStreamFromInput()" style="padding:4px 10px;font-size:0.76rem">▶ Load Stream</button>
   <nav style="display:flex;gap:4px;margin-left:auto;align-items:center">
     <button id="layoutBtn" class="layout-btn" onclick="toggleLayout()" title="Toggle video layout">↔ Side</button>
     <a href="games.html" style="color:#888;text-decoration:none;font-size:0.8rem;padding:5px 10px;border-radius:6px;transition:background 0.15s" onmouseover="this.style.background='#22253a';this.style.color='#e0e0e0'" onmouseout="this.style.background='';this.style.color='#888'">Games</a>
@@ -438,20 +442,35 @@ let pendingType = null;
 let pendingName = null;
 let pendingComment = null;
 let wasPlaying = false;
-let videoMode = 'none'; // 'local' | 'youtube'
-let ytPlayer = null;
-let ytProgressInterval = null;
+let videoMode = 'none'; // 'local' | 'youtube' | 'stream'
+let player = null;       // TR.player handle (current backend)
+let progressInterval = null;
 
 const vid = document.getElementById('vid');
 
-// ── Video abstraction layer ────────────────────────────────────
-function getTime()     { return videoMode === 'youtube' ? (ytPlayer ? ytPlayer.getCurrentTime() : 0) : vid.currentTime; }
-function getDuration() { return videoMode === 'youtube' ? (ytPlayer && typeof ytPlayer.getDuration === 'function' ? ytPlayer.getDuration() : 0) : vid.duration; }
-function isPaused()    { return videoMode === 'youtube' ? (!ytPlayer || ytPlayer.getPlayerState() !== YT.PlayerState.PLAYING) : vid.paused; }
-function doPlay()  { if (videoMode === 'youtube') { if (ytPlayer) ytPlayer.playVideo();  } else vid.play();  document.getElementById('playBtn').textContent = '⏸ Pause'; }
-function doPause() { if (videoMode === 'youtube') { if (ytPlayer) ytPlayer.pauseVideo(); } else vid.pause(); document.getElementById('playBtn').textContent = '▶ Play'; }
-function setCurrentTime(t) { if (videoMode === 'youtube') { if (ytPlayer) ytPlayer.seekTo(t, true); } else vid.currentTime = t; }
-function setRate(r)    { if (videoMode === 'youtube') { if (ytPlayer) ytPlayer.setPlaybackRate(r); } else vid.playbackRate = r; }
+function getTime()     { return player ? player.getTime()     : 0; }
+function getDuration() { return player ? player.getDuration() : 0; }
+function isPaused()    { return !player || player.isPaused(); }
+function doPlay()  { if (player) player.play();  document.getElementById('playBtn').textContent = '⏸ Pause'; }
+function doPause() { if (player) player.pause(); document.getElementById('playBtn').textContent = '▶ Play'; }
+function setCurrentTime(t) { if (player) player.seek(t); }
+function setRate(r)        { if (player) player.setRate(r); }
+
+function onPlayerStateChange(state) {
+  const btn = document.getElementById('playBtn');
+  if      (state === 'playing') btn.textContent = '⏸ Pause';
+  else if (state === 'paused' || state === 'ended') btn.textContent = '▶ Play';
+}
+
+function startProgressInterval() {
+  if (progressInterval) clearInterval(progressInterval);
+  progressInterval = setInterval(updateProgress, 250);
+}
+
+function teardownPlayer() {
+  if (progressInterval) { clearInterval(progressInterval); progressInterval = null; }
+  if (player) { player.destroy(); player = null; }
+}
 
 function onVideoReady() {
   videoLoaded = true;
@@ -540,77 +559,71 @@ function loadVideo(e) {
   const f = e.target.files[0];
   if (!f) return;
   videoBaseName = '';
-  // Tear down any active YouTube player
-  if (ytProgressInterval) { clearInterval(ytProgressInterval); ytProgressInterval = null; }
-  if (ytPlayer) { ytPlayer.destroy(); ytPlayer = null; }
+  teardownPlayer();
   document.getElementById('ytPlayerContainer').style.display = 'none';
   videoMode = 'local';
   vid.src = URL.createObjectURL(f);
   vid.style.display = 'block';
   document.getElementById('noVideo').style.display = 'none';
-  vid.onloadedmetadata = () => {
-    onVideoReady();
-    if (confirm(`Video loaded: "${f.name}"\n\nLoad a matching CSV file?\n(Look for "${videoBaseName}.csv" in the same folder)`))
-      document.getElementById('csvInput').click();
-  };
-  vid.ontimeupdate = updateProgress;
-  vid.onended = () => document.getElementById('playBtn').textContent = '▶ Play';
+  player = TR.player.create({
+    provider: 'local',
+    videoElement: vid,
+    onReady: () => {
+      onVideoReady();
+      if (confirm(`Video loaded: "${f.name}"\n\nLoad a matching CSV file?\n(Look for "${videoBaseName}.csv" in the same folder)`))
+        document.getElementById('csvInput').click();
+    },
+    onStateChange: onPlayerStateChange,
+  });
+  startProgressInterval();
 }
 
 // ── YouTube loading ────────────────────────────────────────────
 function loadYouTube() {
   const url = document.getElementById('ytUrl').value.trim();
-  const m = url.match(/(?:v=|youtu\.be\/|embed\/|live\/)([A-Za-z0-9_-]{11})/);
-  if (!m) { alert('Invalid YouTube URL — could not extract a video ID.'); return; }
-  const videoId = m[1];
+  const videoId = TR.extractVideoId(url);
+  if (!videoId) { alert('Invalid YouTube URL — could not extract a video ID.'); return; }
   videoBaseName = '';
   fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`)
     .then(r => r.json()).then(d => { if (d.title) videoBaseName = d.title; })
     .catch(() => {});
-  // Tear down local video
   vid.pause(); vid.src = ''; vid.style.display = 'none';
   document.getElementById('noVideo').style.display = 'none';
   document.getElementById('ytPlayerContainer').style.display = 'block';
-  if (ytProgressInterval) { clearInterval(ytProgressInterval); ytProgressInterval = null; }
+  teardownPlayer();
   videoMode = 'youtube';
-  if (window.YT && YT.Player) {
-    createYTPlayer(videoId);
-  } else {
-    window._ytPendingId = videoId;
-    if (!document.getElementById('ytApiScript')) {
-      const tag = document.createElement('script');
-      tag.id = 'ytApiScript';
-      tag.src = 'https://www.youtube.com/iframe_api';
-      document.head.appendChild(tag);
-    }
-  }
+  player = TR.player.create({
+    provider: 'youtube',
+    container: document.getElementById('ytPlayerContainer'),
+    videoId,
+    onReady: () => { onVideoReady(); startProgressInterval(); },
+    onStateChange: onPlayerStateChange,
+  });
 }
 
-window.onYouTubeIframeAPIReady = function() {
-  if (window._ytPendingId) { createYTPlayer(window._ytPendingId); window._ytPendingId = null; }
-};
+function loadStreamFromInput() {
+  const uid = document.getElementById('streamUid').value.trim();
+  if (!uid) { alert('Enter a Cloudflare Stream UID.'); return; }
+  loadStream(uid);
+}
 
-function createYTPlayer(videoId) {
-  if (ytPlayer) { ytPlayer.destroy(); ytPlayer = null; }
-  // Replace container contents so YT.Player has a fresh target element
+// ── Cloudflare Stream loading ──────────────────────────────────
+// uidOrToken: a Stream UID (public) or a signed JWT (private).
+// When private, fetch the signed token from Apps Script first and pass it here.
+function loadStream(uidOrToken, opts) {
+  videoBaseName = (opts && opts.videoName) || '';
+  vid.pause(); vid.src = ''; vid.style.display = 'none';
+  document.getElementById('noVideo').style.display = 'none';
   const container = document.getElementById('ytPlayerContainer');
-  container.innerHTML = '<div id="ytInner"></div>';
-  ytPlayer = new YT.Player('ytInner', {
-    videoId,
-    width: '100%',
-    height: '100%',
-    playerVars: { rel: 0, modestbranding: 1 },
-    events: {
-      onReady: () => {
-        onVideoReady();
-        ytProgressInterval = setInterval(updateProgress, 250);
-      },
-      onStateChange: ev => {
-        if      (ev.data === YT.PlayerState.PLAYING) document.getElementById('playBtn').textContent = '⏸ Pause';
-        else if (ev.data === YT.PlayerState.PAUSED ||
-                 ev.data === YT.PlayerState.ENDED)  document.getElementById('playBtn').textContent = '▶ Play';
-      }
-    }
+  container.style.display = 'block';
+  teardownPlayer();
+  videoMode = 'stream';
+  player = TR.player.create({
+    provider: 'stream',
+    container,
+    uid: uidOrToken,
+    onReady: () => { onVideoReady(); startProgressInterval(); },
+    onStateChange: onPlayerStateChange,
   });
 }
 
