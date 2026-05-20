@@ -148,11 +148,6 @@
         <div class="card-title">Video Backfill</div>
         <div class="card-desc">Link videos to field annotations</div>
       </a>
-      <a class="nav-card" href="upload.html" id="uploadCard" style="display:none">
-        <div class="card-icon">☁️</div>
-        <div class="card-title">Stream Upload</div>
-        <div class="card-desc">Upload match video to Cloudflare Stream</div>
-      </a>
       <a class="nav-card" href="analytics.html" id="analyticsCard" style="display:none">
         <div class="card-icon">📈</div>
         <div class="card-title">Analytics</div>
@@ -215,7 +210,6 @@
     }
     if (level === 'admin') {
       document.getElementById('backfillCard').style.display = '';
-      document.getElementById('uploadCard').style.display = '';
       document.getElementById('analyticsCard').style.display = '';
     }
     loginScreen.style.display = 'none';

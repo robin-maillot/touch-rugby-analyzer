@@ -109,20 +109,22 @@ test('Ball Live → possession owner', () => assert.equal(TR.inferActionOwner('T
 
 // ── TR.player.providerFor ────────────────────────────────────
 console.log('TR.player.providerFor');
-test('null meta',                  () => assert.equal(TR.player.providerFor(null), null));
-test('empty meta',                 () => assert.equal(TR.player.providerFor({}), null));
-test('youtubelink → youtube',      () => assert.equal(TR.player.providerFor({ youtubelink: 'https://youtu.be/abc' }), 'youtube'));
-test('streamuid → stream',         () => assert.equal(TR.player.providerFor({ streamuid: 'abc' }), 'stream'));
-test('streamuid wins over youtube',() => assert.equal(TR.player.providerFor({ youtubelink: 'x', streamuid: 'y' }), 'stream'));
-test('explicit override: youtube', () => assert.equal(TR.player.providerFor({ videoprovider: 'youtube', streamuid: 'y' }), 'youtube'));
-test('explicit override: stream',  () => assert.equal(TR.player.providerFor({ videoprovider: 'stream', youtubelink: 'x' }), 'stream'));
-test('garbage override ignored',   () => assert.equal(TR.player.providerFor({ videoprovider: 'vimeo', youtubelink: 'x' }), 'youtube'));
+test('null meta',              () => assert.equal(TR.player.providerFor(null), null));
+test('empty meta',             () => assert.equal(TR.player.providerFor({}), null));
+test('youtubelink → youtube',  () => assert.equal(TR.player.providerFor({ youtubelink: 'https://youtu.be/abc' }), 'youtube'));
+test('no youtubelink → null',  () => assert.equal(TR.player.providerFor({ gcsObject: 'x.mp4' }), null));
+
+// ── TR.player.hasClip ────────────────────────────────────────
+console.log('TR.player.hasClip');
+test('null meta',         () => assert.equal(TR.player.hasClip(null), false));
+test('no gcsObject',      () => assert.equal(TR.player.hasClip({ youtubelink: 'x' }), false));
+test('with gcsObject',    () => assert.equal(TR.player.hasClip({ gcsObject: 'a.mp4' }), true));
+test('empty gcsObject',   () => assert.equal(TR.player.hasClip({ gcsObject: '' }), false));
 
 // ── TR.player.seekLink ───────────────────────────────────────
 console.log('TR.player.seekLink');
 test('youtube URL',         () => assert.equal(TR.player.seekLink({ youtubelink: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' }, 65), 'https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=60s'));
 test('youtube 5s lookback', () => assert.equal(TR.player.seekLink({ youtubelink: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' }, 3),  'https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=0s'));
-test('stream URL',          () => assert.equal(TR.player.seekLink({ streamuid: 'ea95132c15732ca6abd6cc11696c3e2c' }, 65), 'https://iframe.videodelivery.net/ea95132c15732ca6abd6cc11696c3e2c?startTime=60'));
 test('no provider → empty', () => assert.equal(TR.player.seekLink({}, 10), ''));
 test('null meta → empty',   () => assert.equal(TR.player.seekLink(null, 10), ''));
 

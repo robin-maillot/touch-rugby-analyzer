@@ -453,7 +453,7 @@
         <button class="btn btn-ghost" id="zoomToggle" title="Zoom video (Z)">🔍</button>
         <span class="zoom-level" id="zoomLevel" hidden>1.0×</span>
         <button class="btn btn-ghost" id="zoomReset" title="Reset zoom" hidden>⟲</button>
-        <button class="btn btn-ghost" id="clipDownloadBtn" title="Download current clip as MP4 (Cloudflare Stream only)" onclick="downloadCurrentClip()" hidden>⬇ Clip</button>
+        <button class="btn btn-ghost" id="clipBtn" title="Cut a clip of the current loop range and open it in a new tab" onclick="makeCurrentClip()" hidden>▶ Clip</button>
         <span id="clipDownloadStatus" style="font-size:0.75rem;color:var(--text-muted);min-width:90px"></span>
       </div>
     </div>
@@ -637,7 +637,7 @@ let activeFilters = {};
 // Column indices (resolved after headers load)
 let colTime = -1, colType = -1, colName = -1, colGame = -1, colComment = -1, colAction = -1;
 
-// Full metadata entry per game (provides youtubelink, streamuid, videoprovider, etc.)
+// Full metadata entry per game (provides youtubelink, gcsObject, teams, etc.)
 let gameMetaMap = {};
 // Pretty labels from metadata, keyed by game sheet name
 let gameLabelMap = {};
@@ -645,8 +645,7 @@ let gameLabelMap = {};
 // ── Video state ─────────────────────────────────────────────────
 let player           = null;   // TR.player handle
 let progressInterval = null;
-let currentVideoKey  = null;   // provider+id signature to detect "same video"
-let currentProvider  = null;   // 'youtube' | 'stream' | null — drives clip download button
+let currentVideoKey  = null;   // id signature to detect "same video"
 let currentSheetName = null;   // sheet name backing the currently loaded video
 let pendingSeekTime  = null;
 let videoReady       = false;
@@ -1142,10 +1141,15 @@ function playFilteredRow(filteredIdx) {
   loopStart = seekTo;
   loopEnd   = secs + linkOffsetAfter;
 
-  // Dispatch to the right backend (YouTube or Cloudflare Stream) per game.
+  // Look up the game's metadata so we can build the right YouTube player.
   const gameKey = colGame >= 0 ? (row[colGame] || '') : '';
   const meta    = gameMetaMap[gameKey] || null;
   const videoKey = videoKeyFor(meta);
+
+  // Clip button reflects the *current* game's gcsObject, independent of whether
+  // we (re)load the player or whether the game even has a YouTube link.
+  currentSheetName = meta && meta.name || null;
+  document.getElementById('clipBtn').hidden = !TR.player.hasClip(meta);
 
   if (videoKey) {
     if (videoKey !== currentVideoKey) {
@@ -1253,18 +1257,11 @@ function updateNowPlaying(row) {
 // ── Video player ─────────────────────────────────────────────────
 // Stable signature for a meta entry so we can tell "same video" apart.
 function videoKeyFor(meta) {
-  const provider = TR.player.providerFor(meta);
-  if (provider === 'youtube') return 'yt:' + (TR.extractVideoId(meta.youtubelink) || '');
-  if (provider === 'stream')  return 'cf:' + (meta.streamuid || '');
-  return '';
+  return 'yt:' + (TR.extractVideoId(meta && meta.youtubelink) || '');
 }
 
 async function loadPlayer(meta, seekTime = 0) {
-  const provider = TR.player.providerFor(meta);
-  if (!provider) return;
-  currentProvider  = provider;
-  currentSheetName = meta && meta.name || null;
-  document.getElementById('clipDownloadBtn').hidden = (provider !== 'stream');
+  if (!TR.player.providerFor(meta)) return;
   document.getElementById('clipDownloadStatus').textContent = '';
   document.getElementById('noVideoMsg').style.display = 'none';
   document.getElementById('ytContainer').style.display = 'block';
@@ -1276,9 +1273,10 @@ async function loadPlayer(meta, seekTime = 0) {
   const zoom = document.getElementById('ytZoom');
   zoom.innerHTML = '';
 
-  const playerOpts = {
-    provider,
+  player = TR.player.create({
+    provider: 'youtube',
     container: zoom,
+    videoId: TR.extractVideoId(meta.youtubelink),
     onReady: () => {
       videoReady = true;
       document.getElementById('timeDuration').textContent = TR.fmt(player.getDuration());
@@ -1295,37 +1293,17 @@ async function loadPlayer(meta, seekTime = 0) {
       if      (state === 'playing') btn.textContent = '⏸ Pause';
       else if (state === 'paused' || state === 'ended') btn.textContent = '▶ Play';
     },
-  };
-  if (provider === 'youtube') {
-    playerOpts.videoId = TR.extractVideoId(meta.youtubelink);
-  } else if (provider === 'stream') {
-    playerOpts.uid = meta.streamuid;
-    if (meta.streamsigned) {
-      try {
-        const resp = await fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&action=stream_token&sheetName=${TR.enc(meta.name)}`);
-        const result = await resp.json();
-        if (!result.ok) throw new Error(result.error);
-        playerOpts.signedToken = result.token;
-      } catch (err) {
-        document.getElementById('noVideoMsg').style.display = 'block';
-        document.getElementById('ytContainer').style.display = 'none';
-        console.error('Stream token fetch failed:', err);
-        return;
-      }
-    }
-  }
-  player = TR.player.create(playerOpts);
+  });
 }
 
-// ── Clip download (Cloudflare Stream only) ───────────────────────
-// Cuts a clip from the source Stream video using the current loop range
-// (or a fallback window around the current playhead), waits for Cloudflare
-// to encode it + render the MP4, then opens the download.
-async function downloadCurrentClip() {
-  if (currentProvider !== 'stream' || !currentSheetName) return;
+// ── Clip creation (Cloud Run + GCS) ──────────────────────────────
+// Submits the clip range to the m30-clipper Cloud Run service which encodes
+// the segment with ffmpeg, writes it to gs://<bucket>/clips/<jobId>.mp4, and
+// returns a 1h signed URL we open in a new tab.
+async function makeCurrentClip() {
+  const meta = currentSheetName ? gameMetaMap[currentSheetName] : null;
+  if (!meta || !meta.gcsObject) return;
 
-  // Pick the clip range. Prefer the active loop window (already populated when
-  // a row is clicked); fall back to a window around the playhead.
   let start, end;
   if (loopStart != null && loopEnd != null && loopEnd > loopStart) {
     start = loopStart;
@@ -1338,68 +1316,33 @@ async function downloadCurrentClip() {
     alert('Pick an event row first so we know which moment to clip.');
     return;
   }
-  // Cloudflare enforces a 60s minimum clip duration on some plans; pad if needed.
   if (end - start < 1) end = start + 1;
 
-  const btn    = document.getElementById('clipDownloadBtn');
+  const btn    = document.getElementById('clipBtn');
   const status = document.getElementById('clipDownloadStatus');
   btn.disabled = true;
-  status.textContent = 'Creating clip…';
+  status.textContent = 'Encoding clip…';
 
-  let clipUid;
   try {
-    const resp = await fetch(TR.APPS_SCRIPT_URL, {
-      method:  'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body:    JSON.stringify({
+    const resp = await fetch(`${TR.CLIP_SERVICE_URL}/clip`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         secret: TR.secret(),
-        action: 'stream_clip',
-        sheetName: currentSheetName,
+        gcsObject: meta.gcsObject,
         startSeconds: start,
         endSeconds:   end,
       }),
     });
     const result = await resp.json();
-    if (!result.ok) throw new Error(result.error);
-    clipUid = result.clipUid;
+    if (!result.ok) throw new Error(result.error || 'clip failed');
+    status.textContent = '✓ Ready';
+    if (result.downloadUrl) window.open(result.downloadUrl, '_blank');
   } catch (err) {
     status.textContent = 'Failed: ' + err.message;
+  } finally {
     btn.disabled = false;
-    return;
   }
-
-  // Poll until the clip is encoded AND the MP4 download is rendered.
-  const deadline = Date.now() + 10 * 60 * 1000;  // 10 min max
-  while (Date.now() < deadline) {
-    await new Promise(r => setTimeout(r, 4000));
-    try {
-      const resp = await fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&action=stream_clip_status&clipUid=${TR.enc(clipUid)}`);
-      const result = await resp.json();
-      if (!result.ok) throw new Error(result.error);
-      // Cloudflare often leaves percent null during the 'queued' phase, so
-      // fall back to its sub-state label when there's no number to show.
-      const detail = (result.percent != null)
-        ? `${result.percent}%`
-        : (result.cfState || '…');
-      if      (result.state === 'clipping')     status.textContent = `Encoding clip — ${detail}`;
-      else if (result.state === 'mp4-encoding') status.textContent = `Rendering MP4 — ${detail}`;
-      else if (result.state === 'error')        { status.textContent = 'Error: ' + result.error; btn.disabled = false; return; }
-      else if (result.state === 'ready') {
-        status.textContent = '✓ Ready';
-        // Trigger download in a new tab. Cloudflare's MP4 URL serves with
-        // Content-Disposition: attachment, so the browser will save instead of stream.
-        window.open(result.downloadUrl, '_blank');
-        btn.disabled = false;
-        return;
-      }
-    } catch (err) {
-      status.textContent = 'Poll failed: ' + err.message;
-      btn.disabled = false;
-      return;
-    }
-  }
-  status.textContent = 'Timed out — try again later';
-  btn.disabled = false;
 }
 
 // ── Playback helpers ─────────────────────────────────────────────
@@ -1719,8 +1662,8 @@ function toggleLoopMode() {
 }
 
 // ── Shareable seek link ─────────────────────────────────────────
-// Returns a deep-link URL into the right backend (YouTube/Stream), or '' if
-// the game has no video configured. Uses the user's linkOffset (lookback).
+// Returns a deep-link YouTube URL, or '' if the game has no video configured.
+// Uses the user's linkOffset (lookback).
 function makeYtTimestampUrl(gameKey, timeStr) {
   const meta = gameMetaMap[gameKey || ''];
   if (!meta) return '';

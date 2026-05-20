@@ -1,6 +1,7 @@
 var TR = {}; // var so it's a property of the global object (window in browsers, vm context in tests)
 
 TR.APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzhMw4nQr2nVW0MLfPWVXRPXsvImerpzshQ5GnJ3873qQkGMz0bcJQdmTRXCxwygfFm/exec';
+TR.CLIP_SERVICE_URL = 'https://m30-clipper-1070277967282.europe-west1.run.app';
 
 TR.secret = () => sessionStorage.getItem('password') || '';
 

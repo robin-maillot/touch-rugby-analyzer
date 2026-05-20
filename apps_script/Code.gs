@@ -26,35 +26,23 @@ function getMetadata() {
   const ci   = col('competition'), yi = col('year'), di = col('division');
   const vi   = col('video name'), ai = col('analyzable'), yui = col('youtube link');
   const idi  = col('id');
-  const vpi  = col('video provider');  // 'youtube' | 'stream' (optional override)
-  const sui  = col('stream uid');      // Cloudflare Stream video UID
-  const ssi  = col('stream signed');   // '1' / 'true' if signed URLs required
+  const goi  = col('gcs object');      // object path within the configured GCS bucket
 
   const meta = {};
   values.slice(1).forEach(row => {
     const name = row[ni];
     if (!name) return;
-    const youtubelink = yui >= 0 ? row[yui] : '';
-    const streamuid   = sui >= 0 ? row[sui] : '';
-    let provider = vpi >= 0 ? String(row[vpi] || '').toLowerCase().trim() : '';
-    if (provider !== 'youtube' && provider !== 'stream') {
-      provider = streamuid ? 'stream' : (youtubelink ? 'youtube' : '');
-    }
-    const signedRaw = ssi >= 0 ? String(row[ssi] || '').toLowerCase().trim() : '';
-    const streamsigned = signedRaw === '1' || signedRaw === 'true' || signedRaw === 'yes';
     meta[name] = {
-      team1:         t1i >= 0 ? row[t1i] : '',
-      team2:         t2i >= 0 ? row[t2i] : '',
-      competition:   ci  >= 0 ? row[ci]  : '',
-      year:          yi  >= 0 ? row[yi]  : '',
-      division:      di  >= 0 ? row[di]  : '',
-      video:         vi  >= 0 ? row[vi]  : '',
-      analyzable:    ai  >= 0 ? row[ai]  : '',
-      youtubelink:   youtubelink,
-      id:            idi >= 0 ? row[idi] : '',
-      videoprovider: provider,
-      streamuid:     streamuid,
-      streamsigned:  streamsigned,
+      team1:       t1i >= 0 ? row[t1i] : '',
+      team2:       t2i >= 0 ? row[t2i] : '',
+      competition: ci  >= 0 ? row[ci]  : '',
+      year:        yi  >= 0 ? row[yi]  : '',
+      division:    di  >= 0 ? row[di]  : '',
+      video:       vi  >= 0 ? row[vi]  : '',
+      analyzable:  ai  >= 0 ? row[ai]  : '',
+      youtubelink: yui >= 0 ? row[yui] : '',
+      id:          idi >= 0 ? row[idi] : '',
+      gcsObject:   goi >= 0 ? row[goi] : '',
     };
   });
   return meta;
@@ -187,51 +175,6 @@ function doGet(e) {
       return rawJson(result);
     }
 
-    // action=stream_token → mint a short-lived signed JWT for a private
-    // Cloudflare Stream video. Only meaningful when the game's metadata has
-    // streamsigned=1; for public Stream videos the frontend uses the raw UID.
-    if (e.parameter.action === 'stream_token') {
-      const name = e.parameter.sheetName;
-      if (!name) return json({ ok: false, error: 'Missing sheetName parameter' });
-      const meta = getMetadata()[name];
-      if (!meta || !meta.streamuid) return json({ ok: false, error: 'No Stream UID configured for ' + name });
-      if (!meta.streamsigned)        return json({ ok: false, error: 'This video is public — use the raw UID' });
-      try {
-        const token = mintStreamToken(meta.streamuid, 2 * 60 * 60); // 2h
-        return json({ ok: true, token, expiresAt: Math.floor(Date.now() / 1000) + 2 * 60 * 60 });
-      } catch (err) {
-        return json({ ok: false, error: err.toString() });
-      }
-    }
-
-    // action=stream_upload_url → admin-only: request a one-time Cloudflare
-    // direct creator upload URL. The browser uploads straight to Cloudflare;
-    // the file never touches Apps Script (which has a 6-min execution cap).
-    if (e.parameter.action === 'stream_upload_url') {
-      if (e.parameter.secret !== ADMIN_SECRET) return json({ ok: false, error: 'Admin access required.' });
-      try {
-        const maxSec = Math.min(21600, Math.max(60, Number(e.parameter.maxDurationSeconds) || 7200));
-        const result = requestStreamUpload(maxSec);
-        return json({ ok: true, uploadURL: result.uploadURL, uid: result.uid });
-      } catch (err) {
-        return json({ ok: false, error: err.toString() });
-      }
-    }
-
-    // action=stream_clip_status → poll the encoding + MP4-download state of a
-    // clip we previously created. Drives the "Download clip" button's spinner.
-    // Side effect: once the clip is ready-to-stream we auto-trigger the
-    // /downloads endpoint so the caller doesn't need a second action.
-    if (e.parameter.action === 'stream_clip_status') {
-      const clipUid = e.parameter.clipUid;
-      if (!clipUid) return json({ ok: false, error: 'Missing clipUid parameter' });
-      try {
-        return json({ ok: true, ...getStreamClipStatus(clipUid) });
-      } catch (err) {
-        return json({ ok: false, error: err.toString() });
-      }
-    }
-
     const sheetName = e.parameter.sheetName;
     if (!sheetName) {
       return json({ ok: false, error: 'Missing sheetName parameter' });
@@ -276,28 +219,19 @@ function doPost(e) {
     // action=backfill_youtube → write YouTube links into a game tab
     if (data.action === 'backfill_youtube') {
       if (data.secret !== ADMIN_SECRET) return json({ ok: false, error: 'Admin access required.' });
-      const updated = backfillVideoLink(data.sheetName, 'youtube', data.youtubeUrl, false, Number(data.offsetSeconds) || 0);
+      const updated = backfillYoutubeLink(data.sheetName, data.youtubeUrl, Number(data.offsetSeconds) || 0);
       cacheClear();
       return json({ ok: true, updated });
     }
 
-    // action=backfill_video → attach either a YouTube URL or a Cloudflare
-    // Stream UID to a game, with optional time-offset. Replaces backfill_youtube.
-    if (data.action === 'backfill_video') {
+    // action=backfill_gcs → attach a GCS object path to a game (admin only).
+    // Empty string is valid — used to clear the link.
+    if (data.action === 'backfill_gcs') {
       if (data.secret !== ADMIN_SECRET) return json({ ok: false, error: 'Admin access required.' });
-      const provider = String(data.provider || '').toLowerCase();
-      if (provider !== 'youtube' && provider !== 'stream') {
-        return json({ ok: false, error: 'provider must be "youtube" or "stream"' });
-      }
-      const updated = backfillVideoLink(
-        data.sheetName,
-        provider,
-        data.value,
-        !!data.signed,
-        Number(data.offsetSeconds) || 0
-      );
+      if (!data.sheetName) return json({ ok: false, error: 'Missing sheetName parameter' });
+      writeMeta(data.sheetName, { gcsObject: String(data.gcsObject || '').trim() });
       cacheClear();
-      return json({ ok: true, updated });
+      return json({ ok: true });
     }
 
     // action=live_update → upsert a row in _live
@@ -310,26 +244,6 @@ function doPost(e) {
     if (data.action === 'live_clear') {
       clearLiveRow(data.sheetName);
       return json({ ok: true });
-    }
-
-    // action=stream_clip → cut a clip out of a Cloudflare Stream video and
-    // return the new clip's UID. Polling stream_clip_status follows.
-    if (data.action === 'stream_clip') {
-      const sheetName = data.sheetName;
-      if (!sheetName) return json({ ok: false, error: 'Missing sheetName parameter' });
-      const meta = getMetadata()[sheetName];
-      if (!meta || !meta.streamuid) return json({ ok: false, error: 'No Stream UID configured for ' + sheetName });
-      const start = Number(data.startSeconds);
-      const end   = Number(data.endSeconds);
-      if (!isFinite(start) || !isFinite(end) || end <= start) {
-        return json({ ok: false, error: 'startSeconds and endSeconds required, end > start.' });
-      }
-      try {
-        const clipUid = createStreamClip(meta.streamuid, start, end, !!meta.streamsigned);
-        return json({ ok: true, clipUid });
-      } catch (err) {
-        return json({ ok: false, error: err.toString() });
-      }
     }
 
     const ss    = SpreadsheetApp.openById(SHEET_ID);
@@ -391,9 +305,7 @@ function writeMeta(sheetName, meta) {
   const ai   = col('analyzable');
   let yui    = col('youtube link');
   let idi    = col('id');
-  let vpi    = col('video provider');
-  let sui    = col('stream uid');
-  let ssi    = col('stream signed');
+  let goi    = col('gcs object');
 
   // Add 'Youtube Link' column if missing and we have a value to write
   if (yui < 0 && meta.youtubelink != null) {
@@ -412,23 +324,11 @@ function writeMeta(sheetName, meta) {
     values.forEach(row => { while (row.length < headers.length) row.push(''); });
   }
 
-  // Add Cloudflare Stream columns lazily — only when first written to.
-  if (vpi < 0 && meta.videoprovider != null) {
-    sheet.getRange(1, headers.length + 1).setValue('Video Provider');
-    headers.push('video provider');
-    vpi = headers.length - 1;
-    values.forEach(row => { while (row.length < headers.length) row.push(''); });
-  }
-  if (sui < 0 && meta.streamuid != null) {
-    sheet.getRange(1, headers.length + 1).setValue('Stream UID');
-    headers.push('stream uid');
-    sui = headers.length - 1;
-    values.forEach(row => { while (row.length < headers.length) row.push(''); });
-  }
-  if (ssi < 0 && meta.streamsigned != null) {
-    sheet.getRange(1, headers.length + 1).setValue('Stream Signed');
-    headers.push('stream signed');
-    ssi = headers.length - 1;
+  // Add 'GCS Object' column lazily
+  if (goi < 0 && meta.gcsObject != null) {
+    sheet.getRange(1, headers.length + 1).setValue('GCS Object');
+    headers.push('gcs object');
+    goi = headers.length - 1;
     values.forEach(row => { while (row.length < headers.length) row.push(''); });
   }
 
@@ -455,9 +355,7 @@ function writeMeta(sheetName, meta) {
   if (ai  >= 0 && meta.analyzable  != null) row[ai]  = meta.analyzable;
   if (yui >= 0 && meta.youtubelink != null) row[yui] = meta.youtubelink;
   if (idi >= 0 && meta.id          != null) row[idi] = meta.id;
-  if (vpi >= 0 && meta.videoprovider != null) row[vpi] = meta.videoprovider;
-  if (sui >= 0 && meta.streamuid     != null) row[sui] = meta.streamuid;
-  if (ssi >= 0 && meta.streamsigned  != null) row[ssi] = meta.streamsigned ? '1' : '';
+  if (goi >= 0 && meta.gcsObject   != null) row[goi] = meta.gcsObject;
 
   if (existingRow > 0) {
     sheet.getRange(existingRow, 1, 1, numCols).setValues([row]);
@@ -585,34 +483,17 @@ function updateRow(sheetName, time, name, comment) {
   return false;
 }
 
-// ── Attach a video (YouTube URL or Cloudflare Stream UID) to a game ──
-// provider: 'youtube' | 'stream'
-// value:    the YouTube URL OR the Stream UID (32-char hex)
-// signed:   only meaningful for stream — sets the Stream Signed flag
+// ── Attach a YouTube URL to a game ─────────────────────────────
 // offsetSeconds: if non-zero, shifts every Time value in the game tab by
 //                this amount so the sheet aligns with the video timeline.
-function backfillVideoLink(sheetName, provider, value, signed, offsetSeconds) {
+function backfillYoutubeLink(sheetName, youtubeUrl, offsetSeconds) {
   const ss    = SpreadsheetApp.openById(SHEET_ID);
   const sheet = ss.getSheetByName(sheetName);
   if (!sheet) throw new Error(`Tab "${sheetName}" not found.`);
-
-  const meta = { videoprovider: provider };
-  if (provider === 'youtube') {
-    if (!String(value || '').match(/(?:v=|youtu\.be\/|embed\/|live\/)([A-Za-z0-9_-]{11})/)) {
-      throw new Error('Invalid YouTube URL — could not extract video ID.');
-    }
-    meta.youtubelink = value;
-  } else if (provider === 'stream') {
-    const uid = String(value || '').trim();
-    if (!/^[a-f0-9]{32}$/i.test(uid)) {
-      throw new Error('Invalid Stream UID — expected 32 hex characters.');
-    }
-    meta.streamuid    = uid;
-    meta.streamsigned = !!signed;
-  } else {
-    throw new Error('Unknown provider: ' + provider);
+  if (!String(youtubeUrl || '').match(/(?:v=|youtu\.be\/|embed\/|live\/)([A-Za-z0-9_-]{11})/)) {
+    throw new Error('Invalid YouTube URL — could not extract video ID.');
   }
-  writeMeta(sheetName, meta);
+  writeMeta(sheetName, { youtubelink: youtubeUrl });
 
   if (offsetSeconds && offsetSeconds !== 0) {
     const values  = sheet.getDataRange().getDisplayValues();
@@ -647,188 +528,4 @@ function json(obj) {
   return ContentService
     .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
-}
-
-// Run this once from the Apps Script editor (Run ▶) to trigger the OAuth
-// consent prompt for UrlFetchApp. Without this, the deployed web app gets:
-//   "Vous n'êtes pas autorisé à appeler UrlFetchApp.fetch."
-// After authorizing once, every action that calls Cloudflare will work.
-function authorizeUrlFetch() {
-  UrlFetchApp.fetch('https://api.cloudflare.com/client/v4/user/tokens/verify', {
-    headers: { Authorization: 'Bearer ' + (PropertiesService.getScriptProperties().getProperty('CF_API_TOKEN') || '') },
-    muteHttpExceptions: true,
-  });
-  Logger.log('UrlFetchApp authorized.');
-}
-
-// ── Cloudflare Stream integration ──────────────────────────────
-// All Cloudflare credentials live in Apps Script Script Properties so they
-// stay out of source control. Set them from the Apps Script editor:
-//   File → Project Settings → Script Properties
-// Required keys:
-//   CF_ACCOUNT_ID       — Cloudflare account ID (for upload-url endpoint)
-//   CF_API_TOKEN        — API token with Stream:Edit scope (for upload-url)
-//   CF_STREAM_KEY_ID    — `id` returned by POST /stream/keys (the kid)
-//   CF_STREAM_KEY_PEM   — the PEM private key, base64-DECODED from `pem`.
-//                         Should include the BEGIN/END PRIVATE KEY lines.
-function cfProps_() {
-  const p = PropertiesService.getScriptProperties();
-  return {
-    accountId: p.getProperty('CF_ACCOUNT_ID') || '',
-    apiToken:  p.getProperty('CF_API_TOKEN')  || '',
-    keyId:     p.getProperty('CF_STREAM_KEY_ID')  || '',
-    keyPem:    p.getProperty('CF_STREAM_KEY_PEM') || '',
-  };
-}
-
-function base64Url_(bytes) {
-  // Utilities.base64EncodeWebSafe pads with '=' which JWT spec forbids.
-  return Utilities.base64EncodeWebSafe(bytes).replace(/=+$/, '');
-}
-
-// Mint a signed JWT for a Stream video UID. lifetimeSeconds defaults to 2h.
-// Returns a JWT suitable for use as the path segment in
-// https://iframe.videodelivery.net/<token>.
-function mintStreamToken(uid, lifetimeSeconds) {
-  const { keyId, keyPem } = cfProps_();
-  if (!keyId)  throw new Error('CF_STREAM_KEY_ID is not set in Script Properties.');
-  if (!keyPem) throw new Error('CF_STREAM_KEY_PEM is not set in Script Properties.');
-  const now = Math.floor(Date.now() / 1000);
-  const exp = now + (Number(lifetimeSeconds) || 7200);
-  const header  = { alg: 'RS256', kid: keyId, typ: 'JWT' };
-  const payload = { sub: uid, kid: keyId, exp: exp, nbf: now - 30 };
-  const headerB64  = base64Url_(Utilities.newBlob(JSON.stringify(header)).getBytes());
-  const payloadB64 = base64Url_(Utilities.newBlob(JSON.stringify(payload)).getBytes());
-  const signingInput = headerB64 + '.' + payloadB64;
-  const sigBytes = Utilities.computeRsaSha256Signature(signingInput, keyPem);
-  return signingInput + '.' + base64Url_(sigBytes);
-}
-
-// Create a clip out of an existing Stream video. Returns the new clip's UID.
-// requireSignedURLs is inherited from the source video so a private match
-// produces a private clip.
-function createStreamClip(sourceUid, startSeconds, endSeconds, requireSignedURLs) {
-  const { accountId, apiToken } = cfProps_();
-  if (!accountId) throw new Error('CF_ACCOUNT_ID is not set in Script Properties.');
-  if (!apiToken)  throw new Error('CF_API_TOKEN is not set in Script Properties.');
-  const resp = UrlFetchApp.fetch(
-    'https://api.cloudflare.com/client/v4/accounts/' + accountId + '/stream/clip',
-    {
-      method: 'post',
-      headers: { Authorization: 'Bearer ' + apiToken },
-      contentType: 'application/json',
-      payload: JSON.stringify({
-        clippedFromVideoUID: sourceUid,
-        startTimeSeconds:    Math.floor(startSeconds),
-        endTimeSeconds:      Math.ceil(endSeconds),
-        requireSignedURLs:   !!requireSignedURLs,
-      }),
-      muteHttpExceptions: true,
-    }
-  );
-  const body = JSON.parse(resp.getContentText() || '{}');
-  // Cloudflare returns the result at top level for /clip (not wrapped in {success, result}).
-  if (body.uid) return body.uid;
-  if (body.success && body.result && body.result.uid) return body.result.uid;
-  const msg = (body.errors && body.errors.map(e => e.message).join('; ')) || resp.getContentText();
-  throw new Error('Cloudflare /stream/clip failed: ' + msg);
-}
-
-// Poll the state of a clip we previously created. State machine:
-//   'clipping'       — Cloudflare is still encoding the clip from the source
-//   'mp4-encoding'   — clip is ready; /downloads has been triggered, MP4 is rendering
-//   'ready'          — MP4 is available; downloadUrl is returned
-//   'error'          — something failed; message in `error`
-//
-// `cfState` carries the raw Cloudflare sub-state ('queued', 'inprogress', ...)
-// so the UI can show something useful when pctComplete isn't populated yet
-// (Cloudflare often leaves it null during the queued phase).
-function getStreamClipStatus(clipUid) {
-  const { accountId, apiToken } = cfProps_();
-  const auth = { Authorization: 'Bearer ' + apiToken };
-
-  // 1. Check the clip's own encoding state.
-  const vidResp = UrlFetchApp.fetch(
-    'https://api.cloudflare.com/client/v4/accounts/' + accountId + '/stream/' + clipUid,
-    { method: 'get', headers: auth, muteHttpExceptions: true }
-  );
-  const vidBody = JSON.parse(vidResp.getContentText() || '{}');
-  if (!vidBody.success) {
-    const msg = (vidBody.errors && vidBody.errors.map(e => e.message).join('; ')) || 'unknown';
-    return { state: 'error', error: msg };
-  }
-  const result = vidBody.result || {};
-  if (!result.readyToStream) {
-    const s = result.status || {};
-    return {
-      state:   'clipping',
-      cfState: s.state || 'queued',
-      percent: parsePct_(s.pctComplete),
-    };
-  }
-
-  // 2. Clip is encoded — check (or kick off) the MP4 download render.
-  const dlGet = UrlFetchApp.fetch(
-    'https://api.cloudflare.com/client/v4/accounts/' + accountId + '/stream/' + clipUid + '/downloads',
-    { method: 'get', headers: auth, muteHttpExceptions: true }
-  );
-  const dlBody = JSON.parse(dlGet.getContentText() || '{}');
-  let def = dlBody.success && dlBody.result && dlBody.result.default;
-
-  // If no default render exists yet, trigger one.
-  if (!def) {
-    const dlPost = UrlFetchApp.fetch(
-      'https://api.cloudflare.com/client/v4/accounts/' + accountId + '/stream/' + clipUid + '/downloads',
-      { method: 'post', headers: auth, contentType: 'application/json', payload: '{}', muteHttpExceptions: true }
-    );
-    const postBody = JSON.parse(dlPost.getContentText() || '{}');
-    if (!postBody.success) {
-      const msg = (postBody.errors && postBody.errors.map(e => e.message).join('; ')) || 'unknown';
-      return { state: 'error', error: 'Could not request MP4: ' + msg };
-    }
-    def = postBody.result && postBody.result.default;
-  }
-
-  if (!def) return { state: 'mp4-encoding', cfState: 'queued', percent: 0 };
-  if (def.status === 'ready') return { state: 'ready', downloadUrl: def.url };
-  return {
-    state:   'mp4-encoding',
-    cfState: def.status || 'inprogress',
-    percent: parsePct_(def.percentComplete),
-  };
-}
-
-// Cloudflare returns percent fields as strings ("45.123456"), numbers (45), or
-// null depending on the endpoint and the lifecycle phase. Normalise to a
-// rounded number, or null when no progress info is available yet.
-function parsePct_(raw) {
-  if (raw == null || raw === '') return null;
-  const n = Number(raw);
-  if (!isFinite(n)) return null;
-  return Math.round(n);
-}
-
-// Ask Cloudflare for a one-time direct-creator upload URL.
-// Browser then POSTs the video file to `uploadURL`; on success Cloudflare
-// stores it under the returned `uid`.
-function requestStreamUpload(maxDurationSeconds) {
-  const { accountId, apiToken } = cfProps_();
-  if (!accountId) throw new Error('CF_ACCOUNT_ID is not set in Script Properties.');
-  if (!apiToken)  throw new Error('CF_API_TOKEN is not set in Script Properties.');
-  const resp = UrlFetchApp.fetch(
-    'https://api.cloudflare.com/client/v4/accounts/' + accountId + '/stream/direct_upload',
-    {
-      method:  'post',
-      headers: { Authorization: 'Bearer ' + apiToken },
-      contentType: 'application/json',
-      payload: JSON.stringify({ maxDurationSeconds: maxDurationSeconds, requireSignedURLs: false }),
-      muteHttpExceptions: true,
-    }
-  );
-  const body = JSON.parse(resp.getContentText() || '{}');
-  if (!body.success) {
-    const msg = (body.errors && body.errors.map(e => e.message).join('; ')) || 'Unknown Cloudflare error';
-    throw new Error('Cloudflare direct_upload failed: ' + msg);
-  }
-  return { uploadURL: body.result.uploadURL, uid: body.result.uid };
 }

@@ -197,9 +197,6 @@
   <span class="yt-label">YouTube URL:</span>
   <input class="yt-input" id="ytUrl" type="text" placeholder="https://www.youtube.com/watch?v=..." onkeydown="if(event.key==='Enter')loadYouTube()">
   <button class="btn btn-primary" onclick="loadYouTube()" style="padding:4px 10px;font-size:0.76rem">▶ Load YT</button>
-  <span class="yt-label">Stream UID:</span>
-  <input class="yt-input" id="streamUid" type="text" placeholder="32-char Cloudflare Stream UID" style="width:200px" onkeydown="if(event.key==='Enter')loadStreamFromInput()">
-  <button class="btn btn-primary" onclick="loadStreamFromInput()" style="padding:4px 10px;font-size:0.76rem">▶ Load Stream</button>
   <nav style="display:flex;gap:4px;margin-left:auto;align-items:center">
     <button id="layoutBtn" class="layout-btn" onclick="toggleLayout()" title="Toggle video layout">↔ Side</button>
     <a href="games.html" style="color:#888;text-decoration:none;font-size:0.8rem;padding:5px 10px;border-radius:6px;transition:background 0.15s" onmouseover="this.style.background='#22253a';this.style.color='#e0e0e0'" onmouseout="this.style.background='';this.style.color='#888'">Games</a>
@@ -442,7 +439,7 @@ let pendingType = null;
 let pendingName = null;
 let pendingComment = null;
 let wasPlaying = false;
-let videoMode = 'none'; // 'local' | 'youtube' | 'stream'
+let videoMode = 'none'; // 'local' | 'youtube'
 let player = null;       // TR.player handle (current backend)
 let progressInterval = null;
 
@@ -596,32 +593,6 @@ function loadYouTube() {
     provider: 'youtube',
     container: document.getElementById('ytPlayerContainer'),
     videoId,
-    onReady: () => { onVideoReady(); startProgressInterval(); },
-    onStateChange: onPlayerStateChange,
-  });
-}
-
-function loadStreamFromInput() {
-  const uid = document.getElementById('streamUid').value.trim();
-  if (!uid) { alert('Enter a Cloudflare Stream UID.'); return; }
-  loadStream(uid);
-}
-
-// ── Cloudflare Stream loading ──────────────────────────────────
-// uidOrToken: a Stream UID (public) or a signed JWT (private).
-// When private, fetch the signed token from Apps Script first and pass it here.
-function loadStream(uidOrToken, opts) {
-  videoBaseName = (opts && opts.videoName) || '';
-  vid.pause(); vid.src = ''; vid.style.display = 'none';
-  document.getElementById('noVideo').style.display = 'none';
-  const container = document.getElementById('ytPlayerContainer');
-  container.style.display = 'block';
-  teardownPlayer();
-  videoMode = 'stream';
-  player = TR.player.create({
-    provider: 'stream',
-    container,
-    uid: uidOrToken,
     onReady: () => { onVideoReady(); startProgressInterval(); },
     onStateChange: onPlayerStateChange,
   });

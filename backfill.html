@@ -4,13 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Video Backfill — Touch Rugby Analyzer</title>
-  <style>
-    .provider-tabs { display: inline-flex; gap: 0; background: #0f1117; border: 1px solid #2a2d3a; border-radius: 6px; padding: 2px; margin-bottom: 8px; }
-    .provider-tab { background: transparent; color: #888; border: 0; padding: 5px 12px; font-size: 0.78rem; border-radius: 4px; cursor: pointer; }
-    .provider-tab.active { background: #22253a; color: #3b82f6; }
-    .signed-row { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 0.75rem; color: #888; }
-    .signed-row input { accent-color: #3b82f6; }
-  </style>
   <script defer src="https://cloud.umami.is/script.js" data-website-id="cb7fd4f2-fcd5-44d7-a8e4-70e9068870bb" data-auto-track="false"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -60,7 +53,7 @@
     .game-title { font-size: 0.95rem; font-weight: 600; margin-bottom: 2px; }
     .game-sub   { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 14px; }
 
-    .form-row { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
+    .form-row { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; margin-top: 8px; }
     .field { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 160px; }
     .field label { font-size: 0.72rem; color: var(--text-muted); }
     .field input {
@@ -75,7 +68,6 @@
     }
     .field input:focus { border-color: var(--accent); }
     .field input::placeholder { color: #444; }
-    .field-offset { max-width: 120px; }
     .field-time   { max-width: 120px; }
 
     .load-time-btn {
@@ -109,22 +101,17 @@
     .submit-btn.success  { background: var(--green); color: #000; }
     .submit-btn.error    { background: var(--red); }
 
-    .done-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 0.75rem;
-      color: var(--green);
-      margin-bottom: 10px;
-    }
-    .existing-url {
+    .status-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
       font-size: 0.75rem;
       color: var(--text-muted);
       margin-bottom: 12px;
-      word-break: break-all;
     }
-    .existing-url a { color: var(--accent); text-decoration: none; }
-    .existing-url a:hover { text-decoration: underline; }
+    .status-row .ok { color: var(--green); }
+    .status-row a { color: var(--accent); text-decoration: none; word-break: break-all; }
+    .status-row a:hover { text-decoration: underline; }
     .hint { font-size: 0.72rem; color: var(--text-muted); margin-top: 6px; }
 
     #allDone {
@@ -166,81 +153,45 @@ function gameLabel(g) {
   return { title: g.name, sub: '' };
 }
 
-function existingHtmlFor(g) {
-  const provider = TR.player.providerFor(g);
-  if (provider === 'youtube') {
-    return `<div class="done-badge">✓ YouTube linked</div>
-      <div class="existing-url"><a href="${g.youtubelink}" target="_blank" rel="noopener">${g.youtubelink}</a></div>`;
-  }
-  if (provider === 'stream') {
-    const signedBadge = g.streamsigned ? ' (signed)' : '';
-    return `<div class="done-badge">✓ Stream linked${signedBadge}</div>
-      <div class="existing-url">UID: ${g.streamuid}</div>`;
-  }
-  return '';
+function statusRow(g) {
+  const parts = [];
+  if (g.youtubelink) parts.push(`<span class="ok">✓ YouTube</span> <a href="${g.youtubelink}" target="_blank" rel="noopener">${g.youtubelink}</a>`);
+  if (g.gcsObject)   parts.push(`<span class="ok">✓ GCS</span> <span>${g.gcsObject}</span>`);
+  return parts.length ? `<div class="status-row">${parts.join('<span>·</span>')}</div>` : '';
 }
 
 function renderCard(g, container) {
   const { title, sub } = gameLabel(g);
-  const current = TR.player.providerFor(g);
+  const linked = !!g.youtubelink || !!g.gcsObject;
   const card = document.createElement('div');
-  card.className = 'game-card' + (current ? ' done' : '');
+  card.className = 'game-card' + (linked ? ' done' : '');
   card.id = 'card-' + g.name;
-
-  // Default the form to whichever provider this game already uses (or YouTube
-  // for new games).
-  const defaultProvider = current || 'youtube';
 
   card.innerHTML = `
     <div class="game-title">${title}</div>
     <div class="game-sub">${sub || g.name}</div>
-    ${existingHtmlFor(g)}
-    <div class="provider-tabs" data-provider="${defaultProvider}">
-      <button type="button" class="provider-tab ${defaultProvider === 'youtube' ? 'active' : ''}" data-pick="youtube" onclick="pickProvider(this)">YouTube</button>
-      <button type="button" class="provider-tab ${defaultProvider === 'stream' ? 'active' : ''}" data-pick="stream"  onclick="pickProvider(this)">Cloudflare Stream</button>
-    </div>
-    <div class="form-row provider-form provider-form-youtube" ${defaultProvider === 'youtube' ? '' : 'hidden'}>
+    ${statusRow(g)}
+    <div class="form-row">
       <div class="field">
         <label>YouTube URL</label>
         <input type="url" class="yt-input" placeholder="https://www.youtube.com/watch?v=..." value="${g.youtubelink || ''}">
       </div>
-      <button class="submit-btn" onclick="submit(this, '${g.name}', 'youtube')">
-        ${current ? 'Update' : 'Apply'}
-      </button>
-    </div>
-    <div class="form-row provider-form provider-form-stream" ${defaultProvider === 'stream' ? '' : 'hidden'}>
-      <div class="field">
-        <label>Stream UID</label>
-        <input type="text" class="stream-input" placeholder="32-char hex (e.g. ea95132c15732ca6abd6cc11696c3e2c)" value="${g.streamuid || ''}">
-        <div class="signed-row">
-          <input type="checkbox" class="signed-input" id="signed-${g.name}" ${g.streamsigned ? 'checked' : ''}>
-          <label for="signed-${g.name}">Require signed URLs (private video)</label>
-        </div>
-      </div>
-      <button class="submit-btn" onclick="submit(this, '${g.name}', 'stream')">
-        ${current ? 'Update' : 'Apply'}
-      </button>
-    </div>
-    <div class="form-row" style="margin-top:8px">
       <div class="field field-time">
         <label>First event time</label>
         <input type="text" class="first-time-input" placeholder="0:00:00" pattern="\\d+:\\d{2}:\\d{2}">
       </div>
       <button class="load-time-btn" onclick="loadFirstTime(this, '${g.name}')">Load time</button>
+      <button class="submit-btn" onclick="submitYoutube(this, '${g.name}')">${g.youtubelink ? 'Update YT' : 'Save YT'}</button>
+    </div>
+    <div class="form-row">
+      <div class="field">
+        <label>GCS Object (path within bucket, e.g. 2025_….mp4)</label>
+        <input type="text" class="gcs-input" placeholder="2025_m30_seniors-cup_france_england.mp4" value="${g.gcsObject || ''}">
+      </div>
+      <button class="submit-btn" onclick="submitGcs(this, '${g.name}')">${g.gcsObject ? 'Update GCS' : 'Save GCS'}</button>
     </div>
   `;
   container.appendChild(card);
-}
-
-function pickProvider(btn) {
-  const tabs = btn.parentElement;
-  const card = tabs.closest('.game-card');
-  const pick = btn.dataset.pick;
-  tabs.dataset.provider = pick;
-  tabs.querySelectorAll('.provider-tab').forEach(t => t.classList.toggle('active', t === btn));
-  card.querySelectorAll('.provider-form').forEach(f => {
-    f.hidden = !f.classList.contains('provider-form-' + pick);
-  });
 }
 
 function parseHMS(str) {
@@ -276,18 +227,22 @@ async function loadFirstTime(btn, sheetName) {
   }
 }
 
-async function submit(btn, sheetName, provider) {
+function flashSuccess(btn, label) {
+  btn.textContent = '✓ Saved';
+  btn.classList.add('success');
+  setTimeout(() => { btn.disabled = false; btn.textContent = label; btn.classList.remove('success'); }, 2500);
+}
+function flashError(btn, label, msg) {
+  btn.textContent = '✗ Error';
+  btn.classList.add('error');
+  alert('Error: ' + msg);
+  setTimeout(() => { btn.disabled = false; btn.textContent = label; btn.classList.remove('error'); }, 2500);
+}
+
+async function submitYoutube(btn, sheetName) {
   const card = document.getElementById('card-' + sheetName);
-  let value, signed = false;
-  if (provider === 'youtube') {
-    value = card.querySelector('.yt-input').value.trim();
-    if (!value) { alert('Enter a YouTube URL first.'); return; }
-  } else {
-    value  = card.querySelector('.stream-input').value.trim();
-    signed = card.querySelector('.signed-input').checked;
-    if (!value) { alert('Enter a Cloudflare Stream UID first.'); return; }
-    if (!/^[a-f0-9]{32}$/i.test(value)) { alert('Stream UID must be 32 hex characters.'); return; }
-  }
+  const value = card.querySelector('.yt-input').value.trim();
+  if (!value) { alert('Enter a YouTube URL first.'); return; }
 
   const firstTimeInput = card.querySelector('.first-time-input');
   const newTimeStr  = firstTimeInput?.value.trim();
@@ -304,42 +259,50 @@ async function submit(btn, sheetName, provider) {
     offsetSeconds = newSecs - origSecs;
   }
 
-  btn.disabled    = true;
+  btn.disabled = true;
   btn.textContent = '⏳ Saving…';
 
   try {
     const resp = await fetch(TR.APPS_SCRIPT_URL, {
-      method:  'POST',
+      method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
-      body:    JSON.stringify({
+      body: JSON.stringify({
         secret: TR.secret(),
-        action: 'backfill_video',
+        action: 'backfill_youtube',
         sheetName,
-        provider,
-        value,
-        signed,
+        youtubeUrl: value,
         offsetSeconds,
       }),
     });
     const result = await resp.json();
     if (!result.ok) throw new Error(result.error);
-    btn.textContent = '✓ Saved';
-    btn.classList.add('success');
-    card.classList.add('done');
-    let existingEl = card.querySelector('.existing-url');
-    const badge    = card.querySelector('.done-badge');
-    const newBadgeHtml = provider === 'youtube'
-      ? '<div class="done-badge">✓ YouTube linked</div><div class="existing-url"><a href="' + value + '" target="_blank" rel="noopener">' + value + '</a></div>'
-      : '<div class="done-badge">✓ Stream linked' + (signed ? ' (signed)' : '') + '</div><div class="existing-url">UID: ' + value + '</div>';
-    if (badge) badge.remove();
-    if (existingEl) existingEl.remove();
-    card.querySelector('.game-sub').insertAdjacentHTML('afterend', newBadgeHtml);
-    setTimeout(() => { btn.disabled = false; btn.textContent = 'Update'; btn.classList.remove('success'); }, 3000);
+    flashSuccess(btn, 'Update YT');
   } catch (err) {
-    btn.textContent = '✗ Error';
-    btn.classList.add('error');
-    alert('Error: ' + err.message);
-    setTimeout(() => { btn.disabled = false; btn.textContent = 'Apply'; btn.classList.remove('error'); }, 2500);
+    flashError(btn, 'Save YT', err.message);
+  }
+}
+
+async function submitGcs(btn, sheetName) {
+  const card = document.getElementById('card-' + sheetName);
+  const value = card.querySelector('.gcs-input').value.trim();
+  btn.disabled = true;
+  btn.textContent = '⏳ Saving…';
+  try {
+    const resp = await fetch(TR.APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({
+        secret: TR.secret(),
+        action: 'backfill_gcs',
+        sheetName,
+        gcsObject: value,
+      }),
+    });
+    const result = await resp.json();
+    if (!result.ok) throw new Error(result.error);
+    flashSuccess(btn, 'Update GCS');
+  } catch (err) {
+    flashError(btn, 'Save GCS', err.message);
   }
 }
 
@@ -351,11 +314,11 @@ async function load() {
 
     document.getElementById('loading').style.display = 'none';
 
-    const hasVideo = g => !!TR.player.providerFor(g);
-    const missing = result.sheets.filter(g => !hasVideo(g));
-    const linked  = result.sheets.filter(g =>  hasVideo(g));
+    const linked = g => !!g.youtubelink || !!g.gcsObject;
+    const missing = result.sheets.filter(g => !linked(g));
+    const done    = result.sheets.filter(g =>  linked(g));
 
-    if (!missing.length && !linked.length) {
+    if (!missing.length && !done.length) {
       document.getElementById('allDone').style.display = 'block';
       return;
     }
@@ -371,14 +334,14 @@ async function load() {
       section.appendChild(list);
     }
 
-    if (linked.length) {
+    if (done.length) {
       const section = document.getElementById('hasVideo');
       const h = document.createElement('h2');
-      h.textContent = `Already linked (${linked.length})`;
+      h.textContent = `Linked (${done.length})`;
       section.appendChild(h);
       const list = document.createElement('div');
       list.className = 'game-list';
-      linked.forEach(g => renderCard(g, list));
+      done.forEach(g => renderCard(g, list));
       section.appendChild(list);
     }
 

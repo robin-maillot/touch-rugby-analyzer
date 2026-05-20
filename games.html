@@ -32,8 +32,9 @@
     #gameSubtitle { font-size: 0.78rem; color: #777; margin-top: 3px; }
     #gameTimingRow { display: flex; gap: 16px; margin-top: 8px; font-size: 0.78rem; color: #888; flex-wrap: wrap; }
     #gameTimingRow .timing-val { color: #ccc; font-weight: 600; }
-    #viewEventsBtn, #compareHalvesBtn, #turnoverDistBtn { text-decoration: none; background: none; border: 1px solid #3a3d4a; border-radius: 6px; padding: 4px 11px; font-size: 0.75rem; color: #aaa; cursor: pointer; white-space: nowrap; transition: border-color 0.12s, color 0.12s; }
-    #viewEventsBtn:hover, #compareHalvesBtn:hover, #turnoverDistBtn:hover { border-color: var(--accent, #3b82f6); color: #fff; }
+    #viewEventsBtn, #compareHalvesBtn, #turnoverDistBtn, #downloadVideoBtn { text-decoration: none; background: none; border: 1px solid #3a3d4a; border-radius: 6px; padding: 4px 11px; font-size: 0.75rem; color: #aaa; cursor: pointer; white-space: nowrap; transition: border-color 0.12s, color 0.12s; }
+    #viewEventsBtn:hover, #compareHalvesBtn:hover, #turnoverDistBtn:hover, #downloadVideoBtn:hover:not(:disabled) { border-color: var(--accent, #3b82f6); color: #fff; }
+    #downloadVideoBtn:disabled { opacity: 0.5; cursor: default; }
 
     table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
     th { background: #0f1117; color: #aaa; padding: 8px 12px; text-align: left; font-weight: 600; border-bottom: 1px solid #2a2d3a; }
@@ -210,6 +211,7 @@
         <div style="display:flex;gap:6px;margin-left:auto">
           <button id="turnoverDistBtn" onclick="openTurnoverModal()" style="display:none">Turnover Distribution</button>
           <button id="compareHalvesBtn" onclick="openCompareModal()" style="display:none">Compare Halves</button>
+          <button id="downloadVideoBtn" onclick="downloadCurrentGameVideo()" style="display:none">⬇ Download Video</button>
           <a id="viewEventsBtn" href="viewer.html">View Events</a>
         </div>
       </div>
@@ -418,12 +420,35 @@ async function loadGame() {
 }
 
 // ── Helpers ────────────────────────────────────────────────────
-// Returns a deep-link URL into whichever video backend this game uses
-// (YouTube or Cloudflare Stream), seeking to `rawSeconds - 5` (the 5s lookback).
+// Returns a deep-link YouTube URL seeking to `rawSeconds - 5` (the 5s lookback).
 // `meta` is a _metadata entry; pass null/undefined for games with no video.
 function makeYtUrl(meta, rawSeconds) {
   if (!meta) return '';
   return TR.player.seekLink(meta, rawSeconds);
+}
+
+async function downloadCurrentGameVideo() {
+  const meta = currentGame && currentGame.meta;
+  if (!meta || !meta.gcsObject) return;
+  const btn = document.getElementById('downloadVideoBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Preparing…';
+  try {
+    const resp = await fetch(`${TR.CLIP_SERVICE_URL}/download`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ secret: TR.secret(), gcsObject: meta.gcsObject }),
+    });
+    const result = await resp.json();
+    if (!result.ok) throw new Error(result.error || 'download failed');
+    window.open(result.downloadUrl, '_blank');
+    btn.textContent = '⬇ Download Video';
+  } catch (err) {
+    btn.textContent = '✗ ' + err.message;
+    setTimeout(() => { btn.textContent = '⬇ Download Video'; }, 3000);
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 // ── Sheet parsing ──────────────────────────────────────────────
@@ -836,6 +861,10 @@ async function renderGame(events, team1, team2, subtitle, analyzable, meta) {
   // Show container first — vegaEmbed with width:"container" needs a visible element to measure
   document.getElementById('gameTitle').textContent    = `${team1} vs ${team2}`;
   document.getElementById('gameSubtitle').textContent = subtitle;
+  const dlBtn = document.getElementById('downloadVideoBtn');
+  dlBtn.style.display = TR.player.hasClip(meta) ? '' : 'none';
+  dlBtn.disabled = false;
+  dlBtn.textContent = '⬇ Download Video';
   document.getElementById('gameContent').style.display = 'block';
 
   await renderStats('all');

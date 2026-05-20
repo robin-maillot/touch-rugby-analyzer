@@ -1,8 +1,7 @@
 // Depends on js/config.js (TR namespace) and js/utils.js (TR.extractVideoId).
 //
-// Unified video player abstraction over three backends:
+// Unified video player abstraction over two backends:
 //   - 'youtube' : YouTube IFrame API (YT.Player)
-//   - 'stream'  : Cloudflare Stream player (Stream(iframe))
 //   - 'local'   : an existing HTMLVideoElement (e.g. a user-selected local file)
 //
 // All providers return the same shape from TR.player.create(opts):
@@ -73,72 +72,6 @@ TR.player = TR.player || {};
     };
   }
 
-  // ── Cloudflare Stream ─────────────────────────────────────────
-  // The Stream SDK exposes a Player object on an <iframe>; properties
-  // (currentTime, duration, playbackRate, paused) and methods (play/pause)
-  // mirror HTMLMediaElement. Events: 'loadedmetadata', 'play', 'pause',
-  // 'ended', 'seeked', etc.
-  function createStream(opts) {
-    const { container, uid, signedToken, onReady, onStateChange } = opts;
-    container.innerHTML = '';
-    const iframe = document.createElement('iframe');
-    iframe.src = `https://iframe.videodelivery.net/${signedToken || uid}`;
-    iframe.style.width  = '100%';
-    iframe.style.height = '100%';
-    iframe.style.border = '0';
-    iframe.allow = 'accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;';
-    iframe.allowFullscreen = true;
-    container.appendChild(iframe);
-
-    let cf = null;
-    let ready = false;
-    let playing = false;
-    function attach() {
-      cf = window.Stream(iframe);
-      cf.addEventListener('loadedmetadata', () => {
-        ready = true;
-        if (onReady) onReady();
-      });
-      cf.addEventListener('play',  () => { playing = true;  if (onStateChange) onStateChange('playing'); });
-      cf.addEventListener('pause', () => { playing = false; if (onStateChange) onStateChange('paused');  });
-      cf.addEventListener('ended', () => { playing = false; if (onStateChange) onStateChange('ended');   });
-    }
-    if (window.Stream) attach();
-    else {
-      const queue = (window._trStreamQueue = window._trStreamQueue || []);
-      queue.push(attach);
-      const existing = document.getElementById('cfStreamSdk');
-      if (existing) {
-        existing.addEventListener('load', () => {
-          (window._trStreamQueue || []).forEach(fn => fn());
-          window._trStreamQueue = [];
-        });
-      } else {
-        const s = document.createElement('script');
-        s.id  = 'cfStreamSdk';
-        s.src = 'https://embed.cloudflarestream.com/embed/sdk.latest.js';
-        s.onload = () => {
-          (window._trStreamQueue || []).forEach(fn => fn());
-          window._trStreamQueue = [];
-        };
-        document.head.appendChild(s);
-      }
-    }
-
-    return {
-      provider: 'stream',
-      get ready() { return ready; },
-      getTime:     () => cf ? (cf.currentTime || 0) : 0,
-      getDuration: () => cf ? (cf.duration    || 0) : 0,
-      isPaused:    () => !playing,
-      play:        () => { if (cf) cf.play(); },
-      pause:       () => { if (cf) cf.pause(); },
-      seek:        (t) => { if (cf) cf.currentTime = t; },
-      setRate:     (r) => { if (cf) cf.playbackRate = r; },
-      destroy:     () => { container.innerHTML = ''; cf = null; ready = false; }
-    };
-  }
-
   // ── Local <video> element ─────────────────────────────────────
   function createLocal(opts) {
     const { videoElement, onReady, onStateChange } = opts;
@@ -177,40 +110,27 @@ TR.player = TR.player || {};
 
   TR.player.create = function (opts) {
     if (opts.provider === 'youtube') return createYouTube(opts);
-    if (opts.provider === 'stream')  return createStream(opts);
     if (opts.provider === 'local')   return createLocal(opts);
     throw new Error('TR.player: unknown provider "' + opts.provider + '"');
   };
 
   // Pick the right provider for a _metadata entry.
-  // Explicit `videoprovider` wins so admins can override; otherwise infer
-  // from which fields are populated (streamuid > youtubelink).
   TR.player.providerFor = function (meta) {
     if (!meta) return null;
-    const p = (meta.videoprovider || '').toLowerCase();
-    if (p === 'youtube' || p === 'stream') return p;
-    if (meta.streamuid)   return 'stream';
     if (meta.youtubelink) return 'youtube';
     return null;
   };
 
+  // Whether the game has a GCS-backed source video the Cloud Run service can clip.
+  TR.player.hasClip = function (meta) {
+    return !!(meta && meta.gcsObject);
+  };
+
   // Build a deep-link URL that opens the video at a given moment.
-  // Used by games.html / viewer.html to produce shareable seek links.
   // The 5-second lookback matches the existing per-event seek behavior.
   TR.player.seekLink = function (meta, seconds) {
-    const provider = TR.player.providerFor(meta);
     const t = Math.max(0, Math.floor((Number(seconds) || 0) - 5));
-    if (provider === 'youtube') {
-      const vid = TR.extractVideoId(meta && meta.youtubelink);
-      return vid ? `https://www.youtube.com/watch?v=${vid}&t=${t}s` : '';
-    }
-    if (provider === 'stream' && meta && meta.streamuid) {
-      // The watch.cloudflarestream.com host redirects to the customer
-      // subdomain and drops the query string in the process, so startTime is
-      // lost. The iframe.videodelivery.net player respects startTime directly
-      // and works for public videos without needing a customer-code lookup.
-      return `https://iframe.videodelivery.net/${meta.streamuid}?startTime=${t}`;
-    }
-    return '';
+    const vid = TR.extractVideoId(meta && meta.youtubelink);
+    return vid ? `https://www.youtube.com/watch?v=${vid}&t=${t}s` : '';
   };
 })();
