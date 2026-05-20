@@ -821,13 +821,21 @@ function pushLiveUpdate() {
   const gameStartWall = gameStart ? wallStart + gameStart.time * 1000 : (wallStart || Date.now());
   const timeSeconds   = Math.max(0, (Date.now() - gameStartWall) / 1000);
   const { t1, t2 } = computeStats();
-  const tries = annotations
-    .filter(a => a.type === 'Try')
-    .map(a => ({ scorer: a.actionOwner, time: Math.floor(a.time) }));
+  // Event log surfaced on live.html: tries (for running score), penalties, and
+  // half markers. Old `{scorer,time}` rows (no `type`) are still rendered as tries.
+  const LIVE_EVENT_TYPES = new Set(['Try', 'Penalty Attack', 'Penalty Defence']);
+  const events = annotations
+    .filter(a => LIVE_EVENT_TYPES.has(a.type) || a.name === 'Game Start' || a.name === 'Game End')
+    .map(a => ({
+      time:   Math.floor(a.time),
+      scorer: a.actionOwner || '',
+      type:   (a.name === 'Game Start' || a.name === 'Game End') ? a.name : a.type,
+    }))
+    .sort((a, b) => a.time - b.time);
   fetch(TR.APPS_SCRIPT_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify({ secret: TR.secret(), action: 'live_update', sheetName, team1, team2, score1, score2, timeSeconds, poss1: t1.possessions, poss2: t2.possessions, comps1: t1.compsNum, comps2: t2.compsNum, triesJson: JSON.stringify(tries) }),
+    body: JSON.stringify({ secret: TR.secret(), action: 'live_update', sheetName, team1, team2, score1, score2, timeSeconds, poss1: t1.possessions, poss2: t2.possessions, comps1: t1.compsNum, comps2: t2.compsNum, triesJson: JSON.stringify(events) }),
   }).catch(() => {});
 }
 
