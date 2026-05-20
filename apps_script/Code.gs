@@ -417,19 +417,6 @@ function writeLiveRow(sheetName, team1, team2, score1, score2, timeSeconds, poss
     sheet.getRange(1, existing + 1, 1, LIVE_HEADERS.length - existing).setValues([LIVE_HEADERS.slice(existing)]);
   }
 
-  // Clean up rows older than 1 week
-  const ONE_WEEK = 7 * 24 * 60 * 60 * 1000;
-  const now = Date.now();
-  const allVals = sheet.getDataRange().getValues();
-  const hdrs = allVals[0].map(h => String(h).toLowerCase().trim());
-  const uaIdx = hdrs.indexOf('updated at');
-  if (uaIdx >= 0) {
-    for (let i = allVals.length - 1; i >= 1; i--) {
-      const ua = allVals[i][uaIdx];
-      if (ua && (now - new Date(ua).getTime()) > ONE_WEEK) sheet.deleteRow(i + 1);
-    }
-  }
-
   const nowStr = new Date().toISOString();
   const newRow = [sheetName, team1 || '', team2 || '', score1 || 0, score2 || 0, timeSeconds || 0, nowStr, poss1 || 0, poss2 || 0, comps1 || 0, comps2 || 0, '', triesJson || '[]'];
   const values = sheet.getDataRange().getValues();

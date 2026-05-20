@@ -158,6 +158,16 @@
   <h1>Live Games</h1>
   <div class="header-right">
     <span class="refresh-info" id="refreshInfo">refresh in 30s</span>
+    <button class="refresh-btn" id="pauseBtn" onclick="togglePause()" title="Pause auto-refresh">
+      <svg id="pauseIcon" viewBox="0 0 16 16" fill="currentColor">
+        <rect x="4" y="3" width="3" height="10" rx="0.5"/>
+        <rect x="9" y="3" width="3" height="10" rx="0.5"/>
+      </svg>
+      <svg id="playIcon" viewBox="0 0 16 16" fill="currentColor" style="display:none">
+        <path d="M4 3v10l9-5z"/>
+      </svg>
+      <span id="pauseLabel">Pause</span>
+    </button>
     <button class="refresh-btn" id="refreshBtn" onclick="manualRefresh()">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M13.5 2.5A7 7 0 1 0 14.5 9"/>
@@ -198,6 +208,16 @@ function fmtDate(iso) {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
+// Derive the game start clock time from when the row was last written and the
+// elapsed in-game seconds. Approximate (drifts a little for finished games that
+// stopped writing) but accurate enough for a card label.
+function fmtStartTime(iso, elapsedSeconds) {
+  if (!iso) return '';
+  const d = new Date(new Date(iso).getTime() - (Number(elapsedSeconds) || 0) * 1000);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+}
+
 function ordinal(n) {
   const s = ['th', 'st', 'nd', 'rd'], v = n % 100;
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
@@ -224,10 +244,9 @@ function eventTimeline(g) {
     if (type === 'Penalty Attack' || type === 'Penalty Defence') {
       const cls   = type === 'Penalty Attack' ? 'pen-atk' : 'pen-def';
       const label = type === 'Penalty Attack' ? 'Pen ↑' : 'Pen ↓';
-      const tag   = `<span class="ev-tag ${cls}">${label}</span>`;
-      const empty = `<span class="ev-score"></span>`;
-      if (isT1) return `<div class="ev-row">${time}<span class="ev-left">${team} ${tag}</span>${empty}<span></span></div>`;
-      if (isT2) return `<div class="ev-row">${time}<span></span>${empty}<span class="ev-right">${tag} ${team}</span></div>`;
+      const tag   = `<span class="ev-score ev-tag ${cls}">${label}</span>`;
+      if (isT1) return `<div class="ev-row">${time}<span class="ev-left">${team}</span>${tag}<span></span></div>`;
+      if (isT2) return `<div class="ev-row">${time}<span></span>${tag}<span class="ev-right">${team}</span></div>`;
       return '';
     }
 
@@ -255,13 +274,14 @@ function renderCard(g, isLive) {
   const metaLine = (() => {
     const parts = (g.name || '').split('_');
     const date  = fmtDate(g.updatedAt);
+    const start = fmtStartTime(g.updatedAt, g.timeSeconds);
     let year = '', division = '', competition = '';
     if (parts.length >= 3) {
       year        = parts[0];
       division    = parts[1];
       competition = parts.slice(2, parts.length - 2).join(' ');
     }
-    const labels = [date, competition, year, division].filter(Boolean);
+    const labels = [date, start, competition, year, division].filter(Boolean);
     return labels.length ? `<div class="card-meta">${labels.join(' · ')}</div>` : '';
   })();
   return `
@@ -347,6 +367,7 @@ async function fetchLive() {
 const REFRESH_INTERVAL = 30;
 let countdown = REFRESH_INTERVAL;
 let tickTimer  = null;
+let paused     = false;
 
 function setRefreshInfo(text) {
   document.getElementById('refreshInfo').textContent = text;
@@ -354,6 +375,7 @@ function setRefreshInfo(text) {
 
 function startCountdown() {
   clearInterval(tickTimer);
+  if (paused) { setRefreshInfo('paused'); return; }
   countdown = REFRESH_INTERVAL;
   tickTimer = setInterval(() => {
     countdown--;
@@ -378,6 +400,21 @@ async function doRefresh() {
 function manualRefresh() {
   clearInterval(tickTimer);
   doRefresh();
+}
+
+function togglePause() {
+  paused = !paused;
+  document.getElementById('pauseIcon').style.display  = paused ? 'none' : '';
+  document.getElementById('playIcon').style.display   = paused ? '' : 'none';
+  document.getElementById('pauseLabel').textContent   = paused ? 'Resume' : 'Pause';
+  document.getElementById('pauseBtn').title           = paused ? 'Resume auto-refresh' : 'Pause auto-refresh';
+  document.querySelector('.dot').style.animationPlayState = paused ? 'paused' : 'running';
+  if (paused) {
+    clearInterval(tickTimer);
+    setRefreshInfo('paused');
+  } else {
+    startCountdown();
+  }
 }
 
 doRefresh();
