@@ -73,7 +73,7 @@
 
   /* ── Video controls ───────────────────────────────────────── */
   .video-controls { background: var(--surface); border-top: 1px solid var(--border); padding: 7px 10px; display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
-  .vc-row { display: flex; align-items: center; gap: 5px; }
+  .vc-row { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; row-gap: 6px; }
 
   .btn { border: none; border-radius: 5px; padding: 4px 10px; font-size: 0.75rem; cursor: pointer; font-weight: 600; transition: background 0.15s; white-space: nowrap; }
   .btn-ghost { background: var(--surface-2); color: var(--text-muted); border: 1px solid var(--border); }
