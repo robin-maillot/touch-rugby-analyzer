@@ -287,6 +287,10 @@
     .play-icon, .copy-link-btn { opacity: 1; }
   }
 
+  /* Tablet speed toggle — hidden by default, swaps in for the select on tablet */
+  .speed-toggle-btn { display: none; }
+  .speed-toggle-btn.slow { color: var(--accent); border-color: var(--accent); }
+
   /* Tablet & smaller — bigger tap targets and seekbar */
   @media (max-width: 1024px) {
     .btn, .btn-nav, #toggleVideoBtn, #layoutBtn,
@@ -299,6 +303,8 @@
     .resize-handle { width: 8px; }
     .split.vertical .resize-handle { width: 100%; height: 8px; }
     .filter-dropdown label { padding: 9px 12px; font-size: 0.85rem; }
+    .speed-sel { display: none; }
+    .speed-toggle-btn { display: inline-block; }
   }
 
   /* Portrait tablets — auto-stack video over rows */
@@ -449,6 +455,7 @@
           <option value="1.5">1.5×</option>
           <option value="2">2×</option>
         </select>
+        <button class="btn btn-ghost speed-toggle-btn" id="speedToggleBtn" disabled onclick="toggleSpeedSlowFast()" title="Toggle 0.5× / 1× playback speed (A)">1×</button>
         <button class="btn-nav" id="nextRowBtn" disabled onclick="navigateRow(1)">Next ▶</button>
         <button class="btn btn-ghost" id="zoomToggle" title="Zoom video (Z)">🔍</button>
         <span class="zoom-level" id="zoomLevel" hidden>1.0×</span>
@@ -1285,7 +1292,7 @@ async function loadPlayer(meta, seekTime = 0) {
     onReady: () => {
       videoReady = true;
       document.getElementById('timeDuration').textContent = TR.fmt(player.getDuration());
-      ['playBtn','skipBk','skipFw','speedSel'].forEach(id => document.getElementById(id).removeAttribute('disabled'));
+      ['playBtn','skipBk','skipFw','speedSel','speedToggleBtn'].forEach(id => document.getElementById(id).removeAttribute('disabled'));
       if (pendingSeekTime !== null) {
         player.seek(pendingSeekTime);
         player.play();
@@ -1389,7 +1396,20 @@ function skip(s) {
 }
 
 function setSpeed() {
-  if (player && videoReady) player.setRate(parseFloat(document.getElementById('speedSel').value));
+  const v = parseFloat(document.getElementById('speedSel').value);
+  if (player && videoReady) player.setRate(v);
+  // Mirror onto the tablet toggle button so the two controls stay in sync.
+  const btn = document.getElementById('speedToggleBtn');
+  if (btn) {
+    btn.textContent = v + '×';
+    btn.classList.toggle('slow', v < 1);
+  }
+}
+
+function toggleSpeedSlowFast() {
+  const sel = document.getElementById('speedSel');
+  sel.value = sel.value === '0.5' ? '1' : '0.5';
+  setSpeed();
 }
 
 function updateProgress() {

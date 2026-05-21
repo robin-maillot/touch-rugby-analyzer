@@ -402,7 +402,6 @@
     </div>
   </div>
   <div>
-    <div class="settings-label">Competition</div>
     <div class="settings-row">
       <input id="metaYear"        placeholder="Year"        style="max-width:80px" oninput="onMetaChange()">
       <select id="metaDivision" style="max-width:90px" onchange="onMetaChange()">
@@ -417,6 +416,12 @@
       </select>
       <input id="metaCompetition" placeholder="Competition" oninput="onMetaChange()">
       <input id="metaId" placeholder="ID" style="max-width:70px" title="Optional disambiguator for repeat fixtures" oninput="onMetaChange()">
+    </div>
+  </div>
+  <div>
+    <div class="settings-label">Click delay (s) — subtracted from every tag after the first, to compensate for reaction time</div>
+    <div class="settings-row">
+      <input id="clickDelayInput" type="number" min="0" max="9" step="1" value="0" style="max-width:90px" oninput="setClickDelay(this.value)">
     </div>
   </div>
   <div id="sheetPreview">fill metadata to generate tab name</div>
@@ -535,6 +540,7 @@ TR.auth('staff');
 
 window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('metaYear').value = String(new Date().getFullYear());
+  document.getElementById('clickDelayInput').value = String(clickDelay);
   updateUI();
 });
 
@@ -544,6 +550,13 @@ let possession   = 'Team 1';
 let wallStart    = null;
 let liveMode     = false;
 let liveInterval = null;
+let clickDelay   = Math.min(9, Math.max(0, parseInt(localStorage.getItem('fieldClickDelay') || '0', 10) || 0));
+
+function setClickDelay(v) {
+  const n = Math.min(9, Math.max(0, parseInt(v, 10) || 0));
+  clickDelay = n;
+  localStorage.setItem('fieldClickDelay', String(n));
+}
 
 function confirmLeave() {
   if (!annotations.length) return true;
@@ -604,7 +617,8 @@ function setPossession(team) {
 
 // ── Tagging ────────────────────────────────────────────────────
 function tag(type, name, possessionOwner) {
-  const t = nowSeconds();
+  let t = nowSeconds();
+  if (annotations.length > 0) t = Math.max(0, t - clickDelay);
   const actionOwner = TR.inferActionOwner(possessionOwner, type, name);
   annotations.push({ id: Date.now() + Math.random(), type, name, possessionOwner, actionOwner, comment: '', time: t, timeStr: TR.fmt(t) });
 
@@ -625,7 +639,8 @@ function tagGameEventToggle() {
 }
 
 function tagToReview() {
-  const t = nowSeconds();
+  let t = nowSeconds();
+  if (annotations.length > 0) t = Math.max(0, t - clickDelay);
   annotations.push({ id: Date.now() + Math.random(), type: 'To Review', name: 'To Review', possessionOwner: possession, actionOwner: possession, comment: '?', time: t, timeStr: TR.fmt(t) });
   updateUI();
   if (liveMode) pushLiveUpdate();
