@@ -1330,10 +1330,12 @@ async function makeCurrentClip() {
   }
   if (end - start < 1) end = start + 1;
 
+  const crop = (typeof window.getZoomCrop === 'function') ? window.getZoomCrop() : null;
+
   const btn    = document.getElementById('clipBtn');
   const status = document.getElementById('clipDownloadStatus');
   btn.disabled = true;
-  status.textContent = 'Encoding clip…';
+  status.textContent = crop ? 'Encoding zoomed clip…' : 'Encoding clip…';
 
   try {
     const resp = await fetch(`${TR.CLIP_SERVICE_URL}/clip`, {
@@ -1344,6 +1346,7 @@ async function makeCurrentClip() {
         gcsObject: meta.gcsObject,
         startSeconds: start,
         endSeconds:   end,
+        ...(crop ? { crop } : {}),
       }),
     });
     const result = await resp.json();
@@ -1511,6 +1514,19 @@ function setupVideoZoom() {
     zY = Math.min(0, Math.max(minY, zY));
   }
   function resetZoom() { zScale = 1; zX = 0; zY = 0; applyZoom(); }
+
+  // Exposed so makeCurrentClip can bake the current pan/zoom into the ffmpeg
+  // crop. Returns normalized [0,1] source-rect coords, or null when unzoomed.
+  window.getZoomCrop = function() {
+    if (zScale <= 1.001) return null;
+    const r = overlay.getBoundingClientRect();
+    if (!r.width || !r.height) return null;
+    const w = 1 / zScale, h = 1 / zScale;
+    const x = Math.max(0, Math.min(1 - w, -zX / (r.width  * zScale)));
+    const y = Math.max(0, Math.min(1 - h, -zY / (r.height * zScale)));
+    return { x, y, w, h };
+  };
+
   function setZoomMode(on) {
     zoomMode = on;
     overlay.hidden = !on; levelEl.hidden = !on; resetBtn.hidden = !on;
