@@ -64,14 +64,38 @@ function cachePut(key, str) {
 
 function cacheClear() {
   try { CacheService.getScriptCache().removeAll(['list', 'all']); } catch(e) {}
+  // Every cacheClear() site is a write — bump the version so clients reliably
+  // refetch. Drive's getLastUpdated lags SpreadsheetApp writes, so we use an
+  // explicit counter instead.
+  try { SpreadsheetApp.flush(); } catch (e) {}
+  bumpVersion();
 }
 
-// Spreadsheet-wide last-modified timestamp (ms since epoch). Drive updates this
-// on every cell change, so it's a reliable "did anything change" signal.
-// Must be read BEFORE the data it stamps — see doGet handlers.
+// Monotonic write counter stored in ScriptProperties. Bumped on every write
+// via cacheClear() and consulted by getSheetVersion(). Replaces the previous
+// Drive-getLastUpdated approach, which could lag writes by several seconds
+// and cause clients to skip refetches and serve stale localStorage caches.
+const VERSION_PROP = 'sheetVersion';
+
+function bumpVersion() {
+  try {
+    PropertiesService.getScriptProperties().setProperty(VERSION_PROP, String(Date.now()));
+  } catch (e) {}
+}
+
 function getSheetVersion() {
-  try { return DriveApp.getFileById(SHEET_ID).getLastUpdated().getTime(); }
-  catch (e) { return 0; }
+  try {
+    const props  = PropertiesService.getScriptProperties();
+    const stored = props.getProperty(VERSION_PROP);
+    if (stored) return Number(stored);
+    // Cold start: seed from Drive so any clients with pre-existing caches
+    // still validate on the first call.
+    let seed = 0;
+    try { seed = DriveApp.getFileById(SHEET_ID).getLastUpdated().getTime(); } catch (e) {}
+    if (!seed) seed = Date.now();
+    props.setProperty(VERSION_PROP, String(seed));
+    return seed;
+  } catch (e) { return 0; }
 }
 
 function rawJson(str) {

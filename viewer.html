@@ -612,6 +612,11 @@ async function saveEdits() {
     pendingEdits.clear();
     // Clear dirty styling
     document.querySelectorAll('.edit-select.dirty, .edit-input.dirty').forEach(el => el.classList.remove('dirty'));
+    // Bust the localStorage cache and refetch so a reload starts from
+    // server-of-record state, not the pre-save snapshot.
+    try { localStorage.removeItem('trl2_all'); localStorage.removeItem('trl2_list'); } catch {}
+    _liveVersion = null;
+    fetchAll();
     btn.textContent = `✓ Saved ${result.updated}`;
     setTimeout(() => { btn.disabled = false; updateSaveBtn(); }, 2000);
   } catch (err) {
