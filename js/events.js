@@ -7,7 +7,7 @@ TR.MENU = {
   'Penalty Defence': ['Offside', 'Hard Touch', 'In the Ruck', 'Not Moving Forward', 'Delay the play', 'Other'],
   'Turnover':        ['Ball Down', '6th Touch', 'Dummy Touch', 'Bad Roll', '6 Again', 'Interception', 'Other'],
   'Game Event':      ['Game Start', 'Game End'],
-  'Try':             ['Scoop', 'Other', '32 - Long', '33 Quicky', '33', '32 Cut', 'French Flair'],
+  'Try':             ['Scoop', '32', '23', '33', '32 - Cut', '32 - Long', '32 - Quicky', '32 - Scoop', '23 - Quicky', '23 - Scoop', '33 - Cut', '33 - Quicky', '33 - Scoop', 'French Flair', 'Other'],
   'To Review':       [],
 };
 

@@ -92,7 +92,7 @@ The main tool for tagging events against a match video (local file or YouTube).
 
 | Button | Key | Description |
 |---|---|---|
-| Try | `T` | Try scored by the possession team. Sub-types: Scoop, 32-Long, 33 Quicky, 33, 32 Cut, French Flair, Other |
+| Try | `T` | Try scored by the possession team. Sub-types: Scoop, 32, 23, 33, 32 - Cut, 32 - Long, 32 - Quicky, 32 - Scoop, 23 - Quicky, 23 - Scoop, 33 - Cut, 33 - Quicky, 33 - Scoop, French Flair, Other |
 | Turnover | `U` | Ball changes hands. Sub-types: Ball Down, 6th Touch, Dummy Touch, Bad Roll, 6 Again, Interception, Other |
 | Pen Attack | `P` | Penalty against the defence (attacking team benefits) |
 | Pen Defence | `Q` | Penalty against the attack (defending team benefits, possession switches) |
