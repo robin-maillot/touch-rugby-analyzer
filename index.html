@@ -118,7 +118,7 @@
         <div class="card-title">Game Analysis</div>
         <div class="card-desc">Charts &amp; stats per game</div>
       </a>
-      <a class="nav-card" href="dashboard.html">
+      <a class="nav-card" href="dashboard.html" id="dashboardCard" style="display:none">
         <div class="card-icon">🏆</div>
         <div class="card-title">Dashboard</div>
         <div class="card-desc">Team rankings &amp; comparisons</div>
@@ -148,7 +148,7 @@
         <div class="card-title">Video Backfill</div>
         <div class="card-desc">Link videos to field annotations</div>
       </a>
-      <a class="nav-card" href="analytics.html" id="analyticsCard" style="display:none">
+      <a class="nav-card" href="analytics.html">
         <div class="card-icon">📈</div>
         <div class="card-title">Analytics</div>
         <div class="card-desc">Event overview &amp; team patterns</div>
@@ -210,7 +210,7 @@
     }
     if (level === 'admin') {
       document.getElementById('backfillCard').style.display = '';
-      document.getElementById('analyticsCard').style.display = '';
+      document.getElementById('dashboardCard').style.display = '';
     }
     loginScreen.style.display = 'none';
     appContent.style.display  = 'block';

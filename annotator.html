@@ -200,11 +200,12 @@
   <nav style="display:flex;gap:4px;margin-left:auto;align-items:center">
     <button id="layoutBtn" class="layout-btn" onclick="toggleLayout()" title="Toggle video layout">↔ Side</button>
     <a href="games.html" style="color:#888;text-decoration:none;font-size:0.8rem;padding:5px 10px;border-radius:6px;transition:background 0.15s" onmouseover="this.style.background='#22253a';this.style.color='#e0e0e0'" onmouseout="this.style.background='';this.style.color='#888'">Games</a>
-    <a href="dashboard.html" style="color:#888;text-decoration:none;font-size:0.8rem;padding:5px 10px;border-radius:6px;transition:background 0.15s" onmouseover="this.style.background='#22253a';this.style.color='#e0e0e0'" onmouseout="this.style.background='';this.style.color='#888'">Dashboard</a>
+    <a href="dashboard.html" id="dashboardLink" style="display:none;color:#888;text-decoration:none;font-size:0.8rem;padding:5px 10px;border-radius:6px;transition:background 0.15s" onmouseover="this.style.background='#22253a';this.style.color='#e0e0e0'" onmouseout="this.style.background='';this.style.color='#888'">Dashboard</a>
     <a href="viewer.html" style="color:#888;text-decoration:none;font-size:0.8rem;padding:5px 10px;border-radius:6px;transition:background 0.15s" onmouseover="this.style.background='#22253a';this.style.color='#e0e0e0'" onmouseout="this.style.background='';this.style.color='#888'">Events</a>
     <a href="annotator.html" style="background:#22253a;color:#3b82f6;text-decoration:none;font-size:0.8rem;padding:5px 10px;border-radius:6px">Annotator</a>
   </nav>
 </header>
+<script>{ if (sessionStorage.getItem('password') === 'm30-admin') document.getElementById('dashboardLink').style.display = ''; }</script>
 
 <div class="main">
 

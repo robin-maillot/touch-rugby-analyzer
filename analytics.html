@@ -145,13 +145,13 @@
   <div class="header-sep"></div>
   <nav class="header-nav">
     <a href="games.html">Games</a>
-    <a href="dashboard.html">Dashboard</a>
+    <a href="dashboard.html" id="dashboardLink" style="display:none">Dashboard</a>
     <a href="viewer.html">Events</a>
     <a href="analytics.html" class="active">Analytics</a>
     <a href="annotator.html" id="annotatorLink" style="display:none">Annotator</a>
   </nav>
 </header>
-<script>{ const p = sessionStorage.getItem('password'); if (p === 'm30-staff' || p === 'm30-admin') document.getElementById('annotatorLink').style.display = ''; }</script>
+<script>{ const p = sessionStorage.getItem('password'); if (p === 'm30-staff' || p === 'm30-admin') document.getElementById('annotatorLink').style.display = ''; if (p === 'm30-admin') document.getElementById('dashboardLink').style.display = ''; }</script>
 
 <main>
   <div id="loadingArea">
@@ -248,6 +248,14 @@
           <label for="fDiv">Division</label>
           <select id="fDiv"><option value="">All</option></select>
         </div>
+        <div class="filter-group">
+          <label for="fType">Event type</label>
+          <select id="fType"><option value="">All</option></select>
+        </div>
+        <div class="filter-group">
+          <label for="fTeam">Team</label>
+          <select id="fTeam"><option value="">All</option></select>
+        </div>
         <button class="filter-reset" onclick="resetFilters()">Reset</button>
         <div class="filter-summary" id="filterSummary"></div>
       </div>
@@ -282,7 +290,7 @@
 </main>
 
 <script>
-TR.auth('admin');
+TR.auth('viewer');
 
 // ── Constants ────────────────────────────────────────────────
 const TYPE_ORDER  = ['Try', 'Penalty Attack', 'Penalty Defence', 'Turnover', 'Game Event', 'To Review'];
@@ -694,21 +702,37 @@ function populateFilters() {
   fill('fYear', evs.map(e => e.year));
   fill('fComp', evs.map(e => e.comp));
   fill('fDiv',  evs.map(e => e.div));
+  // Event type uses the canonical order, but only includes types present in the data.
+  const presentTypes = new Set(evs.map(e => e.type).filter(Boolean));
+  const typeSel = document.getElementById('fType');
+  TYPE_ORDER.filter(t => presentTypes.has(t)).forEach(v => {
+    const opt = document.createElement('option');
+    opt.value = v; opt.textContent = v;
+    typeSel.appendChild(opt);
+  });
+  typeSel.addEventListener('change', renderBottom);
+  // Team filter — matches against the action owner, consistent with the
+  // rest of this page's team-based aggregations.
+  fill('fTeam', evs.map(e => e.actionOwner));
 }
 
 function resetFilters() {
-  ['fYear', 'fComp', 'fDiv'].forEach(id => { document.getElementById(id).value = ''; });
+  ['fYear', 'fComp', 'fDiv', 'fType', 'fTeam'].forEach(id => { document.getElementById(id).value = ''; });
   renderBottom();
 }
 
 function getFilteredEvents() {
-  const y = document.getElementById('fYear').value;
-  const c = document.getElementById('fComp').value;
-  const d = document.getElementById('fDiv').value;
+  const y    = document.getElementById('fYear').value;
+  const c    = document.getElementById('fComp').value;
+  const d    = document.getElementById('fDiv').value;
+  const t    = document.getElementById('fType').value;
+  const team = document.getElementById('fTeam').value;
   return ALL_EVENTS.filter(e => e.analyzable
-    && (!y || e.year === y)
-    && (!c || e.comp === c)
-    && (!d || e.div  === d));
+    && (!y    || e.year === y)
+    && (!c    || e.comp === c)
+    && (!d    || e.div  === d)
+    && (!t    || e.type === t)
+    && (!team || e.actionOwner === team));
 }
 
 function renderBottom() {
@@ -716,10 +740,12 @@ function renderBottom() {
   const games = new Set(evs.map(e => e.game));
 
   // Filter summary
-  const y = document.getElementById('fYear').value;
-  const c = document.getElementById('fComp').value;
-  const d = document.getElementById('fDiv').value;
-  const parts = [y, c, d].filter(Boolean);
+  const y    = document.getElementById('fYear').value;
+  const c    = document.getElementById('fComp').value;
+  const d    = document.getElementById('fDiv').value;
+  const t    = document.getElementById('fType').value;
+  const team = document.getElementById('fTeam').value;
+  const parts = [y, c, d, t, team].filter(Boolean);
   document.getElementById('filterSummary').innerHTML = parts.length
     ? `<strong>${evs.length.toLocaleString()}</strong> events · <strong>${games.size}</strong> games matching <strong>${parts.join(' · ')}</strong>`
     : `<strong>${evs.length.toLocaleString()}</strong> events across <strong>${games.size}</strong> games`;
@@ -738,14 +764,34 @@ function renderBottom() {
     ${kpi('Top sub-type', topSub ? topSub[0].split('::')[1] : '—', topSub ? topSub[0].split('::')[0] : '', 'orange')}
   `;
 
-  renderFilteredTypeChart(byType);
+  renderFilteredTypeChart(evs, byType, t);
   renderTrendChart(evs);
   renderHeatmap(evs);
   renderFilteredCombos(evs);
   renderFilteredMatrix(evs);
 }
 
-function renderFilteredTypeChart(byType) {
+function renderFilteredTypeChart(evs, byType, activeType) {
+  // When a specific event type is selected we break down by name instead, so
+  // the chart shows the sub-types within the chosen event type.
+  if (activeType) {
+    const byName = countBy(evs, e => e.name || '(blank)');
+    const data = Object.entries(byName).map(([name, count]) => ({ name, count }));
+    if (!data.length) { document.getElementById('fTypeChart').innerHTML = emptyMsg(); return; }
+    const color = TYPE_COLORS[activeType] || '#888';
+    vegaEmbed('#fTypeChart', {
+      width: 'container', height: 220,
+      title: { text: `${activeType} — by name`, color: '#aaa', fontSize: 11, fontWeight: 600, anchor: 'start' },
+      data: { values: data },
+      mark: { type: 'bar', cornerRadiusEnd: 3, color },
+      encoding: {
+        x: { field: 'name', type: 'nominal', sort: '-y', axis: { title: null, labelAngle: -25 } },
+        y: { field: 'count', type: 'quantitative', axis: { title: 'Events' } },
+        tooltip: [{ field: 'name' }, { field: 'count' }],
+      },
+    }, VEGA_OPTS);
+    return;
+  }
   const data = TYPE_ORDER.filter(t => byType[t]).map(t => ({ type: t, count: byType[t] }));
   if (!data.length) { document.getElementById('fTypeChart').innerHTML = emptyMsg(); return; }
   vegaEmbed('#fTypeChart', {

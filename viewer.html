@@ -67,6 +67,7 @@
   #ytZoomOverlay { position: absolute; inset: 0; z-index: 5; cursor: grab; touch-action: none; background: transparent; }
   #ytZoomOverlay.dragging { cursor: grabbing; }
   #zoomToggle.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  #fullPossessionBtn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
   .zoom-level { font-family: monospace; font-size: 0.73rem; color: var(--text-muted); min-width: 36px; text-align: right; }
   .no-video-msg { color: #555; font-size: 0.8rem; text-align: center; padding: 24px 16px; line-height: 1.8; }
   .no-video-msg svg { opacity: 0.2; display: block; margin: 0 auto 10px; }
@@ -380,12 +381,12 @@
   <button id="saveBtn" onclick="saveEdits()">💾 Save</button>
   <nav class="header-nav">
     <a href="games.html">Games</a>
-    <a href="dashboard.html">Dashboard</a>
+    <a href="dashboard.html" id="dashboardLink" style="display:none">Dashboard</a>
     <a href="viewer.html" class="active">Events</a>
-    <a href="analytics.html" id="analyticsLink" style="display:none">Analytics</a>
+    <a href="analytics.html">Analytics</a>
     <a href="annotator.html" id="annotatorLink" style="display:none">Annotator</a>
   </nav>
-  <script>{ const p = sessionStorage.getItem('password'); if (p === 'm30-staff' || p === 'm30-admin') document.getElementById('annotatorLink').style.display = ''; if (p === 'm30-admin') { document.getElementById('editModeBtn').style.display = ''; document.getElementById('analyticsLink').style.display = ''; } }</script>
+  <script>{ const p = sessionStorage.getItem('password'); if (p === 'm30-staff' || p === 'm30-admin') document.getElementById('annotatorLink').style.display = ''; if (p === 'm30-admin') { document.getElementById('editModeBtn').style.display = ''; document.getElementById('dashboardLink').style.display = ''; } }</script>
 </header>
 
 <div id="helpModal" class="modal-backdrop" hidden onclick="if (event.target === this) closeHelpModal()">
@@ -460,6 +461,7 @@
         <button class="btn btn-ghost" id="zoomToggle" title="Zoom video (Z)">🔍</button>
         <span class="zoom-level" id="zoomLevel" hidden>1.0×</span>
         <button class="btn btn-ghost" id="zoomReset" title="Reset zoom" hidden>⟲</button>
+        <button class="btn btn-ghost" id="fullPossessionBtn" onclick="toggleFullPossession()" title="Full possession — start playback from the previous event in this game (capped at 90 s; falls back to the lookback slider for non-analyzable games or when there is no prior event)">📐</button>
         <button class="btn btn-ghost" id="clipBtn" title="Cut a clip of the current loop range and open it in a new tab" onclick="makeCurrentClip()" hidden>▶ Clip</button>
         <span id="clipDownloadStatus" style="font-size:0.75rem;color:var(--text-muted);min-width:90px"></span>
       </div>
@@ -556,6 +558,8 @@ let linkOffset      = parseInt(localStorage.getItem('linkOffset') ?? '5', 10) ||
 let linkOffsetAfter = parseInt(localStorage.getItem('linkOffsetAfter') ?? '2', 10);
 if (isNaN(linkOffsetAfter)) linkOffsetAfter = 2;
 let loopMode    = localStorage.getItem('loopMode') === '1';
+let fullPossession = localStorage.getItem('fullPossession') === '1';
+const MAX_POSSESSION_LOOKBACK = 90;
 let loopStart   = null;
 let loopEnd     = null;
 let activeEventSecs = null;
@@ -668,6 +672,7 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('linkOffsetInput').value = linkOffset;
   document.getElementById('linkOffsetAfterInput').value = linkOffsetAfter;
   applyLoopButtonState();
+  applyFullPossessionButtonState();
   setupSeekbar();
   setupResizeHandle();
   setupVideoZoom();
@@ -1148,14 +1153,15 @@ function playFilteredRow(filteredIdx) {
   const parts   = timeStr.split(':').map(Number);
   const secs    = parts.length === 3 ? parts[0]*3600 + parts[1]*60 + parts[2]
                 : parts.length === 2 ? parts[0]*60 + parts[1] : 0;
-  const seekTo  = Math.max(0, secs - linkOffset);
-  activeEventSecs = secs;
-  loopStart = seekTo;
-  loopEnd   = secs + linkOffsetAfter;
 
   // Look up the game's metadata so we can build the right YouTube player.
   const gameKey = colGame >= 0 ? (row[colGame] || '') : '';
   const meta    = gameMetaMap[gameKey] || null;
+
+  const seekTo  = getLookbackStart(gameKey, secs);
+  activeEventSecs = secs;
+  loopStart = seekTo;
+  loopEnd   = secs + linkOffsetAfter;
   const videoKey = videoKeyFor(meta);
 
   // Clip button reflects the *current* game's gcsObject, independent of whether
@@ -1702,18 +1708,62 @@ function toggleLoopMode() {
   }
 }
 
+function applyFullPossessionButtonState() {
+  const btn = document.getElementById('fullPossessionBtn');
+  if (!btn) return;
+  btn.classList.toggle('active', fullPossession);
+}
+
+function toggleFullPossession() {
+  fullPossession = !fullPossession;
+  localStorage.setItem('fullPossession', fullPossession ? '1' : '0');
+  applyFullPossessionButtonState();
+  // Re-render so copy-link URLs reflect the new mode.
+  updatePagination();
+  // Re-seek the active row if there is one.
+  if (activeEventSecs != null && currentSheetName) {
+    const newStart = getLookbackStart(currentSheetName, activeEventSecs);
+    loopStart = newStart;
+    if (player && videoReady) player.seek(newStart);
+  }
+}
+
+// Resolve the playback start time for a given event, honoring the
+// "Full possession" toggle. Falls back to `secs - linkOffset` when the
+// toggle is off, the game is not analyzable, there is no prior event,
+// or column metadata is missing. Capped at MAX_POSSESSION_LOOKBACK seconds.
+function getLookbackStart(gameKey, secs) {
+  const defaultStart = Math.max(0, secs - linkOffset);
+  if (!fullPossession) return defaultStart;
+  const meta = gameMetaMap[gameKey || ''];
+  const analyzable = meta && /^(true|1|yes)$/i.test(String(meta.analyzable || '').trim());
+  if (!analyzable) return defaultStart;
+  if (colGame < 0 || colTime < 0 || !Array.isArray(allData)) return defaultStart;
+  let prevTime = -Infinity;
+  for (const row of allData) {
+    if (row[colGame] !== gameKey) continue;
+    const parts = (row[colTime] || '').split(':').map(Number);
+    const t = parts.length === 3 ? parts[0]*3600 + parts[1]*60 + parts[2]
+            : parts.length === 2 ? parts[0]*60 + parts[1] : NaN;
+    if (!Number.isFinite(t)) continue;
+    if (t < secs && t > prevTime) prevTime = t;
+  }
+  if (prevTime === -Infinity) return defaultStart;
+  return Math.max(0, prevTime, secs - MAX_POSSESSION_LOOKBACK);
+}
+
 // ── Shareable seek link ─────────────────────────────────────────
 // Returns a deep-link YouTube URL, or '' if the game has no video configured.
-// Uses the user's linkOffset (lookback).
+// Honors the lookback slider and the "Full possession" toggle.
 function makeYtTimestampUrl(gameKey, timeStr) {
   const meta = gameMetaMap[gameKey || ''];
   if (!meta) return '';
   const parts  = (timeStr || '').split(':').map(Number);
   const secs   = parts.length === 3 ? parts[0]*3600 + parts[1]*60 + parts[2]
                : parts.length === 2 ? parts[0]*60 + parts[1] : 0;
-  // TR.player.seekLink applies a 5s default lookback; override here so we
-  // honor the user-configured linkOffset slider.
-  const t = Math.max(0, secs - linkOffset);
+  // TR.player.seekLink applies a 5s default lookback; cancel it out so we
+  // land exactly on the resolved start time.
+  const t = getLookbackStart(gameKey, secs);
   return TR.player.seekLink(meta, t + 5);
 }
 

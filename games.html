@@ -187,13 +187,13 @@
   <span id="status"></span>
   <nav class="header-nav" style="margin-left:auto">
     <a href="games.html" class="active">Games</a>
-    <a href="dashboard.html">Dashboard</a>
+    <a href="dashboard.html" id="dashboardLink" style="display:none">Dashboard</a>
     <a href="viewer.html" id="eventsLink">Events</a>
-    <a href="analytics.html" id="analyticsLink" style="display:none">Analytics</a>
+    <a href="analytics.html">Analytics</a>
     <a href="annotator.html" id="annotatorLink" style="display:none">Annotator</a>
   </nav>
 </header>
-<script>{ const p = sessionStorage.getItem('password'); if (p === 'm30-staff' || p === 'm30-admin') document.getElementById('annotatorLink').style.display = ''; if (p === 'm30-admin') document.getElementById('analyticsLink').style.display = ''; }</script>
+<script>{ const p = sessionStorage.getItem('password'); if (p === 'm30-staff' || p === 'm30-admin') document.getElementById('annotatorLink').style.display = ''; if (p === 'm30-admin') document.getElementById('dashboardLink').style.display = ''; }</script>
 
 <main>
   <div id="selectPrompt">← Select a game from the dropdown above</div>
