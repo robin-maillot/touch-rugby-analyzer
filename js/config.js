@@ -37,5 +37,23 @@ TR.auth = (role) => {
   if (!ok[role]) window.location.replace('index.html');
 };
 
+// Wipe per-user localStorage caches (action=list / action=all / game_*) when
+// the password changes from what was in use last time these caches were written.
+// Server-side responses are now filtered by group, so caches from a prior user
+// would otherwise leak through the version-skip fast-path. Preference keys
+// (linkOffset, layout, etc.) are explicitly left alone.
+(function wipeStaleCaches() {
+  try {
+    const cur  = sessionStorage.getItem('password') || '';
+    if (!cur) return;
+    const last = localStorage.getItem('trl2_user') || '';
+    if (cur === last) return;
+    Object.keys(localStorage)
+      .filter(k => k === 'trl2_list' || k === 'trl2_all' || k.indexOf('trl2_game_') === 0)
+      .forEach(k => localStorage.removeItem(k));
+    localStorage.setItem('trl2_user', cur);
+  } catch (e) {}
+})();
+
 // Emit a single role-tagged pageview as soon as config.js loads.
 TR.umamiIdentify();

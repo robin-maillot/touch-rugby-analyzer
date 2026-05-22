@@ -12,6 +12,7 @@ notebooks/.ipynb_checkpoints/
 # Credentials
 touch_rugby_analyzer/credentials.json
 touch_rugby_analyzer/token.json
+.env
 
 # IDE
 .idea/
