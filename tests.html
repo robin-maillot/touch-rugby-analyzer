@@ -59,6 +59,10 @@
       t.true(TR.MENU['Game Event'].includes('Game Start'));
       t.true(TR.MENU['Game Event'].includes('Game End'));
     });
+    QUnit.test('Try includes 21 and Interception', t => {
+      t.true(TR.MENU['Try'].includes('21'));
+      t.true(TR.MENU['Try'].includes('Interception'));
+    });
     QUnit.test('NAMES_BY_TYPE aliases MENU', t => {
       t.strictEqual(TR.NAMES_BY_TYPE, TR.MENU);
     });

@@ -68,6 +68,7 @@ console.log('TR.MENU');
 test('canonical types present',   () => { ['Penalty Attack','Penalty Defence','Turnover','Game Event','Try','To Review'].forEach(t => assert.ok(Array.isArray(TR.MENU[t]), `missing ${t}`)); });
 test('Turnover has 6 Again',      () => assert.ok(TR.MENU['Turnover'].includes('6 Again')));
 test('Game Event has Start/End',  () => { assert.ok(TR.MENU['Game Event'].includes('Game Start')); assert.ok(TR.MENU['Game Event'].includes('Game End')); });
+test('Try has 21 and Interception', () => { assert.ok(TR.MENU['Try'].includes('21')); assert.ok(TR.MENU['Try'].includes('Interception')); });
 test('NAMES_BY_TYPE alias',       () => assert.equal(TR.NAMES_BY_TYPE, TR.MENU));
 
 // ── TR.isTurnover ─────────────────────────────────────────────

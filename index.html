@@ -156,28 +156,12 @@
     </div>
   </div>
 
+<script src="js/config.js"></script>
 <script>
-  // --- UMAMI MANUAL TRACKING ---
-  // index.html doesn't include js/config.js, so we inline the same role-tagged
-  // pageview logic. The umami <script> has data-auto-track="false".
-  function trUmamiTrack(extra) {
-    const p = sessionStorage.getItem('password');
-    const role = p === 'm30-admin' ? 'admin'
-              : p === 'm30-staff' ? 'staff'
-              : p === 'm30'       ? 'viewer' : 'anon';
-    const data = Object.assign({ role }, extra || {});
-    const send = () => {
-      if (!window.umami) return;
-      if (window.umami.identify) window.umami.identify(data);
-      if (window.umami.track) window.umami.track(props => Object.assign({}, props, data));
-    };
-    if (window.umami && window.umami.track) send();
-    else window.addEventListener('load', send);
-  }
-  trUmamiTrack();
-
-  // --- PASSWORD LOGIC ---
-  const PASSWORDS = { 'm30': 'basic', 'm30-staff': 'staff', 'm30-admin': 'admin' };
+  // --- LOGIN VALIDATED BY APPS SCRIPT ---
+  // The authoritative password list lives in the _groups sheet (read server-side
+  // by action=whoami). We never hardcode passwords here so new group secrets work
+  // without a frontend change.
 
   const loginScreen = document.getElementById('login-screen');
   const appContent  = document.getElementById('app-content');
@@ -185,13 +169,24 @@
   const loginBtn    = document.getElementById('login-btn');
   const errorMsg    = document.getElementById('error-msg');
 
-  function checkPassword() {
-    const pwd   = passInput.value;
-    const level = PASSWORDS[pwd];
-    if (level) {
+  async function whoami(secret) {
+    try {
+      const url  = `${TR.APPS_SCRIPT_URL}?secret=${encodeURIComponent(secret)}&action=whoami`;
+      const resp = await fetch(url);
+      const data = await resp.json();
+      return data.ok ? data.role : null;
+    } catch { return null; }
+  }
+
+  async function checkPassword() {
+    const pwd  = passInput.value;
+    loginBtn.disabled = true;
+    const role = await whoami(pwd);
+    loginBtn.disabled = false;
+    if (role) {
       sessionStorage.setItem('password', pwd);
-      trUmamiTrack({ event: 'login' });
-      initApp(level);
+      TR.umamiIdentify({ event: 'login' });
+      initApp(role);
     } else {
       errorMsg.style.display = 'block';
       passInput.value = '';
@@ -202,13 +197,30 @@
   loginBtn.addEventListener('click', checkPassword);
   passInput.addEventListener('keypress', e => { if (e.key === 'Enter') checkPassword(); });
 
+  // Skip the login screen if we already have a valid password in sessionStorage.
+  // We optimistically hide the login form while whoami is in flight to avoid
+  // flicker on Back-navigation; if validation fails, the form re-appears.
+  const cachedPwd = sessionStorage.getItem('password');
+  if (cachedPwd) {
+    loginScreen.style.display = 'none';
+    whoami(cachedPwd).then(role => {
+      if (role) {
+        initApp(role);
+      } else {
+        sessionStorage.removeItem('password');
+        loginScreen.style.display = '';
+        passInput.focus();
+      }
+    });
+  }
+
   // --- APP LOGIC ---
-  function initApp(level) {
-    if (level === 'staff' || level === 'admin') {
+  function initApp(role) {
+    if (role === 'staff' || role === 'admin') {
       document.getElementById('annotatorCard').style.display = '';
       document.getElementById('fieldCard').style.display = '';
     }
-    if (level === 'admin') {
+    if (role === 'admin') {
       document.getElementById('backfillCard').style.display = '';
       document.getElementById('dashboardCard').style.display = '';
     }

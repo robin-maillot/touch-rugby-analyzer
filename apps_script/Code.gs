@@ -1,9 +1,12 @@
 // ── Configuration ──────────────────────────────────────────────
-const SHEET_ID        = '1B9DwThGoINgicevtjoUDkeQBoGBCD6QFjL0oL7mAU-k';
-const VALID_SECRETS   = new Set(['m30', 'm30-admin', 'm30-staff']);
-const ADMIN_SECRET    = 'm30-admin';
-const METADATA_SHEET  = '_metadata';  // reserved tab name for game metadata
-const LIVE_SHEET      = '_live';      // reserved tab name for live game state
+// SHEET_ID holds the game-data tabs (one per game).
+// CONTROL_SHEET_ID holds the three control-plane tabs: _groups, _metadata, _live.
+const SHEET_ID          = '1B9DwThGoINgicevtjoUDkeQBoGBCD6QFjL0oL7mAU-k';
+const CONTROL_SHEET_ID  = '1Km2QtYOKLW-HQudHcfvjEksAZykBbIFKhl4AuA-AEIo';
+const VALID_ROLES     = new Set(['viewer', 'staff', 'admin']);
+const GROUPS_SHEET    = '_groups';     // reserved tab name for group access table
+const METADATA_SHEET  = '_metadata';   // reserved tab name for game metadata
+const LIVE_SHEET      = '_live';       // reserved tab name for live game state
 
 // Expected column order (must match what the Python pipeline reads)
 const HEADERS = ['Time', 'Possession Owner', 'Type', 'Name', 'To Review', 'Comment', 'Action Owner'];
@@ -11,10 +14,50 @@ const HEADERS = ['Time', 'Possession Owner', 'Type', 'Name', 'To Review', 'Comme
 // Metadata columns appended to action=all rows
 const META_COLS = ['Team 1', 'Team 2', 'Competition', 'Year', 'Division', 'Video Name', 'Analyzable', 'ID'];
 
+// ── Auth helper ────────────────────────────────────────────────
+// Reads _groups (Group | Secret | Role) → Map<secret, {group, role}>.
+// Cached in script cache for CACHE_TTL so we don't hit the sheet on every
+// request. cacheClear() (called after writes) does NOT bust this — group
+// edits happen out-of-band in the Sheets UI, so a 5-min freshness lag is fine.
+function getGroups() {
+  const hit = cacheGet('groups');
+  if (hit) {
+    try { return new Map(JSON.parse(hit)); } catch (e) {}
+  }
+  const sheet = SpreadsheetApp.openById(CONTROL_SHEET_ID).getSheetByName(GROUPS_SHEET);
+  const map = new Map();
+  if (!sheet) return map;
+  const values = sheet.getDataRange().getDisplayValues();
+  if (values.length < 2) return map;
+  const h  = values[0].map(s => String(s).toLowerCase().trim());
+  const gi = h.indexOf('group');
+  const si = h.indexOf('secret');
+  const ri = h.indexOf('role');
+  if (si < 0 || ri < 0) return map;
+  for (let i = 1; i < values.length; i++) {
+    const secret = String(values[i][si] || '').trim();
+    const role   = String(values[i][ri] || '').trim().toLowerCase();
+    const group  = gi >= 0 ? String(values[i][gi] || '').trim() : '';
+    if (secret && VALID_ROLES.has(role)) map.set(secret, { group, role });
+  }
+  try { cachePut('groups', JSON.stringify([...map])); } catch (e) {}
+  return map;
+}
+
+function authFor(secret) {
+  if (!secret) return null;
+  return getGroups().get(String(secret)) || null;
+}
+
+function isAdminSecret(secret) {
+  const a = authFor(secret);
+  return !!(a && a.role === 'admin');
+}
+
 // ── Metadata helper ────────────────────────────────────────────
 // Reads _metadata sheet and returns { [sheetName]: { team1, team2, competition, year, division } }
 function getMetadata() {
-  const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(METADATA_SHEET);
+  const sheet = SpreadsheetApp.openById(CONTROL_SHEET_ID).getSheetByName(METADATA_SHEET);
   if (!sheet) return {};
 
   const values = sheet.getDataRange().getDisplayValues();
@@ -105,7 +148,7 @@ function rawJson(str) {
 // ── GET — list sheets or fetch rows from a tab ─────────────────
 function doGet(e) {
   try {
-    if (!VALID_SECRETS.has(e.parameter.secret)) {
+    if (!authFor(e.parameter.secret)) {
       return json({ ok: false, error: 'Unauthorized' });
     }
 
@@ -115,9 +158,17 @@ function doGet(e) {
       return json({ ok: true, version: getSheetVersion() });
     }
 
+    // action=whoami → return the role/group for the supplied secret. Used by
+    // index.html to validate a cached password against the authoritative _groups
+    // sheet (replacing a stale hardcoded password map).
+    if (e.parameter.action === 'whoami') {
+      const auth = authFor(e.parameter.secret);
+      return json({ ok: true, role: auth.role, group: auth.group });
+    }
+
     // action=live → current live game states
     if (e.parameter.action === 'live') {
-      const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(LIVE_SHEET);
+      const sheet = SpreadsheetApp.openById(CONTROL_SHEET_ID).getSheetByName(LIVE_SHEET);
       if (!sheet) return json({ ok: true, games: [] });
       const values = sheet.getDataRange().getDisplayValues();
       if (values.length < 2) return json({ ok: true, games: [] });
@@ -225,13 +276,13 @@ function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents);
 
-    if (!VALID_SECRETS.has(data.secret)) {
+    if (!authFor(data.secret)) {
       return json({ ok: false, error: 'Unauthorized' });
     }
 
     // action=update_rows → update Name/Comment for specific rows (admin only)
     if (data.action === 'update_rows') {
-      if (data.secret !== ADMIN_SECRET) return json({ ok: false, error: 'Admin access required.' });
+      if (!isAdminSecret(data.secret)) return json({ ok: false, error: 'Admin access required.' });
       let updated = 0;
       for (const change of (data.changes || [])) {
         if (updateRow(change.sheetName, change.time, change.name, change.comment)) updated++;
@@ -242,7 +293,7 @@ function doPost(e) {
 
     // action=backfill_youtube → write YouTube links into a game tab
     if (data.action === 'backfill_youtube') {
-      if (data.secret !== ADMIN_SECRET) return json({ ok: false, error: 'Admin access required.' });
+      if (!isAdminSecret(data.secret)) return json({ ok: false, error: 'Admin access required.' });
       const updated = backfillYoutubeLink(data.sheetName, data.youtubeUrl, Number(data.offsetSeconds) || 0);
       cacheClear();
       return json({ ok: true, updated });
@@ -251,7 +302,7 @@ function doPost(e) {
     // action=backfill_gcs → attach a GCS object path to a game (admin only).
     // Empty string is valid — used to clear the link.
     if (data.action === 'backfill_gcs') {
-      if (data.secret !== ADMIN_SECRET) return json({ ok: false, error: 'Admin access required.' });
+      if (!isAdminSecret(data.secret)) return json({ ok: false, error: 'Admin access required.' });
       if (!data.sheetName) return json({ ok: false, error: 'Missing sheetName parameter' });
       writeMeta(data.sheetName, { gcsObject: String(data.gcsObject || '').trim() });
       cacheClear();
@@ -277,7 +328,7 @@ function doPost(e) {
       if (!data.override) {
         return json({ ok: false, error: `Tab "${data.sheetName}" already exists.`, tabExists: true });
       }
-      if (data.secret !== ADMIN_SECRET) {
+      if (!isAdminSecret(data.secret)) {
         return json({ ok: false, error: 'Admin access required to override.' });
       }
       ss.deleteSheet(sheet);
@@ -308,7 +359,7 @@ function doPost(e) {
 // If not → append to the bottom. No extra password needed here
 // because the caller has already passed the override check above.
 function writeMeta(sheetName, meta) {
-  const ss = SpreadsheetApp.openById(SHEET_ID);
+  const ss = SpreadsheetApp.openById(CONTROL_SHEET_ID);
   let sheet = ss.getSheetByName(METADATA_SHEET);
   if (!sheet) {
     sheet = ss.insertSheet(METADATA_SHEET);
@@ -393,15 +444,14 @@ function writeMeta(sheetName, meta) {
 // Tab name format expected: YEAR_DIVISION_COMPETITION_TEAM1_TEAM2
 // e.g. 2025_m30_seniorscup_france_england
 function backfillMetadata() {
-  const ss     = SpreadsheetApp.openById(SHEET_ID);
-  const sheets = ss.getSheets()
-    .map(s => s.getName())
-    .filter(n => n !== METADATA_SHEET);
+  const gamesSS = SpreadsheetApp.openById(SHEET_ID);
+  const ctrlSS  = SpreadsheetApp.openById(CONTROL_SHEET_ID);
+  const sheets  = gamesSS.getSheets().map(s => s.getName());
 
-  // Delete and recreate _metadata sheet
-  const existing = ss.getSheetByName(METADATA_SHEET);
-  if (existing) ss.deleteSheet(existing);
-  const meta = ss.insertSheet(METADATA_SHEET);
+  // Delete and recreate _metadata sheet in the control spreadsheet
+  const existing = ctrlSS.getSheetByName(METADATA_SHEET);
+  if (existing) ctrlSS.deleteSheet(existing);
+  const meta = ctrlSS.insertSheet(METADATA_SHEET);
 
   const header = ['Sheet Name', 'Team 1', 'Team 2', 'Competition', 'Year', 'Division', 'Video Name'];
   meta.appendRow(header);
@@ -430,7 +480,7 @@ function backfillMetadata() {
 const LIVE_HEADERS = ['Sheet Name', 'Team 1', 'Team 2', 'Score 1', 'Score 2', 'Time Seconds', 'Updated At', 'Poss 1', 'Poss 2', 'Comps 1', 'Comps 2', 'Finished', 'Tries JSON'];
 
 function writeLiveRow(sheetName, team1, team2, score1, score2, timeSeconds, poss1, poss2, comps1, comps2, triesJson) {
-  const ss = SpreadsheetApp.openById(SHEET_ID);
+  const ss = SpreadsheetApp.openById(CONTROL_SHEET_ID);
   let sheet = ss.getSheetByName(LIVE_SHEET);
 
   if (!sheet) {
@@ -455,7 +505,7 @@ function writeLiveRow(sheetName, team1, team2, score1, score2, timeSeconds, poss
 }
 
 function clearLiveRow(sheetName) {
-  const ss    = SpreadsheetApp.openById(SHEET_ID);
+  const ss    = SpreadsheetApp.openById(CONTROL_SHEET_ID);
   const sheet = ss.getSheetByName(LIVE_SHEET);
   if (!sheet) return;
   const values = sheet.getDataRange().getValues();

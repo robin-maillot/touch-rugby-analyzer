@@ -101,6 +101,13 @@
   .np-time { font-family: monospace; font-size: 0.73rem; color: var(--text-muted); background: var(--bg); padding: 2px 6px; border-radius: 3px; }
   .np-game { font-size: 0.7rem; color: var(--text-muted); background: var(--surface-2); padding: 2px 7px; border-radius: 4px; border: 1px solid var(--border); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
   .np-comment { font-size: 0.72rem; color: #f97316; font-style: italic; white-space: pre-wrap; line-height: 1.4; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+  /* Inline edit controls inside Now Playing (admin edit mode) */
+  .np-info .edit-select, .np-info .edit-input { width: auto; min-width: 140px; font-size: 0.82rem; padding: 4px 8px; }
+  .np-edit-comment.edit-input { width: 100%; font-size: 0.78rem; padding: 5px 8px; font-style: italic; color: #f97316; }
+  @media (max-width: 1024px) {
+    .np-info .edit-select, .np-info .edit-input { min-height: 36px; font-size: 0.9rem; min-width: 160px; }
+    .np-edit-comment.edit-input { min-height: 36px; font-size: 0.88rem; }
+  }
 
   /* ── Table controls ───────────────────────────────────────── */
   .controls { background: var(--surface); border-bottom: 1px solid var(--border); padding: 8px 12px; display: flex; flex-direction: column; gap: 7px; flex-shrink: 0; }
@@ -576,6 +583,7 @@ function toggleEditMode() {
   updateSaveBtn();
   renderHeaders();
   updatePagination();
+  if (activeRowIdx >= 0 && filtered[activeRowIdx]) updateNowPlaying(filtered[activeRowIdx]);
 }
 
 // ── Admin edit tracking ─────────────────────────────────────────
@@ -1233,7 +1241,34 @@ function updateNowPlaying(row) {
     badge.textContent = type;
     info.appendChild(badge);
   }
-  if (name) {
+  if (isAdmin && editMode) {
+    const options = TR.NAMES_BY_TYPE[type] || [];
+    const allOpts = options.includes(name) || !name ? options : [name, ...options];
+    if (allOpts.length) {
+      const sel = document.createElement('select');
+      sel.className = 'edit-select' + (pendingEdits.has(row) ? ' dirty' : '');
+      sel.onclick = e => e.stopPropagation();
+      allOpts.forEach(opt => {
+        const o = document.createElement('option');
+        o.value = opt; o.textContent = opt;
+        if (opt === name) o.selected = true;
+        sel.appendChild(o);
+      });
+      sel.onchange = () => {
+        sel.classList.add('dirty');
+        markDirty(row, 'name', sel.value);
+        document.querySelectorAll(`#dataTable tbody tr.active-row .edit-select`).forEach(el => {
+          el.value = sel.value; el.classList.add('dirty');
+        });
+      };
+      info.appendChild(sel);
+    } else if (name) {
+      const s = document.createElement('span');
+      s.style.cssText = 'font-size:0.82rem;color:var(--text)';
+      s.textContent = name;
+      info.appendChild(s);
+    }
+  } else if (name) {
     const s = document.createElement('span');
     s.style.cssText = 'font-size:0.82rem;color:var(--text)';
     s.textContent = name;
@@ -1264,7 +1299,24 @@ function updateNowPlaying(row) {
     info.appendChild(s);
   }
 
-  if (cmmt) {
+  if (isAdmin && editMode) {
+    comment.innerHTML = '';
+    const input = document.createElement('input');
+    input.type      = 'text';
+    input.value     = cmmt || '';
+    input.placeholder = 'Comment…';
+    input.className = 'np-edit-comment edit-input' + (pendingEdits.has(row) ? ' dirty' : '');
+    input.onclick   = e => e.stopPropagation();
+    input.onchange  = () => {
+      input.classList.add('dirty');
+      markDirty(row, 'comment', input.value);
+      document.querySelectorAll(`#dataTable tbody tr.active-row .edit-input`).forEach(el => {
+        el.value = input.value; el.classList.add('dirty');
+      });
+    };
+    comment.appendChild(input);
+    comment.style.display = '';
+  } else if (cmmt) {
     comment.textContent = cmmt;
     comment.style.display = '';
   } else {
