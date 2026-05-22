@@ -70,6 +70,7 @@ function getMetadata() {
   const vi   = col('video name'), ai = col('analyzable'), yui = col('youtube link');
   const idi  = col('id');
   const goi  = col('gcs object');      // object path within the configured GCS bucket
+  const ggi  = col('groups');          // space-separated list of group names allowed to see this game
 
   const meta = {};
   values.slice(1).forEach(row => {
@@ -86,9 +87,23 @@ function getMetadata() {
       youtubelink: yui >= 0 ? row[yui] : '',
       id:          idi >= 0 ? row[idi] : '',
       gcsObject:   goi >= 0 ? row[goi] : '',
+      groups:      ggi >= 0 ? String(row[ggi] || '').trim().split(/\s+/).filter(Boolean) : [],
     };
   });
   return meta;
+}
+
+// True when `auth` (from authFor) is allowed to see the given game's meta entry.
+// Admins always pass. The literal group "ALL" (case-insensitive) is a wildcard —
+// any authenticated user can see games tagged with it. Otherwise the caller's
+// group must appear in the game's Groups cell.
+function canSeeGame(auth, gameMeta) {
+  if (!auth) return false;
+  if (auth.role === 'admin') return true;
+  const gs = (gameMeta && gameMeta.groups) || [];
+  if (gs.some(g => String(g).toUpperCase() === 'ALL')) return true;
+  if (!auth.group) return false;
+  return gs.indexOf(auth.group) >= 0;
 }
 
 // ── Cache helpers ───────────────────────────────────────────────
@@ -148,7 +163,8 @@ function rawJson(str) {
 // ── GET — list sheets or fetch rows from a tab ─────────────────
 function doGet(e) {
   try {
-    if (!authFor(e.parameter.secret)) {
+    const auth = authFor(e.parameter.secret);
+    if (!auth) {
       return json({ ok: false, error: 'Unauthorized' });
     }
 
@@ -162,11 +178,10 @@ function doGet(e) {
     // index.html to validate a cached password against the authoritative _groups
     // sheet (replacing a stale hardcoded password map).
     if (e.parameter.action === 'whoami') {
-      const auth = authFor(e.parameter.secret);
       return json({ ok: true, role: auth.role, group: auth.group });
     }
 
-    // action=live → current live game states
+    // action=live → current live game states (filtered by group via _metadata)
     if (e.parameter.action === 'live') {
       const sheet = SpreadsheetApp.openById(CONTROL_SHEET_ID).getSheetByName(LIVE_SHEET);
       if (!sheet) return json({ ok: true, games: [] });
@@ -181,6 +196,7 @@ function doGet(e) {
       const cm1i = col('comps 1'), cm2i = col('comps 2');
       const fini = col('finished');
       const trji = col('tries json');
+      const meta = getMetadata();   // for group filtering
       const games = values.slice(1)
         .map(row => ({
           name:        row[ni]  || '',
@@ -197,32 +213,41 @@ function doGet(e) {
           finished:    fini >= 0 ? row[fini] === 'true' : false,
           tries:       trji >= 0 && row[trji] ? (() => { try { return JSON.parse(row[trji]); } catch(e) { return []; } })() : [],
         }))
-        .filter(g => g.name);
+        .filter(g => g.name && canSeeGame(auth, meta[g.name]));
       return json({ ok: true, games });
     }
 
+    // Cache key suffix: include version + caller's role/group so writes auto-invalidate
+    // (version bumps on cacheClear) and group A never sees group B's cached payload.
+    const cacheKeySuffix = ':v' + getSheetVersion() + ':' + (auth.role === 'admin' ? '*admin' : (auth.group || '*nogroup'));
+
     // action=list → sheet names + metadata for each game
     if (e.parameter.action === 'list') {
-      const hit = cacheGet('list');
+      const key = 'list' + cacheKeySuffix;
+      const hit = cacheGet(key);
       if (hit) return rawJson(hit);
 
-      const version = getSheetVersion();   // capture BEFORE reading data
+      const version = getSheetVersion();
       const meta    = getMetadata();
-      const result  = JSON.stringify({ ok: true, version, sheets: Object.entries(meta).map(([name, m]) => ({ name, ...m })) });
-      cachePut('list', result);
+      const sheets  = Object.entries(meta)
+        .filter(([_, m]) => canSeeGame(auth, m))
+        .map(([name, m]) => ({ name, ...m }));
+      const result  = JSON.stringify({ ok: true, version, sheets });
+      cachePut(key, result);
       return rawJson(result);
     }
 
     // action=all → every row from every game sheet listed in _metadata, metadata columns appended
     if (e.parameter.action === 'all') {
-      const hit = cacheGet('all');
+      const key = 'all' + cacheKeySuffix;
+      const hit = cacheGet(key);
       if (hit) return rawJson(hit);
 
-      const version = getSheetVersion();   // capture BEFORE reading data
+      const version = getSheetVersion();
       const meta    = getMetadata();
       const ss     = SpreadsheetApp.openById(SHEET_ID);
-      const metaNames = new Set(Object.keys(meta));
-      const sheets = ss.getSheets().filter(s => metaNames.has(s.getName()));
+      const allowed = new Set(Object.keys(meta).filter(name => canSeeGame(auth, meta[name])));
+      const sheets = ss.getSheets().filter(s => allowed.has(s.getName()));
       const allRows = [];
 
       // Always emit a canonical header regardless of each sheet's column order
@@ -246,7 +271,7 @@ function doGet(e) {
       }
 
       const result = JSON.stringify({ ok: true, version, rows: allRows });
-      cachePut('all', result);
+      cachePut(key, result);
       return rawJson(result);
     }
 
@@ -264,6 +289,9 @@ function doGet(e) {
     const version = getSheetVersion();   // capture BEFORE reading data
     const values  = sheet.getDataRange().getDisplayValues();
     const meta    = getMetadata();
+    if (!canSeeGame(auth, meta[sheetName])) {
+      return json({ ok: false, error: `Tab "${sheetName}" not found.` });
+    }
     return json({ ok: true, version, rows: values, meta: meta[sheetName] || {} });
 
   } catch (err) {
@@ -276,9 +304,14 @@ function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents);
 
-    if (!authFor(data.secret)) {
+    const auth = authFor(data.secret);
+    if (!auth) {
       return json({ ok: false, error: 'Unauthorized' });
     }
+    // Non-admin writers have their group auto-stamped onto the game's metadata
+    // row (lazily creating the row + Groups column as needed). Admins skip this
+    // — they should set Groups explicitly via backfill.
+    const callerGroup = auth.role === 'admin' ? '' : (auth.group || '');
 
     // action=update_rows → update Name/Comment for specific rows (admin only)
     if (data.action === 'update_rows') {
@@ -309,9 +342,24 @@ function doPost(e) {
       return json({ ok: true });
     }
 
+    // action=backfill_groups → set the full Groups list for a game (admin only).
+    // Empty list / empty string is valid — removes all groups (admin-only visibility).
+    if (data.action === 'backfill_groups') {
+      if (!isAdminSecret(data.secret)) return json({ ok: false, error: 'Admin access required.' });
+      if (!data.sheetName) return json({ ok: false, error: 'Missing sheetName parameter' });
+      const groups = String(data.groups || '').trim().split(/\s+/).filter(Boolean);
+      writeMeta(data.sheetName, { groups });
+      cacheClear();
+      return json({ ok: true });
+    }
+
     // action=live_update → upsert a row in _live
     if (data.action === 'live_update') {
       writeLiveRow(data.sheetName, data.team1, data.team2, data.score1, data.score2, data.timeSeconds, data.poss1, data.poss2, data.comps1, data.comps2, data.triesJson);
+      // Ensure the caller's group is on the game's metadata row. writeMeta has
+      // a fast no-op path for pure addGroup calls when the group is already
+      // present, so high-frequency live_update calls don't repeatedly write.
+      if (callerGroup) writeMeta(data.sheetName, { addGroup: callerGroup });
       return json({ ok: true });
     }
 
@@ -343,7 +391,10 @@ function doPost(e) {
               .setValues(rows);
     }
 
-    if (data.meta) writeMeta(data.sheetName, data.meta);
+    // Stamp the caller's group onto the new metadata row (non-admin writes only).
+    const metaToWrite = data.meta || {};
+    if (callerGroup) metaToWrite.addGroup = callerGroup;
+    if (Object.keys(metaToWrite).length) writeMeta(data.sheetName, metaToWrite);
 
     cacheClear(); // invalidate list + all caches after any write
 
@@ -381,6 +432,7 @@ function writeMeta(sheetName, meta) {
   let yui    = col('youtube link');
   let idi    = col('id');
   let goi    = col('gcs object');
+  let ggi    = col('groups');
 
   // Add 'Youtube Link' column if missing and we have a value to write
   if (yui < 0 && meta.youtubelink != null) {
@@ -407,12 +459,30 @@ function writeMeta(sheetName, meta) {
     values.forEach(row => { while (row.length < headers.length) row.push(''); });
   }
 
+  // Add 'Groups' column lazily — triggered by either a replace (meta.groups) or
+  // an additive write (meta.addGroup).
+  if (ggi < 0 && (meta.groups != null || meta.addGroup)) {
+    sheet.getRange(1, headers.length + 1).setValue('Groups');
+    headers.push('groups');
+    ggi = headers.length - 1;
+    values.forEach(row => { while (row.length < headers.length) row.push(''); });
+  }
+
   // Find existing row, if any
   const numCols = headers.length;
   let existingRow = -1;
   let existingData = null;
   for (let i = 1; i < values.length; i++) {
     if (ni >= 0 && values[i][ni] === sheetName) { existingRow = i + 1; existingData = values[i]; break; }
+  }
+
+  // Fast no-op short-circuit: a pure addGroup call (no other meta fields) where
+  // the row already exists and the group is already listed. live_update fires
+  // every event so we skip writes here aggressively.
+  const isPureAddGroup = meta.addGroup && !Object.keys(meta).some(k => k !== 'addGroup' && meta[k] != null);
+  if (isPureAddGroup && existingRow > 0 && ggi >= 0) {
+    const cur = String(existingData[ggi] || '').trim().split(/\s+/).filter(Boolean);
+    if (cur.indexOf(meta.addGroup) >= 0) return;
   }
 
   // Start from existing data (to preserve fields not in this update) or a blank row
@@ -431,6 +501,21 @@ function writeMeta(sheetName, meta) {
   if (yui >= 0 && meta.youtubelink != null) row[yui] = meta.youtubelink;
   if (idi >= 0 && meta.id          != null) row[idi] = meta.id;
   if (goi >= 0 && meta.gcsObject   != null) row[goi] = meta.gcsObject;
+
+  // Groups: `groups` replaces the cell wholesale; `addGroup` appends to whatever
+  // is already there (de-duped). The two are independent — `groups` wins if both
+  // are passed.
+  if (ggi >= 0) {
+    let groupList = String(row[ggi] || '').trim().split(/\s+/).filter(Boolean);
+    if (Array.isArray(meta.groups)) {
+      groupList = meta.groups.map(s => String(s).trim()).filter(Boolean);
+    }
+    if (meta.addGroup) {
+      const g = String(meta.addGroup).trim();
+      if (g && groupList.indexOf(g) < 0) groupList.push(g);
+    }
+    row[ggi] = groupList.join(' ');
+  }
 
   if (existingRow > 0) {
     sheet.getRange(existingRow, 1, 1, numCols).setValues([row]);

@@ -155,8 +155,9 @@ function gameLabel(g) {
 
 function statusRow(g) {
   const parts = [];
-  if (g.youtubelink) parts.push(`<span class="ok">✓ YouTube</span> <a href="${g.youtubelink}" target="_blank" rel="noopener">${g.youtubelink}</a>`);
-  if (g.gcsObject)   parts.push(`<span class="ok">✓ GCS</span> <span>${g.gcsObject}</span>`);
+  if (g.youtubelink)              parts.push(`<span class="ok">✓ YouTube</span> <a href="${g.youtubelink}" target="_blank" rel="noopener">${g.youtubelink}</a>`);
+  if (g.gcsObject)                parts.push(`<span class="ok">✓ GCS</span> <span>${g.gcsObject}</span>`);
+  if (g.groups && g.groups.length) parts.push(`<span class="ok">✓ Groups</span> <span>${g.groups.join(' ')}</span>`);
   return parts.length ? `<div class="status-row">${parts.join('<span>·</span>')}</div>` : '';
 }
 
@@ -189,6 +190,13 @@ function renderCard(g, container) {
         <input type="text" class="gcs-input" placeholder="2025_m30_seniors-cup_france_england.mp4" value="${g.gcsObject || ''}">
       </div>
       <button class="submit-btn" onclick="submitGcs(this, '${g.name}')">${g.gcsObject ? 'Update GCS' : 'Save GCS'}</button>
+    </div>
+    <div class="form-row">
+      <div class="field">
+        <label>Groups (space-separated; empty = admin-only; use ALL to make public to every logged-in user)</label>
+        <input type="text" class="groups-input" placeholder="france_m30 england_m30  (or: ALL)" value="${(g.groups || []).join(' ')}">
+      </div>
+      <button class="submit-btn" onclick="submitGroups(this, '${g.name}')">${(g.groups && g.groups.length) ? 'Update Groups' : 'Save Groups'}</button>
     </div>
   `;
   container.appendChild(card);
@@ -303,6 +311,30 @@ async function submitGcs(btn, sheetName) {
     flashSuccess(btn, 'Update GCS');
   } catch (err) {
     flashError(btn, 'Save GCS', err.message);
+  }
+}
+
+async function submitGroups(btn, sheetName) {
+  const card  = document.getElementById('card-' + sheetName);
+  const value = card.querySelector('.groups-input').value.trim();
+  btn.disabled = true;
+  btn.textContent = '⏳ Saving…';
+  try {
+    const resp = await fetch(TR.APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({
+        secret: TR.secret(),
+        action: 'backfill_groups',
+        sheetName,
+        groups: value,
+      }),
+    });
+    const result = await resp.json();
+    if (!result.ok) throw new Error(result.error);
+    flashSuccess(btn, 'Update Groups');
+  } catch (err) {
+    flashError(btn, 'Save Groups', err.message);
   }
 }
 
