@@ -126,6 +126,19 @@
   .comment-hint { font-size: 0.68rem; color: #555; }
   .empty-state { color: #444; font-size: 0.8rem; text-align: center; padding: 20px; }
 
+  /* Keys modal */
+  .keys-dialog { width: 460px; }
+  .keys-row { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid #2a2d3a; }
+  .keys-row:last-of-type { border-bottom: none; }
+  .keys-action { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: #e0e0e0; }
+  .keys-swatch { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+  .keys-key { font-family: 'Segoe UI', sans-serif; font-size: 0.82rem; font-weight: 700; background: #0f1117; border: 1px solid #3a3d4a; border-radius: 4px; padding: 3px 10px; min-width: 38px; text-align: center; color: #e0e0e0; }
+  .keys-key.listening { border-color: #3b82f6; color: #3b82f6; animation: keys-pulse 1s infinite; }
+  @keyframes keys-pulse { 0%,100%{opacity:1} 50%{opacity:0.55} }
+  .keys-rebind { background: #2a2d3a; color: #e0e0e0; border: none; border-radius: 4px; padding: 3px 9px; font-size: 0.72rem; cursor: pointer; }
+  .keys-rebind:hover { background: #3a3d4a; }
+  .keys-error { font-size: 0.72rem; color: #ef4444; min-height: 1em; }
+
   /* Full game toggle */
   .full-game-toggle { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; color: #ccc; cursor: pointer; background: #1a1d27; border: 1px solid #2a2d3a; border-radius: 8px; padding: 6px 12px; flex-shrink: 0; white-space: nowrap; }
   .full-game-toggle input[type=checkbox] { accent-color: #3b82f6; width: 14px; height: 14px; cursor: pointer; }
@@ -298,17 +311,19 @@
       Simple Mode
     </label>
     <span style="width:1px;height:20px;background:#2a2d3a;margin:0 4px;flex-shrink:0"></span>
-    <button class="tag-btn" style="background:#22c55e;color:#000" data-type="Try" onclick="selectType('Try')">Try <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.15);padding:1px 4px;border-radius:3px">T</kbd></button>
-    <button class="tag-btn" style="background:#f97316;color:#fff" data-type="Turnover" onclick="selectType('Turnover')">Turnover <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">U</kbd></button>
-    <button class="tag-btn" style="background:#ef4444;color:#fff" data-type="Penalty Attack" onclick="selectType('Penalty Attack')">Pen Attack <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">P</kbd></button>
-    <button class="tag-btn" style="background:#b91c1c;color:#fff" data-type="Penalty Defence" onclick="selectType('Penalty Defence')">Pen Defence <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">Q</kbd></button>
-    <button class="tag-btn" style="background:#3b82f6;color:#fff" data-type="Game Event" onclick="selectType('Game Event')">Game Event <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">G</kbd></button>
-    <button class="tag-btn" style="background:#a855f7;color:#fff" data-type="To Review" onclick="selectType('To Review')">To Review <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">R</kbd></button>
+    <button class="tag-btn" style="background:#22c55e;color:#000" data-type="Try" onclick="selectType('Try')">Try <kbd class="kbd-hint" data-action="Try" style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.15);padding:1px 4px;border-radius:3px">T</kbd></button>
+    <button class="tag-btn" style="background:#f97316;color:#fff" data-type="Turnover" onclick="selectType('Turnover')">Turnover <kbd class="kbd-hint" data-action="Turnover" style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">U</kbd></button>
+    <button class="tag-btn" style="background:#ef4444;color:#fff" data-type="Penalty Attack" onclick="selectType('Penalty Attack')">Pen Attack <kbd class="kbd-hint" data-action="Penalty Attack" style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">P</kbd></button>
+    <button class="tag-btn" style="background:#b91c1c;color:#fff" data-type="Penalty Defence" onclick="selectType('Penalty Defence')">Pen Defence <kbd class="kbd-hint" data-action="Penalty Defence" style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">Q</kbd></button>
+    <button class="tag-btn" style="background:#3b82f6;color:#fff" data-type="Game Event" onclick="selectType('Game Event')">Game Event <kbd class="kbd-hint" data-action="Game Event" style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">G</kbd></button>
+    <button class="tag-btn" style="background:#a855f7;color:#fff" data-type="To Review" onclick="selectType('To Review')">To Review <kbd class="kbd-hint" data-action="To Review" style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">R</kbd></button>
     <span id="sixthTouchSep" style="width:1px;height:20px;background:#2a2d3a;margin:0 4px;flex-shrink:0"></span>
     <button id="sixthTouchBtn" class="tag-btn" style="background:#c2410c;color:#fff" onclick="quickTag('Turnover','6th Touch')">6th Touch <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">6</kbd></button>
     <button id="sixAgainBtn" class="tag-btn" style="background:#c2410c;color:#fff" onclick="quickTag('Turnover','6 Again')">6 Again <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">5</kbd></button>
     <span style="width:1px;height:20px;background:#2a2d3a;margin:0 4px;flex-shrink:0"></span>
-    <button class="tag-btn" style="background:#3b82f6;color:#fff" onclick="quickBallLive()">Ball Live <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">L</kbd></button>
+    <button class="tag-btn" style="background:#3b82f6;color:#fff" onclick="quickBallLive()">Ball Live <kbd class="kbd-hint" data-action="Ball Live" style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">L</kbd></button>
+    <span style="flex:1"></span>
+    <button class="btn btn-ghost" id="openKeysBtn" onclick="openKeysModal()" title="Customize keyboard shortcuts" style="font-size:0.72rem;padding:4px 9px">⌨ Keys</button>
   </div>
 
   <!-- Sub-action buttons -->
@@ -372,6 +387,19 @@
   <div class="comment-dialog-btns">
     <button class="btn btn-ghost" onclick="closeCommentEditor()">Cancel</button>
     <button class="btn btn-primary" onclick="saveComment()">Save</button>
+  </div>
+</div>
+
+<!-- Keyboard shortcuts modal -->
+<div id="keysOverlay" class="comment-overlay" style="display:none" onclick="closeKeysModal()"></div>
+<div id="keysDialog" class="comment-dialog keys-dialog" style="display:none">
+  <h3>Keyboard Shortcuts</h3>
+  <div id="keysRows"></div>
+  <span class="keys-error" id="keysError"></span>
+  <span class="comment-hint">Letters only. Digits 0–9, space, arrows and escape are reserved.</span>
+  <div class="comment-dialog-btns">
+    <button class="btn btn-ghost" onclick="resetKeyBindings()">Reset to defaults</button>
+    <button class="btn btn-primary" onclick="closeKeysModal()">Done</button>
   </div>
 </div>
 
@@ -1238,7 +1266,32 @@ function saveComment() {
 }
 
 // ── Keyboard shortcuts ─────────────────────────────────────────
-const TYPE_KEYS = { 't':'Try', 'u':'Turnover', 'p':'Penalty Attack', 'q':'Penalty Defence', 'g':'Game Event', 'r':'To Review' };
+const DEFAULT_KEY_BINDINGS = { 'Try':'t', 'Turnover':'u', 'Penalty Attack':'p', 'Penalty Defence':'q', 'Game Event':'g', 'To Review':'r', 'Ball Live':'l' };
+const TYPE_ACTIONS = new Set(['Try','Turnover','Penalty Attack','Penalty Defence','Game Event','To Review']);
+const KEY_STORAGE = 'tr.annotator.keyBindings';
+let keyBindings = loadKeyBindings();
+
+function loadKeyBindings() {
+  try {
+    const raw = localStorage.getItem(KEY_STORAGE);
+    const saved = raw ? JSON.parse(raw) : {};
+    return { ...DEFAULT_KEY_BINDINGS, ...saved };
+  } catch (e) { return { ...DEFAULT_KEY_BINDINGS }; }
+}
+function saveKeyBindings() {
+  try { localStorage.setItem(KEY_STORAGE, JSON.stringify(keyBindings)); } catch (e) {}
+}
+function actionForKey(key) {
+  for (const [action, k] of Object.entries(keyBindings)) if (k === key) return action;
+  return null;
+}
+function applyKeyHints() {
+  document.querySelectorAll('.kbd-hint[data-action]').forEach(el => {
+    const k = keyBindings[el.dataset.action];
+    if (k) el.textContent = k.toUpperCase();
+  });
+}
+applyKeyHints();
 
 document.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
@@ -1254,8 +1307,9 @@ document.addEventListener('keydown', e => {
     if (wasPlaying) { wasPlaying = false; doPlay(); }
     return;
   }
-  if (k === 'l') { quickBallLive(); return; }
-  if (TYPE_KEYS[k]) { selectType(TYPE_KEYS[k]); return; }
+  const action = actionForKey(k);
+  if (action === 'Ball Live') { quickBallLive(); return; }
+  if (action && TYPE_ACTIONS.has(action)) { selectType(action); return; }
   if (k === '6' && isDefaultOther()) { quickTag('Turnover', '6th Touch'); return; }
   if (k === '5' && isDefaultOther()) { quickTag('Turnover', '6 Again'); return; }
   // Team selection when team menu is showing
@@ -1269,6 +1323,75 @@ document.addEventListener('keydown', e => {
     if (idx < opts.length) { e.preventDefault(); selectSubType(selectedType, opts[idx]); }
   }
 });
+
+// ── Keys modal ─────────────────────────────────────────────────
+const KEYS_SWATCHES = { 'Try':'#22c55e', 'Turnover':'#f97316', 'Penalty Attack':'#ef4444', 'Penalty Defence':'#b91c1c', 'Game Event':'#3b82f6', 'To Review':'#a855f7', 'Ball Live':'#3b82f6' };
+let keysListeningFor = null; // action name currently capturing a keypress
+
+function openKeysModal() {
+  renderKeysModal();
+  document.getElementById('keysOverlay').style.display = 'block';
+  document.getElementById('keysDialog').style.display = 'flex';
+}
+function closeKeysModal() {
+  keysListeningFor = null;
+  document.getElementById('keysOverlay').style.display = 'none';
+  document.getElementById('keysDialog').style.display = 'none';
+}
+function renderKeysModal() {
+  const rows = Object.keys(DEFAULT_KEY_BINDINGS).map(action => {
+    const swatch = KEYS_SWATCHES[action] || '#888';
+    const key = (keyBindings[action] || '').toUpperCase();
+    const listening = keysListeningFor === action;
+    return `<div class="keys-row">
+      <div class="keys-action"><div class="keys-swatch" style="background:${swatch}"></div>${action}</div>
+      <span class="keys-key${listening ? ' listening' : ''}" data-key-for="${action}">${listening ? '…' : (key || '—')}</span>
+      <button class="keys-rebind" onclick="startKeyRebind('${action.replace(/'/g, "\\'")}')">${listening ? 'cancel' : 'edit'}</button>
+    </div>`;
+  }).join('');
+  document.getElementById('keysRows').innerHTML = rows;
+  document.getElementById('keysError').textContent = '';
+}
+function startKeyRebind(action) {
+  keysListeningFor = (keysListeningFor === action) ? null : action;
+  renderKeysModal();
+}
+function resetKeyBindings() {
+  keyBindings = { ...DEFAULT_KEY_BINDINGS };
+  saveKeyBindings();
+  applyKeyHints();
+  keysListeningFor = null;
+  renderKeysModal();
+}
+function isKeysModalOpen() {
+  return document.getElementById('keysDialog').style.display === 'flex';
+}
+// Capture rebind keypress at the document level so it works while the modal is open.
+document.addEventListener('keydown', e => {
+  if (!isKeysModalOpen()) return;
+  // Swallow all keys while the modal is open so they don't trigger the annotator.
+  e.preventDefault(); e.stopPropagation();
+  if (e.key === 'Escape') {
+    if (keysListeningFor) { keysListeningFor = null; renderKeysModal(); }
+    else { closeKeysModal(); }
+    return;
+  }
+  if (!keysListeningFor) return;
+  const k = e.key.toLowerCase();
+  const err = document.getElementById('keysError');
+  if (!/^[a-z]$/.test(k)) { err.textContent = 'Letters only (a–z).'; return; }
+  // If this key is already used by another action, swap with the action we're rebinding.
+  const conflictAction = actionForKey(k);
+  if (conflictAction && conflictAction !== keysListeningFor) {
+    const prev = keyBindings[keysListeningFor];
+    keyBindings[conflictAction] = prev;
+  }
+  keyBindings[keysListeningFor] = k;
+  saveKeyBindings();
+  applyKeyHints();
+  keysListeningFor = null;
+  renderKeysModal();
+}, true);
 </script>
 </body>
 </html>

@@ -39,6 +39,18 @@
     #viewEventsBtn:hover, #compareHalvesBtn:hover, #turnoverDistBtn:hover, #downloadVideoBtn:hover:not(:disabled) { border-color: var(--accent, #3b82f6); color: #fff; }
     #downloadVideoBtn:disabled { opacity: 0.5; cursor: default; }
 
+    #commentText { flex: 1; white-space: pre-wrap; color: #ccc; font-size: 0.85rem; line-height: 1.45; }
+    #commentText:empty::before { content: 'No comment yet'; color: #555; font-style: italic; }
+    #commentEditBtn { background: none; border: 1px solid #3a3d4a; color: #aaa; border-radius: 5px; padding: 3px 9px; font-size: 0.72rem; cursor: pointer; flex-shrink: 0; }
+    #commentEditBtn:hover { border-color: #3b82f6; color: #fff; }
+    #commentTextarea { width: 100%; min-height: 70px; background: #0f1117; color: #e0e0e0; border: 1px solid #3a3d4a; border-radius: 6px; padding: 8px 10px; font-family: inherit; font-size: 0.85rem; line-height: 1.45; resize: vertical; }
+    #commentTextarea:focus { outline: none; border-color: #3b82f6; }
+    .comment-btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+    .comment-btns button { background: #2a2d3a; color: #e0e0e0; border: 1px solid #3a3d4a; border-radius: 5px; padding: 4px 12px; font-size: 0.78rem; cursor: pointer; }
+    .comment-btns button:hover { background: #3a3d4a; }
+    .comment-btns button.primary { background: #1d4ed8; border-color: #1d4ed8; }
+    .comment-btns button.primary:hover { background: #2563eb; }
+
     table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
     th { background: #0f1117; color: #aaa; padding: 8px 12px; text-align: left; font-weight: 600; border-bottom: 1px solid #2a2d3a; }
     td { padding: 8px 12px; border-bottom: 1px solid #1f2230; color: #ddd; }
@@ -222,6 +234,21 @@
       <div id="gameTimingRow"></div>
       <div id="halfSelector" style="display:none">
         <div class="half-toggle" id="halfToggle"></div>
+      </div>
+    </div>
+
+    <div class="card" id="commentCard" style="display:none">
+      <div class="card-label">Comment</div>
+      <div id="commentDisplay" style="display:flex;align-items:flex-start;gap:10px">
+        <div id="commentText"></div>
+        <button id="commentEditBtn" onclick="enterCommentEdit()" style="display:none">Edit</button>
+      </div>
+      <div id="commentEditor" style="display:none">
+        <textarea id="commentTextarea" placeholder="Add a comment about this game…"></textarea>
+        <div class="comment-btns">
+          <button onclick="cancelCommentEdit()">Cancel</button>
+          <button class="primary" onclick="saveGameComment()">Save</button>
+        </div>
       </div>
     </div>
 
@@ -868,9 +895,66 @@ async function renderGame(events, team1, team2, subtitle, analyzable, meta) {
   dlBtn.style.display = TR.player.hasClip(meta) ? '' : 'none';
   dlBtn.disabled = false;
   dlBtn.textContent = '⬇ Download Video';
+  renderComment(meta);
   document.getElementById('gameContent').style.display = 'block';
 
   await renderStats('all');
+}
+
+// ── Game-level comment (staff+admin can edit, others read-only) ──
+function renderComment(meta) {
+  const card = document.getElementById('commentCard');
+  const text = String((meta && meta.comment) || '').trim();
+  const role = TR.role();
+  const canEdit = role === 'staff' || role === 'admin';
+  if (!text && !canEdit) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  document.getElementById('commentDisplay').style.display = 'flex';
+  document.getElementById('commentEditor').style.display = 'none';
+  document.getElementById('commentText').textContent = text;
+  const btn = document.getElementById('commentEditBtn');
+  btn.style.display = canEdit ? '' : 'none';
+  btn.textContent = text ? 'Edit' : '+ Add';
+}
+
+function enterCommentEdit() {
+  document.getElementById('commentDisplay').style.display = 'none';
+  document.getElementById('commentEditor').style.display = 'block';
+  const ta = document.getElementById('commentTextarea');
+  ta.value = (currentGame && currentGame.meta && currentGame.meta.comment) || '';
+  ta.focus();
+}
+
+function cancelCommentEdit() {
+  renderComment(currentGame && currentGame.meta);
+}
+
+async function saveGameComment() {
+  const newText = document.getElementById('commentTextarea').value;
+  const sheetName = document.getElementById('gameSelect').value;
+  if (!sheetName) return;
+  const prev = (currentGame && currentGame.meta && currentGame.meta.comment) || '';
+  if (!currentGame.meta) currentGame.meta = {};
+  currentGame.meta.comment = newText;
+  renderComment(currentGame.meta);
+  // Patch the localStorage cache so a quick re-navigation shows the new value.
+  const cached = LS.get('game_' + sheetName);
+  if (cached && cached.meta) { cached.meta.comment = newText; LS.set('game_' + sheetName, cached); }
+  setStatus('Saving…');
+  try {
+    const resp = await fetch(TR.APPS_SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ secret: TR.secret(), action: 'backfill_comment', sheetName, comment: newText }),
+    });
+    const result = await resp.json();
+    if (!result.ok) throw new Error(result.error);
+    setStatus('Saved');
+  } catch (err) {
+    currentGame.meta.comment = prev;
+    if (cached && cached.meta) { cached.meta.comment = prev; LS.set('game_' + sheetName, cached); }
+    renderComment(currentGame.meta);
+    setStatus('Save failed: ' + err.message, true);
+  }
 }
 
 async function renderStats(halfValue) {

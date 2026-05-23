@@ -71,6 +71,7 @@ function getMetadata() {
   const idi  = col('id');
   const goi  = col('gcs object');      // object path within the configured GCS bucket
   const ggi  = col('groups');          // space-separated list of group names allowed to see this game
+  const cmi  = col('comment');         // free-form game-level note
 
   const meta = {};
   values.slice(1).forEach(row => {
@@ -88,6 +89,7 @@ function getMetadata() {
       id:          idi >= 0 ? row[idi] : '',
       gcsObject:   goi >= 0 ? row[goi] : '',
       groups:      ggi >= 0 ? String(row[ggi] || '').trim().split(/\s+/).filter(Boolean) : [],
+      comment:     cmi >= 0 ? row[cmi] : '',
     };
   });
   return meta;
@@ -353,6 +355,16 @@ function doPost(e) {
       return json({ ok: true });
     }
 
+    // action=backfill_comment → write a free-form game comment (staff + admin).
+    // Empty string is valid — used to clear the comment.
+    if (data.action === 'backfill_comment') {
+      if (auth.role !== 'staff' && auth.role !== 'admin') return json({ ok: false, error: 'Staff access required.' });
+      if (!data.sheetName) return json({ ok: false, error: 'Missing sheetName parameter' });
+      writeMeta(data.sheetName, { comment: String(data.comment == null ? '' : data.comment) });
+      cacheClear();
+      return json({ ok: true });
+    }
+
     // action=live_update → upsert a row in _live
     if (data.action === 'live_update') {
       writeLiveRow(data.sheetName, data.team1, data.team2, data.score1, data.score2, data.timeSeconds, data.poss1, data.poss2, data.comps1, data.comps2, data.triesJson);
@@ -468,6 +480,14 @@ function writeMeta(sheetName, meta) {
     values.forEach(row => { while (row.length < headers.length) row.push(''); });
   }
 
+  let cmi = col('comment');
+  if (cmi < 0 && meta.comment != null) {
+    sheet.getRange(1, headers.length + 1).setValue('Comment');
+    headers.push('comment');
+    cmi = headers.length - 1;
+    values.forEach(row => { while (row.length < headers.length) row.push(''); });
+  }
+
   // Find existing row, if any
   const numCols = headers.length;
   let existingRow = -1;
@@ -501,6 +521,7 @@ function writeMeta(sheetName, meta) {
   if (yui >= 0 && meta.youtubelink != null) row[yui] = meta.youtubelink;
   if (idi >= 0 && meta.id          != null) row[idi] = meta.id;
   if (goi >= 0 && meta.gcsObject   != null) row[goi] = meta.gcsObject;
+  if (cmi >= 0 && meta.comment     != null) row[cmi] = meta.comment;
 
   // Groups: `groups` replaces the cell wholesale; `addGroup` appends to whatever
   // is already there (de-duped). The two are independent — `groups` wins if both
