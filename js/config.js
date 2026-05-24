@@ -3,6 +3,49 @@ var TR = {}; // var so it's a property of the global object (window in browsers,
 TR.APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzhMw4nQr2nVW0MLfPWVXRPXsvImerpzshQ5GnJ3873qQkGMz0bcJQdmTRXCxwygfFm/exec';
 TR.CLIP_SERVICE_URL = 'https://m30-clipper-1070277967282.europe-west1.run.app';
 
+// Persistent login: a rolling 30-day session is stored in localStorage and
+// hydrated into sessionStorage on every page load so the rest of the app
+// (which still reads from sessionStorage) keeps working unchanged.
+TR.SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+(function hydrateSession() {
+  try {
+    if (sessionStorage.getItem('password')) return;
+    const raw = localStorage.getItem('trl2_session');
+    if (!raw) return;
+    const s = JSON.parse(raw);
+    if (!s || !s.password || !s.expires || s.expires < Date.now()) {
+      localStorage.removeItem('trl2_session');
+      return;
+    }
+    sessionStorage.setItem('password', s.password);
+    if (s.role) sessionStorage.setItem('role', s.role);
+  } catch (e) {
+    try { localStorage.removeItem('trl2_session'); } catch {}
+  }
+})();
+
+TR.saveSession = (password, role) => {
+  try {
+    sessionStorage.setItem('password', password);
+    if (role) sessionStorage.setItem('role', role);
+    localStorage.setItem('trl2_session', JSON.stringify({
+      password,
+      role: role || null,
+      expires: Date.now() + TR.SESSION_TTL_MS,
+    }));
+  } catch (e) {}
+};
+
+TR.logout = () => {
+  try {
+    sessionStorage.removeItem('password');
+    sessionStorage.removeItem('role');
+    localStorage.removeItem('trl2_session');
+  } catch (e) {}
+  window.location.replace('index.html');
+};
+
 TR.secret = () => sessionStorage.getItem('password') || '';
 
 TR.role = () => {

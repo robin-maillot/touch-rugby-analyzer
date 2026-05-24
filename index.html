@@ -75,6 +75,13 @@
     #app-content header { background: #1a1d27; border-bottom: 1px solid #2a2d3a; padding: 10px 20px; display: flex; align-items: center; gap: 14px; }
     .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
     .logo span { font-size: 1rem; font-weight: 600; color: #fff; }
+    #logout-btn {
+      margin-left: auto; background: #1a1d27; color: #888;
+      border: 1px solid #2a2d3a; border-radius: 6px;
+      padding: 6px 12px; font-size: 0.78rem; cursor: pointer;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    #logout-btn:hover { background: #22253a; color: #e0e0e0; border-color: #3a3d4a; }
 
     .nav-cards { display: flex; gap: 16px; padding: 48px 24px; justify-content: center; flex-wrap: wrap; }
     .nav-card { display: block; background: #1a1d27; border: 1px solid #2a2d3a; border-radius: 12px; padding: 32px 40px; text-decoration: none; text-align: center; color: #e0e0e0; min-width: 200px; transition: border-color 0.15s, background 0.15s; }
@@ -114,6 +121,7 @@
         </svg>
         <span>Touch Rugby Analyzer</span>
       </a>
+      <button id="logout-btn" type="button" title="Sign out and clear this device's saved login">Log out</button>
     </header>
     <div class="nav-cards">
       <a class="nav-card" href="games.html">
@@ -187,7 +195,7 @@
     const role = await whoami(pwd);
     loginBtn.disabled = false;
     if (role) {
-      sessionStorage.setItem('password', pwd);
+      TR.saveSession(pwd, role);
       TR.umamiIdentify({ event: 'login' });
       initApp(role);
     } else {
@@ -199,34 +207,46 @@
 
   loginBtn.addEventListener('click', checkPassword);
   passInput.addEventListener('keypress', e => { if (e.key === 'Enter') checkPassword(); });
+  document.getElementById('logout-btn').addEventListener('click', () => TR.logout());
 
-  // Skip the login screen if we already have a valid password in sessionStorage.
-  // We optimistically hide the login form while whoami is in flight to avoid
-  // flicker on Back-navigation; if validation fails, the form re-appears.
-  const cachedPwd = sessionStorage.getItem('password');
-  if (cachedPwd) {
+  // Skip the login screen if we already have a valid session. We render
+  // immediately from the cached role to avoid a blank page while whoami is in
+  // flight, then revalidate in the background — if the password was revoked
+  // (or role downgraded) we update the UI / kick back to login. On success
+  // we refresh the session TTL so active users stay signed in.
+  const cachedPwd  = sessionStorage.getItem('password');
+  const cachedRole = sessionStorage.getItem('role');
+  if (cachedPwd && cachedRole) {
+    initApp(cachedRole);
+    whoami(cachedPwd).then(role => {
+      if (!role) {
+        TR.logout();
+      } else {
+        TR.saveSession(cachedPwd, role);
+        if (role !== cachedRole) initApp(role);
+      }
+    });
+  } else if (cachedPwd) {
+    // Older session with no cached role — fall back to blocking validation.
     loginScreen.style.display = 'none';
     whoami(cachedPwd).then(role => {
       if (role) {
+        TR.saveSession(cachedPwd, role);
         initApp(role);
       } else {
-        sessionStorage.removeItem('password');
-        loginScreen.style.display = '';
-        passInput.focus();
+        TR.logout();
       }
     });
   }
 
   // --- APP LOGIC ---
   function initApp(role) {
-    if (role === 'staff' || role === 'admin') {
-      document.getElementById('annotatorCard').style.display = '';
-      document.getElementById('fieldCard').style.display = '';
-    }
-    if (role === 'admin') {
-      document.getElementById('backfillCard').style.display = '';
-      document.getElementById('dashboardCard').style.display = '';
-    }
+    const staffOrAdmin = (role === 'staff' || role === 'admin');
+    const admin        = (role === 'admin');
+    document.getElementById('annotatorCard').style.display = staffOrAdmin ? '' : 'none';
+    document.getElementById('fieldCard').style.display     = staffOrAdmin ? '' : 'none';
+    document.getElementById('backfillCard').style.display  = admin ? '' : 'none';
+    document.getElementById('dashboardCard').style.display = admin ? '' : 'none';
     loginScreen.style.display = 'none';
     appContent.style.display  = 'block';
   }

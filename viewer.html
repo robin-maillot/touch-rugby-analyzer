@@ -809,6 +809,12 @@ function processRows(rows) {
   colComment = hli('comment');
   colAction  = hli('action owner');
 
+  // Hide rows from games that have no video (only once metadata has loaded;
+  // skip on a cold cache so we don't hide everything before the list arrives).
+  if (colGame >= 0 && Object.keys(gameMetaMap).length) {
+    allData = allData.filter(row => gameHasVideo(row[colGame]));
+  }
+
   filtered = [...allData];
   buildSearchColSelect();
   buildFilterDropdowns();
