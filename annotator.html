@@ -328,8 +328,8 @@
     <button class="tag-btn" style="background:#3b82f6;color:#fff" data-type="Game Event" onclick="selectType('Game Event')">Game Event <kbd class="kbd-hint" data-action="Game Event" style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">G</kbd></button>
     <button class="tag-btn" style="background:#a855f7;color:#fff" data-type="To Review" onclick="selectType('To Review')">To Review <kbd class="kbd-hint" data-action="To Review" style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">R</kbd></button>
     <span id="sixthTouchSep" style="width:1px;height:20px;background:#2a2d3a;margin:0 4px;flex-shrink:0"></span>
-    <button id="sixthTouchBtn" class="tag-btn" style="background:#c2410c;color:#fff" onclick="quickTag('Turnover','6th Touch')">6th Touch <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">6</kbd></button>
-    <button id="sixAgainBtn" class="tag-btn" style="background:#c2410c;color:#fff" onclick="quickTag('Turnover','6 Again')">6 Again <kbd style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">5</kbd></button>
+    <button id="sixthTouchBtn" class="tag-btn" style="background:#c2410c;color:#fff" onclick="quickTag('Turnover','6th Touch')">6th Touch <kbd class="kbd-hint" data-action="6th Touch" style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">6</kbd></button>
+    <button id="sixAgainBtn" class="tag-btn" style="background:#c2410c;color:#fff" onclick="quickTag('Turnover','6 Again')">6 Again <kbd class="kbd-hint" data-action="6 Again" style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">5</kbd></button>
     <span style="width:1px;height:20px;background:#2a2d3a;margin:0 4px;flex-shrink:0"></span>
     <button class="tag-btn" style="background:#3b82f6;color:#fff" onclick="quickBallLive()">Ball Live <kbd class="kbd-hint" data-action="Ball Live" style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">L</kbd></button>
     <span style="flex:1"></span>
@@ -1324,8 +1324,9 @@ function saveComment() {
 }
 
 // ── Keyboard shortcuts ─────────────────────────────────────────
-const DEFAULT_KEY_BINDINGS = { 'Try':'t', 'Turnover':'u', 'Penalty Attack':'p', 'Penalty Defence':'q', 'Game Event':'g', 'To Review':'r', 'Ball Live':'l' };
+const DEFAULT_KEY_BINDINGS = { 'Try':'t', 'Turnover':'u', 'Penalty Attack':'p', 'Penalty Defence':'q', 'Game Event':'g', 'To Review':'r', 'Ball Live':'l', '6th Touch':'6', '6 Again':'5' };
 const TYPE_ACTIONS = new Set(['Try','Turnover','Penalty Attack','Penalty Defence','Game Event','To Review']);
+const QUICK_TAG_ACTIONS = { '6th Touch': ['Turnover', '6th Touch'], '6 Again': ['Turnover', '6 Again'] };
 const KEY_STORAGE = 'tr.annotator.keyBindings';
 let keyBindings = loadKeyBindings();
 
@@ -1368,8 +1369,10 @@ document.addEventListener('keydown', e => {
   const action = actionForKey(k);
   if (action === 'Ball Live') { quickBallLive(); return; }
   if (action && TYPE_ACTIONS.has(action)) { selectType(action); return; }
-  if (k === '6' && isDefaultOther()) { quickTag('Turnover', '6th Touch'); return; }
-  if (k === '5' && isDefaultOther()) { quickTag('Turnover', '6 Again'); return; }
+  if (action && QUICK_TAG_ACTIONS[action] && isDefaultOther()) {
+    const [t, n] = QUICK_TAG_ACTIONS[action];
+    quickTag(t, n); return;
+  }
   // Team selection when team menu is showing
   if (pendingType !== null && (e.key === '1' || e.key === '2')) {
     e.preventDefault(); selectTeam(e.key === '1' ? 'Team 1' : 'Team 2'); return;
@@ -1383,7 +1386,7 @@ document.addEventListener('keydown', e => {
 });
 
 // ── Keys modal ─────────────────────────────────────────────────
-const KEYS_SWATCHES = { 'Try':'#22c55e', 'Turnover':'#f97316', 'Penalty Attack':'#ef4444', 'Penalty Defence':'#b91c1c', 'Game Event':'#3b82f6', 'To Review':'#a855f7', 'Ball Live':'#3b82f6' };
+const KEYS_SWATCHES = { 'Try':'#22c55e', 'Turnover':'#f97316', 'Penalty Attack':'#ef4444', 'Penalty Defence':'#b91c1c', 'Game Event':'#3b82f6', 'To Review':'#a855f7', 'Ball Live':'#3b82f6', '6th Touch':'#c2410c', '6 Again':'#c2410c' };
 let keysListeningFor = null; // action name currently capturing a keypress
 
 function openKeysModal() {
@@ -1437,7 +1440,7 @@ document.addEventListener('keydown', e => {
   if (!keysListeningFor) return;
   const k = e.key.toLowerCase();
   const err = document.getElementById('keysError');
-  if (!/^[a-z]$/.test(k)) { err.textContent = 'Letters only (a–z).'; return; }
+  if (!/^[a-z0-9]$/.test(k)) { err.textContent = 'Letters or digits only.'; return; }
   // If this key is already used by another action, swap with the action we're rebinding.
   const conflictAction = actionForKey(k);
   if (conflictAction && conflictAction !== keysListeningFor) {
