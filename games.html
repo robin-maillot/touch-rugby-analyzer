@@ -890,7 +890,9 @@ async function renderGame(events, team1, team2, subtitle, analyzable, meta) {
   }
 
   // Show container first — vegaEmbed with width:"container" needs a visible element to measure
-  document.getElementById('gameTitle').textContent    = `${team1} vs ${team2}`;
+  const score1 = events.filter(e => e.Type === 'Try' && e['Action Owner'] === team1).length;
+  const score2 = events.filter(e => e.Type === 'Try' && e['Action Owner'] === team2).length;
+  document.getElementById('gameTitle').textContent    = `${team1} vs ${team2} (${score1} - ${score2})`;
   document.getElementById('gameSubtitle').textContent = subtitle;
   const dlBtn = document.getElementById('downloadVideoBtn');
   dlBtn.style.display = TR.player.hasClip(meta) ? '' : 'none';
