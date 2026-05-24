@@ -149,13 +149,41 @@ function getSheetVersion() {
     const stored = props.getProperty(VERSION_PROP);
     if (stored) return Number(stored);
     // Cold start: seed from Drive so any clients with pre-existing caches
-    // still validate on the first call.
+    // still validate on the first call. Max across both spreadsheets — game
+    // tabs live in SHEET_ID, but _metadata (which the list reads) lives in
+    // CONTROL_SHEET_ID, so either one being newer should bust stale clients.
     let seed = 0;
-    try { seed = DriveApp.getFileById(SHEET_ID).getLastUpdated().getTime(); } catch (e) {}
+    try {
+      const t1 = DriveApp.getFileById(SHEET_ID).getLastUpdated().getTime();
+      const t2 = DriveApp.getFileById(CONTROL_SHEET_ID).getLastUpdated().getTime();
+      seed = Math.max(t1, t2);
+    } catch (e) {}
     if (!seed) seed = Date.now();
     props.setProperty(VERSION_PROP, String(seed));
     return seed;
   } catch (e) { return 0; }
+}
+
+// ── Installable onEdit trigger ─────────────────────────────────
+// Invalidates the list/all caches when _metadata is edited directly in the
+// Sheets UI. Apps-Script-driven writes already call cacheClear(), but manual
+// edits (toggling Analyzable, updating YouTube Link, changing Groups, adding
+// a new game row) bypass that path and would otherwise sit behind the 5-min
+// CACHE_TTL.
+//
+// One-time install (in the Apps Script editor):
+//   Triggers → Add Trigger:
+//     Function:           onMetadataEdit
+//     Event source:       From spreadsheet
+//     Select spreadsheet: the spreadsheet whose ID matches CONTROL_SHEET_ID
+//     Event type:         On edit
+// Re-install if CONTROL_SHEET_ID changes.
+function onMetadataEdit(e) {
+  try {
+    if (!e || !e.range) return;
+    if (e.range.getSheet().getName() !== METADATA_SHEET) return;
+    cacheClear();
+  } catch (err) {}
 }
 
 function rawJson(str) {
