@@ -345,7 +345,8 @@ const gamesMeta = {};
 function applyGameList(result) {
   const sel = document.getElementById('gameSelect');
   sel.innerHTML = '<option value="">— Select a game —</option>';
-  const analyzable = result.sheets.filter(entry => entry.analyzable === 'TRUE');
+  // Reverse API order so the latest game lands at the top of the picker.
+  const analyzable = result.sheets.filter(entry => entry.analyzable === 'TRUE').reverse();
   analyzable.forEach(entry => {
     gamesMeta[entry.name] = entry;
     const opt = document.createElement('option');

@@ -99,14 +99,14 @@
   .list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; flex-shrink: 0; }
   .list-header h2 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #666; }
   .annotations-list { overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 3px; padding-right: 2px; }
-  .annotation-row { display: grid; grid-template-columns: 55px 90px 90px 65px 1fr 1fr auto auto auto; align-items: center; gap: 8px; background: #1a1d27; border-radius: 6px; padding: 5px 10px; border-left: 3px solid; font-size: 0.77rem; cursor: pointer; transition: background 0.1s; }
+  .annotation-row { display: grid; grid-template-columns: 55px 90px 90px 110px 1fr 1fr auto auto auto; align-items: center; gap: 8px; background: #1a1d27; border-radius: 6px; padding: 5px 10px; border-left: 3px solid; font-size: 0.77rem; cursor: pointer; transition: background 0.1s; }
   .annotation-row:hover { background: #22253a; }
   .ann-time { font-family: monospace; color: #aaa; font-size: 0.73rem; }
   .ann-type { font-weight: 700; }
   .ann-name { color: #bbb; }
   .ann-yt a { color: #3b82f6; font-size: 0.7rem; text-decoration: none; }
   .ann-yt a:hover { text-decoration: underline; }
-  .ann-possession { font-size: 0.72rem; color: #888; }
+  .ann-possession { font-size: 0.72rem; color: #888; white-space: nowrap; }
   .ann-comment { font-size: 0.72rem; color: #f97316; font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .ann-del { background: none; border: none; color: #555; cursor: pointer; font-size: 0.95rem; padding: 0 3px; }
   .ann-del:hover { color: #ef4444; }
@@ -115,6 +115,15 @@
   .ann-name-editable { cursor: pointer; border-bottom: 1px dashed #444; }
   .ann-name-editable:hover { color: #e0e0e0; border-bottom-color: #888; }
   .ann-name-select { background: #1a1d27; color: #e0e0e0; border: 1px solid #3b82f6; border-radius: 4px; font-size: 0.76rem; padding: 1px 4px; cursor: pointer; max-width: 100%; }
+
+  /* Possession inconsistency highlighting */
+  .annotation-row.inconsistent { background: rgba(249,115,22,0.08); }
+  .annotation-row.inconsistent:hover { background: rgba(249,115,22,0.14); }
+  .ann-warn { color: #f97316; margin-right: 4px; cursor: help; }
+  .ann-fix-btn { background: rgba(249,115,22,0.15); color: #f97316; border: 1px solid rgba(249,115,22,0.35); border-radius: 4px; padding: 1px 6px; font-size: 0.68rem; font-weight: 600; cursor: pointer; margin-left: 4px; }
+  .ann-fix-btn:hover { background: rgba(249,115,22,0.28); border-color: rgba(249,115,22,0.55); }
+  #fixAllBtn { background: rgba(249,115,22,0.15); color: #f97316; border: 1px solid rgba(249,115,22,0.35); border-radius: 6px; padding: 3px 10px; font-size: 0.72rem; font-weight: 600; cursor: pointer; }
+  #fixAllBtn:hover { background: rgba(249,115,22,0.28); border-color: rgba(249,115,22,0.55); }
 
   /* Comment editor modal */
   .comment-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100; }
@@ -199,6 +208,7 @@
 <script src="js/utils.js"></script>
 <script src="js/events.js"></script>
 <script src="js/possession.js"></script>
+<script src="js/consistency.js"></script>
 <script src="js/player.js"></script>
 </head>
 <body>
@@ -362,6 +372,7 @@
   <div class="list-section">
     <div class="list-header">
       <h2>Annotations (<span id="annCount">0</span>)</h2>
+      <button id="fixAllBtn" style="display:none" onclick="fixAllInconsistencies()" title="Overwrite every possession owner so they follow the inferred chain from the first event">⚠ Fix <span id="inconsistentCount">0</span></button>
       <label class="full-game-toggle" style="font-size:0.72rem;padding:4px 8px;border-color:#2a2d3a">
         <input type="checkbox" id="hideBallLiveToggle">
         Hide Ball Live
@@ -431,15 +442,11 @@ async function fetchGameList() {
     const result = await resp.json();
     if (!result.ok) throw new Error(result.error);
     sel.innerHTML = '<option value="">— Select a game —</option>';
-    result.sheets.forEach(entry => {
-      const t1   = entry.team1, t2 = entry.team2;
-      const comp = [entry.year, entry.division, entry.competition].filter(Boolean).join(' ');
-      let label;
-      if (t1 && t2) label = `${t1} vs ${t2}${comp ? '  (' + comp + ')' : ''}`;
-      else          label = entry.name;
+    // Reverse API order so the latest game lands at the top of the picker.
+    [...result.sheets].reverse().forEach(entry => {
       const opt = document.createElement('option');
       opt.value = entry.name;
-      opt.textContent = label;
+      opt.textContent = TR.sheetNameToLabel(entry);
       sel.appendChild(opt);
     });
   } catch (err) {
@@ -450,6 +457,7 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('metaYear').value = String(new Date().getFullYear());
   fetchGameList();
   document.getElementById('hideBallLiveToggle').addEventListener('change', renderList);
+  document.getElementById('fullGameToggle').addEventListener('change', renderList);
   const list = document.getElementById('annList');
   const btn  = document.getElementById('scrollBottomBtn');
   function updateScrollBtn() {
@@ -838,6 +846,19 @@ function renderList() {
   document.getElementById('annCount').textContent = hideBallLive && visible.length !== annotations.length
     ? `${visible.length} / ${annotations.length}`
     : annotations.length;
+
+  const expected = computeExpectedOwners();
+  const inconsistentIds = getInconsistentIds(expected);
+  const fixAllBtn = document.getElementById('fixAllBtn');
+  if (fixAllBtn) {
+    if (inconsistentIds.size) {
+      fixAllBtn.style.display = '';
+      document.getElementById('inconsistentCount').textContent = inconsistentIds.size;
+    } else {
+      fixAllBtn.style.display = 'none';
+    }
+  }
+
   if (annotations.length === 0) { el.innerHTML = '<div class="empty-state">No annotations yet</div>'; return; }
   setTimeout(() => window._updateScrollBtn && window._updateScrollBtn(), 0);
   el.innerHTML = visible.map(a => {
@@ -845,11 +866,16 @@ function renderList() {
     const ytCell = yt ? `<a href="${yt}" target="_blank" title="Open YouTube -5s">▶ YT</a>` : '<span style="color:#333">—</span>';
     const commentTitle = (a.comment || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/\n/g,'&#10;');
     const commentDisplay = (a.comment || '').replace(/&/g,'&amp;').replace(/</g,'&lt;');
-    return `<div class="annotation-row" style="border-color:${COLORS[a.type]}" onclick="seekTo(${a.time})">
+    const bad = inconsistentIds.has(a.id);
+    const exp = bad ? displayTeam(expected.get(a.id)) : '';
+    const warnHtml = bad
+      ? `<span class="ann-warn" title="Expected ${exp} based on the chain from prior events">⚠</span><button class="ann-fix-btn" onclick="event.stopPropagation();fixOneInconsistency(${a.id})" title="Set possession to ${exp} and recompute downstream">Fix</button>`
+      : '';
+    return `<div class="annotation-row${bad ? ' inconsistent' : ''}" style="border-color:${COLORS[a.type]}" onclick="seekTo(${a.time})">
       <span class="ann-time">${a.timeStr}</span>
       <span class="ann-type" style="color:${COLORS[a.type]}">${a.type}</span>
       <span class="ann-name${TR.MENU[a.type] && TR.MENU[a.type].length ? ' ann-name-editable' : ''}" id="ann-name-${a.id}" onclick="event.stopPropagation();editAnnotationName(${a.id})" title="${TR.MENU[a.type] && TR.MENU[a.type].length ? 'Click to change' : ''}">${a.name || '—'}</span>
-      <span class="ann-possession">${displayTeam(a.possessionOwner)}</span>
+      <span class="ann-possession">${warnHtml}${displayTeam(a.possessionOwner)}</span>
       <span class="ann-comment" title="${commentTitle}">${commentDisplay || ''}</span>
       <span class="ann-yt">${ytCell}</span>
       <button class="ann-comment-btn" onclick="event.stopPropagation();openCommentEditor(${a.id})" title="${a.comment ? 'Edit comment' : 'Add comment'}">${a.comment ? '💬' : '✎'}</button>
@@ -905,6 +931,38 @@ function editAnnotationName(id) {
 
   span.replaceWith(sel);
   sel.focus();
+}
+
+// ── Possession-chain consistency (logic lives in js/consistency.js) ────
+function computeExpectedOwners() {
+  return isFullGame() ? TR.computeExpectedOwners(annotations) : new Map();
+}
+
+function getInconsistentIds(expected) {
+  if (!isFullGame()) return new Set();
+  return TR.getInconsistentIds(annotations, expected);
+}
+
+function fixAllInconsistencies() {
+  if (!isFullGame()) return;
+  const inconsistent = getInconsistentIds();
+  if (!inconsistent.size) return;
+  if (!confirm(`Overwrite possession owners on ${inconsistent.size} event${inconsistent.size === 1 ? '' : 's'} so they follow the inferred chain from the first event? Manual Game Event overrides (e.g. Ball Live possession set by the user) will be rewritten too.`)) return;
+  TR.applyConsistencyFix(annotations);
+  renderList();
+  renderMarkers();
+}
+
+function fixOneInconsistency(id) {
+  const expected = computeExpectedOwners();
+  if (!expected.has(id)) return;
+  const ann = annotations.find(a => a.id === id);
+  if (!ann) return;
+  ann.possessionOwner = expected.get(id);
+  ann.actionOwner = TR.inferActionOwner(ann.possessionOwner, ann.type, ann.name);
+  recomputeOwnersFrom(ann.time);
+  renderList();
+  renderMarkers();
 }
 
 function recomputeOwnersFrom(startTime) {

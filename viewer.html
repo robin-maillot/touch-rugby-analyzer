@@ -668,6 +668,9 @@ let colTime = -1, colType = -1, colName = -1, colGame = -1, colComment = -1, col
 let gameMetaMap = {};
 // Pretty labels from metadata, keyed by game sheet name
 let gameLabelMap = {};
+// API order index (sheet name → position in the original list), so the game
+// picker can sort by "latest first" the same way games.html / annotator do.
+let gameOrderMap = {};
 
 // ── Video state ─────────────────────────────────────────────────
 let player           = null;   // TR.player handle
@@ -703,10 +706,12 @@ window.addEventListener('DOMContentLoaded', () => {
 function buildGameMetaMap(sheets) {
   gameMetaMap = {};
   gameLabelMap = {};
+  gameOrderMap = {};
   if (!sheets) return;
-  sheets.forEach(entry => {
+  sheets.forEach((entry, i) => {
     gameMetaMap[entry.name] = entry;
     gameLabelMap[entry.name] = TR.sheetNameToLabel(entry);
+    gameOrderMap[entry.name] = i;
   });
 }
 function gameHasVideo(name) {
@@ -840,7 +845,9 @@ function buildSearchColSelect() {
 function populateGameFilter() {
   const sel = document.getElementById('gameFilter');
   const games = [...new Set(allData.map(r => colGame >= 0 ? r[colGame] : '').filter(Boolean))];
-  games.sort((a, b) => (gameLabelMap[a] || a).localeCompare(gameLabelMap[b] || b));
+  // Reverse API order so the latest game lands at the top of the picker —
+  // games not in the metadata list fall to the bottom (treated as -Infinity).
+  games.sort((a, b) => (gameOrderMap[b] ?? -Infinity) - (gameOrderMap[a] ?? -Infinity));
   sel.innerHTML = '<option value="">All games</option>';
   games.forEach(g => {
     const opt = document.createElement('option');
