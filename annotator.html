@@ -320,6 +320,11 @@
       <input type="checkbox" id="defaultOtherToggle" checked>
       Simple Mode
     </label>
+    <label class="full-game-toggle" title="Subtracted from every tag after the first, to compensate for reaction time">
+      Delay
+      <input id="clickDelayInput" type="number" min="0" max="9" step="1" value="0" style="width:36px;background:transparent;border:none;color:#fff;font-size:0.78rem;text-align:center;padding:0;outline:none" oninput="setClickDelay(this.value)">
+      s
+    </label>
     <span style="width:1px;height:20px;background:#2a2d3a;margin:0 4px;flex-shrink:0"></span>
     <button class="tag-btn" style="background:#22c55e;color:#000" data-type="Try" onclick="selectType('Try')">Try <kbd class="kbd-hint" data-action="Try" style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.15);padding:1px 4px;border-radius:3px">T</kbd></button>
     <button class="tag-btn" style="background:#f97316;color:#fff" data-type="Turnover" onclick="selectType('Turnover')">Turnover <kbd class="kbd-hint" data-action="Turnover" style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">U</kbd></button>
@@ -455,6 +460,7 @@ async function fetchGameList() {
 }
 window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('metaYear').value = String(new Date().getFullYear());
+  document.getElementById('clickDelayInput').value = String(clickDelay);
   fetchGameList();
   document.getElementById('hideBallLiveToggle').addEventListener('change', renderList);
   document.getElementById('fullGameToggle').addEventListener('change', renderList);
@@ -470,6 +476,14 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 const DEFAULT_OTHER_TYPES = new Set(["Try","Turnover","Penalty Attack","Penalty Defence"]);
+
+let clickDelay = Math.min(9, Math.max(0, parseInt(localStorage.getItem('tr.annotator.clickDelay') || '0', 10) || 0));
+
+function setClickDelay(v) {
+  const n = Math.min(9, Math.max(0, parseInt(v, 10) || 0));
+  clickDelay = n;
+  localStorage.setItem('tr.annotator.clickDelay', String(n));
+}
 
 let annotations = [];
 let videoLoaded = false;
@@ -795,7 +809,8 @@ function selectSubType(type, name, comment = '') {
 // ── Tagging ────────────────────────────────────────────────────
 function tag(type, name, possessionOwner, comment = '') {
   if (!videoLoaded) return;
-  const t = getTime();
+  let t = getTime();
+  if (annotations.length > 0) t = Math.max(0, t - clickDelay);
   const actionOwner = TR.inferActionOwner(possessionOwner, type, name);
   annotations.push({ id: Date.now() + Math.random(), type, name, possessionOwner, actionOwner, comment, time: t, timeStr: TR.fmt(t) });
   annotations.sort((a,b) => a.time - b.time);
