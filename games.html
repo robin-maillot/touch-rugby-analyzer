@@ -11,6 +11,7 @@
   <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
   <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
   <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Segoe UI', sans-serif; background: #0f1117; color: #e0e0e0; min-height: 100vh; }
@@ -123,6 +124,15 @@
       transition: color 0.12s;
     }
     .compare-close:hover { color: #fff; }
+    .compare-header-actions { display: flex; align-items: center; gap: 8px; }
+    .compare-export {
+      background: #1f2230; border: 1px solid #2a2d3a; color: #ccc;
+      font-size: 0.78rem; font-weight: 600; padding: 6px 12px;
+      border-radius: 6px; cursor: pointer;
+      transition: background 0.12s, color 0.12s, border-color 0.12s;
+    }
+    .compare-export:hover    { background: #2a2d3a; color: #fff; border-color: #3b82f6; }
+    .compare-export:disabled { opacity: 0.5; cursor: not-allowed; }
     #compareBody { overflow-y: auto; padding: 4px 0; }
     .compare-scroll { overflow-x: auto; padding: 0 20px 16px; }
     .compare-table {
@@ -292,7 +302,10 @@
   <div id="compareCard">
     <div class="compare-header">
       <span class="compare-title" id="compareTitle">Compare Halves</span>
-      <button class="compare-close" onclick="closeCompareModal()">✕</button>
+      <div class="compare-header-actions">
+        <button class="compare-export" id="exportCompareBtn" onclick="exportCompareTable()">⬇ Export JPG</button>
+        <button class="compare-close" onclick="closeCompareModal()">✕</button>
+      </div>
     </div>
     <div id="compareBody">
       <div class="compare-scroll">
@@ -726,9 +739,13 @@ function buildMetrics(possessions, teamNames, events) {
     const teamPens   = events.filter(e => (e.Type === 'Penalty' || e.Type === 'Penalty Attack' || e.Type === 'Penalty Defence') && e['Action Owner'] === team);
     const penAttack  = teamPens.filter(e => e['Action Owner'] === e['Possession Owner']).length;
     const penDefence = teamPens.filter(e => e['Action Owner'] !== e['Possession Owner']).length;
-    const successRate = g.length ? `${Math.round(tries     / g.length * 100)}%` : '—';
-    const compsRate   = g.length ? `${Math.round(comps     / g.length * 100)}%` : '—';
-    const atkRate     = g.length ? `${Math.round(penAttack / g.length * 100)}%` : '—';
+    const driveGood  = events.filter(e => e.Type === 'Game Event' && e.Name === 'Drive - Good' && e['Action Owner'] === team).length;
+    const driveBad   = events.filter(e => e.Type === 'Game Event' && e.Name === 'Drive - Bad'  && e['Action Owner'] === team).length;
+    const successRate    = g.length ? `${Math.round(tries     / g.length * 100)}%` : '—';
+    const compsRate      = g.length ? `${Math.round(comps     / g.length * 100)}%` : '—';
+    const atkRate        = g.length ? `${Math.round(penAttack / g.length * 100)}%` : '—';
+    const driveGoodRate  = g.length ? `${Math.round(driveGood / g.length * 100)}%` : '—';
+    const driveBadRate   = g.length ? `${Math.round(driveBad  / g.length * 100)}%` : '—';
     return {
       Team: team, Possessions: g.length,
       Tries: g.length ? `${tries} (${successRate})` : tries,
@@ -740,6 +757,8 @@ function buildMetrics(possessions, teamNames, events) {
       // of which penalties make up each cell.
       _penAttackEvents:  teamPens.filter(e => e['Action Owner'] === e['Possession Owner']),
       _penDefenceEvents: teamPens.filter(e => e['Action Owner'] !== e['Possession Owner']),
+      'Drive +': g.length ? `${driveGood} (${driveGoodRate})` : driveGood,
+      'Drive −': g.length ? `${driveBad} (${driveBadRate})` : driveBad,
       'Avg Time (s)': avg.toFixed(1), 'Total Time (s)': total.toFixed(1),
       'Dead Ball (s)': g.reduce((s, p) => s + Math.max(0, (p.End - p.Start) - p.Duration_Sec), 0).toFixed(1),
       'Avg Turnover (s)': turnoverAvgs[team].toFixed(1),
@@ -1131,6 +1150,53 @@ function closeCompareModal() {
   document.getElementById('compareOverlay').style.display = 'none';
 }
 
+async function exportCompareTable() {
+  if (!currentGame || typeof html2canvas !== 'function') return;
+  const card       = document.getElementById('compareCard');
+  const body       = document.getElementById('compareBody');
+  const scroll     = card.querySelector('.compare-scroll');
+  const exportBtn  = document.getElementById('exportCompareBtn');
+  const closeBtn   = card.querySelector('.compare-close');
+
+  // Relax height/scroll constraints so html2canvas captures the entire table.
+  const orig = {
+    cardMax:   card.style.maxHeight,
+    bodyOvfY:  body.style.overflowY,
+    scrollOvfX: scroll.style.overflowX,
+  };
+  card.style.maxHeight   = 'none';
+  body.style.overflowY   = 'visible';
+  scroll.style.overflowX = 'visible';
+  exportBtn.style.visibility = 'hidden';
+  closeBtn.style.visibility  = 'hidden';
+  const origText = exportBtn.textContent;
+
+  try {
+    const canvas = await html2canvas(card, { backgroundColor: '#1a1d27', scale: 2, useCORS: true });
+    const slug = s => String(s || '').toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    const { team1, team2 } = currentGame;
+    const filename = `${slug(team1) || 'team1'}-vs-${slug(team2) || 'team2'}-half-comparison.jpg`;
+    canvas.toBlob(blob => {
+      if (!blob) { alert('Export failed: could not encode image.'); return; }
+      const url = URL.createObjectURL(blob);
+      const a = Object.assign(document.createElement('a'), { href: url, download: filename });
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }, 'image/jpeg', 0.95);
+  } catch (err) {
+    alert('Export failed: ' + err.message);
+  } finally {
+    card.style.maxHeight   = orig.cardMax;
+    body.style.overflowY   = orig.bodyOvfY;
+    scroll.style.overflowX = orig.scrollOvfX;
+    exportBtn.style.visibility = '';
+    closeBtn.style.visibility  = '';
+    exportBtn.textContent = origText;
+  }
+}
+
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { closeCompareModal(); closeTurnoverModal(); }
 });
@@ -1158,11 +1224,12 @@ function buildPeriodMetrics() {
 }
 
 function buildCompareTable(periods, teamNames) {
-  const LOWER_IS_BETTER = new Set(['Pen Attack', 'Pen Defence', 'Avg Turnover (s)']);
+  const LOWER_IS_BETTER = new Set(['Pen Attack', 'Pen Defence', 'Avg Turnover (s)', 'Drive −']);
   const NEUTRAL         = new Set(['Dead Ball (s)']);
   const SECTIONS = [
     { label: 'Scoring',    keys: ['Possessions', 'Tries', 'Completions'] },
     { label: 'Discipline', keys: ['Pen Attack', 'Pen Defence'] },
+    { label: 'Drives',     keys: ['Drive +', 'Drive −'] },
     { label: 'Possession', keys: ['Avg Time (s)', 'Total Time (s)', 'Dead Ball (s)', 'Avg Turnover (s)'] },
   ];
 

@@ -472,7 +472,7 @@
         <span class="zoom-level" id="zoomLevel" hidden>1.0×</span>
         <button class="btn btn-ghost" id="zoomReset" title="Reset zoom" hidden>⟲</button>
         <button class="btn btn-ghost" id="fullPossessionBtn" onclick="toggleFullPossession()" title="Full possession — start playback from the previous event in this game (capped at 90 s; falls back to the lookback slider for non-analyzable games or when there is no prior event)">📐</button>
-        <button class="btn btn-ghost" id="clipBtn" title="Cut a clip of the current loop range and open it in a new tab" onclick="makeCurrentClip()" hidden>▶ Clip</button>
+        <button class="btn btn-ghost" id="clipBtn" title="Cut a clip of the current loop range and download it" onclick="makeCurrentClip()" hidden>▶ Clip</button>
         <span id="clipDownloadStatus" style="font-size:0.75rem;color:var(--text-muted);min-width:90px"></span>
       </div>
     </div>
@@ -1385,7 +1385,8 @@ async function loadPlayer(meta, seekTime = 0) {
 // ── Clip creation (Cloud Run + GCS) ──────────────────────────────
 // Submits the clip range to the m30-clipper Cloud Run service which encodes
 // the segment with ffmpeg, writes it to gs://<bucket>/clips/<jobId>.mp4, and
-// returns a 1h signed URL we open in a new tab.
+// returns a 1h signed URL with Content-Disposition: attachment so a click
+// triggers a download.
 async function makeCurrentClip() {
   const meta = currentSheetName ? gameMetaMap[currentSheetName] : null;
   if (!meta || !meta.gcsObject) return;
@@ -1426,7 +1427,12 @@ async function makeCurrentClip() {
     const result = await resp.json();
     if (!result.ok) throw new Error(result.error || 'clip failed');
     status.textContent = '✓ Ready';
-    if (result.downloadUrl) window.open(result.downloadUrl, '_blank');
+    if (result.downloadUrl) {
+      const a = Object.assign(document.createElement('a'), { href: result.downloadUrl, download: '' });
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }
   } catch (err) {
     status.textContent = 'Failed: ' + err.message;
   } finally {

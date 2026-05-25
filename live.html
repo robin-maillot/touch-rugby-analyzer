@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Live Games — Touch Rugby Analyzer</title>
+  <title>Live Touch Rugby Games — Touch Rugby Analyzer</title>
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
@@ -64,7 +64,44 @@
     }
     #empty p { margin-top: 8px; font-size: 0.8rem; }
 
-    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+    #loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 100px 24px;
+      gap: 18px;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; align-items: start; }
+
+    .live-count {
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #ef4444;
+      background: rgba(239,68,68,0.12);
+      border: 1px solid rgba(239,68,68,0.3);
+      border-radius: 4px;
+      padding: 3px 8px;
+    }
+
+    @keyframes scoreFlash {
+      0%   { transform: scale(1);    color: var(--text); text-shadow: none; }
+      25%  { transform: scale(1.22); color: #22c55e;     text-shadow: 0 0 14px rgba(34,197,94,0.55); }
+      100% { transform: scale(1);    color: var(--text); text-shadow: none; }
+    }
+    .score.bump { animation: scoreFlash 0.9s ease-out; }
 
     .section-label {
       font-size: 0.72rem;
@@ -158,7 +195,8 @@
 
 <header>
   <div class="dot"></div>
-  <h1>Live Games</h1>
+  <h1>Live Touch Rugby Games</h1>
+  <span class="live-count" id="liveCount" style="display:none">0 live</span>
   <div class="header-right">
     <span class="refresh-info" id="refreshInfo">refresh in 30s</span>
     <button class="refresh-btn" id="pauseBtn" onclick="togglePause()" title="Pause auto-refresh">
@@ -176,12 +214,16 @@
         <path d="M13.5 2.5A7 7 0 1 0 14.5 9"/>
         <polyline points="14.5 2 14.5 6 10.5 6"/>
       </svg>
-      Refresh
+      <span id="refreshLabel">Refresh</span>
     </button>
   </div>
 </header>
 
 <main>
+  <div id="loading">
+    <div class="spinner"></div>
+    <div>Loading live games…</div>
+  </div>
   <div id="empty" style="display:none">
     No live games right now
     <p>Games appear here when an annotator enables live mode.</p>
@@ -269,11 +311,13 @@ function eventTimeline(g) {
   </div>`;
 }
 
-function renderCard(g, isLive) {
+function renderCard(g, isLive, bumped) {
   const fmt = (n, d) => d > 0 ? `${n}/${d}` : '–';
   const badge = isLive
     ? `<span class="live-badge">LIVE</span>`
     : `<span class="ended-badge">FT</span>`;
+  const bump1 = bumped && bumped.t1 ? ' bump' : '';
+  const bump2 = bumped && bumped.t2 ? ' bump' : '';
   const metaLine = (() => {
     const parts = (g.name || '').split('_');
     const date  = fmtDate(g.updatedAt);
@@ -297,12 +341,12 @@ function renderCard(g, isLive) {
     <div class="scoreboard">
       <div class="team">
         <div class="team-name">${g.team1 || 'Team 1'}</div>
-        <div class="score">${g.score1}</div>
+        <div class="score${bump1}">${g.score1}</div>
       </div>
       <div class="divider">–</div>
       <div class="team">
         <div class="team-name">${g.team2 || 'Team 2'}</div>
-        <div class="score">${g.score2}</div>
+        <div class="score${bump2}">${g.score2}</div>
       </div>
     </div>
     <div class="stats-panel">
@@ -321,11 +365,19 @@ function renderCard(g, isLive) {
   </div>`;
 }
 
+const prevScores = {};
+
+function bumpFor(g) {
+  const prev = prevScores[g.name];
+  return prev ? { t1: g.score1 > prev.score1, t2: g.score2 > prev.score2 } : null;
+}
+
 function render(games) {
   const grid          = document.getElementById('grid');
   const empty         = document.getElementById('empty');
   const recentSection = document.getElementById('recent-section');
   const recentGrid    = document.getElementById('recent-grid');
+  const liveCount     = document.getElementById('liveCount');
   const now           = Date.now();
 
   const active = games.filter(g => {
@@ -340,8 +392,15 @@ function render(games) {
   });
 
   if (active.length) {
+    liveCount.textContent   = `${active.length} live`;
+    liveCount.style.display = '';
+  } else {
+    liveCount.style.display = 'none';
+  }
+
+  if (active.length) {
     empty.style.display = 'none';
-    grid.innerHTML = active.map(g => renderCard(g, true)).join('');
+    grid.innerHTML = active.map(g => renderCard(g, true, bumpFor(g))).join('');
   } else {
     grid.innerHTML = '';
     empty.style.display = recent.length ? 'none' : 'block';
@@ -349,21 +408,33 @@ function render(games) {
 
   if (recent.length) {
     recentSection.style.display = 'block';
-    recentGrid.innerHTML = recent.map(g => renderCard(g, false)).join('');
+    recentGrid.innerHTML = recent.map(g => renderCard(g, false, bumpFor(g))).join('');
   } else {
     recentSection.style.display = 'none';
   }
+
+  // Snapshot scores AFTER rendering so the next refresh diff is accurate.
+  for (const g of games) prevScores[g.name] = { score1: g.score1, score2: g.score2 };
 }
 
+let firstLoad = true;
 async function fetchLive() {
   try {
     const resp   = await fetch(`${TR.APPS_SCRIPT_URL}?secret=${encodeURIComponent(TR.secret() || 'm30')}&action=live`);
     const result = await resp.json();
     if (result.ok) {
+      if (firstLoad) {
+        document.getElementById('loading').style.display = 'none';
+        firstLoad = false;
+      }
       render(result.games);
     }
   } catch (err) {
     // keep showing last state on network error
+    if (firstLoad) {
+      document.getElementById('loading').innerHTML =
+        '<div style="color:#ef4444">Couldn\'t reach the server. Retrying…</div>';
+    }
   }
 }
 
@@ -392,11 +463,14 @@ function startCountdown() {
 }
 
 async function doRefresh() {
-  const btn = document.getElementById('refreshBtn');
+  const btn   = document.getElementById('refreshBtn');
+  const label = document.getElementById('refreshLabel');
   btn.classList.add('spinning');
+  label.textContent = 'Refreshing';
   setRefreshInfo('updating…');
   await fetchLive();
   btn.classList.remove('spinning');
+  label.textContent = 'Refresh';
   startCountdown();
 }
 

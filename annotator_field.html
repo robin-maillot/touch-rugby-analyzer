@@ -100,7 +100,7 @@
     /* ── Scoreboard ─────────────────────────────────────────────── */
     #scoreboard {
       background: var(--surface);
-      padding: 16px;
+      padding: 10px 16px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -108,9 +108,9 @@
       flex-shrink: 0;
     }
     .score-team { flex: 1; text-align: center; }
-    .score-name { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .score-val  { font-size: 3rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
-    .score-sep        { font-size: 1.5rem; color: var(--border); padding: 0 8px; }
+    .score-name { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .score-val  { font-size: 2.2rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+    .score-sep        { font-size: 1.2rem; color: var(--border); padding: 0 6px; }
     .clock-half-label { font-size: 0.62rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 4px; }
     #halfClock        { font-size: 0.9rem; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; margin-top: 1px; }
     #totalClock       { font-size: 0.62rem; color: var(--text-muted); font-variant-numeric: tabular-nums; margin-top: 2px; }
@@ -146,8 +146,36 @@
 
     /* ── Event buttons ──────────────────────────────────────────── */
     .event-grid { display: grid; gap: 8px; }
-    .event-grid.two-col { grid-template-columns: 1fr 1fr; }
-    .event-grid.one-col { grid-template-columns: 1fr; }
+    .event-grid.two-col   { grid-template-columns: 1fr 1fr; }
+    .event-grid.three-col { grid-template-columns: 1fr 1fr 1fr; }
+
+    .gated-section, .gated-label, .gated-button, .gated-grid { display: none; }
+    body.game-running .gated-section,
+    body.game-running .gated-label    { display: block; }
+    body.game-running .gated-grid     { display: grid; }
+    body.game-running .gated-button   { display: revert; }
+    body:not(.game-running) .btn-undo-big { grid-column: 1 / -1; }
+
+    .start-btn {
+      flex: 1;
+      padding: 14px 8px;
+      border-radius: 10px;
+      border: 2px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      -webkit-tap-highlight-color: transparent;
+      font-family: inherit;
+    }
+    .start-btn:active { filter: brightness(0.85); transform: scale(0.97); }
+    .start-btn.running {
+      background: rgba(34,197,94,0.12);
+      border-color: var(--green);
+      color: var(--green);
+    }
 
     .evt-btn {
       padding: 18px 12px;
@@ -454,36 +482,34 @@
 <main>
 
   <div>
-    <div class="section-label">Possession</div>
     <div class="poss-toggle">
       <button class="poss-btn active" id="possBtn1" onclick="setPossession('Team 1')">Team 1</button>
+      <button class="start-btn"       id="gameEventBtn" onclick="tagGameEventToggle()">Start</button>
       <button class="poss-btn"        id="possBtn2" onclick="setPossession('Team 2')">Team 2</button>
     </div>
   </div>
 
-  <div>
+  <div class="gated-section">
     <div class="section-label">Events</div>
-    <div class="event-grid two-col">
-      <button class="evt-btn btn-try1"    data-gated onclick="tagWithPossession('Try','Other')">Try</button>
-      <button class="evt-btn btn-turn"    data-gated onclick="tagWithPossession('Turnover','Other')">Turnover</button>
-      <button class="evt-btn btn-pen-atk" data-gated onclick="tagWithPossession('Penalty Attack','Other')">Pen Attack</button>
-      <button class="evt-btn btn-turn"    data-gated onclick="tagWithPossession('Turnover','6th Touch')">6th Touch</button>
-      <button class="evt-btn btn-pen-def" data-gated onclick="tagWithPossession('Penalty Defence','Other')">Pen Defence</button>
-      <button class="evt-btn btn-turn"    data-gated style="opacity:0.65" onclick="tagWithPossession('Turnover','6 Again')">6 Again</button>
+    <div class="event-grid three-col">
+      <button class="evt-btn btn-try1"    onclick="tagWithPossession('Try','Other')">Try</button>
+      <button class="evt-btn btn-turn"    onclick="tagWithPossession('Turnover','Other')">Turnover</button>
+      <button class="evt-btn btn-turn"    onclick="tagWithPossession('Turnover','6th Touch')">6th Touch</button>
+      <button class="evt-btn btn-pen-atk" onclick="tagWithPossession('Penalty Attack','Other')">Pen Attack</button>
+      <button class="evt-btn btn-pen-def" onclick="tagWithPossession('Penalty Defence','Other')">Pen Defence</button>
+      <button class="evt-btn btn-turn"    style="opacity:0.65" onclick="tagWithPossession('Turnover','6 Again')">6 Again</button>
     </div>
   </div>
 
   <div>
-    <div class="section-label">Game Events</div>
-    <div class="event-grid two-col">
-      <button class="evt-btn btn-game" id="gameEventBtn" onclick="tagGameEventToggle()">Start</button>
-      <button class="evt-btn btn-game" data-gated onclick="tagGameEvent('Ball Live')">Ball Live</button>
+    <div class="section-label gated-label">Game Events</div>
+    <div class="event-grid two-col gated-grid" style="margin-bottom: 8px">
+      <button class="evt-btn btn-try1"    onclick="tagGameEvent('Drive - Good')">Drive +</button>
+      <button class="evt-btn btn-pen-atk" onclick="tagGameEvent('Drive - Bad')">Drive −</button>
     </div>
-  </div>
-
-  <div>
-    <div class="event-grid two-col">
-      <button class="evt-btn btn-review"   data-gated onclick="tagToReview()">To Review</button>
+    <div class="event-grid three-col">
+      <button class="evt-btn btn-game     gated-button" onclick="tagGameEvent('Ball Live')">Ball Live</button>
+      <button class="evt-btn btn-review   gated-button" onclick="tagToReview()">To Review</button>
       <button class="evt-btn btn-undo-big" onclick="undoLast()">↩ Undo</button>
     </div>
   </div>
@@ -513,6 +539,8 @@
         <button class="evt-btn btn-turn"    style="opacity:0.65" onclick="applyEdit('Turnover','6 Again')">6 Again</button>
         <button class="evt-btn btn-game"    onclick="applyEdit('Game Event','Ball Live')">Ball Live</button>
         <button class="evt-btn btn-review"  onclick="applyEdit('To Review','To Review')">To Review</button>
+        <button class="evt-btn btn-try1"    onclick="applyEdit('Game Event','Drive - Good')">Drive +</button>
+        <button class="evt-btn btn-pen-atk" onclick="applyEdit('Game Event','Drive - Bad')">Drive −</button>
         <button class="evt-btn btn-game"    onclick="applyEdit('Game Event','Game Start')">Game Start</button>
         <button class="evt-btn btn-game"    onclick="applyEdit('Game Event','Game End')">Game End</button>
       </div>
@@ -672,12 +700,20 @@ let teamsSwapped = false;
 function toggleSwap() {
   teamsSwapped = !teamsSwapped;
 
-  // Possession buttons
-  const poss = document.querySelector('.poss-toggle');
-  const btn1 = document.getElementById('possBtn1');
-  const btn2 = document.getElementById('possBtn2');
-  if (teamsSwapped) poss.appendChild(btn1);
-  else poss.insertBefore(btn1, btn2);
+  // Possession + Start/End buttons (3-column row, Start/End stays in middle)
+  const poss    = document.querySelector('.poss-toggle');
+  const btn1    = document.getElementById('possBtn1');
+  const btn2    = document.getElementById('possBtn2');
+  const gameBtn = document.getElementById('gameEventBtn');
+  if (teamsSwapped) {
+    poss.appendChild(btn2);
+    poss.appendChild(gameBtn);
+    poss.appendChild(btn1);
+  } else {
+    poss.appendChild(btn1);
+    poss.appendChild(gameBtn);
+    poss.appendChild(btn2);
+  }
 
   // Scoreboard (flex order; center div stays at default order:0)
   const s1 = document.getElementById('scoreName1').closest('.score-team');
@@ -816,8 +852,10 @@ function updateUI() {
   const gameEventAnnots = annotations.filter(a => a.name === 'Game Start' || a.name === 'Game End');
   const lastGameEvent   = gameEventAnnots[gameEventAnnots.length - 1];
   const gameRunning     = !!(lastGameEvent && lastGameEvent.name === 'Game Start');
-  document.getElementById('gameEventBtn').textContent = gameRunning ? 'End' : 'Start';
-  document.querySelectorAll('.evt-btn[data-gated]').forEach(b => { b.disabled = !gameRunning; });
+  const gameBtn = document.getElementById('gameEventBtn');
+  gameBtn.textContent = gameRunning ? 'End' : 'Start';
+  gameBtn.classList.toggle('running', gameRunning);
+  document.body.classList.toggle('game-running', gameRunning);
 
   if (!annotations.length) {
     el.innerHTML = '<div style="color:var(--text-muted);font-size:0.82rem;padding:8px 0">No events yet</div>';
@@ -1017,6 +1055,8 @@ function computeStats() {
     const comps  = mine.filter(s => s.endType === 'Try' || s.endName === '6th Touch').length;
     const penAtk = annotations.filter(a => a.type === 'Penalty Attack'  && a.actionOwner === key).length;
     const penDef = annotations.filter(a => a.type === 'Penalty Defence' && a.actionOwner === key).length;
+    const driveGood = annotations.filter(a => a.type === 'Game Event' && a.name === 'Drive - Good' && a.actionOwner === key).length;
+    const driveBad  = annotations.filter(a => a.type === 'Game Event' && a.name === 'Drive - Bad'  && a.actionOwner === key).length;
     const total    = mine.reduce((s, p) => s + p.duration, 0);
     const avg      = mine.length ? total / mine.length : 0;
     const deadBallRaw = mine.reduce((sum, seg) => {
@@ -1032,6 +1072,8 @@ function computeStats() {
       compsPct:    mine.length ? Math.round(comps  / mine.length * 100) : null,
       penAtk,      penAtkPct: mine.length ? Math.round(penAtk / mine.length * 100) : null,
       penDef,
+      driveGood,   driveGoodPct: mine.length ? Math.round(driveGood / mine.length * 100) : null,
+      driveBad,    driveBadPct:  mine.length ? Math.round(driveBad  / mine.length * 100) : null,
       avgTime:     avg.toFixed(1),    avgTimeRaw:  avg,
       totalTime:   total.toFixed(1),  totalTimeRaw:total,
       deadBall:    deadBallRaw.toFixed(1), deadBallRaw,
@@ -1111,6 +1153,13 @@ function refreshStats() {
       rows: [
         { label: 'Pen Attack',   n1: tL.penAtk + '/' + tL.possessions, pct1: tL.penAtkPct, n2: tR.penAtk + '/' + tR.possessions, pct2: tR.penAtkPct, r1: tL.penAtk, r2: tR.penAtk, hib: false },
         { label: 'Pen Defence',  n1: tL.penDef, pct1: tL.penDefPct, n2: tR.penDef, pct2: tR.penDefPct, r1: tL.penDef, r2: tR.penDef, hib: false },
+      ],
+    },
+    {
+      label: 'Drives',
+      rows: [
+        { label: 'Drive +',  n1: tL.driveGood + ' / ' + tL.possessions, pct1: tL.driveGoodPct, n2: tR.driveGood + ' / ' + tR.possessions, pct2: tR.driveGoodPct, r1: tL.driveGood, r2: tR.driveGood, hib: true  },
+        { label: 'Drive −',  n1: tL.driveBad  + ' / ' + tL.possessions, pct1: tL.driveBadPct,  n2: tR.driveBad  + ' / ' + tR.possessions, pct2: tR.driveBadPct,  r1: tL.driveBad,  r2: tR.driveBad,  hib: false },
       ],
     },
   ];
