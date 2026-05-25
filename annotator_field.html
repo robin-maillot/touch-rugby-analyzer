@@ -428,6 +428,10 @@
     </div>
   </div>
   <div id="sheetPreview">fill metadata to generate tab name</div>
+  <div>
+    <div class="settings-label">Saved Session</div>
+    <button class="btn-icon" onclick="clearSession()" style="background:#7f1d1d;color:#fff;border-color:#7f1d1d">🗑 Clear all data</button>
+  </div>
 </div>
 
 <div id="scoreboard">
@@ -544,6 +548,7 @@ TR.auth('staff');
 window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('metaYear').value = String(new Date().getFullYear());
   document.getElementById('clickDelayInput').value = String(clickDelay);
+  maybeRestoreSession();
   updateUI();
 });
 
@@ -561,10 +566,88 @@ function setClickDelay(v) {
   localStorage.setItem('fieldClickDelay', String(n));
 }
 
+// ── Session persistence ───────────────────────────────────────
+const SESSION_KEY = 'fieldAnnotatorSession';
+
+function saveSession() {
+  try {
+    const state = {
+      annotations,
+      possession,
+      wallStart,
+      teamsSwapped,
+      meta: {
+        team1:       document.getElementById('metaTeam1').value,
+        team2:       document.getElementById('metaTeam2').value,
+        year:        document.getElementById('metaYear').value,
+        division:    document.getElementById('metaDivision').value,
+        competition: document.getElementById('metaCompetition').value,
+        id:          document.getElementById('metaId').value,
+      },
+    };
+    localStorage.setItem(SESSION_KEY, JSON.stringify(state));
+  } catch (e) { /* quota or disabled — ignore */ }
+}
+
+function clearSavedSession() {
+  try { localStorage.removeItem(SESSION_KEY); } catch (e) {}
+}
+
+function maybeRestoreSession() {
+  let saved;
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return;
+    saved = JSON.parse(raw);
+  } catch (e) { return; }
+  if (!saved || !Array.isArray(saved.annotations) || !saved.annotations.length) return;
+
+  const m = saved.meta || {};
+  const label = `${m.team1 || 'Team 1'} vs ${m.team2 || 'Team 2'} — ${saved.annotations.length} event${saved.annotations.length === 1 ? '' : 's'}`;
+  if (!confirm(`Restore previous session?\n\n${label}`)) {
+    clearSavedSession();
+    return;
+  }
+
+  annotations = saved.annotations;
+  possession  = saved.possession || 'Team 1';
+  wallStart   = saved.wallStart || null;
+  if (m.team1       != null) document.getElementById('metaTeam1').value       = m.team1;
+  if (m.team2       != null) document.getElementById('metaTeam2').value       = m.team2;
+  if (m.year        != null) document.getElementById('metaYear').value        = m.year;
+  if (m.division    != null) document.getElementById('metaDivision').value    = m.division;
+  if (m.competition != null) document.getElementById('metaCompetition').value = m.competition;
+  if (m.id          != null) document.getElementById('metaId').value          = m.id;
+  document.getElementById('possBtn1').textContent = (m.team1 || '').trim() || 'Team 1';
+  document.getElementById('possBtn2').textContent = (m.team2 || '').trim() || 'Team 2';
+  setPossession(possession);
+  if (saved.teamsSwapped) toggleSwap();
+  updateSheetPreview();
+}
+
+function clearSession() {
+  const n = annotations.length;
+  if (!confirm(`Delete all session data?\n\n${n} event${n === 1 ? '' : 's'} and metadata will be erased. This cannot be undone.`)) return;
+  if (!confirm('Are you sure? This is permanent.')) return;
+  annotations  = [];
+  possession   = 'Team 1';
+  wallStart    = null;
+  if (teamsSwapped) toggleSwap();
+  ['metaTeam1','metaTeam2','metaCompetition','metaId'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('metaYear').value = String(new Date().getFullYear());
+  document.getElementById('metaDivision').value = '';
+  document.getElementById('possBtn1').textContent = 'Team 1';
+  document.getElementById('possBtn2').textContent = 'Team 2';
+  setPossession('Team 1');
+  clearSavedSession();
+  updateSheetPreview();
+  updateUI();
+}
+
 function confirmLeave() {
   if (!annotations.length) return true;
   const n = annotations.length;
-  return confirm(`You have ${n} event${n === 1 ? '' : 's'} on this page. Leaving will discard them. Continue?`);
+  return confirm(`You have ${n} event${n === 1 ? '' : 's'} saved. They'll be restored when you return. Leave?`);
 }
 
 // ── Time helpers ───────────────────────────────────────────────
@@ -609,6 +692,7 @@ function toggleSwap() {
   h2.style.order = teamsSwapped ? '-1' : '1';
 
   document.getElementById('swapBtn').classList.toggle('active', teamsSwapped);
+  saveSession();
 }
 
 // ── Possession ─────────────────────────────────────────────────
@@ -616,6 +700,7 @@ function setPossession(team) {
   possession = team;
   document.getElementById('possBtn1').classList.toggle('active', team === 'Team 1');
   document.getElementById('possBtn2').classList.toggle('active', team === 'Team 2');
+  saveSession();
 }
 
 // ── Tagging ────────────────────────────────────────────────────
@@ -629,6 +714,7 @@ function tag(type, name, possessionOwner) {
   if (next !== possessionOwner) setPossession(next);
 
   updateUI();
+  saveSession();
   if (liveMode) pushLiveUpdate();
 }
 
@@ -646,6 +732,7 @@ function tagToReview() {
   if (annotations.length > 0) t = Math.max(0, t - clickDelay);
   annotations.push({ id: Date.now() + Math.random(), type: 'To Review', name: 'To Review', possessionOwner: possession, actionOwner: possession, comment: '?', time: t, timeStr: TR.fmt(t) });
   updateUI();
+  saveSession();
   if (liveMode) pushLiveUpdate();
 }
 
@@ -654,6 +741,7 @@ function undoLast() {
   const removed = annotations.pop();
   setPossession(removed.possessionOwner);
   updateUI();
+  saveSession();
 }
 
 // ── Edit event ─────────────────────────────────────────────────
@@ -694,6 +782,7 @@ function applyEdit(type, name) {
   replayPossessionFrom(editingIndex + 1);
   closeEdit();
   updateUI();
+  saveSession();
 }
 
 // ── UI update ──────────────────────────────────────────────────
@@ -757,6 +846,7 @@ function onMetaChange() {
   document.getElementById('possBtn2').textContent = t2;
   updateUI();
   updateSheetPreview();
+  saveSession();
 }
 
 // ── Settings panel ─────────────────────────────────────────────
@@ -1129,6 +1219,7 @@ async function pushToSheet(override = false) {
 
     document.getElementById('overrideBtn').style.display = 'none';
     btn.textContent = `✓ ${result.appended} rows`;
+    clearSavedSession();
     setTimeout(() => { btn.disabled = false; btn.textContent = override ? '⚠ Override' : '⬆ Push'; }, 2500);
   } catch (err) {
     alert('Network error: ' + err.message);
