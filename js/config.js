@@ -60,16 +60,19 @@ function clearSessionCookie() {
     }
     sessionStorage.setItem('password', s.password);
     if (s.role) sessionStorage.setItem('role', s.role);
+    if (s.group) sessionStorage.setItem('group', s.group);
   } catch (e) {
     try { localStorage.removeItem('trl2_session'); } catch {}
   }
 })();
 
-TR.saveSession = (password, role) => {
-  const s = { password, role: role || null, expires: Date.now() + TR.SESSION_TTL_MS };
+TR.saveSession = (password, role, group) => {
+  const s = { password, role: role || null, group: group || null, expires: Date.now() + TR.SESSION_TTL_MS };
   try {
     sessionStorage.setItem('password', password);
     if (role) sessionStorage.setItem('role', role);
+    if (group) sessionStorage.setItem('group', group);
+    else sessionStorage.removeItem('group');
     localStorage.setItem('trl2_session', JSON.stringify(s));
   } catch (e) {}
   writeSessionCookie(s);
@@ -79,6 +82,7 @@ TR.logout = () => {
   try {
     sessionStorage.removeItem('password');
     sessionStorage.removeItem('role');
+    sessionStorage.removeItem('group');
     localStorage.removeItem('trl2_session');
   } catch (e) {}
   clearSessionCookie();
@@ -87,7 +91,19 @@ TR.logout = () => {
 
 TR.secret = () => sessionStorage.getItem('password') || '';
 
+// The access group the current secret belongs to (from action=whoami, persisted
+// at login). '' for admins (no group) or when not yet known. Game annotations
+// are tagged with this group server-side; the field annotator surfaces it so the
+// annotator can confirm their work is attributed to the right group.
+TR.userGroup = () => sessionStorage.getItem('group') || '';
+
+// The authoritative role comes from action=whoami (the _groups sheet) and is
+// persisted into the session at login, so arbitrary group secrets (e.g.
+// "cyril-staff") work — not just the legacy m30/m30-staff/m30-admin trio. Fall
+// back to deriving from the legacy secrets only when no role was cached.
 TR.role = () => {
+  const cached = sessionStorage.getItem('role');
+  if (cached) return cached;
   const p = sessionStorage.getItem('password');
   return p === 'm30-admin' ? 'admin'
        : p === 'm30-staff' ? 'staff'
@@ -107,16 +123,15 @@ TR.umamiIdentify = (extra) => {
   else if (typeof window.addEventListener === 'function') window.addEventListener('load', send);
 };
 
-// Redirect to index.html if the stored password doesn't meet the required role.
-// role: 'viewer' | 'staff' | 'admin'
-TR.auth = (role) => {
-  const p = sessionStorage.getItem('password');
-  const ok = {
-    viewer: p === 'm30' || p === 'm30-staff' || p === 'm30-admin',
-    staff:  p === 'm30-staff' || p === 'm30-admin',
-    admin:  p === 'm30-admin',
-  };
-  if (!ok[role]) window.location.replace('index.html');
+// Redirect to index.html unless the current role meets the required level.
+// required: 'viewer' | 'staff' | 'admin'. Uses the cached role (set by whoami at
+// login) so any group secret works, with a fast bypass back to login if there's
+// no session at all.
+TR.auth = (required) => {
+  if (!sessionStorage.getItem('password')) { window.location.replace('index.html'); return; }
+  const rank = { anon: 0, viewer: 1, staff: 2, admin: 3 };
+  const need = { viewer: 1, staff: 2, admin: 3 };
+  if ((rank[TR.role()] || 0) < (need[required] || 0)) window.location.replace('index.html');
 };
 
 // Wipe per-user localStorage caches (action=list / action=all / game_*) when

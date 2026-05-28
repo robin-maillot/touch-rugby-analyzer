@@ -153,7 +153,7 @@
     <a href="annotator.html" id="annotatorLink" style="display:none">Annotator</a>
   </nav>
 </header>
-<script>{ const p = sessionStorage.getItem('password'); if (p === 'm30-staff' || p === 'm30-admin') document.getElementById('annotatorLink').style.display = ''; if (p === 'm30-admin') document.getElementById('dashboardLink').style.display = ''; }</script>
+<script>{ const r = TR.role(); if (r === 'staff' || r === 'admin') document.getElementById('annotatorLink').style.display = ''; if (r === 'admin') document.getElementById('dashboardLink').style.display = ''; }</script>
 
 <main>
   <div id="loadingArea">

@@ -175,24 +175,27 @@
   const loginBtn    = document.getElementById('login-btn');
   const errorMsg    = document.getElementById('error-msg');
 
+  // Returns { role, group } for a valid secret, or null. The group is persisted
+  // into the session so pages (e.g. the field annotator) can show which group
+  // their uploads will be attributed to.
   async function whoami(secret) {
     try {
       const url  = `${TR.APPS_SCRIPT_URL}?secret=${encodeURIComponent(secret)}&action=whoami`;
       const resp = await fetch(url);
       const data = await resp.json();
-      return data.ok ? data.role : null;
+      return data.ok ? { role: data.role, group: data.group || '' } : null;
     } catch { return null; }
   }
 
   async function checkPassword() {
     const pwd  = passInput.value;
     loginBtn.disabled = true;
-    const role = await whoami(pwd);
+    const auth = await whoami(pwd);
     loginBtn.disabled = false;
-    if (role) {
-      TR.saveSession(pwd, role);
+    if (auth) {
+      TR.saveSession(pwd, auth.role, auth.group);
       TR.umamiIdentify({ event: 'login' });
-      initApp(role);
+      initApp(auth.role);
     } else {
       errorMsg.style.display = 'block';
       passInput.value = '';
@@ -213,21 +216,21 @@
   const cachedRole = sessionStorage.getItem('role');
   if (cachedPwd && cachedRole) {
     initApp(cachedRole);
-    whoami(cachedPwd).then(role => {
-      if (!role) {
+    whoami(cachedPwd).then(auth => {
+      if (!auth) {
         TR.logout();
       } else {
-        TR.saveSession(cachedPwd, role);
-        if (role !== cachedRole) initApp(role);
+        TR.saveSession(cachedPwd, auth.role, auth.group);
+        if (auth.role !== cachedRole) initApp(auth.role);
       }
     });
   } else if (cachedPwd) {
     // Older session with no cached role — fall back to blocking validation.
     loginScreen.style.display = 'none';
-    whoami(cachedPwd).then(role => {
-      if (role) {
-        TR.saveSession(cachedPwd, role);
-        initApp(role);
+    whoami(cachedPwd).then(auth => {
+      if (auth) {
+        TR.saveSession(cachedPwd, auth.role, auth.group);
+        initApp(auth.role);
       } else {
         TR.logout();
       }

@@ -201,7 +201,7 @@
     <a href="annotator.html" id="annotatorLink" style="display:none">Annotator</a>
   </nav>
 </header>
-<script>{ const p = sessionStorage.getItem('password'); if (p === 'm30-staff' || p === 'm30-admin') document.getElementById('annotatorLink').style.display = ''; }</script>
+<script>{ const r = TR.role(); if (r === 'staff' || r === 'admin') document.getElementById('annotatorLink').style.display = ''; }</script>
 
 <main>
   <div id="loadingArea"><span class="spinner"></span>Loading dashboard data…<div style="font-size:0.75rem;color:var(--dim);margin-top:8px" id="loadHint"></div></div>

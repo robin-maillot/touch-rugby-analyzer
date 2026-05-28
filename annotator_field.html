@@ -471,6 +471,7 @@
     </div>
   </div>
   <div id="sheetPreview">fill metadata to generate tab name</div>
+  <div id="groupInfo" style="font-size:0.72rem;padding:2px 0"></div>
   <div>
     <div class="settings-label">Saved Session</div>
     <button class="btn-icon" onclick="clearSession()" style="background:#7f1d1d;color:#fff;border-color:#7f1d1d">🗑 Clear all data</button>
@@ -592,8 +593,43 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('metaYear').value = String(new Date().getFullYear());
   document.getElementById('clickDelayInput').value = String(clickDelay);
   maybeRestoreSession();
+  updateGroupInfo();       // show cached group immediately…
+  refreshGroupFromServer(); // …then confirm/refresh from the authoritative source
   updateUI();
 });
+
+// Re-fetch role/group for the current secret and persist it, so the group
+// indicator and pre-push check are accurate even if this page was opened
+// directly (without going through the login screen first).
+async function refreshGroupFromServer() {
+  const secret = TR.secret();
+  if (!secret) return;
+  try {
+    const resp = await fetch(`${TR.APPS_SCRIPT_URL}?secret=${encodeURIComponent(secret)}&action=whoami`);
+    const data = await resp.json();
+    if (data && data.ok) {
+      TR.saveSession(secret, data.role, data.group || '');
+      updateGroupInfo();
+    }
+  } catch (e) { /* offline — keep cached value */ }
+}
+
+// Show which access group this push will be attributed to. The group is derived
+// server-side from the secret, so this mirrors exactly what gets stamped onto
+// the game's metadata row — it's a confirmation, not a separate source of truth.
+function updateGroupInfo() {
+  const el = document.getElementById('groupInfo');
+  if (!el) return;
+  const role  = sessionStorage.getItem('role') || TR.role();
+  const group = TR.userGroup();
+  if (role === 'admin') {
+    el.innerHTML = '<span style="color:var(--text-muted)">Uploading as admin — set visibility in Backfill (no group auto-tagged).</span>';
+  } else if (group) {
+    el.innerHTML = `<span style="color:var(--text-muted)">Uploads tagged to group:</span> <strong style="color:var(--green)">${group}</strong>`;
+  } else {
+    el.innerHTML = '<span style="color:var(--red)">⚠ No group on your login — uploads will be admin-only. Re-login or check access.</span>';
+  }
+}
 
 // ── State ──────────────────────────────────────────────────────
 let annotations  = [];
@@ -1274,6 +1310,13 @@ async function pushToSheet(override = false) {
   const sheetName = metaToSheetName();
   if (!sheetName) { alert('Fill in team/competition details first.'); return; }
 
+  // Warn before saving an un-grouped game: a non-admin secret with no group
+  // means the upload won't be attributed to any group and will be admin-only.
+  const role = sessionStorage.getItem('role') || TR.role();
+  if (role !== 'admin' && !TR.userGroup()) {
+    if (!confirm('Your login has no access group, so this game will be saved without one (admin-only visibility). Push anyway?')) return;
+  }
+
   const btn = override ? document.getElementById('overrideBtn') : document.getElementById('pushBtn');
   btn.disabled = true;
   btn.textContent = '⏳ Pushing…';
@@ -1303,7 +1346,7 @@ async function pushToSheet(override = false) {
 
     if (!result.ok) {
       if (result.tabExists && !override) {
-        if (TR.secret() === 'm30-admin') {
+        if (TR.role() === 'admin') {
           document.getElementById('overrideBtn').style.display = '';
           alert(`Tab "${sheetName}" already exists. Tap ⚠ Override to replace it.`);
         } else {
@@ -1316,7 +1359,10 @@ async function pushToSheet(override = false) {
     }
 
     document.getElementById('overrideBtn').style.display = 'none';
-    btn.textContent = `✓ ${result.appended} rows`;
+    // Prefer the group the server actually stamped (result.group); fall back to
+    // the client's known group for older backends that don't return it.
+    const savedGroup = (result.group != null ? result.group : TR.userGroup());
+    btn.textContent = savedGroup ? `✓ ${result.appended} rows → ${savedGroup}` : `✓ ${result.appended} rows`;
     clearSavedSession();
     setTimeout(() => { btn.disabled = false; btn.textContent = override ? '⚠ Override' : '⬆ Push'; }, 2500);
   } catch (err) {

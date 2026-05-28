@@ -395,7 +395,7 @@
     <a href="analytics.html">Analytics</a>
     <a href="annotator.html" id="annotatorLink" style="display:none">Annotator</a>
   </nav>
-  <script>{ const p = sessionStorage.getItem('password'); if (p === 'm30-staff' || p === 'm30-admin') document.getElementById('annotatorLink').style.display = ''; if (p === 'm30-admin') { document.getElementById('editModeBtn').style.display = ''; document.getElementById('dashboardLink').style.display = ''; } }</script>
+  <script>{ const r = TR.role(); if (r === 'staff' || r === 'admin') document.getElementById('annotatorLink').style.display = ''; if (r === 'admin') { document.getElementById('editModeBtn').style.display = ''; document.getElementById('dashboardLink').style.display = ''; } }</script>
 </header>
 
 <div id="helpModal" class="modal-backdrop" hidden onclick="if (event.target === this) closeHelpModal()">
@@ -561,7 +561,7 @@ const FILTERABLE  = ['Type', 'Name', 'Action Owner', 'Division', 'Competition'];
 const HIDDEN_COLS = new Set(['Team 1', 'Team 2', 'Video Name', 'To Review', 'Youtube Link', 'Possession Owner', 'Analyzable']);
 const TYPE_BADGE  = { 'try':'badge-try', 'penalty':'badge-penalty', 'penalty attack':'badge-penalty', 'penalty defence':'badge-penalty', 'turnover':'badge-turnover', 'to review':'badge-toreview' };
 
-const isAdmin = sessionStorage.getItem('password') === 'm30-admin';
+const isAdmin = TR.role() === 'admin';
 let editMode    = false;
 let linkOffset      = parseInt(localStorage.getItem('linkOffset') ?? '5', 10) || 5;
 let linkOffsetAfter = parseInt(localStorage.getItem('linkOffsetAfter') ?? '2', 10);

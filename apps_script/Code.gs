@@ -438,7 +438,8 @@ function doPost(e) {
 
     cacheClear(); // invalidate list + all caches after any write
 
-    return json({ ok: true, appended: rows ? rows.length : 0 });
+    // Echo the group we stamped so the client can confirm attribution.
+    return json({ ok: true, appended: rows ? rows.length : 0, group: callerGroup });
 
   } catch (err) {
     return json({ ok: false, error: err.toString() });

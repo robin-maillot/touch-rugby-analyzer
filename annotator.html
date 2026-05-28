@@ -234,7 +234,7 @@
     <a href="annotator.html" style="background:#22253a;color:#3b82f6;text-decoration:none;font-size:0.8rem;padding:5px 10px;border-radius:6px">Annotator</a>
   </nav>
 </header>
-<script>{ if (sessionStorage.getItem('password') === 'm30-admin') document.getElementById('dashboardLink').style.display = ''; }</script>
+<script>{ if (TR.role() === 'admin') document.getElementById('dashboardLink').style.display = ''; }</script>
 
 <div class="main">
 
@@ -1220,7 +1220,7 @@ async function pushToSheet(override = false) {
 
     if (!result.ok) {
       if (result.tabExists && !override) {
-        if (TR.secret() === 'm30-admin') {
+        if (TR.role() === 'admin') {
           document.getElementById('overrideBtn').style.display = '';
           alert(`Tab "${sheetName}" already exists. Click ⚠ Override Tab to replace it.`);
         } else {
