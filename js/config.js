@@ -139,3 +139,44 @@ TR.auth = (role) => {
 
 // Emit a single role-tagged pageview as soon as config.js loads.
 TR.umamiIdentify();
+
+// ── Shared brand mark ──────────────────────────────────────────
+// <tr-logo> renders the standard top-left banner logo so every page's header
+// shares one definition. Light DOM with self-contained inline styles, so it
+// looks identical regardless of the host page's CSS.
+//   <tr-logo></tr-logo>          → badge + "Touch Rugby Analyzer" wordmark
+//   <tr-logo compact></tr-logo>  → badge only (for pages with their own <h1>)
+//   attrs: home="…" (link target, default index.html), label="…" (wordmark)
+if (typeof customElements !== 'undefined' && typeof HTMLElement !== 'undefined') {
+  class TRLogo extends HTMLElement {
+    connectedCallback() {
+      if (this._built) return;
+      this._built = true;
+      const home    = this.getAttribute('home')  || 'index.html';
+      const label   = this.getAttribute('label') || 'Touch Rugby Analyzer';
+      const compact = this.hasAttribute('compact');
+      const a = document.createElement('a');
+      a.href = home;
+      a.className = 'tr-logo';
+      a.style.cssText = 'display:inline-flex;align-items:center;gap:8px;text-decoration:none;flex-shrink:0';
+      a.innerHTML =
+        '<img src="apple-touch-icon.png" alt="Touch Rugby" ' +
+        'style="width:24px;height:24px;border-radius:5px;display:block;flex-shrink:0">' +
+        (compact ? '' :
+          '<span class="tr-logo-text" style="font-size:1rem;font-weight:600;color:#fff;white-space:nowrap">' +
+          label + '</span>');
+      this.appendChild(a);
+    }
+  }
+  if (!customElements.get('tr-logo')) customElements.define('tr-logo', TRLogo);
+}
+
+// ── Service worker (offline app shell) ─────────────────────────
+// Caches static assets so pages load offline; see sw.js. Relative path keeps it
+// working under a project subpath on GitHub Pages.
+if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator &&
+    typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
