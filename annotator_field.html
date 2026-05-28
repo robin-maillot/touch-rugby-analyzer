@@ -62,6 +62,12 @@
     .btn-hdr-override { background: #7f1d1d; color: #fff; border-color: #7f1d1d; }
     .btn-live.active  { color: var(--red); border-color: var(--red); background: rgba(239,68,68,0.08); }
     .btn-hdr-swap.active { color: var(--accent); border-color: var(--accent); }
+    .btn-hdr-stats {
+      display: inline-flex; align-items: center; gap: 5px;
+      color: var(--accent); border-color: var(--accent);
+      background: rgba(59,130,246,0.12); font-weight: 600;
+    }
+    .btn-hdr-stats svg { flex-shrink: 0; }
 
     /* ── Settings panel ─────────────────────────────────────────── */
     #settingsPanel {
@@ -418,7 +424,10 @@
     <button class="btn-icon btn-hdr-push" id="pushBtn"     onclick="pushToSheet()">⬆ Push</button>
     <button class="btn-icon btn-hdr-swap" id="swapBtn"     onclick="toggleSwap()">⇆ Swap</button>
     <button class="btn-icon btn-hdr-override" id="overrideBtn" style="display:none" onclick="pushToSheet(true)">⚠ Override</button>
-    <button class="btn-icon"              onclick="openStats()">Stats</button>
+    <button class="btn-icon btn-hdr-stats" onclick="openStats()" title="View live stats">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="6" y1="20" x2="6" y2="13"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="18" y1="20" x2="18" y2="9"/></svg>
+      <span>Stats</span>
+    </button>
     <button class="btn-icon btn-live"     id="liveBtn"     onclick="toggleLive()">⚫ Live</button>
     <button class="btn-icon"              onclick="toggleSettings()" id="settingsBtn">⚙ Setup</button>
   </div>
@@ -504,8 +513,8 @@
   <div>
     <div class="section-label gated-label">Game Events</div>
     <div class="event-grid two-col gated-grid" style="margin-bottom: 8px">
-      <button class="evt-btn btn-try1"    onclick="tagGameEvent('Drive - Good')">Drive +</button>
-      <button class="evt-btn btn-pen-atk" onclick="tagGameEvent('Drive - Bad')">Drive −</button>
+      <button class="evt-btn btn-try1" id="driveGoodBtn"   onclick="tagGameEvent('Drive - Good')">Drive +</button>
+      <button class="evt-btn btn-pen-atk" id="driveBadBtn" onclick="tagGameEvent('Drive - Bad')">Drive −</button>
     </div>
     <div class="event-grid three-col">
       <button class="evt-btn btn-game     gated-button" onclick="tagGameEvent('Ball Live')">Ball Live</button>
@@ -755,7 +764,27 @@ function tag(type, name, possessionOwner) {
 }
 
 function tagWithPossession(type, name) { tag(type, name, possession); }
-function tagGameEvent(name)            { tag('Game Event', name, possession); }
+function tagGameEvent(name) {
+  // Drive +/- is a per-possession rating: allow only one per possession so a
+  // single possession can't be double-tagged. The lock clears at the next
+  // play-ending event (see driveAlreadyTagged).
+  if ((name === 'Drive - Good' || name === 'Drive - Bad') && driveAlreadyTagged()) return;
+  tag('Game Event', name, possession);
+}
+
+// True if a Drive +/- has already been tagged in the current possession. A
+// possession runs until the next play-ending event (Try / Turnover / Penalty /
+// Game Start / End) — i.e. any annotation that isn't a Game Event or To Review.
+// Ball Live is the dead-time lead-in to a possession, so it isn't a boundary.
+function driveAlreadyTagged() {
+  for (let i = annotations.length - 1; i >= 0; i--) {
+    const a = annotations[i];
+    if (a.type === 'Game Event' && (a.name === 'Drive - Good' || a.name === 'Drive - Bad')) return true;
+    if (a.type === 'To Review' || a.name === 'Ball Live') continue;
+    return false; // play-ending event reached — current possession has no drive yet
+  }
+  return false;
+}
 
 function tagGameEventToggle() {
   const gameEventAnnots = annotations.filter(a => a.name === 'Game Start' || a.name === 'Game End');
@@ -856,6 +885,11 @@ function updateUI() {
   gameBtn.textContent = gameRunning ? 'End' : 'Start';
   gameBtn.classList.toggle('running', gameRunning);
   document.body.classList.toggle('game-running', gameRunning);
+
+  // Lock Drive +/- once a drive is tagged this possession (avoids double-tagging)
+  const driveLocked = driveAlreadyTagged();
+  document.getElementById('driveGoodBtn').disabled = driveLocked;
+  document.getElementById('driveBadBtn').disabled  = driveLocked;
 
   if (!annotations.length) {
     el.innerHTML = '<div style="color:var(--text-muted);font-size:0.82rem;padding:8px 0">No events yet</div>';
@@ -1131,6 +1165,13 @@ function refreshStats() {
   // Each row: { label, n1, pct1, n2, pct2, r1, r2, hib }
   // hib: true = higher better, false = lower better, null = informational
   const [tL, tR] = teamsSwapped ? [t2, t1] : [t1, t2];
+
+  // Dead Ball / Avg Turnover are only meaningful with Ball Live events; the
+  // Drives section only when drives were tagged. Omit them otherwise (kept in
+  // sync with games.html).
+  const hasBallLive = annotations.some(a => a.name === 'Ball Live');
+  const hasDrives   = annotations.some(a => a.type === 'Game Event' && (a.name === 'Drive - Good' || a.name === 'Drive - Bad'));
+
   const sections = [
     {
       label: 'Scoring',
@@ -1144,8 +1185,10 @@ function refreshStats() {
       rows: [
         { label: 'Avg Time (s)',  n1: tL.avgTime,   pct1: null, n2: tR.avgTime,   pct2: null, r1: tL.avgTimeRaw,   r2: tR.avgTimeRaw,   hib: null  },
         { label: 'Total Time (s)',n1: tL.totalTime, pct1: null, n2: tR.totalTime, pct2: null, r1: tL.totalTimeRaw, r2: tR.totalTimeRaw, hib: null  },
-        { label: 'Dead Ball (s)', n1: tL.deadBall,  pct1: null, n2: tR.deadBall,  pct2: null, r1: tL.deadBallRaw,  r2: tR.deadBallRaw,  hib: false },
-        { label: 'Avg Turnover (s)', n1: tL.avgTurnover, pct1: null, n2: tR.avgTurnover, pct2: null, r1: tL.avgTurnoverRaw, r2: tR.avgTurnoverRaw, hib: false },
+        ...(hasBallLive ? [
+          { label: 'Dead Ball (s)', n1: tL.deadBall,  pct1: null, n2: tR.deadBall,  pct2: null, r1: tL.deadBallRaw,  r2: tR.deadBallRaw,  hib: false },
+          { label: 'Avg Turnover (s)', n1: tL.avgTurnover, pct1: null, n2: tR.avgTurnover, pct2: null, r1: tL.avgTurnoverRaw, r2: tR.avgTurnoverRaw, hib: false },
+        ] : []),
       ],
     },
     {
@@ -1155,13 +1198,13 @@ function refreshStats() {
         { label: 'Pen Defence',  n1: tL.penDef, pct1: tL.penDefPct, n2: tR.penDef, pct2: tR.penDefPct, r1: tL.penDef, r2: tR.penDef, hib: false },
       ],
     },
-    {
+    ...(hasDrives ? [{
       label: 'Drives',
       rows: [
         { label: 'Drive +',  n1: tL.driveGood + ' / ' + tL.possessions, pct1: tL.driveGoodPct, n2: tR.driveGood + ' / ' + tR.possessions, pct2: tR.driveGoodPct, r1: tL.driveGood, r2: tR.driveGood, hib: true  },
         { label: 'Drive −',  n1: tL.driveBad  + ' / ' + tL.possessions, pct1: tL.driveBadPct,  n2: tR.driveBad  + ' / ' + tR.possessions, pct2: tR.driveBadPct,  r1: tL.driveBad,  r2: tR.driveBad,  hib: false },
       ],
-    },
+    }] : []),
   ];
 
   const html = sections.map(sec => {

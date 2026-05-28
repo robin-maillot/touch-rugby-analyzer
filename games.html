@@ -1142,7 +1142,13 @@ function openCompareModal() {
   const { team1, team2 } = currentGame;
   document.getElementById('compareTitle').textContent = `${team1} vs ${team2} — Half Comparison`;
   const periods = buildPeriodMetrics();
-  document.getElementById('compareTable').innerHTML = buildCompareTable(periods, [team1, team2]);
+  // Omit Dead Ball / Avg Turnover with no Ball Live events, and the Drives
+  // section with no drive events (kept in sync with annotator_field.html).
+  const evts = currentGame.events;
+  const hasBallLive = evts.some(e => e.Name === 'Ball Live');
+  const hasDrives   = evts.some(e => e.Type === 'Game Event' && (e.Name === 'Drive - Good' || e.Name === 'Drive - Bad'));
+  document.getElementById('compareTable').innerHTML =
+    buildCompareTable(periods, [team1, team2], { hasBallLive, hasDrives });
   document.getElementById('compareOverlay').style.display = 'flex';
 }
 
@@ -1223,14 +1229,15 @@ function buildPeriodMetrics() {
   return periods;
 }
 
-function buildCompareTable(periods, teamNames) {
+function buildCompareTable(periods, teamNames, { hasBallLive = true, hasDrives = true } = {}) {
   const LOWER_IS_BETTER = new Set(['Pen Attack', 'Pen Defence', 'Avg Turnover (s)', 'Drive −']);
   const NEUTRAL         = new Set(['Dead Ball (s)']);
   const SECTIONS = [
     { label: 'Scoring',    keys: ['Possessions', 'Tries', 'Completions'] },
     { label: 'Discipline', keys: ['Pen Attack', 'Pen Defence'] },
-    { label: 'Drives',     keys: ['Drive +', 'Drive −'] },
-    { label: 'Possession', keys: ['Avg Time (s)', 'Total Time (s)', 'Dead Ball (s)', 'Avg Turnover (s)'] },
+    ...(hasDrives ? [{ label: 'Drives', keys: ['Drive +', 'Drive −'] }] : []),
+    { label: 'Possession', keys: ['Avg Time (s)', 'Total Time (s)',
+      ...(hasBallLive ? ['Dead Ball (s)', 'Avg Turnover (s)'] : [])] },
   ];
 
   function numVal(v) {
