@@ -6,17 +6,57 @@ TR.CLIP_SERVICE_URL = 'https://m30-clipper-1070277967282.europe-west1.run.app';
 // Persistent login: a rolling 30-day session is stored in localStorage and
 // hydrated into sessionStorage on every page load so the rest of the app
 // (which still reads from sessionStorage) keeps working unchanged.
+//
+// iOS standalone (home-screen) web apps spin up a fresh sessionStorage on every
+// navigation and don't reliably flush/share localStorage across those per-page
+// webviews, so localStorage alone loses the session as soon as you leave a page.
+// A cookie is the one store iOS standalone persists across navigations and
+// relaunches, so we mirror the session into a cookie and treat it as the
+// last-resort source when both sessionStorage and localStorage come back empty.
 TR.SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const SESSION_COOKIE = 'trl2_session';
+
+function readSessionCookie() {
+  try {
+    const m = document.cookie.match(/(?:^|;\s*)trl2_session=([^;]+)/);
+    if (!m) return null;
+    const s = JSON.parse(decodeURIComponent(m[1]));
+    if (!s || !s.password || !s.expires || s.expires < Date.now()) return null;
+    return s;
+  } catch (e) { return null; }
+}
+
+function writeSessionCookie(s) {
+  try {
+    const secure = location.protocol === 'https:' ? '; Secure' : '';
+    const maxAge = Math.max(0, Math.floor((s.expires - Date.now()) / 1000));
+    document.cookie = `${SESSION_COOKIE}=${encodeURIComponent(JSON.stringify(s))}; ` +
+      `path=/; max-age=${maxAge}; SameSite=Lax${secure}`;
+  } catch (e) {}
+}
+
+function clearSessionCookie() {
+  try {
+    const secure = location.protocol === 'https:' ? '; Secure' : '';
+    document.cookie = `${SESSION_COOKIE}=; path=/; max-age=0; SameSite=Lax${secure}`;
+  } catch (e) {}
+}
 
 (function hydrateSession() {
   try {
     if (sessionStorage.getItem('password')) return;
-    const raw = localStorage.getItem('trl2_session');
-    if (!raw) return;
-    const s = JSON.parse(raw);
+    let s = null;
+    try {
+      const raw = localStorage.getItem('trl2_session');
+      if (raw) s = JSON.parse(raw);
+    } catch (e) { s = null; }
     if (!s || !s.password || !s.expires || s.expires < Date.now()) {
-      localStorage.removeItem('trl2_session');
-      return;
+      // localStorage missing/expired — fall back to the cookie (the store that
+      // survives iOS standalone navigations) and re-seed localStorage from it.
+      try { localStorage.removeItem('trl2_session'); } catch {}
+      s = readSessionCookie();
+      if (!s) { clearSessionCookie(); return; }
+      try { localStorage.setItem('trl2_session', JSON.stringify(s)); } catch {}
     }
     sessionStorage.setItem('password', s.password);
     if (s.role) sessionStorage.setItem('role', s.role);
@@ -26,15 +66,13 @@ TR.SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 })();
 
 TR.saveSession = (password, role) => {
+  const s = { password, role: role || null, expires: Date.now() + TR.SESSION_TTL_MS };
   try {
     sessionStorage.setItem('password', password);
     if (role) sessionStorage.setItem('role', role);
-    localStorage.setItem('trl2_session', JSON.stringify({
-      password,
-      role: role || null,
-      expires: Date.now() + TR.SESSION_TTL_MS,
-    }));
+    localStorage.setItem('trl2_session', JSON.stringify(s));
   } catch (e) {}
+  writeSessionCookie(s);
 };
 
 TR.logout = () => {
@@ -43,6 +81,7 @@ TR.logout = () => {
     sessionStorage.removeItem('role');
     localStorage.removeItem('trl2_session');
   } catch (e) {}
+  clearSessionCookie();
   window.location.replace('index.html');
 };
 
