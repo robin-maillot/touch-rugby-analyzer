@@ -130,35 +130,16 @@ Fill in Team 1, Team 2, Year, Division, Competition before pushing. The Google S
 
 ---
 
-### Field Annotator (`field.html`)
+### Field Annotator (`annotator_field.html`)
 *Staff and admin only*
 
-Mobile-friendly annotation without a video. Designed for use on the pitch during live games. Timestamps are wall-clock based: the first event is `0:00:00` and all subsequent events are offset from that.
+Phone-first, video-less tagging designed for live use on the sideline. Timestamps are
+wall-clock based (first event = `0:00`), possession and score are inferred as you tap, and
+a Push produces the same sheet format as the video annotator.
 
-#### Layout
-- **Possession toggle** — set which team has the ball before tagging. Labels update when team names are filled in.
-- **Event buttons** (two-column grid):
-
-| Left | Right |
-|---|---|
-| Try | Turnover |
-| Pen Attack | 6th Touch |
-| Pen Defence | 6 Again |
-
-- **Game Start / Game End** — structural events; the game clock counts up from Game Start.
-- **Recent events** — last 5 events shown, with an Undo button to remove the last one.
-
-#### Possession rules
-- Try and Turnover (including 6th Touch) auto-switch possession to the other team.
-- 6 Again keeps possession with the attacking team.
-- Try ownership is inferred from possession at the time of tagging.
-
-#### Setup panel
-Tap **⚙ Setup** to enter Team 1, Team 2, Year, Division, Competition. The Google Sheet tab name preview updates as you type.
-
-#### Saving
-- **⬆ Push** — same format as the video annotator, fully compatible with the Games and Dashboard pages.
-- **⚫ Live** — same live broadcast as the video annotator. Uses real elapsed time since Game Start.
+**See [FIELD_ANNOTATOR.md](FIELD_ANNOTATOR.md) for the full how-to-use guide** — setup,
+event buttons, Drive / Ball Live tagging, the live Stats sheet, live broadcasting, editing
+mistakes, session restore, and saving.
 
 ---
 
