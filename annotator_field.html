@@ -1312,10 +1312,26 @@ function refreshStats() {
 }
 
 // ── Push to sheet ──────────────────────────────────────────────
+// A game is analysable when it has a Game Start and its last event (by time)
+// is a Game End. Used both to set the Analyzable flag and to warn before push.
+function isAnalysable() {
+  if (!annotations.some(a => a.name === 'Game Start')) return false;
+  const last = [...annotations].sort((a, b) => a.time - b.time).pop();
+  return !!last && last.name === 'Game End';
+}
+
 async function pushToSheet(override = false) {
   if (!annotations.length) { alert('No events to push.'); return; }
   const sheetName = metaToSheetName();
   if (!sheetName) { alert('Fill in team/competition details first.'); return; }
+
+  // A game is only analysable if it has a Game Start and ends with a Game End.
+  // Warn loudly before pushing a game that doesn't, so it isn't silently saved
+  // as non-analysable (Analyzable=FALSE) — the usual cause is forgetting to tag
+  // Game End before pushing.
+  if (!isAnalysable()) {
+    if (!confirm('This game doesn\'t end with a "Game End" event, so it will be saved as NOT analysable (it won\'t appear in stats/dashboards). Tag Game End first to make it analysable.\n\nPush anyway?')) return;
+  }
 
   // Warn before saving an un-grouped game: a non-admin secret with no group
   // means the upload won't be attributed to any group and will be admin-only.
@@ -1340,8 +1356,7 @@ async function pushToSheet(override = false) {
   const rows = annotations.map(a => [a.timeStr, a.possessionOwner, a.type, a.name, '', a.comment, a.actionOwner]);
 
   try {
-    const names      = annotations.map(a => a.name);
-    const analyzable = names.includes('Game Start') && names.includes('Game End') ? 'TRUE' : 'FALSE';
+    const analyzable = isAnalysable() ? 'TRUE' : 'FALSE';
     const body = {
       secret: TR.secret(), sheetName, rows, creatorToken,
       meta: {
