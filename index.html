@@ -70,6 +70,15 @@
       transition: background 0.15s;
     }
     #login-btn:hover { background: #2563eb; }
+    #login-btn:disabled { opacity: 0.7; cursor: default; }
+    #login-btn .spinner {
+      display: inline-block; width: 14px; height: 14px;
+      margin-right: 8px; vertical-align: -2px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: #fff; border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
     #error-msg {
       color: #ef4444; margin-top: 12px;
       display: none; font-size: 0.8rem;
@@ -190,13 +199,16 @@
   async function checkPassword() {
     const pwd  = passInput.value;
     loginBtn.disabled = true;
+    loginBtn.innerHTML = '<span class="spinner"></span>Verifying…';
+    errorMsg.style.display = 'none';
     const auth = await whoami(pwd);
-    loginBtn.disabled = false;
     if (auth) {
       TR.saveSession(pwd, auth.role, auth.group);
       TR.umamiIdentify({ event: 'login' });
       initApp(auth.role);
     } else {
+      loginBtn.disabled = false;
+      loginBtn.textContent = 'Login';
       errorMsg.style.display = 'block';
       passInput.value = '';
       passInput.focus();
