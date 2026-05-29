@@ -122,6 +122,26 @@ function cachePut(key, str) {
   } catch(e) {}
 }
 
+// ── Tab ownership tokens ───────────────────────────────────────
+// Maps a game tab name → the client-minted token that created it, so the same
+// session can re-push (overwrite) a freshly-created game without admin override.
+// Stored in persistent Script Properties (survives cache eviction). Volume is
+// low (one key per game tab) so unbounded growth is not a concern.
+function creatorTokenKey(sheetName) { return 'creator:' + sheetName; }
+
+function getCreatorToken(sheetName) {
+  try { return PropertiesService.getScriptProperties().getProperty(creatorTokenKey(sheetName)); }
+  catch (e) { return null; }
+}
+
+function setCreatorToken(sheetName, token) {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    if (token) props.setProperty(creatorTokenKey(sheetName), token);
+    else       props.deleteProperty(creatorTokenKey(sheetName));
+  } catch (e) {}
+}
+
 function cacheClear() {
   try { CacheService.getScriptCache().removeAll(['list', 'all']); } catch(e) {}
   // Every cacheClear() site is a write — bump the version so clients reliably
@@ -193,25 +213,9 @@ function rawJson(str) {
 // ── GET — list sheets or fetch rows from a tab ─────────────────
 function doGet(e) {
   try {
-    const auth = authFor(e.parameter.secret);
-    if (!auth) {
-      return json({ ok: false, error: 'Unauthorized' });
-    }
-
-    // action=version → live spreadsheet-modified timestamp (never cached server-side).
-    // Clients use this to skip the heavy action=all / action=list refetches when nothing changed.
-    if (e.parameter.action === 'version') {
-      return json({ ok: true, version: getSheetVersion() });
-    }
-
-    // action=whoami → return the role/group for the supplied secret. Used by
-    // index.html to validate a cached password against the authoritative _groups
-    // sheet (replacing a stale hardcoded password map).
-    if (e.parameter.action === 'whoami') {
-      return json({ ok: true, role: auth.role, group: auth.group });
-    }
-
-    // action=live → current live game states (filtered by group via _metadata)
+    // action=live → current live game states. PUBLIC endpoint: no secret
+    // required and no group filtering, so the live scoreboard is shareable to
+    // spectators without a login. Handled before the auth gate below.
     if (e.parameter.action === 'live') {
       const sheet = SpreadsheetApp.openById(CONTROL_SHEET_ID).getSheetByName(LIVE_SHEET);
       if (!sheet) return json({ ok: true, games: [] });
@@ -226,7 +230,6 @@ function doGet(e) {
       const cm1i = col('comps 1'), cm2i = col('comps 2');
       const fini = col('finished');
       const trji = col('tries json');
-      const meta = getMetadata();   // for group filtering
       const games = values.slice(1)
         .map(row => ({
           name:        row[ni]  || '',
@@ -243,8 +246,26 @@ function doGet(e) {
           finished:    fini >= 0 ? row[fini] === 'true' : false,
           tries:       trji >= 0 && row[trji] ? (() => { try { return JSON.parse(row[trji]); } catch(e) { return []; } })() : [],
         }))
-        .filter(g => g.name && canSeeGame(auth, meta[g.name]));
+        .filter(g => g.name);
       return json({ ok: true, games });
+    }
+
+    const auth = authFor(e.parameter.secret);
+    if (!auth) {
+      return json({ ok: false, error: 'Unauthorized' });
+    }
+
+    // action=version → live spreadsheet-modified timestamp (never cached server-side).
+    // Clients use this to skip the heavy action=all / action=list refetches when nothing changed.
+    if (e.parameter.action === 'version') {
+      return json({ ok: true, version: getSheetVersion() });
+    }
+
+    // action=whoami → return the role/group for the supplied secret. Used by
+    // index.html to validate a cached password against the authoritative _groups
+    // sheet (replacing a stale hardcoded password map).
+    if (e.parameter.action === 'whoami') {
+      return json({ ok: true, role: auth.role, group: auth.group });
     }
 
     // Cache key suffix: include version + caller's role/group so writes auto-invalidate
@@ -413,16 +434,26 @@ function doPost(e) {
     const sheet = ss.getSheetByName(data.sheetName);
 
     if (sheet) {
-      if (!data.override) {
-        return json({ ok: false, error: `Tab "${data.sheetName}" already exists.`, tabExists: true });
-      }
-      if (!isAdminSecret(data.secret)) {
-        return json({ ok: false, error: 'Admin access required to override.' });
+      // A push carrying the same creatorToken that first created this tab is
+      // allowed to overwrite it — this lets the field annotator push the same
+      // (newly-created) game repeatedly from one device without admin override.
+      const ownsTab = data.creatorToken && getCreatorToken(data.sheetName) === data.creatorToken;
+      if (!ownsTab) {
+        if (!data.override) {
+          return json({ ok: false, error: `Tab "${data.sheetName}" already exists.`, tabExists: true });
+        }
+        if (!isAdminSecret(data.secret)) {
+          return json({ ok: false, error: 'Admin access required to override.' });
+        }
       }
       ss.deleteSheet(sheet);
     }
 
     const newSheet = ss.insertSheet(data.sheetName);
+    // Record (or refresh) which token owns this tab so subsequent pushes from
+    // the same session can overwrite it. Admin overrides without a token clear
+    // any prior ownership.
+    setCreatorToken(data.sheetName, data.creatorToken || '');
     newSheet.appendRow(HEADERS);
 
     const rows = data.rows;

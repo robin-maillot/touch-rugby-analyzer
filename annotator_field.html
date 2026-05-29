@@ -635,6 +635,10 @@ function updateGroupInfo() {
 let annotations  = [];
 let possession   = 'Team 1';
 let wallStart    = null;
+// Per-game token, generated lazily on first push. Persisted with the session so
+// repeated pushes of the SAME game (created by this device) can overwrite the
+// existing tab without an admin override. Reset when a new game is started.
+let creatorToken = null;
 let liveMode     = false;
 let liveInterval = null;
 let clickDelay   = Math.min(9, Math.max(0, parseInt(localStorage.getItem('fieldClickDelay') || '0', 10) || 0));
@@ -655,6 +659,7 @@ function saveSession() {
       possession,
       wallStart,
       teamsSwapped,
+      creatorToken,
       meta: {
         team1:       document.getElementById('metaTeam1').value,
         team2:       document.getElementById('metaTeam2').value,
@@ -691,6 +696,7 @@ function maybeRestoreSession() {
   annotations = saved.annotations;
   possession  = saved.possession || 'Team 1';
   wallStart   = saved.wallStart || null;
+  creatorToken = saved.creatorToken || null;
   if (m.team1       != null) document.getElementById('metaTeam1').value       = m.team1;
   if (m.team2       != null) document.getElementById('metaTeam2').value       = m.team2;
   if (m.year        != null) document.getElementById('metaYear').value        = m.year;
@@ -711,6 +717,7 @@ function clearSession() {
   annotations  = [];
   possession   = 'Team 1';
   wallStart    = null;
+  creatorToken = null;
   if (teamsSwapped) toggleSwap();
   ['metaTeam1','metaTeam2','metaCompetition','metaId'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('metaYear').value = String(new Date().getFullYear());
@@ -1321,13 +1328,22 @@ async function pushToSheet(override = false) {
   btn.disabled = true;
   btn.textContent = '⏳ Pushing…';
 
+  // Mint a stable per-game token on first push so later pushes of this same game
+  // (from this device) can overwrite the tab without admin override. Persist it
+  // immediately so a reload mid-game keeps the ability to re-push.
+  if (!creatorToken) {
+    creatorToken = (crypto.randomUUID ? crypto.randomUUID()
+                    : String(Date.now()) + '-' + Math.random().toString(36).slice(2));
+    saveSession();
+  }
+
   const rows = annotations.map(a => [a.timeStr, a.possessionOwner, a.type, a.name, '', a.comment, a.actionOwner]);
 
   try {
     const names      = annotations.map(a => a.name);
     const analyzable = names.includes('Game Start') && names.includes('Game End') ? 'TRUE' : 'FALSE';
     const body = {
-      secret: TR.secret(), sheetName, rows,
+      secret: TR.secret(), sheetName, rows, creatorToken,
       meta: {
         team1:       document.getElementById('metaTeam1').value.trim(),
         team2:       document.getElementById('metaTeam2').value.trim(),
@@ -1363,7 +1379,10 @@ async function pushToSheet(override = false) {
     // the client's known group for older backends that don't return it.
     const savedGroup = (result.group != null ? result.group : TR.userGroup());
     btn.textContent = savedGroup ? `✓ ${result.appended} rows → ${savedGroup}` : `✓ ${result.appended} rows`;
-    clearSavedSession();
+    // Keep the session (and its creatorToken) so the annotator can keep tagging
+    // and push the same game again — the backend will overwrite the tab it owns.
+    // Persist the token the server confirmed it stored, in case it was minted now.
+    saveSession();
     setTimeout(() => { btn.disabled = false; btn.textContent = override ? '⚠ Override' : '⬆ Push'; }, 2500);
   } catch (err) {
     alert('Network error: ' + err.message);
