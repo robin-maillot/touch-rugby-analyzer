@@ -58,8 +58,8 @@
     border: 1px solid var(--line);
     color: var(--ink);
     border-radius: 9px;
-    padding: 9px 11px;
-    font-size: 15px;
+    padding: 11px 12px;
+    font-size: 16px; /* >=16px avoids iOS focus zoom */
     width: 100%;
   }
   input:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px rgba(245,197,66,.15); }
@@ -69,9 +69,11 @@
     font-weight: 600;
     border: none;
     border-radius: 9px;
-    padding: 10px 16px;
+    padding: 12px 18px;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 15px;
+    min-height: 44px; /* comfortable touch target */
+    touch-action: manipulation; /* no 300ms tap delay / double-tap zoom */
     transition: transform .05s ease, filter .15s ease;
   }
   button:active { transform: translateY(1px); }
@@ -81,7 +83,7 @@
   .btn-ghost:hover { background: #224d70; }
   .btn-danger { background: transparent; color: var(--red); border: 1px solid var(--red); }
   .btn-danger:hover { background: rgba(232,85,59,.12); }
-  .btn-sm { padding: 6px 10px; font-size: 13px; }
+  .btn-sm { padding: 10px 14px; font-size: 14px; min-height: 40px; }
 
   .players-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
   .chip {
@@ -92,9 +94,10 @@
     display: flex; align-items: center; gap: 8px;
     font-weight: 600;
   }
+  .chip { padding-left: 16px; font-size: 16px; }
   .chip button {
-    background: none; color: var(--muted); padding: 0 4px;
-    font-size: 18px; line-height: 1;
+    background: none; color: var(--muted); padding: 0 6px;
+    font-size: 22px; line-height: 1; min-height: 0; min-width: 36px;
   }
   .chip button:hover { color: var(--red); }
 
@@ -119,6 +122,10 @@
   .round-title { font-size: 22px; font-weight: 800; }
   .round-title span { color: var(--gold); }
   .round-sub { color: var(--muted); font-size: 13px; }
+  .bid-tally { color: var(--green); font-weight: 600; } /* bids == tricks */
+  .bid-tally::before { content: " · "; color: var(--muted); font-weight: 400; }
+  .bid-tally.over { color: var(--gold); }  /* more bids than tricks */
+  .bid-tally.under { color: var(--red); }  /* fewer bids than tricks */
 
   .entry-grid { display: grid; gap: 12px; }
   .entry-player {
@@ -138,9 +145,9 @@
   .preview-neg { color: var(--red); }
   .bonus-hint { font-size: 11px; color: var(--muted); }
 
-  .bid-stepper { display: flex; align-items: center; gap: 6px; }
-  .bid-stepper button { background: var(--surface2); border: 1px solid var(--line); color: var(--ink); width: 32px; padding: 6px 0; }
-  .bid-stepper .val { width: 34px; text-align: center; font-weight: 700; font-size: 17px; }
+  .bid-stepper { display: flex; align-items: center; gap: 8px; }
+  .bid-stepper button { background: var(--surface2); border: 1px solid var(--line); color: var(--ink); width: 46px; height: 46px; padding: 0; font-size: 22px; min-height: 46px; }
+  .bid-stepper .val { width: 40px; text-align: center; font-weight: 700; font-size: 20px; }
 
   /* Modal */
   .modal-backdrop {
@@ -158,7 +165,7 @@
   }
   .modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
   .modal-head h2 { font-size: 20px; color: var(--gold); }
-  .modal-close { background: var(--surface2); color: var(--ink); border: 1px solid var(--line); width: 34px; height: 34px; border-radius: 8px; font-size: 18px; line-height: 1; }
+  .modal-close { background: var(--surface2); color: var(--ink); border: 1px solid var(--line); width: 44px; height: 44px; min-height: 44px; border-radius: 8px; font-size: 20px; line-height: 1; padding: 0; }
   .modal-close:hover { background: #224d70; }
   .chart-wrap { width: 100%; overflow-x: auto; }
   .chart-legend { display: flex; flex-wrap: wrap; gap: 12px 18px; margin-top: 16px; justify-content: center; }
@@ -176,6 +183,40 @@
   details.rules summary { cursor: pointer; color: var(--gold); font-weight: 600; }
   details.rules ul { margin: 10px 0 0 18px; color: var(--muted); font-size: 14px; line-height: 1.7; }
   details.rules b { color: var(--ink); }
+
+  /* ---- Phone / small-tablet tuning ---- */
+  @media (max-width: 640px) {
+    body { padding: 14px 10px 56px; }
+    .card { padding: 16px 13px; border-radius: 14px; }
+    header { margin-bottom: 20px; }
+
+    /* Setup: stack controls full-width and make the primary action big */
+    #setup .row { gap: 12px; }
+    #playerName { flex: 1 1 100%; }
+    #addPlayer { flex: 1 1 100%; }
+    #numRounds { width: 100%; }
+    #setup label.fld { flex: 1 1 100%; }
+    #startGame { margin-left: 0 !important; width: 100%; font-size: 17px; min-height: 52px; }
+
+    /* Round entry: each player's bid/won steppers share a row, bonus + score below */
+    .entry-player { padding: 14px; }
+    .entry-fields { gap: 12px 18px; align-items: flex-start; }
+    .entry-fields .fld { flex: 0 0 auto; }
+    .preview-score { flex: 1 1 100%; margin-left: 0; text-align: left; font-size: 22px; }
+
+    /* Round nav: full-width buttons, primary action prominent */
+    .round-head { gap: 14px; }
+    .round-head .row { width: 100%; gap: 12px; }
+    #prevRound { flex: 0 0 auto; }
+    #nextRound { flex: 1 1 auto; font-size: 16px; min-height: 50px; }
+
+    /* Toolbar buttons fill the width so they're easy to hit */
+    .toolbar { gap: 12px; }
+    .toolbar button { flex: 1 1 40%; min-height: 46px; }
+
+    .modal { padding: 16px; }
+    .totals-row td { font-size: 18px; }
+  }
 </style>
 </head>
 <body>
@@ -197,6 +238,10 @@
       <label class="fld">Rounds
         <input type="number" id="numRounds" value="10" min="1" max="20" style="width:90px;">
       </label>
+      <label class="fld" style="flex-direction:row;align-items:center;gap:8px;">
+        <input type="checkbox" id="bonusOnlyIfHit" style="width:auto;" checked>
+        Bonus only if bid is hit
+      </label>
       <button class="btn-primary" id="startGame" style="margin-left:auto;">Start Game →</button>
     </div>
   </section>
@@ -206,7 +251,7 @@
     <div class="round-head">
       <div>
         <div class="round-title">Round <span id="roundNum">1</span> <span class="round-sub" id="roundOf"></span></div>
-        <div class="round-sub" id="cardsInfo"></div>
+        <div class="round-sub"><span id="cardsInfo"></span><span id="bidTally" class="bid-tally"></span></div>
       </div>
       <div class="row">
         <button class="btn-ghost btn-sm" id="prevRound">← Prev</button>
@@ -248,7 +293,7 @@
       <li><b>Bid &gt; 0, hit exactly:</b> +20 per trick won.</li>
       <li><b>Bid 0, hit exactly (won none):</b> +10 × round number.</li>
       <li><b>Missed (over or under):</b> −10 per trick off. A missed zero-bid loses 10 × round number.</li>
-      <li><b>Bonus</b> (14s captured, Skull King / Pirates / Mermaid captures) is added on top — enter the total bonus per player.</li>
+      <li><b>Bonus</b> (14s captured, Skull King / Pirates / Mermaid captures) is added on top — enter the total bonus per player. With <b>Bonus only if bid is hit</b> enabled, bonus points count only when the player hits their bid exactly.</li>
     </ul>
   </details>
 
@@ -263,6 +308,7 @@
   var state = {
     players: [],        // [{name}]
     numRounds: 10,
+    bonusOnlyIfHit: true, // only count bonus points when the bid is hit exactly
     started: false,
     current: 0,         // current round index (0-based)
     // rounds[r][p] = {bid, won, bonus}
@@ -284,14 +330,16 @@
   // ---------- scoring ----------
   function roundScore(roundNumber, bid, won, bonus) {
     bid = +bid || 0; won = +won || 0; bonus = +bonus || 0;
+    var hit = (bid === won);
     var base;
     if (bid === 0) {
-      base = (won === 0) ? 10 * roundNumber : -10 * roundNumber;
-    } else if (bid === won) {
+      base = hit ? 10 * roundNumber : -10 * roundNumber;
+    } else if (hit) {
       base = 20 * bid;
     } else {
       base = -10 * Math.abs(bid - won);
     }
+    if (state.bonusOnlyIfHit && !hit) bonus = 0;
     return base + bonus;
   }
 
@@ -308,8 +356,8 @@
 
   // ---------- setup UI ----------
   var els = {};
-  ["playerName","addPlayer","playersList","numRounds","startGame",
-   "setup","game","scoreboardCard","roundNum","roundOf","cardsInfo",
+  ["playerName","addPlayer","playersList","numRounds","bonusOnlyIfHit","startGame",
+   "setup","game","scoreboardCard","roundNum","roundOf","cardsInfo","bidTally",
    "prevRound","nextRound","entryGrid","scoreTable","newGame","editSetup",
    "showGraph","graphModal","closeGraph","chartWrap","chartLegend"]
    .forEach(function (id) { els[id] = document.getElementById(id); });
@@ -348,6 +396,7 @@
   els.startGame.onclick = function () {
     if (state.players.length < 2) { alert("Add at least 2 pirates."); return; }
     state.numRounds = Math.max(1, Math.min(20, +els.numRounds.value || 10));
+    state.bonusOnlyIfHit = els.bonusOnlyIfHit.checked;
     if (!state.started) {
       state.rounds = [];
       for (var r = 0; r < state.numRounds; r++) {
@@ -424,13 +473,23 @@
 
       function commit() {
         updatePreview(preview, roundNumber, cell);
+        updateBidTally(roundNumber);
         save();
-        renderScoreboard();
+        // Scoreboard intentionally not refreshed here — it updates on Save & Next.
       }
       updatePreview(preview, roundNumber, cell);
 
       els.entryGrid.appendChild(div);
     });
+
+    updateBidTally(roundNumber);
+  }
+
+  function updateBidTally(roundNumber) {
+    var total = 0;
+    state.rounds[state.current].forEach(function (c) { total += (+c.bid || 0); });
+    els.bidTally.textContent = total + " of " + roundNumber + " trick" + (roundNumber > 1 ? "s" : "") + " bid";
+    els.bidTally.className = "bid-tally" + (total > roundNumber ? " over" : total < roundNumber ? " under" : "");
   }
 
   function updatePreview(el, roundNumber, cell) {
@@ -462,13 +521,18 @@
   }
 
   els.nextRound.onclick = function () {
+    // Commit the current round: untouched bids lock in at their default (0).
+    state.rounds[state.current].forEach(function (cell) { cell.entered = true; });
     if (state.current < state.numRounds - 1) {
       state.current++;
       save();
       renderRound();
+      renderScoreboard();
       window.scrollTo({ top: 0, behavior: "smooth" });
     } else {
       // finish — just keep scoreboard visible
+      save();
+      renderScoreboard();
       els.nextRound.textContent = "Game Over ☠️";
       window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
     }
@@ -628,12 +692,13 @@
   els.newGame.onclick = function () {
     if (!confirm("Start a fresh game? Current scores will be cleared.")) return;
     var keepPlayers = state.players.slice();
-    state = { players: keepPlayers, numRounds: state.numRounds, started: false, current: 0, rounds: [] };
+    state = { players: keepPlayers, numRounds: state.numRounds, bonusOnlyIfHit: state.bonusOnlyIfHit, started: false, current: 0, rounds: [] };
     save();
     els.game.classList.add("hidden");
     els.scoreboardCard.classList.add("hidden");
     els.setup.classList.remove("hidden");
     els.numRounds.value = state.numRounds;
+    els.bonusOnlyIfHit.checked = !!state.bonusOnlyIfHit;
     renderPlayers();
   };
   els.editSetup.onclick = function () {
@@ -645,6 +710,7 @@
   // ---------- boot ----------
   load();
   els.numRounds.value = state.numRounds;
+  els.bonusOnlyIfHit.checked = !!state.bonusOnlyIfHit;
   renderPlayers();
   if (state.started && state.rounds.length) {
     showGame();
