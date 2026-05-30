@@ -105,13 +105,14 @@
 
   /* Scoreboard */
   .scoreboard { overflow-x: auto; }
-  table { border-collapse: collapse; width: 100%; min-width: 520px; }
+  table { border-collapse: collapse; width: 100%; }
   th, td { padding: 10px 8px; text-align: center; border-bottom: 1px solid var(--line); }
   thead th {
     color: var(--gold); font-size: 13px; text-transform: uppercase;
     letter-spacing: .05em; position: sticky; top: 0; background: var(--surface);
   }
-  th.player-col, td.player-col { text-align: left; }
+  /* "Round" column shrinks to its content so player columns get the space */
+  th.player-col, td.player-col { text-align: left; width: 1%; white-space: nowrap; padding-left: 4px; padding-right: 10px; }
   .totals-row td { font-size: 20px; font-weight: 800; border-top: 2px solid var(--gold-dim); border-bottom: none; padding-top: 14px; }
   .totals-row .lbl { color: var(--gold); font-size: 14px; font-weight: 700; text-transform: uppercase; }
   .pos-1 { color: var(--gold); }
@@ -134,12 +135,19 @@
     border-radius: 12px;
     padding: 12px 14px;
   }
-  .entry-player .name { font-weight: 700; margin-bottom: 10px; font-size: 16px; }
+  .entry-player.starter { border-color: var(--gold); box-shadow: inset 3px 0 0 var(--gold), 0 0 0 1px var(--gold); }
+  .entry-player .name { font-weight: 700; margin-bottom: 10px; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+  .entry-player .name .pname { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .starter-badge {
+    background: var(--gold); color: #1a1206; font-size: 11px; font-weight: 800;
+    text-transform: uppercase; letter-spacing: .04em; padding: 2px 8px; border-radius: 999px; white-space: nowrap;
+  }
+  .starter-badge::before { content: "🎲 "; }
   .entry-fields { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end; }
-  .entry-fields .fld { min-width: 70px; flex: 0 0 auto; }
-  .entry-fields .fld input { width: 80px; }
+  .entry-fields .fld { min-width: 0; flex: 0 0 auto; }
+  .bonus-fld input { width: 72px; }
   .preview-score {
-    margin-left: auto; font-weight: 800; font-size: 20px; min-width: 70px; text-align: right;
+    margin-left: auto; font-weight: 800; font-size: 20px; text-align: right; white-space: nowrap;
   }
   .preview-pos { color: var(--green); }
   .preview-neg { color: var(--red); }
@@ -198,11 +206,22 @@
     #setup label.fld { flex: 1 1 100%; }
     #startGame { margin-left: 0 !important; width: 100%; font-size: 17px; min-height: 52px; }
 
-    /* Round entry: each player's bid/won steppers share a row, bonus + score below */
-    .entry-player { padding: 14px; }
-    .entry-fields { gap: 12px 18px; align-items: flex-start; }
-    .entry-fields .fld { flex: 0 0 auto; }
-    .preview-score { flex: 1 1 100%; margin-left: 0; text-align: left; font-size: 22px; }
+    /* Scoreboard: tighter cells so more players fit before scrolling */
+    th, td { padding: 8px 5px; font-size: 14px; }
+    th.player-col, td.player-col { padding-left: 2px; padding-right: 8px; }
+    .totals-row td { padding-top: 12px; }
+
+    /* Round entry: keep bid / won / bonus on a single row with compact steppers */
+    .entry-player { padding: 12px; }
+    .entry-player .name { margin-bottom: 8px; }
+    .entry-fields { gap: 10px; flex-wrap: nowrap; align-items: flex-end; }
+    .entry-fields .fld { flex: 0 1 auto; min-width: 0; }
+    .bid-stepper { gap: 4px; }
+    .bid-stepper button { width: 40px; height: 40px; min-height: 40px; font-size: 20px; }
+    .bid-stepper .val { width: 26px; font-size: 18px; }
+    .bonus-fld input { width: 56px; }
+    .bonus-hint { display: none; }
+    .preview-score { font-size: 18px; }
 
     /* Round nav: full-width buttons, primary action prominent */
     .round-head { gap: 14px; }
@@ -430,15 +449,30 @@
     els.prevRound.style.opacity = (r === 0) ? .4 : 1;
     els.nextRound.textContent = (r === state.numRounds - 1) ? "Finish ✓" : "Save & Next →";
 
+    var starterIdx = r % state.players.length; // starting player rotates each round
     els.entryGrid.innerHTML = "";
     state.players.forEach(function (pl, p) {
       var cell = state.rounds[r][p];
+      var isStarter = (p === starterIdx);
       var div = document.createElement("div");
-      div.className = "entry-player";
+      div.className = "entry-player" + (isStarter ? " starter" : "");
 
+      // Header row: name (+ starter badge) on the left, running score on the right
       var name = document.createElement("div");
       name.className = "name";
-      name.textContent = pl.name;
+      var pname = document.createElement("span");
+      pname.className = "pname";
+      pname.textContent = pl.name;
+      name.appendChild(pname);
+      if (isStarter) {
+        var badge = document.createElement("span");
+        badge.className = "starter-badge";
+        badge.textContent = "Starts";
+        name.appendChild(badge);
+      }
+      var preview = document.createElement("div");
+      preview.className = "preview-score";
+      name.appendChild(preview);
       div.appendChild(name);
 
       var fields = document.createElement("div");
@@ -450,25 +484,20 @@
       }));
 
       // Won stepper
-      fields.appendChild(stepper("Tricks won", roundNumber, cell.won, function (v) {
+      fields.appendChild(stepper("Won", roundNumber, cell.won, function (v) {
         cell.won = v; cell.entered = true; commit();
       }));
 
       // Bonus
       var bonusFld = document.createElement("label");
-      bonusFld.className = "fld";
-      bonusFld.innerHTML = "Bonus<span class='bonus-hint'>(14s, captures)</span>";
+      bonusFld.className = "fld bonus-fld";
+      bonusFld.innerHTML = "Bonus<span class='bonus-hint'> (14s, captures)</span>";
       var bonusInput = document.createElement("input");
       bonusInput.type = "number"; bonusInput.step = "10"; bonusInput.value = cell.bonus || 0;
-      bonusInput.style.width = "80px";
       bonusInput.oninput = function () { cell.bonus = +bonusInput.value || 0; cell.entered = true; commit(); };
       bonusFld.appendChild(bonusInput);
       fields.appendChild(bonusFld);
 
-      var preview = document.createElement("div");
-      preview.className = "preview-score";
-      div.appendChild(fields);
-      fields.appendChild(preview);
       div.appendChild(fields);
 
       function commit() {
