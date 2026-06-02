@@ -6,6 +6,10 @@
 // where prev is the most recent non-To-Review event with a recorded owner.
 // The first such event seeds the chain.
 //
+// Each `Game Start` re-seeds the chain (one per half): any team can start any
+// half, so a Game Start's recorded owner is taken at face value, never flagged,
+// and the chain for that half is validated from it.
+//
 // Crucially, the chain advances from the *expected* owner (not the recorded
 // one). So a single wrong override is flagged only on that one row — it does
 // not "infect" every downstream row.
@@ -20,6 +24,8 @@ TR.computeExpectedOwners = (annotations) => {
   let state = '';
   for (const ann of sorted) {
     if (!ann || ann.type === 'To Review') continue;
+    // A Game Start opens a new half — any team can start it, so re-seed.
+    if (ann.type === 'Game Event' && ann.name === 'Game Start') state = '';
     if (!state) {
       if (ann.possessionOwner) {
         state = ann.possessionOwner;
@@ -48,8 +54,9 @@ TR.getInconsistentIds = (annotations, expected) => {
 
 // Mutates `annotations` in place: rewrites every non-To-Review event's
 // possessionOwner & actionOwner to follow the inferred chain. The first event
-// with a recorded possessionOwner is preserved as the seed. Returns the count
-// of events whose possessionOwner changed (excluding the seed).
+// with a recorded possessionOwner is preserved as the seed, and every Game
+// Start re-seeds the chain for its half (its recorded owner is preserved).
+// Returns the count of events whose possessionOwner changed (excluding seeds).
 TR.applyConsistencyFix = (annotations) => {
   if (!Array.isArray(annotations)) return 0;
   const sorted = annotations.filter(Boolean).sort((a, b) => (a.time || 0) - (b.time || 0));
@@ -57,6 +64,8 @@ TR.applyConsistencyFix = (annotations) => {
   let changed = 0;
   for (const ann of sorted) {
     if (!ann || ann.type === 'To Review') continue;
+    // A Game Start opens a new half — keep its recorded owner as the new seed.
+    if (ann.type === 'Game Event' && ann.name === 'Game Start') state = '';
     if (!state) {
       if (ann.possessionOwner) state = ann.possessionOwner;
     } else {

@@ -380,7 +380,7 @@
   <div class="list-section">
     <div class="list-header">
       <h2>Annotations (<span id="annCount">0</span>)</h2>
-      <button id="fixAllBtn" style="display:none" onclick="fixAllInconsistencies()" title="Overwrite every possession owner so they follow the inferred chain from the first event">⚠ Fix <span id="inconsistentCount">0</span></button>
+      <button id="fixAllBtn" style="display:none" onclick="fixAllInconsistencies()" title="Overwrite every possession owner so they follow the inferred chain from each half's Game Start">⚠ Fix <span id="inconsistentCount">0</span></button>
       <label class="full-game-toggle" style="font-size:0.72rem;padding:4px 8px;border-color:#2a2d3a">
         <input type="checkbox" id="hideBallLiveToggle">
         Hide Ball Live
@@ -965,7 +965,7 @@ function fixAllInconsistencies() {
   if (!isFullGame()) return;
   const inconsistent = getInconsistentIds();
   if (!inconsistent.size) return;
-  if (!confirm(`Overwrite possession owners on ${inconsistent.size} event${inconsistent.size === 1 ? '' : 's'} so they follow the inferred chain from the first event? Manual Game Event overrides (e.g. Ball Live possession set by the user) will be rewritten too.`)) return;
+  if (!confirm(`Overwrite possession owners on ${inconsistent.size} event${inconsistent.size === 1 ? '' : 's'} so they follow the inferred chain from each half's Game Start? Manual Game Event overrides (e.g. Ball Live possession set by the user) will be rewritten too.`)) return;
   TR.applyConsistencyFix(annotations);
   renderList();
   renderMarkers();

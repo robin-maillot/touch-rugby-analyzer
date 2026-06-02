@@ -275,6 +275,36 @@ test('events out of chronological order get sorted before chaining', () => {
   assert.equal(exp.get(anns[0].id), 'Team 1');    // Try at t=20 expects Team 1
 });
 
+test('Game Start re-seeds the chain (any team can start a half)', () => {
+  // First half ends with Team 1 in possession; Team 1 also starts the second
+  // half. Without the per-half re-seed the chain would expect Team 1 anyway —
+  // so use a scenario where the continuous chain would expect Team 2.
+  const anns = mkAnns([
+    [0,   'Game Event', 'Game Start', 'Team 1'],
+    [10,  'Try',        'Scoop',      'Team 1'],   // chain → Team 2
+    [600, 'Game Event', 'Game End',   'Team 2'],
+    [700, 'Game Event', 'Game Start', 'Team 1'],   // 2nd half: Team 1 starts — must not be flagged
+    [710, 'Game Event', 'Ball Live',  'Team 1'],
+  ]);
+  const exp = TR.computeExpectedOwners(anns);
+  assert.equal(exp.get(anns[3].id), 'Team 1');   // expected equals itself (new seed)
+  assert.equal(exp.get(anns[4].id), 'Team 1');   // chain continues from the new seed
+});
+
+test('Game Start without an owner leaves the new half unseeded until the next owned event', () => {
+  const anns = mkAnns([
+    [0,   'Game Event', 'Game Start', 'Team 1'],
+    [600, 'Game Event', 'Game End',   'Team 1'],
+    [700, 'Game Event', 'Game Start', ''],         // owner unknown — no expectation
+    [710, 'Try',        'Scoop',      'Team 2'],   // becomes the second-half seed
+    [720, 'Game Event', 'Ball Live',  'Team 1'],
+  ]);
+  const exp = TR.computeExpectedOwners(anns);
+  assert.equal(exp.has(anns[2].id), false);
+  assert.equal(exp.get(anns[3].id), 'Team 2');
+  assert.equal(exp.get(anns[4].id), 'Team 1');    // Try Team 2 → Team 1 next
+});
+
 test('null/empty annotations are tolerated', () => {
   const anns = [null, ...mkAnns([[0, 'Try', 'Scoop', 'Team 1']]), undefined];
   const exp = TR.computeExpectedOwners(anns);
@@ -368,6 +398,19 @@ test('Penalty Defence chain (possession stays with attacker)', () => {
   assert.equal(TR.getInconsistentIds(anns).size, 0);
 });
 
+test('second-half Game Start is never flagged regardless of which team starts', () => {
+  const anns = mkAnns([
+    [0,   'Game Event', 'Game Start', 'Team 1'],
+    [10,  'Try',        'Scoop',      'Team 1'],   // continuous chain → Team 2
+    [600, 'Game Event', 'Game End',   'Team 2'],
+    [700, 'Game Event', 'Game Start', 'Team 1'],   // Team 1 starts again — valid
+    [710, 'Try',        'Scoop',      'Team 2'],   // bad: second-half chain says Team 1
+  ]);
+  const bad = TR.getInconsistentIds(anns);
+  assert.equal(bad.size, 1);
+  assert.ok(bad.has(anns[4].id));                  // only the Try, not the Game Start
+});
+
 test('field-annotator scenario: manual possession swap with no tagged event', () => {
   // User manually clicked the possession button to swap teams without
   // tagging a Turnover. The next event is recorded with the new team and
@@ -427,6 +470,20 @@ test('preserves the seed event (first with a recorded owner)', () => {
   TR.applyConsistencyFix(anns);
   assert.equal(anns[0].possessionOwner, 'Team 2');  // seed kept
   assert.equal(anns[1].possessionOwner, 'Team 2');  // fixed (expected Team 2 after Game Start)
+});
+
+test('fix preserves each half\'s Game Start owner and rewrites from it', () => {
+  const anns = mkAnns([
+    [0,   'Game Event', 'Game Start', 'Team 1'],
+    [10,  'Try',        'Scoop',      'Team 1'],   // continuous chain → Team 2
+    [600, 'Game Event', 'Game End',   'Team 2'],
+    [700, 'Game Event', 'Game Start', 'Team 1'],   // 2nd-half seed — must be preserved
+    [710, 'Game Event', 'Ball Live',  'Team 2'],   // wrong: should follow new seed (Team 1)
+  ]);
+  const changed = TR.applyConsistencyFix(anns);
+  assert.equal(anns[3].possessionOwner, 'Team 1');  // seed kept, not rewritten to Team 2
+  assert.equal(anns[4].possessionOwner, 'Team 1');  // fixed against the new seed
+  assert.equal(changed, 1);
 });
 
 test('actionOwner is recomputed after fixing possessionOwner', () => {
