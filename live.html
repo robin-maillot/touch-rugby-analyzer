@@ -194,8 +194,98 @@
     .ev-tag.pen-def { color: #f59e0b; background: rgba(245,158,11,0.12); }
     .ev-marker { grid-template-columns: 44px 1fr; color: var(--text-muted); font-size: 0.72rem; font-style: italic; }
     .ev-marker-label { text-align: center; }
+
+    /* Expand-to-theater affordance — only rendered when a game has a video */
+    .expand-btn {
+      background: rgba(239,68,68,0.12);
+      border: 1px solid rgba(239,68,68,0.3);
+      color: #ef4444;
+      border-radius: 4px;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: background 0.15s;
+    }
+    .expand-btn:hover { background: rgba(239,68,68,0.22); }
+
+    /* Theater overlay: large video + scoreboard/stats beside it (desktop) or above it (mobile) */
+    .theater {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      background: rgba(0,0,0,0.92);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .theater.open { display: flex; }
+    .theater-inner {
+      display: flex;
+      gap: 18px;
+      width: 100%;
+      max-width: 1500px;
+      max-height: 100%;
+      align-items: stretch;
+    }
+    .theater-video { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; }
+    .video-frame {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      max-height: 100%;
+      background: #000;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .video-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+    .theater-side {
+      flex: 0 0 340px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      overflow-y: auto;
+    }
+    .theater-side .scoreboard { margin-top: 4px; }
+    .theater-stats { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+    .theater-close {
+      position: absolute;
+      top: 16px;
+      right: 18px;
+      z-index: 1;
+      width: 36px;
+      height: 36px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 1.1rem;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .theater-close:hover { border-color: var(--accent); }
+
+    @media (max-width: 820px) {
+      .theater { padding: 0; }
+      .theater-inner { flex-direction: column; gap: 0; }
+      .theater-side {
+        flex: 0 0 auto;
+        max-height: 42vh;
+        border: none;
+        border-bottom: 1px solid var(--border);
+        border-radius: 0;
+      }
+    }
   </style>
 <script src="js/config.js"></script>
+<script src="js/utils.js"></script>
 </head>
 <body>
 
@@ -242,8 +332,22 @@
   </div>
 </main>
 
+<div class="theater" id="theater">
+  <button class="theater-close" onclick="closeTheater()" title="Close (Esc)">✕</button>
+  <div class="theater-inner">
+    <div class="theater-video"><div class="video-frame" id="theaterFrame"></div></div>
+    <aside class="theater-side" id="theaterSide"></aside>
+  </div>
+</div>
+
 <script>
 const STALE_MS           = 2 * 60 * 1000;
+
+function isGameLive(g) {
+  if (g.finished) return false;
+  if (!g.updatedAt) return true;
+  return (Date.now() - new Date(g.updatedAt).getTime()) < STALE_MS;
+}
 
 function fmtTime(seconds) {
   const s = Math.floor(seconds);
@@ -318,66 +422,123 @@ function eventTimeline(g) {
   </div>`;
 }
 
-function renderCard(g, isLive, bumped) {
+function metaLineHtml(g) {
+  const parts = (g.name || '').split('_');
+  const date  = fmtDate(g.updatedAt);
+  const start = fmtStartTime(g.updatedAt, g.timeSeconds);
+  let year = '', division = '', competition = '';
+  if (parts.length >= 3) {
+    year        = parts[0];
+    division    = parts[1];
+    competition = parts.slice(2, parts.length - 2).join(' ');
+  }
+  const labels = [date, start, competition, year, division].filter(Boolean);
+  return labels.length ? `<div class="card-meta">${labels.join(' · ')}</div>` : '';
+}
+
+function scoreboardHtml(g, bumped) {
+  const bump1 = bumped && bumped.t1 ? ' bump' : '';
+  const bump2 = bumped && bumped.t2 ? ' bump' : '';
+  return `
+    <div class="team">
+      <div class="team-name">${g.team1 || 'Team 1'}</div>
+      <div class="score${bump1}">${g.score1}</div>
+    </div>
+    <div class="divider">–</div>
+    <div class="team">
+      <div class="team-name">${g.team2 || 'Team 2'}</div>
+      <div class="score${bump2}">${g.score2}</div>
+    </div>`;
+}
+
+function statsInnerHtml(g) {
   const fmt = (n, d) => d > 0 ? `${n}/${d}` : '–';
+  return `
+    <div class="stats-row">
+      <div class="stats-label">Tries</div>
+      <div class="stats-val">${fmt(g.score1, g.poss1)}</div>
+      <div class="stats-val">${fmt(g.score2, g.poss2)}</div>
+    </div>
+    <div class="stats-row">
+      <div class="stats-label">Completions</div>
+      <div class="stats-val">${fmt(g.comps1, g.poss1)}</div>
+      <div class="stats-val">${fmt(g.comps2, g.poss2)}</div>
+    </div>
+    ${eventTimeline(g)}`;
+}
+
+function renderCard(g, isLive, bumped) {
   const badge = isLive
     ? `<span class="live-badge">LIVE</span>`
     : `<span class="ended-badge">FT</span>`;
-  const bump1 = bumped && bumped.t1 ? ' bump' : '';
-  const bump2 = bumped && bumped.t2 ? ' bump' : '';
-  const metaLine = (() => {
-    const parts = (g.name || '').split('_');
-    const date  = fmtDate(g.updatedAt);
-    const start = fmtStartTime(g.updatedAt, g.timeSeconds);
-    let year = '', division = '', competition = '';
-    if (parts.length >= 3) {
-      year        = parts[0];
-      division    = parts[1];
-      competition = parts.slice(2, parts.length - 2).join(' ');
-    }
-    const labels = [date, start, competition, year, division].filter(Boolean);
-    return labels.length ? `<div class="card-meta">${labels.join(' · ')}</div>` : '';
-  })();
+  const expandBtn = TR.extractVideoId(g.youtubelink)
+    ? `<button class="expand-btn" onclick="event.stopPropagation(); openTheater('${g.name}')">▶ Watch</button>`
+    : '';
   return `
   <div class="card" onclick="this.querySelector('.stats-panel').classList.toggle('open')">
     <div class="card-header">
       ${badge}
+      ${expandBtn}
       <span class="game-time">${fmtTime(g.timeSeconds)}</span>
     </div>
-    ${metaLine}
-    <div class="scoreboard">
-      <div class="team">
-        <div class="team-name">${g.team1 || 'Team 1'}</div>
-        <div class="score${bump1}">${g.score1}</div>
-      </div>
-      <div class="divider">–</div>
-      <div class="team">
-        <div class="team-name">${g.team2 || 'Team 2'}</div>
-        <div class="score${bump2}">${g.score2}</div>
-      </div>
-    </div>
-    <div class="stats-panel">
-      <div class="stats-row">
-        <div class="stats-label">Tries</div>
-        <div class="stats-val">${fmt(g.score1, g.poss1)}</div>
-        <div class="stats-val">${fmt(g.score2, g.poss2)}</div>
-      </div>
-      <div class="stats-row">
-        <div class="stats-label">Completions</div>
-        <div class="stats-val">${fmt(g.comps1, g.poss1)}</div>
-        <div class="stats-val">${fmt(g.comps2, g.poss2)}</div>
-      </div>
-      ${eventTimeline(g)}
-    </div>
+    ${metaLineHtml(g)}
+    <div class="scoreboard">${scoreboardHtml(g, bumped)}</div>
+    <div class="stats-panel">${statsInnerHtml(g)}</div>
   </div>`;
 }
 
 const prevScores = {};
+let lastGames    = [];
 
 function bumpFor(g) {
   const prev = prevScores[g.name];
   return prev ? { t1: g.score1 > prev.score1, t2: g.score2 > prev.score2 } : null;
 }
+
+// ── Theater overlay (large video + scoreboard/stats) ──────────────
+let theaterGame = null; // sheet name of the game currently expanded
+
+function theaterSideHtml(g, isLive, bumped) {
+  const badge = isLive
+    ? `<span class="live-badge">LIVE</span>`
+    : `<span class="ended-badge">FT</span>`;
+  return `
+    <div class="card-header">
+      ${badge}
+      <span class="game-time">${fmtTime(g.timeSeconds)}</span>
+    </div>
+    ${metaLineHtml(g)}
+    <div class="scoreboard">${scoreboardHtml(g, bumped)}</div>
+    <div class="theater-stats">${statsInnerHtml(g)}</div>`;
+}
+
+function openTheater(name) {
+  const g = lastGames.find(x => x.name === name);
+  if (!g) return;
+  const id = TR.extractVideoId(g.youtubelink);
+  if (!id) return;
+  theaterGame = name;
+  const frame = document.getElementById('theaterFrame');
+  // Only (re)build the iframe when the video changes, so refreshes don't reload it.
+  if (frame.dataset.vid !== id) {
+    frame.innerHTML = `<iframe src="https://www.youtube.com/embed/${id}?autoplay=1&rel=0" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>`;
+    frame.dataset.vid = id;
+  }
+  document.getElementById('theaterSide').innerHTML = theaterSideHtml(g, isGameLive(g), bumpFor(g));
+  document.getElementById('theater').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeTheater() {
+  const frame = document.getElementById('theaterFrame');
+  frame.innerHTML = '';        // stop playback
+  frame.dataset.vid = '';
+  theaterGame = null;
+  document.getElementById('theater').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeTheater(); });
 
 function render(games) {
   const grid          = document.getElementById('grid');
@@ -396,6 +557,10 @@ function render(games) {
   const recent = games.filter(g => {
     const age = g.updatedAt ? (now - new Date(g.updatedAt).getTime()) : 0;
     return g.finished || age >= STALE_MS;
+  }).sort((a, b) => {
+    const ta = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+    const tb = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+    return tb - ta; // most recently updated first
   });
 
   if (active.length) {
@@ -418,6 +583,16 @@ function render(games) {
     recentGrid.innerHTML = recent.map(g => renderCard(g, false, bumpFor(g))).join('');
   } else {
     recentSection.style.display = 'none';
+  }
+
+  // Keep the open theater's scoreboard/stats fresh (but not the video iframe).
+  // Done before the prevScores snapshot so bumpFor() still sees the prior scores.
+  lastGames = games;
+  if (theaterGame) {
+    const g = games.find(x => x.name === theaterGame);
+    if (g) {
+      document.getElementById('theaterSide').innerHTML = theaterSideHtml(g, isGameLive(g), bumpFor(g));
+    }
   }
 
   // Snapshot scores AFTER rendering so the next refresh diff is accurate.

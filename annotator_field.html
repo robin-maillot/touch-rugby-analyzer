@@ -465,6 +465,12 @@
     </div>
   </div>
   <div>
+    <div class="settings-label">YouTube link or video ID (optional) — enables live video on the scoreboard</div>
+    <div class="settings-row">
+      <input id="metaYoutube" placeholder="youtu.be/… , watch?v=… , or 11-char ID" oninput="onMetaChange()" onchange="normalizeYoutubeInput()">
+    </div>
+  </div>
+  <div>
     <div class="settings-label">Click delay (s) — subtracted from every tag after the first, to compensate for reaction time</div>
     <div class="settings-row">
       <input id="clickDelayInput" type="number" min="0" max="9" step="1" value="0" style="max-width:90px" oninput="setClickDelay(this.value)">
@@ -667,6 +673,7 @@ function saveSession() {
         division:    document.getElementById('metaDivision').value,
         competition: document.getElementById('metaCompetition').value,
         id:          document.getElementById('metaId').value,
+        youtubelink: document.getElementById('metaYoutube').value,
       },
     };
     localStorage.setItem(SESSION_KEY, JSON.stringify(state));
@@ -703,6 +710,7 @@ function maybeRestoreSession() {
   if (m.division    != null) document.getElementById('metaDivision').value    = m.division;
   if (m.competition != null) document.getElementById('metaCompetition').value = m.competition;
   if (m.id          != null) document.getElementById('metaId').value          = m.id;
+  if (m.youtubelink != null) document.getElementById('metaYoutube').value      = m.youtubelink;
   document.getElementById('possBtn1').textContent = (m.team1 || '').trim() || 'Team 1';
   document.getElementById('possBtn2').textContent = (m.team2 || '').trim() || 'Team 2';
   setPossession(possession);
@@ -719,7 +727,7 @@ function clearSession() {
   wallStart    = null;
   creatorToken = null;
   if (teamsSwapped) toggleSwap();
-  ['metaTeam1','metaTeam2','metaCompetition','metaId'].forEach(id => document.getElementById(id).value = '');
+  ['metaTeam1','metaTeam2','metaCompetition','metaId','metaYoutube'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('metaYear').value = String(new Date().getFullYear());
   document.getElementById('metaDivision').value = '';
   document.getElementById('possBtn1').textContent = 'Team 1';
@@ -970,6 +978,15 @@ function onMetaChange() {
   saveSession();
 }
 
+// On blur, rewrite the field to the canonical watch URL (TR.normalizeYoutubeUrl
+// accepts a full URL or a bare 11-char ID; leaves unrecognised input as typed).
+function normalizeYoutubeInput() {
+  const el   = document.getElementById('metaYoutube');
+  const norm = TR.normalizeYoutubeUrl(el.value);
+  if (norm) el.value = norm;
+  onMetaChange();
+}
+
 // ── Settings panel ─────────────────────────────────────────────
 function toggleSettings() {
   document.getElementById('settingsPanel').classList.toggle('open');
@@ -1064,7 +1081,7 @@ function pushLiveUpdate() {
   fetch(TR.APPS_SCRIPT_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify({ secret: TR.secret(), action: 'live_update', sheetName, team1, team2, score1, score2, timeSeconds, poss1: t1.possessions, poss2: t2.possessions, comps1: t1.compsNum, comps2: t2.compsNum, triesJson: JSON.stringify(events) }),
+    body: JSON.stringify({ secret: TR.secret(), action: 'live_update', sheetName, team1, team2, score1, score2, timeSeconds, poss1: t1.possessions, poss2: t2.possessions, comps1: t1.compsNum, comps2: t2.compsNum, triesJson: JSON.stringify(events), youtubelink: TR.normalizeYoutubeUrl(document.getElementById('metaYoutube').value) }),
   }).catch(() => {});
 }
 
@@ -1367,6 +1384,7 @@ async function pushToSheet(override = false) {
         competition: document.getElementById('metaCompetition').value.trim(),
         id:          document.getElementById('metaId').value.trim(),
         video:       '',
+        youtubelink: TR.normalizeYoutubeUrl(document.getElementById('metaYoutube').value),
         analyzable,
       },
     };

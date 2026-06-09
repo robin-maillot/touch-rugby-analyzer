@@ -43,6 +43,21 @@ test('embed',      () => assert.equal(TR.extractVideoId('https://www.youtube.com
 test('live',       () => assert.equal(TR.extractVideoId('https://www.youtube.com/live/dQw4w9WgXcQ'), 'dQw4w9WgXcQ'));
 test('invalid',    () => { assert.equal(TR.extractVideoId('https://example.com'), null); assert.equal(TR.extractVideoId(null), null); assert.equal(TR.extractVideoId(''), null); });
 
+// ── TR.normalizeYoutubeUrl ────────────────────────────────────
+console.log('TR.normalizeYoutubeUrl');
+const CANON = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+test('bare 11-char video ID → watch URL', () => assert.equal(TR.normalizeYoutubeUrl('dQw4w9WgXcQ'), CANON));
+test('live/ stream URL → watch URL',      () => assert.equal(TR.normalizeYoutubeUrl('https://www.youtube.com/live/dQw4w9WgXcQ'), CANON));
+test('watch URL → canonical',             () => assert.equal(TR.normalizeYoutubeUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ'), CANON));
+test('youtu.be with extra params stripped', () => assert.equal(TR.normalizeYoutubeUrl('https://youtu.be/dQw4w9WgXcQ?t=90'), CANON));
+test('watch URL with playlist param',     () => assert.equal(TR.normalizeYoutubeUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PL123'), CANON));
+test('embed URL → watch URL',             () => assert.equal(TR.normalizeYoutubeUrl('https://www.youtube.com/embed/dQw4w9WgXcQ'), CANON));
+test('surrounding whitespace trimmed',    () => assert.equal(TR.normalizeYoutubeUrl('  dQw4w9WgXcQ  '), CANON));
+test('empty / null / undefined → empty string', () => { assert.equal(TR.normalizeYoutubeUrl(''), ''); assert.equal(TR.normalizeYoutubeUrl(null), ''); assert.equal(TR.normalizeYoutubeUrl(undefined), ''); });
+test('too-short / non-ID text → empty string', () => { assert.equal(TR.normalizeYoutubeUrl('hello'), ''); assert.equal(TR.normalizeYoutubeUrl('too-short'), ''); });
+test('exactly 11 valid chars treated as ID', () => assert.equal(TR.normalizeYoutubeUrl('abcdefghijk'), 'https://www.youtube.com/watch?v=abcdefghijk'));
+test('12-char bare string is not an ID',  () => assert.equal(TR.normalizeYoutubeUrl('abcdefghijkl'), ''));
+
 // ── TR.substituteTeams ────────────────────────────────────────
 console.log('TR.substituteTeams');
 test('replaces Team 1/2', () => {

@@ -230,6 +230,7 @@ function doGet(e) {
       const cm1i = col('comps 1'), cm2i = col('comps 2');
       const fini = col('finished');
       const trji = col('tries json');
+      const yli  = col('youtube link');
       const games = values.slice(1)
         .map(row => ({
           name:        row[ni]  || '',
@@ -245,6 +246,7 @@ function doGet(e) {
           comps2:      cm2i >= 0 ? Number(row[cm2i]) : 0,
           finished:    fini >= 0 ? row[fini] === 'true' : false,
           tries:       trji >= 0 && row[trji] ? (() => { try { return JSON.parse(row[trji]); } catch(e) { return []; } })() : [],
+          youtubelink: yli  >= 0 ? row[yli]  : '',
         }))
         .filter(g => g.name);
       return json({ ok: true, games });
@@ -416,7 +418,7 @@ function doPost(e) {
 
     // action=live_update → upsert a row in _live
     if (data.action === 'live_update') {
-      writeLiveRow(data.sheetName, data.team1, data.team2, data.score1, data.score2, data.timeSeconds, data.poss1, data.poss2, data.comps1, data.comps2, data.triesJson);
+      writeLiveRow(data.sheetName, data.team1, data.team2, data.score1, data.score2, data.timeSeconds, data.poss1, data.poss2, data.comps1, data.comps2, data.triesJson, data.youtubelink);
       // Ensure the caller's group is on the game's metadata row. writeMeta has
       // a fast no-op path for pure addGroup calls when the group is already
       // present, so high-frequency live_update calls don't repeatedly write.
@@ -643,9 +645,9 @@ function backfillMetadata() {
 }
 
 // ── Live game state helpers ─────────────────────────────────────
-const LIVE_HEADERS = ['Sheet Name', 'Team 1', 'Team 2', 'Score 1', 'Score 2', 'Time Seconds', 'Updated At', 'Poss 1', 'Poss 2', 'Comps 1', 'Comps 2', 'Finished', 'Tries JSON'];
+const LIVE_HEADERS = ['Sheet Name', 'Team 1', 'Team 2', 'Score 1', 'Score 2', 'Time Seconds', 'Updated At', 'Poss 1', 'Poss 2', 'Comps 1', 'Comps 2', 'Finished', 'Tries JSON', 'Youtube Link'];
 
-function writeLiveRow(sheetName, team1, team2, score1, score2, timeSeconds, poss1, poss2, comps1, comps2, triesJson) {
+function writeLiveRow(sheetName, team1, team2, score1, score2, timeSeconds, poss1, poss2, comps1, comps2, triesJson, youtubelink) {
   const ss = SpreadsheetApp.openById(CONTROL_SHEET_ID);
   let sheet = ss.getSheetByName(LIVE_SHEET);
 
@@ -658,11 +660,15 @@ function writeLiveRow(sheetName, team1, team2, score1, score2, timeSeconds, poss
   }
 
   const nowStr = new Date().toISOString();
-  const newRow = [sheetName, team1 || '', team2 || '', score1 || 0, score2 || 0, timeSeconds || 0, nowStr, poss1 || 0, poss2 || 0, comps1 || 0, comps2 || 0, '', triesJson || '[]'];
+  const newRow = [sheetName, team1 || '', team2 || '', score1 || 0, score2 || 0, timeSeconds || 0, nowStr, poss1 || 0, poss2 || 0, comps1 || 0, comps2 || 0, '', triesJson || '[]', youtubelink || ''];
   const values = sheet.getDataRange().getValues();
+
+  const ytIdx = LIVE_HEADERS.length - 1; // Youtube Link is the last column
 
   for (let i = 1; i < values.length; i++) {
     if (String(values[i][0]) === sheetName) {
+      // Don't clobber a previously-set link with an empty update.
+      if (!youtubelink && values[i][ytIdx]) newRow[ytIdx] = values[i][ytIdx];
       sheet.getRange(i + 1, 1, 1, newRow.length).setValues([newRow]);
       return;
     }

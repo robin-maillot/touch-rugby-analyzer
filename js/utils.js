@@ -16,6 +16,16 @@ TR.extractVideoId = (url) => {
   return m ? m[1] : null;
 };
 
+// Accept a full YouTube URL OR a bare 11-char video ID and return a canonical
+// watch URL — or '' if neither. The field annotator lets users paste either form;
+// live.html / the metadata store always get a clean watch?v= link.
+TR.normalizeYoutubeUrl = (input) => {
+  const v = String(input == null ? '' : input).trim();
+  if (!v) return '';
+  const id = TR.extractVideoId(v) || (/^[A-Za-z0-9_-]{11}$/.test(v) ? v : null);
+  return id ? `https://www.youtube.com/watch?v=${id}` : '';
+};
+
 // Human-readable label for a sheet entry (from action=list), preferring
 // metadata over tab-name parsing. Used by the game pickers in games.html
 // and viewer.html so both surfaces show the same pretty name.

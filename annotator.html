@@ -1076,9 +1076,9 @@ async function loadFromSheet() {
 
     // Auto-load YouTube video from game metadata
     if (m.youtubelink) {
-      const ytMatch = String(m.youtubelink).match(/(?:v=|youtu\.be\/|embed\/|live\/)([A-Za-z0-9_-]{11})/);
-      if (ytMatch) {
-        document.getElementById('ytUrl').value = `https://www.youtube.com/watch?v=${ytMatch[1]}`;
+      const ytUrl = TR.normalizeYoutubeUrl(m.youtubelink);
+      if (ytUrl) {
+        document.getElementById('ytUrl').value = ytUrl;
         loadYouTube();
       }
     }
@@ -1164,7 +1164,7 @@ async function pushLiveUpdate() {
   fetch(TR.APPS_SCRIPT_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify({ secret: TR.secret(), action: 'live_update', sheetName, team1, team2, score1, score2, timeSeconds }),
+    body: JSON.stringify({ secret: TR.secret(), action: 'live_update', sheetName, team1, team2, score1, score2, timeSeconds, youtubelink: (document.getElementById('ytUrl').value || '').trim() }),
   }).catch(() => {});
 }
 
