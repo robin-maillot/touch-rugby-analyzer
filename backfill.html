@@ -356,8 +356,9 @@ async function load() {
     document.getElementById('loading').style.display = 'none';
 
     const linked = g => !!g.youtubelink || !!g.gcsObject;
-    const missing = result.sheets.filter(g => !linked(g));
-    const done    = result.sheets.filter(g =>  linked(g));
+    // Reverse API order so the most recent games sit at the top of each section.
+    const missing = result.sheets.filter(g => !linked(g)).reverse();
+    const done    = result.sheets.filter(g =>  linked(g)).reverse();
 
     if (!missing.length && !done.length) {
       document.getElementById('allDone').style.display = 'block';
