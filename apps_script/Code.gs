@@ -7,6 +7,8 @@ const VALID_ROLES     = new Set(['viewer', 'staff', 'admin']);
 const GROUPS_SHEET    = '_groups';     // reserved tab name for group access table
 const METADATA_SHEET  = '_metadata';   // reserved tab name for game metadata
 const LIVE_SHEET      = '_live';       // reserved tab name for live game state
+// Control-plane tabs the admin sheet editor may read/write (all in CONTROL_SHEET_ID).
+const ADMIN_SHEETS    = [GROUPS_SHEET, METADATA_SHEET, LIVE_SHEET];
 
 // Expected column order (must match what the Python pipeline reads)
 const HEADERS = ['Time', 'Possession Owner', 'Type', 'Name', 'To Review', 'Comment', 'Action Owner'];
@@ -143,10 +145,13 @@ function setCreatorToken(sheetName, token) {
 }
 
 function cacheClear() {
-  try { CacheService.getScriptCache().removeAll(['list', 'all']); } catch(e) {}
-  // Every cacheClear() site is a write — bump the version so clients reliably
-  // refetch. Drive's getLastUpdated lags SpreadsheetApp writes, so we use an
-  // explicit counter instead.
+  // The list/all caches are keyed by version (key = '<list|all>:v<version>:<group>'),
+  // so bumping the version below makes every existing entry unreachable — old keys
+  // simply age out via CACHE_TTL. A bare removeAll(['list','all']) here was a no-op:
+  // those unsuffixed keys are never written. The 'groups' cache is intentionally NOT
+  // busted on writes (it's refreshed on its own schedule). Every cacheClear() site is
+  // a write, and the version bump is what reliably forces clients to refetch — Drive's
+  // getLastUpdated lags SpreadsheetApp writes, so we use an explicit counter instead.
   try { SpreadsheetApp.flush(); } catch (e) {}
   bumpVersion();
 }
@@ -268,6 +273,18 @@ function doGet(e) {
     // sheet (replacing a stale hardcoded password map).
     if (e.parameter.action === 'whoami') {
       return json({ ok: true, role: auth.role, group: auth.group });
+    }
+
+    // action=admin_sheet → raw grid (headers + data rows) of a control sheet,
+    // for the admin sheet editor. Admin only; never cached (always live).
+    if (e.parameter.action === 'admin_sheet') {
+      if (auth.role !== 'admin') return json({ ok: false, error: 'Admin access required.' });
+      const name = e.parameter.name;
+      if (ADMIN_SHEETS.indexOf(name) < 0) return json({ ok: false, error: 'Sheet not editable.' });
+      const sheet = SpreadsheetApp.openById(CONTROL_SHEET_ID).getSheetByName(name);
+      if (!sheet) return json({ ok: true, name, headers: [], rows: [] });
+      const values = sheet.getDataRange().getDisplayValues();
+      return json({ ok: true, name, headers: values[0] || [], rows: values.slice(1) });
     }
 
     // Cache key suffix: include version + caller's role/group so writes auto-invalidate
@@ -412,6 +429,50 @@ function doPost(e) {
       if (auth.role !== 'staff' && auth.role !== 'admin') return json({ ok: false, error: 'Staff access required.' });
       if (!data.sheetName) return json({ ok: false, error: 'Missing sheetName parameter' });
       writeMeta(data.sheetName, { comment: String(data.comment == null ? '' : data.comment) });
+      cacheClear();
+      return json({ ok: true });
+    }
+
+    // ── Admin sheet editor (admin only) ──────────────────────────
+    // Edit individual cells / add / delete rows in a control sheet
+    // (_groups, _metadata, _live). Every path calls cacheClear() so the change
+    // propagates site-wide immediately — unlike a manual edit in the Sheets UI,
+    // which only invalidates caches if the onMetadataEdit trigger is installed.
+    function adminSheet(name) {
+      if (ADMIN_SHEETS.indexOf(name) < 0) return null;
+      return SpreadsheetApp.openById(CONTROL_SHEET_ID).getSheetByName(name);
+    }
+
+    if (data.action === 'admin_set_cell') {
+      if (!isAdminSecret(data.secret)) return json({ ok: false, error: 'Admin access required.' });
+      const sheet = adminSheet(data.sheet);
+      if (!sheet) return json({ ok: false, error: 'Sheet not editable.' });
+      const r = Number(data.row), c = Number(data.col); // 0-based data coords (row excludes header)
+      if (!(r >= 0) || !(c >= 0)) return json({ ok: false, error: 'Bad cell coordinates.' });
+      sheet.getRange(r + 2, c + 1).setValue(data.value == null ? '' : data.value);
+      cacheClear();
+      return json({ ok: true });
+    }
+
+    if (data.action === 'admin_add_row') {
+      if (!isAdminSecret(data.secret)) return json({ ok: false, error: 'Admin access required.' });
+      const sheet = adminSheet(data.sheet);
+      if (!sheet) return json({ ok: false, error: 'Sheet not editable.' });
+      const width = Math.max(sheet.getLastColumn(), 1);
+      const row = [];
+      for (let i = 0; i < width; i++) row.push((data.values && data.values[i] != null) ? data.values[i] : '');
+      sheet.appendRow(row);
+      cacheClear();
+      return json({ ok: true, row: sheet.getLastRow() - 2 }); // 0-based data index of the new row
+    }
+
+    if (data.action === 'admin_delete_row') {
+      if (!isAdminSecret(data.secret)) return json({ ok: false, error: 'Admin access required.' });
+      const sheet = adminSheet(data.sheet);
+      if (!sheet) return json({ ok: false, error: 'Sheet not editable.' });
+      const r = Number(data.row);
+      if (!(r >= 0)) return json({ ok: false, error: 'Bad row index.' });
+      sheet.deleteRow(r + 2);
       cacheClear();
       return json({ ok: true });
     }

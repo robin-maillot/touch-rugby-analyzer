@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Sheet Editor — Touch Rugby Analyzer</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0f1117">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:        #0f1117;
+      --surface:   #181b26;
+      --surface-2: #22253a;
+      --border:    #2a2d3a;
+      --text:      #e0e0e0;
+      --text-muted:#888;
+      --accent:    #3b82f6;
+      --good:      #22c55e;
+      --bad:       #ef4444;
+    }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    header h1 { font-size: 1rem; font-weight: 600; }
+    header a.back { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; }
+    header a.back:hover { color: var(--text); }
+    .header-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+
+    main { padding: 24px; max-width: 1400px; margin: 0 auto; }
+
+    .tabs { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
+    .tab {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-family: monospace;
+      padding: 8px 16px;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+    }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: #fff; border-color: var(--accent); background: rgba(59,130,246,0.12); }
+
+    .toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+    .btn {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      cursor: pointer;
+      font-size: 0.8rem;
+      padding: 6px 12px;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .btn:hover { border-color: var(--accent); }
+    .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .btn-danger:hover { border-color: var(--bad); color: var(--bad); }
+    .status { font-size: 0.78rem; color: var(--text-muted); margin-left: auto; }
+    .status.good { color: var(--good); }
+    .status.bad  { color: var(--bad); }
+
+    .note {
+      font-size: 0.76rem;
+      color: var(--text-muted);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-bottom: 16px;
+    }
+
+    .grid-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; }
+    table { border-collapse: collapse; width: 100%; font-size: 0.8rem; }
+    thead th {
+      background: var(--surface-2);
+      color: var(--text-muted);
+      font-weight: 600;
+      text-align: left;
+      padding: 8px 10px;
+      white-space: nowrap;
+      position: sticky;
+      top: 0;
+      border-bottom: 1px solid var(--border);
+    }
+    thead th.rownum, td.rownum { width: 34px; text-align: center; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+    thead th.actions, td.actions { width: 44px; text-align: center; }
+    tbody tr:nth-child(even) { background: rgba(255,255,255,0.015); }
+    td { padding: 0; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    td input.cell {
+      width: 100%;
+      min-width: 110px;
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text);
+      font: inherit;
+      padding: 7px 10px;
+    }
+    td input.cell:focus { outline: none; border-color: var(--accent); background: var(--surface); border-radius: 4px; }
+    td input.cell.saving { border-color: var(--accent); }
+    td input.cell.saved  { border-color: var(--good); }
+    td input.cell.error  { border-color: var(--bad); }
+    .del-btn {
+      background: none; border: none; color: var(--text-muted); cursor: pointer;
+      font-size: 1rem; line-height: 1; padding: 6px;
+    }
+    .del-btn:hover { color: var(--bad); }
+
+    #loading, #empty { padding: 60px 24px; text-align: center; color: var(--text-muted); }
+    .spinner { width: 30px; height: 30px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 14px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+  <script src="js/config.js"></script>
+  <script src="js/utils.js"></script>
+</head>
+<body>
+
+<header>
+  <tr-logo compact></tr-logo>
+  <h1>Admin Sheet Editor</h1>
+  <div class="header-right">
+    <a class="back" href="index.html">← Home</a>
+  </div>
+</header>
+
+<main>
+  <div class="tabs" id="tabs">
+    <button class="tab" data-sheet="_metadata">_metadata</button>
+    <button class="tab" data-sheet="_groups">_groups</button>
+    <button class="tab" data-sheet="_live">_live</button>
+  </div>
+
+  <div class="note">
+    Edits save on blur (or Enter) and immediately bump the server cache version, so
+    changes propagate to every page on their next load. Editing the Google Sheet
+    directly does <strong>not</strong> do this. Be careful: <code>_live</code> rows
+    are rewritten by live games, and <code>_groups</code> controls access.
+  </div>
+
+  <div class="toolbar">
+    <button class="btn" id="refreshBtn" onclick="loadSheet(currentSheet)">↻ Refresh</button>
+    <button class="btn btn-primary" id="addRowBtn" onclick="addRow()">+ Add row</button>
+    <span class="status" id="status"></span>
+  </div>
+
+  <div id="loading" style="display:none"><div class="spinner"></div>Loading…</div>
+  <div id="empty" style="display:none">This sheet is empty.</div>
+  <div class="grid-wrap" id="gridWrap" style="display:none">
+    <table id="grid">
+      <thead id="thead"></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+</main>
+
+<script>
+TR.auth('admin');
+
+let currentSheet = '_metadata';
+let state = { headers: [], rows: [] }; // rows: array of arrays (data rows, no header)
+
+function setStatus(msg, kind) {
+  const el = document.getElementById('status');
+  el.textContent = msg || '';
+  el.className = 'status' + (kind ? ' ' + kind : '');
+}
+
+function selectTab(sheet) {
+  currentSheet = sheet;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.sheet === sheet));
+  loadSheet(sheet);
+}
+
+async function loadSheet(sheet) {
+  document.getElementById('loading').style.display  = 'block';
+  document.getElementById('gridWrap').style.display = 'none';
+  document.getElementById('empty').style.display    = 'none';
+  setStatus('');
+  try {
+    const resp = await fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&action=admin_sheet&name=${TR.enc(sheet)}`);
+    const res  = await resp.json();
+    if (!res.ok) throw new Error(res.error || 'Load failed');
+    state = { headers: res.headers || [], rows: res.rows || [] };
+    renderGrid();
+  } catch (err) {
+    document.getElementById('loading').style.display = 'none';
+    setStatus('Load failed: ' + err.message, 'bad');
+  }
+}
+
+function renderGrid() {
+  document.getElementById('loading').style.display = 'none';
+  const { headers, rows } = state;
+
+  if (!headers.length) {
+    document.getElementById('empty').style.display = 'block';
+    return;
+  }
+
+  const thead = document.getElementById('thead');
+  thead.innerHTML = '<tr><th class="rownum">#</th>' +
+    headers.map(h => `<th>${escapeHtml(h)}</th>`).join('') +
+    '<th class="actions"></th></tr>';
+
+  const tbody = document.getElementById('tbody');
+  tbody.innerHTML = rows.map((row, r) => {
+    const cells = headers.map((_, c) => {
+      const v = row[c] != null ? row[c] : '';
+      return `<td><input class="cell" data-row="${r}" data-col="${c}" value="${escapeAttr(v)}"></td>`;
+    }).join('');
+    return `<tr><td class="rownum">${r + 1}</td>${cells}` +
+      `<td class="actions"><button class="del-btn" title="Delete row" onclick="deleteRow(${r})">✕</button></td></tr>`;
+  }).join('');
+
+  // Wire change handlers (blur or Enter commits).
+  tbody.querySelectorAll('input.cell').forEach(inp => {
+    inp.addEventListener('change', () => saveCell(inp));
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') inp.blur(); });
+  });
+
+  document.getElementById('gridWrap').style.display = 'block';
+  document.getElementById('empty').style.display    = 'none';
+}
+
+async function saveCell(inp) {
+  const r = Number(inp.dataset.row), c = Number(inp.dataset.col);
+  const value = inp.value;
+  if (state.rows[r] && state.rows[r][c] === value) return; // unchanged
+  inp.classList.remove('saved', 'error');
+  inp.classList.add('saving');
+  setStatus('Saving…');
+  try {
+    const resp = await fetch(TR.APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ secret: TR.secret(), action: 'admin_set_cell', sheet: currentSheet, row: r, col: c, value }),
+    });
+    const res = await resp.json();
+    if (!res.ok) throw new Error(res.error || 'Save failed');
+    if (!state.rows[r]) state.rows[r] = [];
+    state.rows[r][c] = value;
+    inp.classList.remove('saving');
+    inp.classList.add('saved');
+    setStatus('Saved · caches refreshed', 'good');
+    setTimeout(() => inp.classList.remove('saved'), 1200);
+  } catch (err) {
+    inp.classList.remove('saving');
+    inp.classList.add('error');
+    setStatus('Save failed: ' + err.message, 'bad');
+  }
+}
+
+async function addRow() {
+  setStatus('Adding row…');
+  try {
+    const resp = await fetch(TR.APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ secret: TR.secret(), action: 'admin_add_row', sheet: currentSheet }),
+    });
+    const res = await resp.json();
+    if (!res.ok) throw new Error(res.error || 'Add failed');
+    await loadSheet(currentSheet);
+    setStatus('Row added', 'good');
+  } catch (err) {
+    setStatus('Add failed: ' + err.message, 'bad');
+  }
+}
+
+async function deleteRow(r) {
+  const label = (state.rows[r] || []).slice(0, 3).filter(Boolean).join(' · ') || `row ${r + 1}`;
+  if (!confirm(`Delete this row?\n\n${label}\n\nThis cannot be undone.`)) return;
+  setStatus('Deleting…');
+  try {
+    const resp = await fetch(TR.APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ secret: TR.secret(), action: 'admin_delete_row', sheet: currentSheet, row: r }),
+    });
+    const res = await resp.json();
+    if (!res.ok) throw new Error(res.error || 'Delete failed');
+    await loadSheet(currentSheet);
+    setStatus('Row deleted', 'good');
+  } catch (err) {
+    setStatus('Delete failed: ' + err.message, 'bad');
+  }
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>]/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;' }[ch]));
+}
+function escapeAttr(s) {
+  return String(s).replace(/[&"<>]/g, ch => ({ '&':'&amp;', '"':'&quot;', '<':'&lt;', '>':'&gt;' }[ch]));
+}
+
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => selectTab(t.dataset.sheet)));
+selectTab('_metadata');
+</script>
+</body>
+</html>
