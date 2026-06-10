@@ -23,3 +23,7 @@ touch_rugby_analyzer/token.json
 
 # Favicon source (cropped/resized variants are committed)
 icon.png
+
+# Local ML experiments (human tracking / YOLO / SAM3): scripts, notebooks,
+# sample videos and model weights — kept out of the repo for now.
+/experiments/
