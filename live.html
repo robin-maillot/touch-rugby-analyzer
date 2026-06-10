@@ -271,6 +271,16 @@
       cursor: pointer;
     }
     .theater-close:hover { border-color: var(--accent); }
+    /* Refresh control inside the theater (header is hidden behind the overlay) */
+    .theater-toolbar {
+      position: absolute;
+      top: 16px;
+      left: 18px;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
 
     @media (max-width: 820px) {
       .theater { padding: 0; }
@@ -333,6 +343,16 @@
 </main>
 
 <div class="theater" id="theater">
+  <div class="theater-toolbar">
+    <span class="refresh-info" id="theaterRefreshInfo">refresh in 30s</span>
+    <button class="refresh-btn" id="theaterRefreshBtn" onclick="manualRefresh()">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M13.5 2.5A7 7 0 1 0 14.5 9"/>
+        <polyline points="14.5 2 14.5 6 10.5 6"/>
+      </svg>
+      <span id="theaterRefreshLabel">Refresh</span>
+    </button>
+  </div>
   <button class="theater-close" onclick="closeTheater()" title="Close (Esc)">✕</button>
   <div class="theater-inner">
     <div class="theater-video"><div class="video-frame" id="theaterFrame"></div></div>
@@ -627,6 +647,7 @@ let paused     = false;
 
 function setRefreshInfo(text) {
   document.getElementById('refreshInfo').textContent = text;
+  document.getElementById('theaterRefreshInfo').textContent = text;
 }
 
 function startCountdown() {
@@ -645,14 +666,14 @@ function startCountdown() {
 }
 
 async function doRefresh() {
-  const btn   = document.getElementById('refreshBtn');
-  const label = document.getElementById('refreshLabel');
-  btn.classList.add('spinning');
-  label.textContent = 'Refreshing';
+  const btns   = [document.getElementById('refreshBtn'), document.getElementById('theaterRefreshBtn')];
+  const labels = [document.getElementById('refreshLabel'), document.getElementById('theaterRefreshLabel')];
+  btns.forEach(b => b.classList.add('spinning'));
+  labels.forEach(l => l.textContent = 'Refreshing');
   setRefreshInfo('updating…');
   await fetchLive();
-  btn.classList.remove('spinning');
-  label.textContent = 'Refresh';
+  btns.forEach(b => b.classList.remove('spinning'));
+  labels.forEach(l => l.textContent = 'Refresh');
   startCountdown();
 }
 
