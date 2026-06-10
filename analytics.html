@@ -148,7 +148,24 @@
   }
   .plot-controls select:focus { border-color: var(--accent); outline: none; }
   .plot-filters { border-top: 1px dashed var(--border); padding-top: 12px; }
-  .plot-filters-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--dim); margin-bottom: 8px; }
+  .plot-filters-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .plot-filters-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--dim); }
+  .plot-clear { background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 6px; padding: 5px 12px; font-size: 0.74rem; cursor: pointer; }
+  .plot-clear:hover { border-color: var(--accent); color: var(--text); }
+  .plot-clear:disabled { opacity: 0.4; cursor: default; }
+  /* Multi-select filter (button + checkbox dropdown) */
+  .mf { position: relative; }
+  .mf-btn { width: 100%; min-height: 36px; display: flex; justify-content: space-between; align-items: center; gap: 6px; background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 7px 9px; font-size: 0.82rem; cursor: pointer; text-align: left; }
+  .mf-btn:hover { border-color: var(--accent); }
+  .mf-btn .mf-cur { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mf-btn .mf-caret { color: var(--dim); flex-shrink: 0; }
+  .mf-btn.has-sel { border-color: var(--accent); color: var(--accent); }
+  .mf-pop { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 30; display: none; max-height: 240px; overflow: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow); padding: 4px; }
+  .mf-pop.open { display: block; }
+  .mf-pop label { display: flex; align-items: center; gap: 8px; padding: 7px 8px; font-size: 0.8rem; color: var(--text); border-radius: 5px; cursor: pointer; white-space: nowrap; }
+  .mf-pop label:hover { background: var(--surface-2); }
+  .mf-pop input { accent-color: var(--accent); width: 15px; height: 15px; flex-shrink: 0; }
+  .mf-empty { padding: 8px; font-size: 0.76rem; color: var(--dim); }
   #plotChart { width: 100%; min-height: 440px; margin-top: 8px; }
   .plot-empty { text-align: center; color: var(--dim); padding: 60px 16px; font-size: 0.85rem; }
   .plot-note { font-size: 0.72rem; color: var(--muted); margin-top: 6px; }
@@ -264,6 +281,11 @@
       </div>
     </div>
 
+    <!-- ── Custom 2D plot builder (launch) ── -->
+    <div class="plot-launch">
+      <button onclick="openPlotModal()" aria-haspopup="dialog">📊 Build a custom 2D plot</button>
+    </div>
+
     <hr class="divider">
 
     <!-- ─── BOTTOM: Filtered deep dive ─────────────────────── -->
@@ -327,10 +349,6 @@
       </div>
     </div>
 
-    <!-- ── Custom 2D plot builder ── -->
-    <div class="plot-launch">
-      <button onclick="openPlotModal()" aria-haspopup="dialog">📊 Build a custom 2D plot</button>
-    </div>
   </div>
 </main>
 
@@ -360,12 +378,23 @@
         </div>
       </div>
       <div class="plot-filters">
-        <div class="plot-filters-label">Filter data</div>
+        <div class="plot-filters-head">
+          <span class="plot-filters-label">Filter data (multi-select)</span>
+          <button type="button" class="plot-clear" id="plotClearBtn" onclick="clearPlotFilters()">Clear filters</button>
+        </div>
         <div class="plot-controls">
-          <div class="pc"><label for="plotFComp">Competition</label><select id="plotFComp" onchange="renderPlot()"><option value="">All</option></select></div>
-          <div class="pc"><label for="plotFDiv">Division</label><select id="plotFDiv" onchange="renderPlot()"><option value="">All</option></select></div>
-          <div class="pc"><label for="plotFGame">Game</label><select id="plotFGame" onchange="renderPlot()"><option value="">All</option></select></div>
-          <div class="pc"><label for="plotFTeam">Team</label><select id="plotFTeam" onchange="renderPlot()"><option value="">All</option></select></div>
+          <div class="pc"><label>Competition</label>
+            <div class="mf"><button type="button" class="mf-btn" id="mfBtn_competition" onclick="toggleFilterPop(event,'competition')"><span class="mf-cur">All</span><span class="mf-caret">▾</span></button><div class="mf-pop" id="mfPop_competition"></div></div>
+          </div>
+          <div class="pc"><label>Division</label>
+            <div class="mf"><button type="button" class="mf-btn" id="mfBtn_division" onclick="toggleFilterPop(event,'division')"><span class="mf-cur">All</span><span class="mf-caret">▾</span></button><div class="mf-pop" id="mfPop_division"></div></div>
+          </div>
+          <div class="pc"><label>Game</label>
+            <div class="mf"><button type="button" class="mf-btn" id="mfBtn_game" onclick="toggleFilterPop(event,'game')"><span class="mf-cur">All</span><span class="mf-caret">▾</span></button><div class="mf-pop" id="mfPop_game"></div></div>
+          </div>
+          <div class="pc"><label>Team</label>
+            <div class="mf"><button type="button" class="mf-btn" id="mfBtn_team" onclick="toggleFilterPop(event,'team')"><span class="mf-cur">All</span><span class="mf-caret">▾</span></button><div class="mf-pop" id="mfPop_team"></div></div>
+          </div>
         </div>
       </div>
       <div id="plotChart"></div>
@@ -1172,6 +1201,65 @@ function emptyMsg() {
     { key: 'opponent', label: 'Opponent' },
   ];
 
+  // Multi-select data filters (empty Set = "All").
+  const FILTERS = [
+    { key: 'competition', label: 'Competition' },
+    { key: 'division', label: 'Division' },
+    { key: 'game', label: 'Game' },
+    { key: 'team', label: 'Team' },
+  ];
+  const fsel = { competition: new Set(), division: new Set(), game: new Set(), team: new Set() };
+  const passesFilters = r => FILTERS.every(f => !fsel[f.key].size || fsel[f.key].has(r[f.key]));
+
+  function filterButtonLabel(key) {
+    const s = fsel[key];
+    if (!s.size) return 'All';
+    if (s.size === 1) return [...s][0];
+    return `${s.size} selected`;
+  }
+  function refreshFilterButtons() {
+    FILTERS.forEach(f => {
+      const btn = document.getElementById('mfBtn_' + f.key);
+      if (!btn) return;
+      btn.querySelector('.mf-cur').textContent = filterButtonLabel(f.key);
+      btn.classList.toggle('has-sel', fsel[f.key].size > 0);
+    });
+    const clr = document.getElementById('plotClearBtn');
+    if (clr) clr.disabled = FILTERS.every(f => !fsel[f.key].size);
+  }
+  function populateFilterDropdowns() {
+    FILTERS.forEach(f => {
+      const vals = [...new Set(DATA.rows.map(r => r[f.key]).filter(v => v && v !== '—'))].sort();
+      const pop = document.getElementById('mfPop_' + f.key);
+      if (!pop) return;
+      pop.innerHTML = vals.length
+        ? vals.map(v => `<label><input type="checkbox" value="${v.replace(/"/g, '&quot;')}" ${fsel[f.key].has(v) ? 'checked' : ''}> ${v}</label>`).join('')
+        : '<div class="mf-empty">No values</div>';
+      pop.querySelectorAll('input').forEach(cb => cb.onchange = () => {
+        cb.checked ? fsel[f.key].add(cb.value) : fsel[f.key].delete(cb.value);
+        refreshFilterButtons();
+        renderPlot();
+      });
+    });
+    refreshFilterButtons();
+  }
+  window.toggleFilterPop = function (e, key) {
+    e.stopPropagation();
+    const pop = document.getElementById('mfPop_' + key);
+    const wasOpen = pop.classList.contains('open');
+    document.querySelectorAll('.mf-pop.open').forEach(p => p.classList.remove('open'));
+    if (!wasOpen) pop.classList.add('open');
+  };
+  window.clearPlotFilters = function () {
+    FILTERS.forEach(f => fsel[f.key].clear());
+    populateFilterDropdowns();
+    renderPlot();
+  };
+  // Close any open filter dropdown on outside click.
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.mf')) document.querySelectorAll('.mf-pop.open').forEach(p => p.classList.remove('open'));
+  });
+
   // ── Time + possession helpers (mirror games.html so stats stay consistent) ──
   function parseTimeStr(str) {
     const p = (str || '').split(':').map(Number);
@@ -1319,12 +1407,6 @@ function emptyMsg() {
     return { rows, params };
   }
 
-  const uniq = f => [...new Set(DATA.rows.map(r => r[f]).filter(v => v && v !== '—'))].sort();
-  function fillFilter(id, vals) {
-    document.getElementById(id).innerHTML = '<option value="">All</option>' +
-      vals.map(v => `<option value="${v}">${v}</option>`).join('');
-  }
-
   window.openPlotModal = function () {
     DATA = buildRows();
     if (DATA.params.length) {
@@ -1339,10 +1421,7 @@ function emptyMsg() {
         document.getElementById('plotGroup').value = '';   // no grouping by default
         built = true;
       }
-      fillFilter('plotFComp', uniq('competition'));
-      fillFilter('plotFDiv', uniq('division'));
-      fillFilter('plotFGame', uniq('game'));
-      fillFilter('plotFTeam', uniq('team'));
+      populateFilterDropdowns();
     }
     document.getElementById('plotModal').classList.add('open');
     document.body.style.overflow = 'hidden';
@@ -1371,12 +1450,7 @@ function emptyMsg() {
     const classOf = gKey ? (r => r[gKey]) : (splitWL ? (r => r.outcome) : null);
     let n = 0;
     if (classOf) {
-      const fComp = document.getElementById('plotFComp').value, fDiv = document.getElementById('plotFDiv').value;
-      const fGame = document.getElementById('plotFGame').value, fTeam = document.getElementById('plotFTeam').value;
-      n = new Set(DATA.rows.filter(r =>
-        (!fComp || r.competition === fComp) && (!fDiv || r.division === fDiv) &&
-        (!fGame || r.game === fGame) && (!fTeam || r.team === fTeam))
-        .map(classOf).filter(c => c && c !== '—')).size;
+      n = new Set(DATA.rows.filter(passesFilters).map(classOf).filter(c => c && c !== '—')).size;
     }
     const ok = n >= 2;
     btn.disabled = !ok;
@@ -1393,15 +1467,11 @@ function emptyMsg() {
     if (!DATA.rows.length) { chart.innerHTML = '<div class="plot-empty">No analysable data loaded yet.</div>'; note.textContent = ''; return; }
     const xKey = document.getElementById('plotX').value, yKey = document.getElementById('plotY').value;
     const gKey = document.getElementById('plotGroup').value;
-    const fComp = document.getElementById('plotFComp').value, fDiv = document.getElementById('plotFDiv').value;
-    const fGame = document.getElementById('plotFGame').value, fTeam = document.getElementById('plotFTeam').value;
     const lbl = (arr, k) => (arr.find(p => p.key === k) || {}).label || k;
     const xLabel = lbl(DATA.params, xKey), yLabel = lbl(DATA.params, yKey);
     const gLabel = (GROUPS.find(g => g.key === gKey) || {}).label || gKey;
 
-    const rows = DATA.rows.filter(r =>
-      (!fComp || r.competition === fComp) && (!fDiv || r.division === fDiv) &&
-      (!fGame || r.game === fGame) && (!fTeam || r.team === fTeam));
+    const rows = DATA.rows.filter(passesFilters);
     if (!rows.length) { chart.innerHTML = '<div class="plot-empty">No points match the current filters.</div>'; note.textContent = ''; return; }
 
     const splitWL = document.getElementById('plotSplitWL').checked;
@@ -1497,11 +1567,7 @@ function emptyMsg() {
     const classOf = gKey ? (r => r[gKey]) : (splitWL ? (r => r.outcome) : null);
     if (!classOf) { note.textContent = 'Rank axes: choose a "Group by" (or enable Win/Loss) so there are groups to separate.'; return; }
 
-    const fComp = document.getElementById('plotFComp').value, fDiv = document.getElementById('plotFDiv').value;
-    const fGame = document.getElementById('plotFGame').value, fTeam = document.getElementById('plotFTeam').value;
-    const valid = DATA.rows.filter(r =>
-      (!fComp || r.competition === fComp) && (!fDiv || r.division === fDiv) &&
-      (!fGame || r.game === fGame) && (!fTeam || r.team === fTeam))
+    const valid = DATA.rows.filter(passesFilters)
       .filter(r => { const c = classOf(r); return c && c !== '—'; });
     const classes = [...new Set(valid.map(classOf))];
     if (classes.length < 2) { note.textContent = 'Rank axes: need at least 2 groups in the current selection.'; return; }
