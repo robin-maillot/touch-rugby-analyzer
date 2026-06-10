@@ -1445,19 +1445,33 @@ function emptyMsg() {
     const classes = [...new Set(valid.map(classOf))];
     if (classes.length < 2) { note.textContent = 'Rank axes: need at least 2 groups in the current selection.'; return; }
 
-    // Per-feature 1D Fisher ratio = between-class variance / within-class variance (scale-invariant).
+    // Global (unfiltered) spread per feature, so separation is scale-fair even
+    // when the selection has one point per group (e.g. a single game).
+    const gstd = {};
+    DATA.params.forEach(par => {
+      const v = DATA.rows.map(r => r[par.key]).filter(x => x != null);
+      if (v.length < 2) { gstd[par.key] = 0; return; }
+      const m = v.reduce((a, b) => a + b, 0) / v.length;
+      gstd[par.key] = Math.sqrt(v.reduce((a, b) => a + (b - m) ** 2, 0) / v.length);
+    });
+
+    // Rank by between-class / within-class scatter on globally-standardised values.
+    // With one point per group (single game) within-scatter is 0, so fall back to
+    // ranking by between-group separation alone.
     RANK = DATA.params.map(par => {
+      const sd = gstd[par.key];
       const pts = valid.map(r => ({ c: classOf(r), v: r[par.key] })).filter(p => p.v != null);
-      const byC = {}; pts.forEach(p => { (byC[p.c] ||= []).push(p.v); });
-      if (pts.length <= classes.length || Object.keys(byC).length < 2) return { key: par.key, label: par.label, score: -1, n: pts.length };
-      const g = pts.reduce((s, p) => s + p.v, 0) / pts.length;
+      const byC = {}; pts.forEach(p => { (byC[p.c] ||= []).push(p.v / sd); });
+      if (!sd || Object.keys(byC).length < 2) return { key: par.key, label: par.label, score: -1, n: pts.length };
+      const all = pts.map(p => p.v / sd);
+      const g = all.reduce((a, b) => a + b, 0) / all.length;
       let between = 0, within = 0;
-      Object.values(byC).forEach(vs => {
-        const m = vs.reduce((a, b) => a + b, 0) / vs.length;
-        between += vs.length * (m - g) ** 2;
-        vs.forEach(v => within += (v - m) ** 2);
+      Object.values(byC).forEach(zs => {
+        const m = zs.reduce((a, b) => a + b, 0) / zs.length;
+        between += zs.length * (m - g) ** 2;
+        zs.forEach(z => within += (z - m) ** 2);
       });
-      return { key: par.key, label: par.label, score: within > 0 ? between / within : (between > 0 ? Infinity : 0), n: pts.length };
+      return { key: par.key, label: par.label, score: within > 1e-9 ? between / within : between, n: pts.length };
     }).filter(x => x.score >= 0).sort((a, b) => b.score - a.score);
 
     if (!RANK.length) { note.textContent = 'Rank axes: not enough data to compare features.'; return; }
