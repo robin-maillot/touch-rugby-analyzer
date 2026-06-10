@@ -8,7 +8,7 @@
   <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#0f1117">
+  <meta name="theme-color" content="#0b0e14">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -17,36 +17,16 @@
   <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
   <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
   <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
-  <style>
-    :root {
-      --bg:        #0f1117;
-      --surface:   #1a1d27;
-      --surface-2: #22253a;
-      --border:    #2a2d3a;
-      --border-l:  #1c1f2e;
-      --text:      #e0e0e0;
-      --muted:     #888;
-      --dim:       #555;
-      --accent:    #3b82f6;
-      --green:     #22c55e;
-      --red:       #ef4444;
-      --red-dark:  #b91c1c;
-      --orange:    #f97316;
-      --purple:    #7c3aed;
-      --yellow:    #f59e0b;
-    }
+  <link rel="stylesheet" href="css/theme.css">
+<style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+    body { font-family: 'Inter', 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
 
     /* Header (matches dashboard) */
     header { background: var(--surface); padding: 10px 20px; display: flex; align-items: center; gap: 14px; border-bottom: 1px solid var(--border); }
     .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
     .logo span { font-size: 1rem; font-weight: 600; color: #fff; white-space: nowrap; }
     .header-sep { width: 1px; height: 20px; background: var(--border); align-self: center; }
-    .header-nav { display: flex; gap: 4px; margin-left: auto; }
-    .header-nav a { color: var(--muted); text-decoration: none; font-size: 0.8rem; padding: 5px 10px; border-radius: 6px; transition: background 0.15s, color 0.15s; }
-    .header-nav a:hover { background: var(--surface-2); color: var(--text); }
-    .header-nav a.active { background: var(--surface-2); color: var(--accent); }
 
     /* Layout */
     main { padding: 20px 24px 60px; max-width: 1180px; margin: 0 auto; }
@@ -135,6 +115,63 @@
       .two-col { grid-template-columns: 1fr; }
       .kpi-strip { grid-template-columns: repeat(2, 1fr); }
     }
+  /* ── Custom 2D plot builder ─────────────────────────────── */
+  .plot-launch { display: flex; justify-content: center; margin: 28px 0 8px; }
+  .plot-launch button {
+    background: var(--accent-strong, #2563eb); color: #fff; border: none;
+    border-radius: 8px; padding: 11px 20px; font-size: 0.9rem; font-weight: 600;
+    cursor: pointer; display: inline-flex; align-items: center; gap: 8px;
+  }
+  .plot-launch button:hover { background: var(--accent); }
+  .plot-modal {
+    position: fixed; inset: 0; z-index: 1000; display: none;
+    align-items: center; justify-content: center; padding: 24px;
+    background: rgba(0,0,0,0.6); backdrop-filter: blur(2px);
+  }
+  .plot-modal.open { display: flex; }
+  .plot-panel {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    box-shadow: var(--shadow, 0 20px 60px rgba(0,0,0,0.5));
+    width: min(960px, 100%); max-height: calc(100vh - 48px); overflow: auto; color: var(--text);
+  }
+  .plot-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--surface); }
+  .plot-head h2 { margin: 0; font-size: 1rem; font-weight: 600; }
+  .plot-close { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1.1rem; padding: 4px 8px; border-radius: 5px; }
+  .plot-close:hover { background: var(--surface-2); color: var(--text); }
+  .plot-body { padding: 16px 18px 20px; }
+  .plot-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px 12px; margin-bottom: 14px; }
+  .plot-controls .pc { display: flex; flex-direction: column; gap: 4px; }
+  .plot-controls label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+  .plot-controls select {
+    background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 7px 8px; font-size: 0.82rem; min-height: 36px; cursor: pointer;
+  }
+  .plot-controls select:focus { border-color: var(--accent); outline: none; }
+  .plot-filters { border-top: 1px dashed var(--border); padding-top: 12px; }
+  .plot-filters-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--dim); margin-bottom: 8px; }
+  #plotChart { width: 100%; min-height: 440px; margin-top: 8px; }
+  .plot-empty { text-align: center; color: var(--dim); padding: 60px 16px; font-size: 0.85rem; }
+  .plot-note { font-size: 0.72rem; color: var(--muted); margin-top: 6px; }
+
+  /* Rank-axes popup (sits above the plot modal) */
+  .rank-modal { position: fixed; inset: 0; z-index: 1100; display: none; align-items: center; justify-content: center; padding: 24px; background: rgba(0,0,0,0.55); }
+  .rank-modal.open { display: flex; }
+  .rank-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; width: min(460px, 100%); max-height: calc(100vh - 80px); display: flex; flex-direction: column; box-shadow: var(--shadow); color: var(--text); }
+  .rank-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+  .rank-head h3 { margin: 0; font-size: 0.95rem; font-weight: 600; }
+  .rank-sub { padding: 9px 18px 2px; font-size: 0.72rem; color: var(--dim); }
+  .rank-list { overflow: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; }
+  .rank-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 7px; cursor: pointer; background: var(--surface-2); transition: border-color .12s, background .12s; }
+  .rank-item:hover { border-color: var(--accent); }
+  .rank-item.sel { border-color: var(--accent); background: var(--accent-soft); }
+  .rank-badge { font-size: 0.68rem; font-weight: 700; min-width: 22px; height: 22px; padding: 0 4px; border-radius: 11px; display: flex; align-items: center; justify-content: center; background: var(--surface-3); color: var(--text-muted); flex-shrink: 0; font-variant-numeric: tabular-nums; }
+  .rank-label { font-size: 0.83rem; }
+  .rank-score { margin-left: auto; font-variant-numeric: tabular-nums; font-size: 0.74rem; color: var(--muted); }
+  .rank-axis { font-size: 0.7rem; font-weight: 700; color: #fff; background: var(--accent-strong); border-radius: 4px; padding: 1px 6px; margin-left: 8px; }
+  .rank-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 18px; border-top: 1px solid var(--border); }
+  .rank-foot span { font-size: 0.76rem; color: var(--muted); }
+  .rank-foot button { background: var(--accent-strong); color: #fff; border: none; border-radius: 7px; padding: 8px 16px; font-size: 0.82rem; font-weight: 600; cursor: pointer; }
+  .rank-foot button:disabled { opacity: 0.4; cursor: default; }
   </style>
 <script src="js/config.js"></script>
 <script src="js/utils.js"></script>
@@ -145,7 +182,8 @@
 <header>
   <tr-logo></tr-logo>
   <div class="header-sep"></div>
-  <nav class="header-nav">
+  <button id="navToggle" class="nav-toggle" onclick="toggleNavMenu()" aria-label="Open page menu" aria-expanded="false" aria-controls="headerNav" aria-haspopup="true">☰</button>
+  <nav class="header-nav" id="headerNav">
     <a href="games.html">Games</a>
     <a href="dashboard.html" id="dashboardLink" style="display:none">Dashboard</a>
     <a href="viewer.html">Events</a>
@@ -288,8 +326,68 @@
         </div>
       </div>
     </div>
+
+    <!-- ── Custom 2D plot builder ── -->
+    <div class="plot-launch">
+      <button onclick="openPlotModal()" aria-haspopup="dialog">📊 Build a custom 2D plot</button>
+    </div>
   </div>
 </main>
+
+<div class="plot-modal" id="plotModal" role="dialog" aria-modal="true" aria-label="Custom 2D plot" onclick="if(event.target===this)closePlotModal()">
+  <div class="plot-panel">
+    <div class="plot-head">
+      <h2>Custom 2D plot <span style="color:var(--dim);font-weight:400">— one point per team per game</span></h2>
+      <button class="plot-close" onclick="closePlotModal()" aria-label="Close">✕</button>
+    </div>
+    <div class="plot-body">
+      <div class="plot-controls">
+        <div class="pc"><label for="plotX">X axis</label><select id="plotX" onchange="renderPlot()"></select></div>
+        <div class="pc"><label for="plotY">Y axis</label><select id="plotY" onchange="renderPlot()"></select></div>
+        <div class="pc"><label for="plotGroup">Group by (colour)</label><select id="plotGroup" onchange="renderPlot()"></select></div>
+        <div class="pc"><label for="plotSplitWL">Split by result</label>
+          <label style="display:flex;align-items:center;gap:7px;min-height:36px;font-size:0.82rem;color:var(--text);cursor:pointer">
+            <input type="checkbox" id="plotSplitWL" onchange="renderPlot()" style="width:16px;height:16px;accent-color:var(--accent)"> Win / Loss
+          </label>
+        </div>
+        <div class="pc"><label for="plotShowAvg">Averages</label>
+          <label style="display:flex;align-items:center;gap:7px;min-height:36px;font-size:0.82rem;color:var(--text);cursor:pointer">
+            <input type="checkbox" id="plotShowAvg" checked onchange="renderPlot()" style="width:16px;height:16px;accent-color:var(--accent)"> Show means
+          </label>
+        </div>
+        <div class="pc"><label for="plotBestBtn">Auto-select</label>
+          <button type="button" id="plotBestBtn" onclick="openRankModal()" title="Rank every axis by how well it separates the groups, then choose two" style="min-height:36px;background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:0.82rem;padding:0 12px">✨ Rank axes</button>
+        </div>
+      </div>
+      <div class="plot-filters">
+        <div class="plot-filters-label">Filter data</div>
+        <div class="plot-controls">
+          <div class="pc"><label for="plotFComp">Competition</label><select id="plotFComp" onchange="renderPlot()"><option value="">All</option></select></div>
+          <div class="pc"><label for="plotFDiv">Division</label><select id="plotFDiv" onchange="renderPlot()"><option value="">All</option></select></div>
+          <div class="pc"><label for="plotFGame">Game</label><select id="plotFGame" onchange="renderPlot()"><option value="">All</option></select></div>
+          <div class="pc"><label for="plotFTeam">Team</label><select id="plotFTeam" onchange="renderPlot()"><option value="">All</option></select></div>
+        </div>
+      </div>
+      <div id="plotChart"></div>
+      <div class="plot-note" id="plotNote"></div>
+    </div>
+  </div>
+</div>
+
+<div class="rank-modal" id="rankModal" role="dialog" aria-modal="true" aria-label="Rank axes" onclick="if(event.target===this)closeRankModal()">
+  <div class="rank-panel">
+    <div class="rank-head">
+      <h3>Rank axes by group separation</h3>
+      <button class="plot-close" onclick="closeRankModal()" aria-label="Close">✕</button>
+    </div>
+    <div class="rank-sub" id="rankSub"></div>
+    <div class="rank-list" id="rankList"></div>
+    <div class="rank-foot">
+      <span id="rankSel">Select 2 features</span>
+      <button id="rankApply" disabled onclick="applyRankSelection()">Apply</button>
+    </div>
+  </div>
+</div>
 
 <script>
 TR.auth('viewer');
@@ -415,6 +513,7 @@ function parseEvents(rows) {
     if (!type) return null;
     return {
       type, name,
+      time:  r[I.time] || '',
       owner:       resolve(r[I.poss],   team1, team2),
       actionOwner: resolve(r[I.action], team1, team2),
       game:  r[I.game],
@@ -1005,5 +1104,415 @@ function emptyMsg() {
 }
 </script>
 
+<script>
+// ── Custom 2D plot builder (one point per team per game) ──────────
+(function () {
+  const slug = s => (s || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+  let built = false;
+  let DATA = { rows: [], params: [] };
+  let hidden = new Set();   // group values toggled off via the legend
+  let lastGroupKey = null;  // reset `hidden` when the grouping changes
+
+  // Make colour-legend labels clickable to independently hide/show each series.
+  function attachLegendToggle(groupVals) {
+    const set = new Set(groupVals.map(String));
+    document.querySelectorAll('#plotChart text').forEach(t => {
+      const v = t.textContent;
+      if (!set.has(v)) return;                 // only the colour-legend (group) labels
+      const off = hidden.has(v);
+      t.style.cursor = 'pointer';
+      t.style.opacity = off ? '0.45' : '1';
+      t.style.textDecoration = off ? 'line-through' : 'none';
+      t.addEventListener('click', () => {
+        hidden.has(v) ? hidden.delete(v) : hidden.add(v);
+        renderPlot();
+      }, { once: true });
+    });
+  }
+
+  const GROUPS = [
+    { key: '', label: 'None — single colour' },
+    { key: 'team', label: 'Team' }, { key: 'competition', label: 'Competition' },
+    { key: 'division', label: 'Division' }, { key: 'year', label: 'Year' },
+    { key: 'opponent', label: 'Opponent' },
+  ];
+
+  // ── Time + possession helpers (mirror games.html so stats stay consistent) ──
+  function parseTimeStr(str) {
+    const p = (str || '').split(':').map(Number);
+    if (p.length === 3) return p[0] * 3600 + p[1] * 60 + p[2];
+    if (p.length === 2) return p[0] * 60 + p[1];
+    return +str || 0;
+  }
+  // wall-clock → seconds from first Game Start, handling per-half offsets
+  function addGameTime(events) {
+    events.forEach(e => { e._raw = parseTimeStr(e.time); });
+    const starts = events.filter(e => e.type === 'Game Event' && e.name === 'Game Start');
+    const ends   = events.filter(e => e.type === 'Game Event' && e.name === 'Game End');
+    if (!starts.length) { const t0 = events[0] ? events[0]._raw : 0; events.forEach(e => e._gt = e._raw - t0); return; }
+    const STOPPAGE = 300, offsets = [];
+    for (let i = 0; i < starts.length; i++) {
+      if (i === 0) offsets.push(-starts[0]._raw);
+      else { const prevEndRaw = ends[i - 1] ? ends[i - 1]._raw : starts[i]._raw; offsets.push(-starts[i]._raw + prevEndRaw + offsets[i - 1] + STOPPAGE); }
+    }
+    events.forEach(e => {
+      let off = offsets[offsets.length - 1];
+      for (let i = 0; i < starts.length - 1; i++) { if (e._raw < starts[i + 1]._raw) { off = offsets[i]; break; } }
+      e._gt = e._raw + off;
+    });
+  }
+  // Possession segments → [{team, duration}] with dead-ball (Ball Live) time removed.
+  function possessionSegments(events, t1, t2) {
+    const other = t => (t === t1 ? t2 : t1);
+    let cur = null;
+    events.forEach((e, i) => {
+      const prev = i > 0 ? events[i - 1] : null;
+      if (prev && prev.type === 'Try') cur = other(prev._owner);
+      else if (e.owner) cur = e.owner;
+      e._owner = cur;
+    });
+    let prevOwner = null, pid = 0;
+    events.forEach((e, i) => {
+      const prev = i > 0 ? events[i - 1] : null;
+      const newP = e._owner !== prevOwner || e.name === 'Game Start' || (prev && prev.name === 'Game End') || (prev && prev.type === 'Try');
+      if (i === 0 || newP) pid++;
+      e._pid = pid; prevOwner = e._owner;
+    });
+    const byPid = {};
+    events.forEach(e => { (byPid[e._pid] ||= []).push(e); });
+    const raw = Object.values(byPid).map(g => ({
+      Team: g[0]._owner,
+      rawStart: Math.min(...g.map(e => e._gt)),
+      rawEnd: Math.max(...g.map(e => e._gt)),
+      endEvent: g[g.length - 1].name,
+    }));
+    const sorted = [...events].sort((a, b) => a._gt - b._gt);
+    const deadSlots = sorted.filter(e => e.name === 'Ball Live').map(bl => {
+      const idx = sorted.indexOf(bl), prev = idx > 0 ? sorted[idx - 1] : null;
+      return prev ? { start: prev._gt, end: bl._gt } : null;
+    }).filter(Boolean);
+    return raw.map((p, i) => {
+      const start = i === 0 ? p.rawStart : (raw[i - 1].endEvent === 'Game End' ? p.rawStart : raw[i - 1].rawEnd);
+      const dead = deadSlots.filter(d => d.start >= start && d.end <= p.rawEnd).reduce((s, d) => s + (d.end - d.start), 0);
+      return { team: p.Team, duration: Math.max(0, p.rawEnd - start - dead) };
+    }).filter(s => s.team);
+  }
+
+  // Aggregate ALL_EVENTS (analysable) into one record per (game, team).
+  function buildRows() {
+    const evs = (typeof ALL_EVENTS !== 'undefined' ? ALL_EVENTS : []).filter(e => e.analyzable);
+    const byGame = {};
+    evs.forEach(e => { (byGame[e.game] ||= []).push(e); });
+    const rows = [];
+    const r3 = v => v == null ? null : +v.toFixed(3);
+    const share = (a, b) => (a == null || b == null || (a + b) === 0) ? null : +(a / (a + b)).toFixed(3);
+
+    for (const game in byGame) {
+      const gevs = byGame[game];                       // chronological within a game
+      const teams = [...new Set(gevs.flatMap(e => [e.team1, e.team2]).filter(Boolean))];
+      if (!teams.length) continue;
+      addGameTime(gevs);
+      const segs = possessionSegments(gevs, teams[0], teams[1]);
+      const possCount = {}, possTime = {};
+      segs.forEach(s => { possCount[s.team] = (possCount[s.team] || 0) + 1; possTime[s.team] = (possTime[s.team] || 0) + s.duration; });
+      const meta = gevs[0];
+
+      const cnt = (team, pred) => gevs.filter(e => e.actionOwner === team && pred(e)).length;
+      const stat = {};
+      teams.forEach(team => {
+        const pc = possCount[team] || 0;
+        const s = {
+          tries:     cnt(team, e => e.type === 'Try'),
+          turnovers: cnt(team, e => e.type === 'Turnover'),
+          sixth:     cnt(team, e => e.type === 'Turnover' && e.name === '6th Touch'),
+          offPen:    cnt(team, e => e.type === 'Penalty Attack'),
+          defPen:    cnt(team, e => e.type === 'Penalty Defence'),
+          total:     gevs.filter(e => e.actionOwner === team).length,
+          poss:      pc,
+          possTime:  +(possTime[team] || 0).toFixed(1),
+        };
+        s.completion = pc ? (s.tries + s.sixth) / pc : null;   // (tries + 6th touch) / possessions
+        stat[team] = s;
+      });
+
+      teams.forEach(team => {
+        const me = stat[team], opp = stat[teams.find(t => t !== team)] || {};
+        const oppPoss = opp.poss || 0;
+        rows.push({
+          game, team, opponent: teams.find(t => t !== team) || '—',
+          competition: meta.comp || '—', division: meta.div || '—', year: meta.year || '—',
+          outcome: teams.length < 2 ? '—' : me.tries > (opp.tries || 0) ? 'Won' : me.tries < (opp.tries || 0) ? 'Lost' : 'Drew',
+          // counts
+          total_events: me.total, possessions: me.poss,
+          cnt_try: me.tries, cnt_turnover: me.turnovers,
+          cnt_penalty_attack: me.offPen, cnt_penalty_defence: me.defPen, cnt_6th_touch: me.sixth,
+          // rates
+          completion_rate: r3(me.completion),
+          off_pen_per_poss: me.poss ? r3(me.offPen / me.poss) : null,
+          def_pen_per_poss: oppPoss ? r3(me.defPen / oppPoss) : null,
+          pen_per_poss: (me.poss || oppPoss) ? r3((me.poss ? me.offPen / me.poss : 0) + (oppPoss ? me.defPen / oppPoss : 0)) : null,
+          avg_poss_time: me.poss ? r3(me.possTime / me.poss) : null,
+          tries_per_possession: me.poss ? r3(me.tries / me.poss) : null,
+          turnovers_per_possession: me.poss ? r3(me.turnovers / me.poss) : null,
+          // shares vs opponent (mine / total)
+          try_share: share(me.tries, opp.tries),
+          poss_share: share(me.possTime, opp.possTime),
+          completion_share: share(me.completion, opp.completion),
+        });
+      });
+    }
+
+    const params = [
+      { key: 'total_events', label: 'Total events' },
+      { key: 'possessions', label: 'Possessions' },
+      { key: 'cnt_try', label: 'Tries' },
+      { key: 'cnt_turnover', label: 'Turnovers' },
+      { key: 'cnt_6th_touch', label: '6th Touch (count)' },
+      { key: 'cnt_penalty_attack', label: 'Off penalties (count)' },
+      { key: 'cnt_penalty_defence', label: 'Def penalties (count)' },
+      { key: 'completion_rate', label: 'Completion rate ((tries+6th)/poss)' },
+      { key: 'avg_poss_time', label: 'Avg possession time / set (s)' },
+      { key: 'off_pen_per_poss', label: 'Off penalties / possession' },
+      { key: 'def_pen_per_poss', label: 'Def penalties / opp possession' },
+      { key: 'pen_per_poss', label: 'Penalties / possession' },
+      { key: 'tries_per_possession', label: 'Tries / possession' },
+      { key: 'turnovers_per_possession', label: 'Turnovers / possession' },
+      { key: 'try_share', label: 'Try share (mine / total)' },
+      { key: 'poss_share', label: 'Possession-time share (mine / total)' },
+      { key: 'completion_share', label: 'Completion-rate share (mine / total)' },
+    ];
+    return { rows, params };
+  }
+
+  const uniq = f => [...new Set(DATA.rows.map(r => r[f]).filter(v => v && v !== '—'))].sort();
+  function fillFilter(id, vals) {
+    document.getElementById(id).innerHTML = '<option value="">All</option>' +
+      vals.map(v => `<option value="${v}">${v}</option>`).join('');
+  }
+
+  window.openPlotModal = function () {
+    DATA = buildRows();
+    if (DATA.params.length) {
+      const opts = DATA.params.map(p => `<option value="${p.key}">${p.label}</option>`).join('');
+      const has = k => DATA.params.some(p => p.key === k);
+      const X = document.getElementById('plotX'), Y = document.getElementById('plotY');
+      X.innerHTML = opts; Y.innerHTML = opts;
+      document.getElementById('plotGroup').innerHTML = GROUPS.map(g => `<option value="${g.key}">${g.label}</option>`).join('');
+      if (!built) {
+        X.value = has('cnt_turnover') ? 'cnt_turnover' : DATA.params[0].key;
+        Y.value = has('cnt_try') ? 'cnt_try' : (DATA.params[1] || DATA.params[0]).key;
+        document.getElementById('plotGroup').value = '';   // no grouping by default
+        built = true;
+      }
+      fillFilter('plotFComp', uniq('competition'));
+      fillFilter('plotFDiv', uniq('division'));
+      fillFilter('plotFGame', uniq('game'));
+      fillFilter('plotFTeam', uniq('team'));
+    }
+    document.getElementById('plotModal').classList.add('open');
+    document.body.style.overflow = 'hidden';
+    renderPlot();
+  };
+
+  window.closePlotModal = function () {
+    document.getElementById('plotModal').classList.remove('open');
+    document.body.style.overflow = '';
+  };
+
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    const rank = document.getElementById('rankModal');
+    if (rank && rank.classList.contains('open')) { closeRankModal(); return; }   // close popup first
+    const plot = document.getElementById('plotModal');
+    if (plot && plot.classList.contains('open')) closePlotModal();
+  });
+
+  window.renderPlot = function () {
+    const chart = document.getElementById('plotChart'), note = document.getElementById('plotNote');
+    if (!DATA.rows.length) { chart.innerHTML = '<div class="plot-empty">No analysable data loaded yet.</div>'; note.textContent = ''; return; }
+    const xKey = document.getElementById('plotX').value, yKey = document.getElementById('plotY').value;
+    const gKey = document.getElementById('plotGroup').value;
+    const fComp = document.getElementById('plotFComp').value, fDiv = document.getElementById('plotFDiv').value;
+    const fGame = document.getElementById('plotFGame').value, fTeam = document.getElementById('plotFTeam').value;
+    const lbl = (arr, k) => (arr.find(p => p.key === k) || {}).label || k;
+    const xLabel = lbl(DATA.params, xKey), yLabel = lbl(DATA.params, yKey);
+    const gLabel = (GROUPS.find(g => g.key === gKey) || {}).label || gKey;
+
+    const rows = DATA.rows.filter(r =>
+      (!fComp || r.competition === fComp) && (!fDiv || r.division === fDiv) &&
+      (!fGame || r.game === fGame) && (!fTeam || r.team === fTeam));
+    if (!rows.length) { chart.innerHTML = '<div class="plot-empty">No points match the current filters.</div>'; note.textContent = ''; return; }
+
+    const splitWL = document.getElementById('plotSplitWL').checked;
+    const showAvg = document.getElementById('plotShowAvg').checked;
+    const grouped = !!gKey;   // "None" → single colour, no legend
+
+    // Only points with both axes present are plottable (rates are null when possessions = 0).
+    const plotRows = rows.filter(r => r[xKey] != null && r[yKey] != null);
+    if (!plotRows.length) { chart.innerHTML = '<div class="plot-empty">No points have a value for both axes — try different metrics or filters.</div>'; note.textContent = ''; return; }
+
+    // Means: one per cluster — per group, and per outcome when win/loss is split.
+    const mkey = r => `${grouped ? r[gKey] : 'all'}||${splitWL ? r.outcome : 'all'}`;
+    const groups = {};
+    plotRows.forEach(r => { (groups[mkey(r)] ||= []).push(r); });
+    const means = Object.values(groups).map(rs => {
+      const m = {
+        mx: rs.reduce((s, r) => s + (+r[xKey] || 0), 0) / rs.length,
+        my: rs.reduce((s, r) => s + (+r[yKey] || 0), 0) / rs.length,
+        n: rs.length, outcome: rs[0].outcome,
+      };
+      if (grouped) m[gKey] = rs[0][gKey];
+      return m;
+    });
+
+    // Colour = the chosen group (single fixed colour when none). Win/Loss = SHAPE: ● win, ▲ loss.
+    const SHAPE = { domain: ['Won', 'Lost', 'Drew'], range: ['circle', 'triangle-up', 'square'] };
+    const colorEnc = grouped ? { field: gKey, type: 'nominal', title: gLabel } : { value: '#3b82f6' };
+    const shapeEnc = splitWL ? { field: 'outcome', type: 'nominal', title: 'Result', scale: SHAPE } : null;
+
+    // Hidden series (toggled via legend) are dimmed in JS — reset when the grouping changes.
+    if (gKey !== lastGroupKey) { hidden = new Set(); lastGroupKey = gKey; }
+    plotRows.forEach(r => r._op = (grouped && hidden.has(String(r[gKey]))) ? 0.06 : 0.7);
+    means.forEach(m => m._op = (grouped && hidden.has(String(m[gKey]))) ? 0.06 : 1);
+    const rawOpacity = { field: '_op', type: 'quantitative', scale: null, legend: null };
+
+    const ptEnc = {
+      x: { field: xKey, type: 'quantitative', title: xLabel },
+      y: { field: yKey, type: 'quantitative', title: yLabel },
+      color: colorEnc, opacity: rawOpacity,
+      tooltip: [
+        { field: 'team', title: 'Team' }, { field: 'opponent', title: 'Opponent' },
+        { field: 'outcome', title: 'Result' }, { field: 'game', title: 'Game' },
+        { field: xKey, title: xLabel }, { field: yKey, title: yLabel },
+      ],
+    };
+    if (shapeEnc) ptEnc.shape = shapeEnc;
+
+    const mnEnc = {
+      x: { field: 'mx', type: 'quantitative' }, y: { field: 'my', type: 'quantitative' },
+      // share the points' colour scale → one merged legend (don't null it, or the legend vanishes)
+      color: colorEnc, opacity: rawOpacity,
+      tooltip: [
+        ...(grouped ? [{ field: gKey, title: gLabel }] : []),
+        ...(splitWL ? [{ field: 'outcome', title: 'Result' }] : []),
+        { field: 'mx', title: 'mean ' + xLabel, format: '.2f' },
+        { field: 'my', title: 'mean ' + yLabel, format: '.2f' },
+        { field: 'n', title: 'points' },
+      ],
+    };
+    if (shapeEnc) mnEnc.shape = shapeEnc;   // share the shape scale → one merged "Result" legend
+
+    const layer = [{ mark: { type: 'point', filled: true, size: 80 }, encoding: ptEnc }];
+    if (showAvg) layer.push({ data: { values: means }, mark: { type: 'point', filled: false, size: 340, strokeWidth: 4 }, encoding: mnEnc });
+
+    const spec = {
+      $schema: 'https://vega.github.io/schema/vega-lite/v5.json',
+      config: (typeof VEGA_CONFIG !== 'undefined' ? VEGA_CONFIG : {}),
+      width: 'container', height: 440,
+      data: { values: plotRows },
+      layer,
+    };
+    vegaEmbed('#plotChart', spec, { actions: false, renderer: 'svg' })
+      .then(() => { if (grouped) attachLegendToggle([...new Set(plotRows.map(r => String(r[gKey])))]); })
+      .catch(err => console.error('plot render failed:', err && err.message));
+
+    const parts = [`${plotRows.length} team-game points`];
+    if (splitWL) parts.push('● win / ▲ loss');
+    if (showAvg) parts.push('hollow = mean');
+    if (grouped) parts.push('click a legend label to hide / show that series');
+    note.textContent = parts.join(' · ');
+  };
+
+  // ── Rank axes by how well each separates the groups (1D Fisher ratio) ──
+  let RANK = [];        // [{key,label,score,n}] sorted best-first
+  let RANK_SEL = [];    // up to 2 chosen feature keys (order → [X, Y])
+  const fmtScore = s => s === Infinity ? '∞' : s.toFixed(2);
+
+  window.openRankModal = function () {
+    const note = document.getElementById('plotNote');
+    const gKey = document.getElementById('plotGroup').value;
+    const splitWL = document.getElementById('plotSplitWL').checked;
+    // Classes = the colour grouping, or Win/Loss when that's the only split.
+    const classOf = gKey ? (r => r[gKey]) : (splitWL ? (r => r.outcome) : null);
+    if (!classOf) { note.textContent = 'Rank axes: choose a "Group by" (or enable Win/Loss) so there are groups to separate.'; return; }
+
+    const fComp = document.getElementById('plotFComp').value, fDiv = document.getElementById('plotFDiv').value;
+    const fGame = document.getElementById('plotFGame').value, fTeam = document.getElementById('plotFTeam').value;
+    const valid = DATA.rows.filter(r =>
+      (!fComp || r.competition === fComp) && (!fDiv || r.division === fDiv) &&
+      (!fGame || r.game === fGame) && (!fTeam || r.team === fTeam))
+      .filter(r => { const c = classOf(r); return c && c !== '—'; });
+    const classes = [...new Set(valid.map(classOf))];
+    if (classes.length < 2) { note.textContent = 'Rank axes: need at least 2 groups in the current selection.'; return; }
+
+    // Per-feature 1D Fisher ratio = between-class variance / within-class variance (scale-invariant).
+    RANK = DATA.params.map(par => {
+      const pts = valid.map(r => ({ c: classOf(r), v: r[par.key] })).filter(p => p.v != null);
+      const byC = {}; pts.forEach(p => { (byC[p.c] ||= []).push(p.v); });
+      if (pts.length <= classes.length || Object.keys(byC).length < 2) return { key: par.key, label: par.label, score: -1, n: pts.length };
+      const g = pts.reduce((s, p) => s + p.v, 0) / pts.length;
+      let between = 0, within = 0;
+      Object.values(byC).forEach(vs => {
+        const m = vs.reduce((a, b) => a + b, 0) / vs.length;
+        between += vs.length * (m - g) ** 2;
+        vs.forEach(v => within += (v - m) ** 2);
+      });
+      return { key: par.key, label: par.label, score: within > 0 ? between / within : (between > 0 ? Infinity : 0), n: pts.length };
+    }).filter(x => x.score >= 0).sort((a, b) => b.score - a.score);
+
+    if (!RANK.length) { note.textContent = 'Rank axes: not enough data to compare features.'; return; }
+
+    const gLabel = gKey ? ((GROUPS.find(g => g.key === gKey) || {}).label || gKey) : 'win / loss';
+    document.getElementById('rankSub').textContent = `Separating by ${gLabel} · ${classes.length} groups · ${valid.length} points · higher = more discriminative`;
+    document.getElementById('rankList').innerHTML = RANK.map((r, i) =>
+      `<div class="rank-item" data-key="${r.key}" onclick="toggleRank('${r.key}')">
+         <span class="rank-badge">${i + 1}</span>
+         <span class="rank-label">${r.label}</span>
+         <span class="rank-score">${fmtScore(r.score)}</span>
+       </div>`).join('');
+
+    // Pre-select the current X/Y if they're in the list, else the top two.
+    const curX = document.getElementById('plotX').value, curY = document.getElementById('plotY').value;
+    const has = k => RANK.some(r => r.key === k);
+    RANK_SEL = (has(curX) && has(curY) && curX !== curY) ? [curX, curY] : RANK.slice(0, 2).map(r => r.key);
+    updateRankSel();
+    document.getElementById('rankModal').classList.add('open');
+  };
+
+  window.toggleRank = function (key) {
+    const i = RANK_SEL.indexOf(key);
+    if (i >= 0) RANK_SEL.splice(i, 1);
+    else { RANK_SEL.push(key); if (RANK_SEL.length > 2) RANK_SEL.shift(); }
+    updateRankSel();
+  };
+
+  function updateRankSel() {
+    document.querySelectorAll('#rankList .rank-item').forEach(el => {
+      const idx = RANK_SEL.indexOf(el.dataset.key);
+      el.classList.toggle('sel', idx >= 0);
+      let ax = el.querySelector('.rank-axis');
+      if (idx >= 0) { if (!ax) { ax = document.createElement('span'); ax.className = 'rank-axis'; el.appendChild(ax); } ax.textContent = idx === 0 ? 'X' : 'Y'; }
+      else if (ax) ax.remove();
+    });
+    const lbl = k => (RANK.find(r => r.key === k) || {}).label || k;
+    const sel = document.getElementById('rankSel');
+    if (RANK_SEL.length === 0) sel.textContent = 'Select 2 features (1st → X, 2nd → Y)';
+    else if (RANK_SEL.length === 1) sel.textContent = `X = ${lbl(RANK_SEL[0])} · pick a 2nd for Y`;
+    else sel.textContent = `X = ${lbl(RANK_SEL[0])}  ·  Y = ${lbl(RANK_SEL[1])}`;
+    document.getElementById('rankApply').disabled = RANK_SEL.length !== 2;
+  }
+
+  window.applyRankSelection = function () {
+    if (RANK_SEL.length !== 2) return;
+    document.getElementById('plotX').value = RANK_SEL[0];
+    document.getElementById('plotY').value = RANK_SEL[1];
+    closeRankModal();
+    renderPlot();
+  };
+
+  window.closeRankModal = function () { document.getElementById('rankModal').classList.remove('open'); };
+})();
+</script>
+<script src="js/nav.js"></script>
 </body>
 </html>
