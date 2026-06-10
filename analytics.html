@@ -1113,21 +1113,33 @@ function emptyMsg() {
   let hidden = new Set();   // group values toggled off via the legend
   let lastGroupKey = null;  // reset `hidden` when the grouping changes
 
-  // Make colour-legend labels clickable to independently hide/show each series.
+  // Make colour-legend rows clickable to independently hide/show each series.
+  // Vega sets pointer-events:none on legend text, and clicks miss the narrow
+  // glyphs, so we force pointer-events on the legend and hit-test by row.
   function attachLegendToggle(groupVals) {
     const set = new Set(groupVals.map(String));
-    document.querySelectorAll('#plotChart text').forEach(t => {
-      const v = t.textContent;
-      if (!set.has(v)) return;                 // only the colour-legend (group) labels
-      const off = hidden.has(v);
-      t.style.cursor = 'pointer';
+    const leg = document.querySelector('#plotChart g.role-legend');
+    if (!leg) return;
+    const labels = [...leg.querySelectorAll('.role-legend-label text')].filter(t => set.has(t.textContent));
+    // reflect hidden state + make the whole legend interactive
+    labels.forEach(t => {
+      const off = hidden.has(t.textContent);
       t.style.opacity = off ? '0.45' : '1';
       t.style.textDecoration = off ? 'line-through' : 'none';
-      t.addEventListener('click', () => {
-        hidden.has(v) ? hidden.delete(v) : hidden.add(v);
-        renderPlot();
-      }, { once: true });
     });
+    leg.style.cursor = 'pointer';
+    leg.querySelectorAll('path, text').forEach(n => { n.style.pointerEvents = 'all'; });
+    leg.addEventListener('click', e => {
+      let hit = null, best = Infinity;
+      labels.forEach(t => {
+        const r = t.getBoundingClientRect();
+        if (e.clientY >= r.top - 6 && e.clientY <= r.bottom + 6) {
+          const d = Math.abs((r.top + r.bottom) / 2 - e.clientY);
+          if (d < best) { best = d; hit = t.textContent; }
+        }
+      });
+      if (hit != null) { hidden.has(hit) ? hidden.delete(hit) : hidden.add(hit); renderPlot(); }
+    }, { once: true });
   }
 
   const GROUPS = [
