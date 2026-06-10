@@ -8,38 +8,34 @@
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#0f1117">
+<meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="Touch Rugby">
 <script defer src="https://cloud.umami.is/script.js" data-website-id="cb7fd4f2-fcd5-44d7-a8e4-70e9068870bb" data-auto-track="false"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="css/theme.css">
 <style>
-  :root {
-    --bg:           #0f1117;
-    --surface:      #1a1d27;
-    --surface-2:    #22253a;
-    --border:       #2a2d3a;
-    --border-light: #1f2230;
-    --text:         #e0e0e0;
-    --text-muted:   #888;
-    --text-dim:     #555;
-    --accent:       #3b82f6;
-    --accent-hover: #2563eb;
-    --vp-w:         420px;
-  }
+  /* Identity tokens now live in css/theme.css; only page-specific vars here. */
+  :root { --vp-w: 420px; }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg); color: var(--text);
+    height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden;
+    -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: 'cv05', 'ss01';
+  }
+  /* Accessibility focus + reduced-motion now live in css/theme.css */
 
   /* ── Header ───────────────────────────────────────────────── */
-  header { background: var(--surface); padding: 10px 20px; display: flex; align-items: center; gap: 14px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  header { background: var(--surface); padding: 10px 20px; display: flex; align-items: center; gap: 14px; border-bottom: 1px solid var(--border); flex-shrink: 0; position: relative; }
   .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
   .logo span { font-size: 1rem; font-weight: 600; color: #fff; white-space: nowrap; }
-  .header-nav { display: flex; gap: 4px; margin-left: auto; }
-  .header-nav a { color: var(--text-muted); text-decoration: none; font-size: 0.8rem; padding: 5px 10px; border-radius: 6px; transition: background 0.15s, color 0.15s; }
-  .header-nav a:hover { background: var(--surface-2); color: var(--text); }
-  .header-nav a.active { background: var(--surface-2); color: var(--accent); }
+  /* .nav-toggle / .header-nav dropdown styles now live in css/theme.css */
   #rowCount { font-size: 0.78rem; color: var(--text-muted); }
 
   /* ── Layout modes (3-state video button) ──────────────────── */
@@ -56,7 +52,7 @@
     border-right: none;
   }
   #toggleVideoBtn { background: var(--surface-2); color: var(--text-muted); border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px; font-size: 0.78rem; cursor: pointer; white-space: nowrap; }
-  #toggleVideoBtn:hover { background: #2e3245; color: var(--text); }
+  #toggleVideoBtn:hover { background: var(--surface-3); color: var(--text); }
   #toggleVideoBtn.active { border-color: var(--accent); color: var(--accent); }
 
   /* ── Split layout ─────────────────────────────────────────── */
@@ -91,14 +87,18 @@
 
   .btn { border: none; border-radius: 5px; padding: 4px 10px; font-size: 0.75rem; cursor: pointer; font-weight: 600; transition: background 0.15s; white-space: nowrap; }
   .btn-ghost { background: var(--surface-2); color: var(--text-muted); border: 1px solid var(--border); }
-  .btn-ghost:hover { background: #2e3245; color: var(--text); }
+  .btn-ghost:hover { background: var(--surface-3); color: var(--text); }
   .btn-ghost:disabled { opacity: 0.4; cursor: default; }
-  .btn-primary { background: var(--accent); color: #fff; border: none; }
+  .btn-primary { background: var(--accent-strong); color: #fff; border: none; }
   .btn-primary:hover { background: var(--accent-hover); }
   .btn-primary:disabled { opacity: 0.5; cursor: default; }
   .btn-nav { background: var(--surface-2); color: var(--text-muted); border: 1px solid var(--border); border-radius: 5px; padding: 4px 9px; font-size: 0.73rem; cursor: pointer; font-weight: 700; }
-  .btn-nav:hover { background: #2e3245; color: var(--text); }
+  .btn-nav:hover { background: var(--surface-3); color: var(--text); }
   .btn-nav:disabled { opacity: 0.35; cursor: default; }
+
+  /* Header utility button (shared base for Loop / Stack / Edit / Shortcuts) */
+  .hbtn { background: var(--surface-2); color: var(--text-muted); border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px; font-size: 0.78rem; cursor: pointer; white-space: nowrap; transition: background .15s, color .15s, border-color .15s; }
+  .hbtn:hover { background: var(--surface-3); color: var(--text); }
 
   .seekbar-wrap { position: relative; height: 5px; background: var(--surface-2); border-radius: 3px; cursor: pointer; flex: 1; }
   .seekbar-fill { height: 100%; background: var(--accent); border-radius: 3px; pointer-events: none; }
@@ -134,7 +134,7 @@
   .filter-wrap { position: relative; }
   .filter-btn { display: flex; align-items: center; gap: 6px; padding: 5px 10px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; color: var(--text-muted); font-size: 0.77rem; cursor: pointer; user-select: none; white-space: nowrap; }
   .filter-btn::after { content: '▾'; font-size: 0.7em; opacity: 0.6; }
-  .filter-btn:hover { border-color: #3a3d4a; color: var(--text); }
+  .filter-btn:hover { border-color: var(--surface-3); color: var(--text); }
   .filter-btn.active { border-color: var(--accent); color: var(--accent); }
   .filter-dropdown { position: absolute; top: calc(100% + 4px); left: 0; min-width: 160px; max-height: 260px; overflow-y: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); z-index: 100; display: none; padding: 4px 0; }
   .filter-dropdown.open { display: block; }
@@ -147,7 +147,7 @@
   .table-panel { position: relative; }
 
   /* Scroll-to-bottom button */
-  .scroll-bottom-btn { position: absolute; bottom: 60px; right: 18px; z-index: 20; background: var(--accent); color: #fff; border: none; border-radius: 50%; width: 30px; height: 30px; font-size: 1rem; line-height: 1; cursor: pointer; display: none; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.5); transition: background 0.15s; }
+  .scroll-bottom-btn { position: absolute; bottom: 60px; right: 18px; z-index: 20; background: var(--accent-strong); color: #fff; border: none; border-radius: 50%; width: 36px; height: 36px; font-size: 1rem; line-height: 1; cursor: pointer; display: none; align-items: center; justify-content: center; box-shadow: var(--shadow); transition: background 0.15s; }
   .scroll-bottom-btn:hover { background: var(--accent-hover); }
   .scroll-bottom-btn.visible { display: flex; }
 
@@ -164,32 +164,37 @@
   td { padding: 6px 10px; border-bottom: 1px solid var(--border-light); color: #ccc; vertical-align: middle; }
   tr.playable { cursor: pointer; }
   tr.playable:hover td { background: var(--surface-2); }
-  tr.active-row td { background: rgba(59,130,246,0.13) !important; }
+  tr.active-row td { background: var(--accent-soft) !important; }
+  tr.active-row td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
   tr.active-row { outline: none; }
 
   /* Compact number stepper (used for seconds before/after) */
-  .num-stepper {
-    display: inline-flex; align-items: center; gap: 2px;
+  /* Seconds before/after — quick-preset chips + custom value */
+  .sec-group {
+    display: inline-flex; align-items: center; gap: 4px;
     background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px;
     padding: 2px 6px; font-size: 0.78rem; color: var(--text-muted);
     white-space: nowrap; transition: border-color 0.15s;
   }
-  .num-stepper:focus-within { border-color: var(--accent); }
-  .num-stepper .num-icon { font-size: 0.85rem; line-height: 1; }
-  .num-stepper input {
-    width: 26px; background: transparent; border: none; outline: none;
-    color: var(--text); font-size: 0.78rem; font-variant-numeric: tabular-nums;
-    text-align: center; padding: 2px 0; -moz-appearance: textfield;
+  .sec-group:focus-within { border-color: var(--accent); }
+  .sec-icon { font-size: 0.85rem; line-height: 1; }
+  .sec-chips { display: inline-flex; gap: 2px; }
+  .chip {
+    min-width: 28px; padding: 4px 7px; border-radius: 5px; cursor: pointer;
+    background: transparent; color: var(--text-muted); border: 1px solid transparent;
+    font-size: 0.74rem; font-variant-numeric: tabular-nums; line-height: 1;
+    transition: background .15s, color .15s, border-color .15s;
   }
-  .num-stepper input::-webkit-outer-spin-button,
-  .num-stepper input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-  .num-stepper .num-btn {
-    background: none; border: none; cursor: pointer; padding: 0 4px;
-    color: var(--text-muted); font-size: 0.95rem; line-height: 1; font-weight: 600;
-    transition: color 0.15s;
+  .chip:hover { background: var(--surface-3); color: var(--text); }
+  .chip.active { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); font-weight: 600; }
+  .sec-group input {
+    width: 30px; background: transparent; border: none; border-left: 1px solid var(--border);
+    outline: none; color: var(--text); font-size: 0.78rem; font-variant-numeric: tabular-nums;
+    text-align: center; padding: 2px 0 2px 4px; margin-left: 2px; -moz-appearance: textfield;
   }
-  .num-stepper .num-btn:hover { color: var(--accent); }
-  .num-stepper .num-unit { color: var(--text-dim); }
+  .sec-group input::-webkit-outer-spin-button,
+  .sec-group input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .sec-unit { color: var(--text-dim); }
 
   tr.active-row.looping td { background: rgba(34,197,94,0.18) !important; box-shadow: inset 3px 0 0 #22c55e; }
 
@@ -251,6 +256,13 @@
   .yt-link:hover { background: rgba(244,67,54,0.2); }
   .game-tag { font-size: 0.7rem; color: var(--text-muted); background: var(--surface-2); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border); }
 
+  /* Keep rows single-height: clip long Game/Competition values to one line… */
+  .cell-clip { display: inline-block; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
+  td.col-game .game-tag { display: inline-block; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
+  td.col-competition { max-width: 150px; }
+  /* …while letting the ID column grow enough to keep e.g. "Friendly 10" on one line */
+  td.col-id, th.col-id { white-space: nowrap; }
+
   /* Comment expand */
   .comment-cell { font-size: 0.78rem; color: #f97316; font-style: italic; }
   .comment-rest { display: none; white-space: pre-wrap; margin-top: 3px; }
@@ -258,12 +270,8 @@
   .comment-toggle { background: none; border: none; color: #888; cursor: pointer; font-size: 0.66rem; padding: 2px 0; display: inline-flex; align-items: center; gap: 2px; }
   .comment-toggle:hover { color: #f97316; }
 
-  /* Play icon on hover */
-  .play-icon { opacity: 0; font-size: 0.75rem; color: var(--accent); margin-right: 4px; transition: opacity 0.1s; }
-  tr.playable:hover .play-icon { opacity: 1; }
-
-  /* Copy-link button */
-  .copy-link-btn { opacity: 0; border: none; background: none; cursor: pointer; padding: 0 0 0 5px; color: var(--text-dim); vertical-align: middle; line-height: 1; transition: opacity 0.1s, color 0.15s; }
+  /* Copy-link button — leading affordance in the Time cell (reveals on row hover) */
+  .copy-link-btn { opacity: 0; border: none; background: none; cursor: pointer; padding: 0 5px 0 0; color: var(--text-dim); vertical-align: middle; line-height: 1; transition: opacity 0.1s, color 0.15s; }
   tr.playable:hover .copy-link-btn { opacity: 1; }
   .copy-link-btn:hover { color: var(--accent); }
   .copy-link-btn.copied { color: #00c853 !important; opacity: 1; }
@@ -284,12 +292,11 @@
   #saveBtn { background: #f97316; color: #fff; border: none; border-radius: 6px; padding: 5px 12px; font-size: 0.78rem; font-weight: 600; cursor: pointer; display: none; }
   #saveBtn:hover { background: #ea6e00; }
   #saveBtn:disabled { opacity: 0.4; cursor: default; }
-  tr.active-row .play-icon { opacity: 1; color: #22c55e; }
 
   .empty { text-align: center; padding: 40px; color: var(--text-dim); font-size: 0.85rem; }
-  #loadingMsg { text-align: center; padding: 50px 24px; color: #888; font-size: 0.88rem; display: none; }
+  #loadingMsg { text-align: center; padding: 50px 24px; color: var(--text-muted); font-size: 0.88rem; display: none; }
   #errorMsg   { color: #ef4444; font-size: 0.8rem; padding: 10px 16px; display: none; }
-  .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #2a2d3a; border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 8px; }
+  .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 8px; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
   /* ── Pagination ───────────────────────────────────────────── */
@@ -305,7 +312,7 @@
 
   /* Touch devices — show normally hover-only affordances */
   @media (hover: none) {
-    .play-icon, .copy-link-btn { opacity: 1; }
+    .copy-link-btn { opacity: 1; }
   }
 
   /* Tablet speed toggle — hidden by default, swaps in for the select on tablet */
@@ -317,6 +324,7 @@
     .btn, .btn-nav, #toggleVideoBtn, #layoutBtn,
     .filter-btn, .col-select, .search-input { min-height: 36px; }
     .btn, .btn-nav { padding: 7px 12px; }
+    .chip { min-height: 36px; padding: 6px 11px; font-size: 0.82rem; }
     td { padding: 9px 10px; }
     .seekbar-wrap { height: 10px; border-radius: 5px; }
     .seekbar-fill { border-radius: 5px; }
@@ -366,6 +374,7 @@
 <script src="js/utils.js"></script>
 <script src="js/events.js"></script>
 <script src="js/player.js"></script>
+<script src="js/nav.js"></script>
 </head>
 <body>
 
@@ -373,29 +382,36 @@
   <tr-logo></tr-logo>
   <span id="rowCount"></span>
   <button id="toggleVideoBtn" class="active" data-mode="both" onclick="cycleVideoLayout()" title="Cycle layout: Both → Rows → Video">&#9783; Both</button>
-  <div class="num-stepper" title="Seconds before event to start video / copy link">
-    <span class="num-icon">⏪</span>
-    <button type="button" class="num-btn" onclick="adjustLinkOffset(-1)" aria-label="Decrease">−</button>
-    <input id="linkOffsetInput" type="number" min="0" max="120" value="5" oninput="setLinkOffset(this.value)">
-    <button type="button" class="num-btn" onclick="adjustLinkOffset(1)" aria-label="Increase">+</button>
-    <span class="num-unit">s</span>
+  <div class="sec-group" id="beforeGroup" title="Seconds before event to start video / copy link">
+    <span class="sec-icon" aria-hidden="true">⏪</span>
+    <span class="sec-chips" role="group" aria-label="Seconds before event">
+      <button type="button" class="chip" data-val="5"  onclick="pickLinkOffset(5)">5</button>
+      <button type="button" class="chip" data-val="10" onclick="pickLinkOffset(10)">10</button>
+      <button type="button" class="chip" data-val="15" onclick="pickLinkOffset(15)">15</button>
+    </span>
+    <input id="linkOffsetInput" type="number" inputmode="numeric" aria-label="Seconds before event (custom)" title="Custom seconds before" min="0" max="120" value="5" oninput="setLinkOffset(this.value)">
+    <span class="sec-unit">s</span>
   </div>
-  <div class="num-stepper" title="Seconds after event (loop window end)">
-    <span class="num-icon">⏩</span>
-    <button type="button" class="num-btn" onclick="adjustLinkOffsetAfter(-1)" aria-label="Decrease">−</button>
-    <input id="linkOffsetAfterInput" type="number" min="0" max="120" value="2" oninput="setLinkOffsetAfter(this.value)">
-    <button type="button" class="num-btn" onclick="adjustLinkOffsetAfter(1)" aria-label="Increase">+</button>
-    <span class="num-unit">s</span>
+  <div class="sec-group" id="afterGroup" title="Seconds after event (loop window end)">
+    <span class="sec-icon" aria-hidden="true">⏩</span>
+    <span class="sec-chips" role="group" aria-label="Seconds after event">
+      <button type="button" class="chip" data-val="2"  onclick="pickLinkOffsetAfter(2)">2</button>
+      <button type="button" class="chip" data-val="5"  onclick="pickLinkOffsetAfter(5)">5</button>
+      <button type="button" class="chip" data-val="10" onclick="pickLinkOffsetAfter(10)">10</button>
+    </span>
+    <input id="linkOffsetAfterInput" type="number" inputmode="numeric" aria-label="Seconds after event (custom)" title="Custom seconds after" min="0" max="120" value="2" oninput="setLinkOffsetAfter(this.value)">
+    <span class="sec-unit">s</span>
   </div>
-  <button id="loopBtn" style="background:var(--surface-2);color:var(--text-muted);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:0.78rem;cursor:pointer;white-space:nowrap;transition:all 0.15s" onclick="toggleLoopMode()" title="Toggle loop playback (R)">🔁 Loop</button>
-  <button id="layoutBtn" style="background:var(--surface-2);color:var(--text-muted);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:0.78rem;cursor:pointer;white-space:nowrap;transition:all 0.15s" onclick="toggleLayout()" title="Toggle video layout">↕ Stack</button>
-  <button id="editModeBtn" style="display:none;background:var(--surface-2);color:var(--text-muted);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:0.78rem;cursor:pointer;white-space:nowrap;transition:all 0.15s" onclick="toggleEditMode()" title="Toggle edit mode">✏ Edit</button>
-  <button id="helpBtn" style="background:var(--surface-2);color:var(--text-muted);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:0.78rem;cursor:pointer;white-space:nowrap;transition:all 0.15s" onclick="openHelpModal()" title="Keyboard shortcuts (?)" aria-label="Show keyboard shortcuts">⌨ Shortcuts</button>
+  <button id="loopBtn" class="hbtn" onclick="toggleLoopMode()" title="Toggle loop playback (R)" aria-label="Toggle loop playback">🔁 Loop</button>
+  <button id="layoutBtn" class="hbtn" onclick="toggleLayout()" title="Toggle video layout" aria-label="Toggle video layout">↕ Stack</button>
+  <button id="editModeBtn" class="hbtn" style="display:none" onclick="toggleEditMode()" title="Toggle edit mode" aria-label="Toggle edit mode">✏ Edit</button>
+  <button id="helpBtn" class="hbtn" onclick="openHelpModal()" title="Keyboard shortcuts (?)" aria-label="Show keyboard shortcuts">⌨ Shortcuts</button>
   <button id="saveBtn" onclick="saveEdits()">💾 Save</button>
-  <nav class="header-nav">
+  <button id="navToggle" class="nav-toggle" onclick="toggleNavMenu()" aria-label="Open page menu" aria-expanded="false" aria-controls="headerNav" aria-haspopup="true">☰</button>
+  <nav class="header-nav" id="headerNav">
     <a href="games.html">Games</a>
     <a href="dashboard.html" id="dashboardLink" style="display:none">Dashboard</a>
-    <a href="viewer.html" class="active">Events</a>
+    <a href="viewer.html" class="active" aria-current="page">Events</a>
     <a href="analytics.html">Analytics</a>
     <a href="annotator.html" id="annotatorLink" style="display:none">Annotator</a>
   </nav>
@@ -471,15 +487,15 @@
         </select>
         <button class="btn btn-ghost speed-toggle-btn" id="speedToggleBtn" disabled onclick="toggleSpeedSlowFast()" title="Toggle 0.5× / 1× playback speed (A)">1×</button>
         <button class="btn-nav" id="nextRowBtn" disabled onclick="navigateRow(1)">Next ▶</button>
-        <button class="btn btn-ghost" id="zoomToggle" title="Zoom video (Z)">🔍</button>
+        <button class="btn btn-ghost" id="zoomToggle" title="Zoom video (Z)" aria-label="Zoom video">🔍</button>
         <span class="zoom-presets" id="zoomPresets" hidden>
           <button type="button" class="zoom-preset" data-z="1" title="Zoom 1.0× (reset)">1.0×</button>
           <button type="button" class="zoom-preset" data-z="2" title="Zoom 2.0×">2.0×</button>
           <button type="button" class="zoom-preset" data-z="5" title="Zoom 5.0×">5.0×</button>
         </span>
         <span class="zoom-level" id="zoomLevel" hidden>1.0×</span>
-        <button class="btn btn-ghost" id="fullPossessionBtn" onclick="toggleFullPossession()" title="Full possession — start playback from the previous event in this game (capped at 90 s; falls back to the lookback slider for non-analyzable games or when there is no prior event)">📐</button>
-        <button class="btn btn-ghost" id="shareTimestampBtn" onclick="shareCurrentTimestamp(this)" title="Copy a YouTube link to the current video timestamp">🔗</button>
+        <button class="btn btn-ghost" id="fullPossessionBtn" onclick="toggleFullPossession()" aria-label="Play full possession from previous event" title="Full possession — start playback from the previous event in this game (capped at 90 s; falls back to the lookback slider for non-analyzable games or when there is no prior event)">📐</button>
+        <button class="btn btn-ghost" id="shareTimestampBtn" onclick="shareCurrentTimestamp(this)" aria-label="Copy link to current timestamp" title="Copy a YouTube link to the current video timestamp">🔗</button>
         <button class="btn btn-ghost" id="clipBtn" title="Cut a clip of the current loop range and download it" onclick="makeCurrentClip()" hidden>▶ Clip</button>
         <span id="clipDownloadStatus" style="font-size:0.75rem;color:var(--text-muted);min-width:90px"></span>
       </div>
@@ -502,12 +518,12 @@
 
     <div class="controls" id="controls" style="display:none">
       <div class="top-row">
-        <select id="gameFilter" class="col-select" style="min-width:160px;max-width:260px" onchange="selectGame(this.value)">
+        <select id="gameFilter" class="col-select" style="min-width:160px;max-width:260px" aria-label="Filter by game" onchange="selectGame(this.value)">
           <option value="">All games</option>
         </select>
         <div class="search-group">
-          <select id="searchCol" class="col-select"></select>
-          <input id="searchInput" class="search-input" type="text" placeholder="Search…">
+          <select id="searchCol" class="col-select" aria-label="Search column"></select>
+          <input id="searchInput" class="search-input" type="text" placeholder="Search…" aria-label="Search events">
         </div>
         <button class="btn btn-ghost" onclick="resetFilters()">↺ Reset</button>
       </div>
@@ -524,7 +540,7 @@
       <div class="empty" id="emptyState" style="display:none">No matching records found.</div>
     </div>
 
-    <button class="scroll-bottom-btn" id="scrollBottomBtn" title="Scroll to bottom" onclick="document.querySelector('.table-wrap').scrollTo({top:999999,behavior:'smooth'})">↓</button>
+    <button class="scroll-bottom-btn" id="scrollBottomBtn" title="Scroll to bottom" aria-label="Scroll to bottom" onclick="document.querySelector('.table-wrap').scrollTo({top:999999,behavior:'smooth'})">↓</button>
 
     <div class="pagination" id="pagination" style="display:none">
       <div class="pagination-info">
@@ -693,6 +709,7 @@ let activeRowIdx     = -1;     // index in `filtered`
 window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('linkOffsetInput').value = linkOffset;
   document.getElementById('linkOffsetAfterInput').value = linkOffsetAfter;
+  refreshOffsetChips();
   applyLoopButtonState();
   applyFullPossessionButtonState();
   setupSeekbar();
@@ -996,6 +1013,11 @@ function resetFilters() {
 }
 
 // ── Table rendering ─────────────────────────────────────────────
+// Stable per-column class so CSS can target specific columns (e.g. col-game, col-id)
+function colSlug(h) {
+  return (h || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
 function renderHeaders() {
   const thead = document.querySelector('#dataTable thead');
   thead.innerHTML = '';
@@ -1004,6 +1026,8 @@ function renderHeaders() {
     if (selectedGame && i === colGame) return;
     const th = document.createElement('th');
     th.textContent = h || '#';
+    const slug = colSlug(h);
+    if (slug) th.classList.add('col-' + slug);
     th.onclick = () => sortBy(i);
     if (i === sortCol) th.classList.add(sortAsc ? 'sort-asc' : 'sort-desc');
     tr.appendChild(th);
@@ -1036,11 +1060,13 @@ function renderRows(rows) {
       if (selectedGame && i === colGame) return;
       const td  = document.createElement('td');
       const col = (headers[i] || '').toLowerCase();
+      const slug = colSlug(headers[i]);
+      if (slug) td.classList.add('col-' + slug);
 
       if (i === colTime && hasVideo) {
-        td.innerHTML = `<span class="play-icon">▶</span>${cell || ''}`;
         const copyBtn = makeCopyLinkBtn(row[colGame] || '', cell || '');
         if (copyBtn) td.appendChild(copyBtn);
+        td.appendChild(document.createTextNode(cell || ''));
       } else if (col === 'type' && cell) {
         const span = document.createElement('span');
         span.textContent = cell;
@@ -1055,6 +1081,13 @@ function renderRows(rows) {
         const span = document.createElement('span');
         span.textContent = cell;
         span.className = 'game-tag';
+        span.title = cell;          // full value still discoverable when clipped
+        td.appendChild(span);
+      } else if (col === 'competition' && cell) {
+        const span = document.createElement('span');
+        span.textContent = cell;
+        span.className = 'cell-clip';
+        span.title = cell;
         td.appendChild(span);
       } else if (col === 'name' && isAdmin && editMode) {
         const type    = colType >= 0 ? row[colType] : '';
@@ -1737,6 +1770,7 @@ function isHelpModalOpen() {
 }
 function openHelpModal()  { document.getElementById('helpModal').hidden = false; }
 function closeHelpModal() { document.getElementById('helpModal').hidden = true; }
+// Collapsible page-menu behaviour now lives in js/nav.js
 
 // ── Keyboard shortcuts ────────────────────────────────────────────
 document.addEventListener('keydown', e => {
@@ -1764,6 +1798,7 @@ function setLinkOffset(val) {
   linkOffset = n;
   localStorage.setItem('linkOffset', n);
   if (activeEventSecs != null) loopStart = Math.max(0, activeEventSecs - linkOffset);
+  refreshOffsetChips();
 }
 
 function setLinkOffsetAfter(val) {
@@ -1771,20 +1806,32 @@ function setLinkOffsetAfter(val) {
   linkOffsetAfter = n;
   localStorage.setItem('linkOffsetAfter', n);
   if (activeEventSecs != null) loopEnd = activeEventSecs + linkOffsetAfter;
+  refreshOffsetChips();
 }
 
-function adjustLinkOffset(delta) {
-  const input = document.getElementById('linkOffsetInput');
-  const next  = Math.max(0, Math.min(120, (parseInt(input.value, 10) || 0) + delta));
-  input.value = next;
-  setLinkOffset(next);
+// Quick-preset chips: set the value, mirror it into the custom field, sync state.
+function pickLinkOffset(n) {
+  document.getElementById('linkOffsetInput').value = n;
+  setLinkOffset(n);
 }
 
-function adjustLinkOffsetAfter(delta) {
-  const input = document.getElementById('linkOffsetAfterInput');
-  const next  = Math.max(0, Math.min(120, (parseInt(input.value, 10) || 0) + delta));
-  input.value = next;
-  setLinkOffsetAfter(next);
+function pickLinkOffsetAfter(n) {
+  document.getElementById('linkOffsetAfterInput').value = n;
+  setLinkOffsetAfter(n);
+}
+
+// Highlight the chip matching the current value (none when it's a custom value).
+function refreshOffsetChips() {
+  document.querySelectorAll('#beforeGroup .chip').forEach(c => {
+    const on = parseInt(c.dataset.val, 10) === linkOffset;
+    c.classList.toggle('active', on);
+    c.setAttribute('aria-pressed', on);
+  });
+  document.querySelectorAll('#afterGroup .chip').forEach(c => {
+    const on = parseInt(c.dataset.val, 10) === linkOffsetAfter;
+    c.classList.toggle('active', on);
+    c.setAttribute('aria-pressed', on);
+  });
 }
 
 function applyLoopButtonState() {
