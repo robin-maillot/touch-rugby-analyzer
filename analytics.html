@@ -1113,15 +1113,17 @@ function emptyMsg() {
   let hidden = new Set();   // group values toggled off via the legend
   let lastGroupKey = null;  // reset `hidden` when the grouping changes
 
-  // Make colour-legend rows clickable to independently hide/show each series.
-  // Vega sets pointer-events:none on legend text, and clicks miss the narrow
+  // Make colour-legend rows clickable to hide/show series.
+  // Vega sets pointer-events:none on legend text and clicks miss the narrow
   // glyphs, so we force pointer-events on the legend and hit-test by row.
+  //   single click → toggle that series
+  //   double click → isolate it (hide the rest); double-click again → show all
   function attachLegendToggle(groupVals) {
     const set = new Set(groupVals.map(String));
     const leg = document.querySelector('#plotChart g.role-legend');
     if (!leg) return;
     const labels = [...leg.querySelectorAll('.role-legend-label text')].filter(t => set.has(t.textContent));
-    // reflect hidden state + make the whole legend interactive
+    if (!labels.length) return;
     labels.forEach(t => {
       const off = hidden.has(t.textContent);
       t.style.opacity = off ? '0.45' : '1';
@@ -1129,7 +1131,8 @@ function emptyMsg() {
     });
     leg.style.cursor = 'pointer';
     leg.querySelectorAll('path, text').forEach(n => { n.style.pointerEvents = 'all'; });
-    leg.addEventListener('click', e => {
+
+    const hitTest = e => {
       let hit = null, best = Infinity;
       labels.forEach(t => {
         const r = t.getBoundingClientRect();
@@ -1138,8 +1141,28 @@ function emptyMsg() {
           if (d < best) { best = d; hit = t.textContent; }
         }
       });
-      if (hit != null) { hidden.has(hit) ? hidden.delete(hit) : hidden.add(hit); renderPlot(); }
-    }, { once: true });
+      return hit;
+    };
+
+    let timer = null;   // delay the single-click so a double-click can pre-empt it
+    leg.addEventListener('click', e => {
+      const hit = hitTest(e);
+      if (hit == null || timer) return;            // 2nd click of a double → ignore
+      timer = setTimeout(() => {
+        timer = null;
+        hidden.has(hit) ? hidden.delete(hit) : hidden.add(hit);
+        renderPlot();
+      }, 220);
+    });
+    leg.addEventListener('dblclick', e => {
+      if (timer) { clearTimeout(timer); timer = null; }
+      const hit = hitTest(e);
+      if (hit == null) return;
+      const others = [...set].filter(v => v !== hit);
+      const onlyHitVisible = !hidden.has(hit) && others.every(v => hidden.has(v));
+      hidden = onlyHitVisible ? new Set() : new Set(others);   // show all ↔ isolate
+      renderPlot();
+    });
   }
 
   const GROUPS = [
