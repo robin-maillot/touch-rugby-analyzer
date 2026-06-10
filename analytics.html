@@ -1327,8 +1327,34 @@ function emptyMsg() {
     if (plot && plot.classList.contains('open')) closePlotModal();
   });
 
+  // Enable "Rank axes" only when the current grouping + filters yield ≥2 groups.
+  function updateBestBtnState() {
+    const btn = document.getElementById('plotBestBtn');
+    if (!btn) return;
+    const gKey = document.getElementById('plotGroup').value;
+    const splitWL = document.getElementById('plotSplitWL').checked;
+    const classOf = gKey ? (r => r[gKey]) : (splitWL ? (r => r.outcome) : null);
+    let n = 0;
+    if (classOf) {
+      const fComp = document.getElementById('plotFComp').value, fDiv = document.getElementById('plotFDiv').value;
+      const fGame = document.getElementById('plotFGame').value, fTeam = document.getElementById('plotFTeam').value;
+      n = new Set(DATA.rows.filter(r =>
+        (!fComp || r.competition === fComp) && (!fDiv || r.division === fDiv) &&
+        (!fGame || r.game === fGame) && (!fTeam || r.team === fTeam))
+        .map(classOf).filter(c => c && c !== '—')).size;
+    }
+    const ok = n >= 2;
+    btn.disabled = !ok;
+    btn.style.opacity = ok ? '' : '0.4';
+    btn.style.cursor = ok ? 'pointer' : 'default';
+    btn.title = ok ? 'Rank every axis by how well it separates the groups, then choose two'
+      : (classOf ? 'Need at least 2 groups in the current selection to rank axes'
+                 : 'Pick a "Group by" (or enable Win/Loss) to rank axes');
+  }
+
   window.renderPlot = function () {
     const chart = document.getElementById('plotChart'), note = document.getElementById('plotNote');
+    updateBestBtnState();   // grey out "Rank axes" unless there are ≥2 groups to separate
     if (!DATA.rows.length) { chart.innerHTML = '<div class="plot-empty">No analysable data loaded yet.</div>'; note.textContent = ''; return; }
     const xKey = document.getElementById('plotX').value, yKey = document.getElementById('plotY').value;
     const gKey = document.getElementById('plotGroup').value;
