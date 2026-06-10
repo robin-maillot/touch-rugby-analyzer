@@ -1,0 +1,91 @@
+/* ============================================================
+   Touch Rugby Analyzer — shared theme
+   Single source of truth for the visual identity, accessibility
+   defaults, and the collapsible page-nav menu. Linked from every
+   page; pages keep only page-specific styles in their own <style>.
+   ============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  /* ── Surfaces / structure ── */
+  --bg:            #0b0e14;
+  --surface:       #141925;
+  --surface-2:     #1e2433;
+  --surface-3:     #2a3142;   /* interactive hover */
+  --border:        #2b3242;
+  --border-light:  #1c2230;
+  /* ── Text ── */
+  --text:          #e9ecf3;
+  --text-muted:    #9ba6b9;   /* ~7:1 on --surface (AAA) */
+  --text-dim:      #6c7689;   /* ~3.8:1 — secondary/decorative only */
+  /* ── Accent (brand blue kept; identity shift comes from surfaces/type) ── */
+  --accent:        #3b82f6;   /* emphasis: links, focus, active states */
+  --accent-hover:  #2563eb;
+  --accent-strong: #2563eb;   /* filled-button bg → white text 5.1:1 (AA) */
+  --accent-soft:   rgba(59,130,246,0.13);
+  /* ── Semantic ── */
+  --green:         #22c55e;
+  --red:           #ef4444;
+  --orange:        #f97316;
+  --yellow:        #f59e0b;
+  --purple:        #7c3aed;
+  --good:          #22c55e;
+  --bad:           #ef4444;
+  /* ── Misc ── */
+  --radius:        8px;
+  --shadow:        0 8px 28px rgba(0,0,0,0.45);
+
+  /* ── Legacy aliases (so existing per-page CSS keeps resolving) ── */
+  --muted:         var(--text-muted);
+  --dim:           var(--text-dim);
+  --border-l:      var(--border-light);
+  --red-dark:      #b91c1c;
+}
+
+/* Default UI font (pages may override in their own <style>; all set Inter first) */
+body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+
+/* ── Accessibility: visible keyboard focus on all interactive elements ── */
+a:focus-visible, button:focus-visible, select:focus-visible,
+input:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 5px;
+}
+/* Don't show focus rings for mouse users the browser can't classify */
+:focus:not(:focus-visible) { outline: none; }
+
+/* ── Respect reduced-motion preference ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── Collapsible page nav (hamburger → dropdown), used on every page ── */
+header { position: relative; }
+.nav-toggle {
+  display: inline-flex; align-items: center; justify-content: center;
+  margin-left: auto; width: 38px; height: 38px;
+  background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
+  border-radius: 6px; cursor: pointer; font-size: 1.05rem; line-height: 1;
+  transition: background .15s, border-color .15s;
+}
+.nav-toggle:hover { background: var(--surface-3); }
+.nav-toggle[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); }
+.header-nav {
+  display: none; position: absolute; top: calc(100% + 6px); right: 8px;
+  flex-direction: column; gap: 2px; min-width: 190px; margin-left: 0;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; box-shadow: var(--shadow); padding: 6px; z-index: 200;
+}
+.header-nav.open { display: flex; }
+.header-nav a {
+  color: var(--text-muted); text-decoration: none; font-size: 0.9rem;
+  padding: 11px 14px; border-radius: 6px; transition: background 0.15s, color 0.15s;
+}
+.header-nav a:hover { background: var(--surface-2); color: var(--text); }
+.header-nav a.active { background: var(--surface-2); color: var(--accent); }

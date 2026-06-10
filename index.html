@@ -7,17 +7,18 @@
   <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#0f1117">
+  <meta name="theme-color" content="#0b0e14">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="Touch Rugby">
   <script defer src="https://cloud.umami.is/script.js" data-website-id="cb7fd4f2-fcd5-44d7-a8e4-70e9068870bb" data-auto-track="false"></script>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <style>
+  <link rel="stylesheet" href="css/theme.css">
+<style>
     body {
-      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-      background: #0f1117;
+      font-family: 'Inter', "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: #0b0e14;
       margin: 0;
       padding: 0;
     }
@@ -26,7 +27,7 @@
     #login-screen {
       position: fixed;
       top: 0; left: 0; width: 100%; height: 100%;
-      background: #0f1117;
+      background: #0b0e14;
       display: flex; flex-direction: column;
       justify-content: center; align-items: center;
       z-index: 1000;
@@ -37,8 +38,8 @@
     }
     .login-logo span { font-size: 1.1rem; font-weight: 700; color: #fff; }
     #login-box {
-      background: #1a1d27;
-      border: 1px solid #2a2d3a;
+      background: #141925;
+      border: 1px solid #2b3242;
       padding: 32px 36px;
       border-radius: 10px;
       text-align: center;
@@ -54,8 +55,8 @@
     #password-input {
       width: 100%; padding: 10px 12px;
       margin: 0 0 12px;
-      background: #0f1117; border: 1px solid #2a2d3a;
-      border-radius: 6px; color: #e0e0e0;
+      background: #0b0e14; border: 1px solid #2b3242;
+      border-radius: 6px; color: #e9ecf3;
       font-size: 15px; outline: none;
       transition: border-color 0.15s;
       box-sizing: border-box;
@@ -85,25 +86,25 @@
     }
 
     /* --- Main Content (Hidden Initially) --- */
-    #app-content { display: none; background: #0f1117; min-height: 100vh; }
+    #app-content { display: none; background: #0b0e14; min-height: 100vh; }
 
-    #app-content header { background: #1a1d27; border-bottom: 1px solid #2a2d3a; padding: 10px 20px; display: flex; align-items: center; gap: 14px; }
+    #app-content header { background: #141925; border-bottom: 1px solid #2b3242; padding: 10px 20px; display: flex; align-items: center; gap: 14px; }
     .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
     .logo span { font-size: 1rem; font-weight: 600; color: #fff; }
     #logout-btn {
-      margin-left: auto; background: #1a1d27; color: #888;
-      border: 1px solid #2a2d3a; border-radius: 6px;
+      margin-left: auto; background: #141925; color: #9ba6b9;
+      border: 1px solid #2b3242; border-radius: 6px;
       padding: 6px 12px; font-size: 0.78rem; cursor: pointer;
       transition: background 0.15s, color 0.15s, border-color 0.15s;
     }
-    #logout-btn:hover { background: #22253a; color: #e0e0e0; border-color: #3a3d4a; }
+    #logout-btn:hover { background: #1e2433; color: #e9ecf3; border-color: #3a3d4a; }
 
     .nav-cards { display: flex; gap: 16px; padding: 48px 24px; justify-content: center; flex-wrap: wrap; }
-    .nav-card { display: block; background: #1a1d27; border: 1px solid #2a2d3a; border-radius: 12px; padding: 32px 40px; text-decoration: none; text-align: center; color: #e0e0e0; min-width: 200px; transition: border-color 0.15s, background 0.15s; }
-    .nav-card:hover { background: #22253a; border-color: #3b82f6; }
+    .nav-card { display: block; background: #141925; border: 1px solid #2b3242; border-radius: 12px; padding: 32px 40px; text-decoration: none; text-align: center; color: #e9ecf3; min-width: 200px; transition: border-color 0.15s, background 0.15s; }
+    .nav-card:hover { background: #1e2433; border-color: #3b82f6; }
     .nav-card .card-icon  { font-size: 2rem; margin-bottom: 10px; }
     .nav-card .card-title { font-size: 1rem; font-weight: 700; color: #fff; }
-    .nav-card .card-desc  { font-size: 0.78rem; color: #888; margin-top: 4px; }
+    .nav-card .card-desc  { font-size: 0.78rem; color: #9ba6b9; margin-top: 4px; }
   </style>
 </head>
 <body>

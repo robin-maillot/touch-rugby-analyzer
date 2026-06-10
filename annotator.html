@@ -8,38 +8,39 @@
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#0f1117">
+<meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="Touch Rugby">
 <script defer src="https://cloud.umami.is/script.js" data-website-id="cb7fd4f2-fcd5-44d7-a8e4-70e9068870bb" data-auto-track="false"></script>
+<link rel="stylesheet" href="css/theme.css">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Segoe UI', sans-serif; background: #0f1117; color: #e0e0e0; height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+  body { font-family: 'Inter', 'Segoe UI', sans-serif; background: #0b0e14; color: #e9ecf3; height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
 
-  header { background: #1a1d27; padding: 10px 20px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #2a2d3a; flex-shrink: 0; }
+  header { background: #141925; padding: 10px 20px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #2b3242; flex-shrink: 0; }
   header h1 { font-size: 1.1rem; font-weight: 600; color: #fff; }
-  header span { font-size: 0.75rem; color: #888; }
-  .yt-input { background: #0f1117; border: 1px solid #3a3d4a; border-radius: 5px; color: #ccc; padding: 4px 8px; font-size: 0.78rem; width: 260px; }
-  .yt-input::placeholder { color: #555; }
-  .yt-label { font-size: 0.75rem; color: #888; white-space: nowrap; }
+  header span { font-size: 0.75rem; color: #9ba6b9; }
+  .yt-input { background: #0b0e14; border: 1px solid #3a3d4a; border-radius: 5px; color: #ccc; padding: 4px 8px; font-size: 0.78rem; width: 260px; }
+  .yt-input::placeholder { color: #6c7689; }
+  .yt-label { font-size: 0.75rem; color: #9ba6b9; white-space: nowrap; }
 
   .main { display: flex; flex-direction: column; flex: 1; overflow: hidden; padding: 10px 12px; gap: 8px; }
 
-  .video-wrapper { background: #000; border-radius: 8px; overflow: hidden; position: relative; flex-shrink: 0; display: flex; align-items: center; justify-content: center; height: var(--video-h, 52vh); border: 1px solid #2a2d3a; }
-  .video-resize-handle { height: 5px; cursor: row-resize; background: #2a2d3a; flex-shrink: 0; border-radius: 3px; transition: background 0.15s; user-select: none; }
+  .video-wrapper { background: #000; border-radius: 8px; overflow: hidden; position: relative; flex-shrink: 0; display: flex; align-items: center; justify-content: center; height: var(--video-h, 52vh); border: 1px solid #2b3242; }
+  .video-resize-handle { height: 5px; cursor: row-resize; background: #2b3242; flex-shrink: 0; border-radius: 3px; transition: background 0.15s; user-select: none; }
   .video-resize-handle:hover, .video-resize-handle.dragging { background: #3b82f6; }
   video { max-width: 100%; max-height: 100%; display: block; }
-  .no-video { display: flex; flex-direction: column; align-items: center; gap: 10px; color: #555; }
+  .no-video { display: flex; flex-direction: column; align-items: center; gap: 10px; color: #6c7689; }
   .no-video svg { opacity: 0.3; }
   .no-video p { font-size: 0.85rem; }
 
-  .controls { display: flex; align-items: center; gap: 8px; background: #1a1d27; border-radius: 8px; padding: 7px 12px; border: 1px solid #2a2d3a; flex-shrink: 0; flex-wrap: wrap; }
+  .controls { display: flex; align-items: center; gap: 8px; background: #141925; border-radius: 8px; padding: 7px 12px; border: 1px solid #2b3242; flex-shrink: 0; flex-wrap: wrap; }
   .btn { border: none; border-radius: 6px; padding: 5px 12px; font-size: 0.78rem; cursor: pointer; font-weight: 600; transition: all 0.15s; }
   .btn-primary { background: #3b82f6; color: #fff; }
   .btn-primary:hover { background: #2563eb; }
-  .btn-ghost { background: #2a2d3a; color: #ccc; }
+  .btn-ghost { background: #2b3242; color: #ccc; }
   .btn-ghost:hover { background: #3a3d4a; }
   .btn-ghost:disabled { opacity: 0.4; cursor: default; }
   .btn-danger { background: #ef4444; color: #fff; }
@@ -52,8 +53,8 @@
   .btn-load { background: #0ea5e9; color: #fff; }
   .btn-load:hover { background: #0284c7; }
   .btn-load:disabled { opacity: 0.5; cursor: default; }
-  .time-display { font-family: monospace; font-size: 0.88rem; color: #fff; background: #0f1117; padding: 4px 8px; border-radius: 5px; min-width: 75px; text-align: center; }
-  select { background: #2a2d3a; color: #ccc; border: 1px solid #3a3d4a; border-radius: 5px; padding: 4px 7px; font-size: 0.78rem; cursor: pointer; }
+  .time-display { font-family: monospace; font-size: 0.88rem; color: #fff; background: #0b0e14; padding: 4px 8px; border-radius: 5px; min-width: 75px; text-align: center; }
+  select { background: #2b3242; color: #ccc; border: 1px solid #3a3d4a; border-radius: 5px; padding: 4px 7px; font-size: 0.78rem; cursor: pointer; }
 
   /* Tag buttons */
   .tag-bar { display: flex; gap: 7px; flex-wrap: wrap; flex-shrink: 0; align-items: center; }
@@ -62,9 +63,9 @@
   .tag-btn.active { outline: 3px solid #fff; outline-offset: 2px; }
 
   /* Sub-menu */
-  .submenu { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; background: #1a1d27; border-radius: 8px; padding: 6px 10px; border: 1px solid #2a2d3a; flex-shrink: 0; min-height: 36px; }
-  .submenu-label { font-size: 0.72rem; color: #888; margin-right: 4px; }
-  .sub-btn { border: none; border-radius: 6px; padding: 4px 10px; font-size: 0.76rem; font-weight: 600; cursor: pointer; background: #2a2d3a; color: #ddd; transition: background 0.1s; display: flex; align-items: center; gap: 4px; }
+  .submenu { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; background: #141925; border-radius: 8px; padding: 6px 10px; border: 1px solid #2b3242; flex-shrink: 0; min-height: 36px; }
+  .submenu-label { font-size: 0.72rem; color: #9ba6b9; margin-right: 4px; }
+  .sub-btn { border: none; border-radius: 6px; padding: 4px 10px; font-size: 0.76rem; font-weight: 600; cursor: pointer; background: #2b3242; color: #ddd; transition: background 0.1s; display: flex; align-items: center; gap: 4px; }
   .sub-btn:hover { background: #3a3d4a; }
   .sub-btn .hotkey { font-size: 0.65rem; opacity: 0.55; background: rgba(255,255,255,0.1); padding: 1px 4px; border-radius: 3px; }
   .submenu-empty { font-size: 0.75rem; color: #444; font-style: italic; }
@@ -72,14 +73,14 @@
   /* Timeline */
   .timeline-section { flex-shrink: 0; }
   .timeline-label { font-size: 0.68rem; color: #666; margin-bottom: 3px; letter-spacing: 0.05em; text-transform: uppercase; }
-  .timeline-wrapper { position: relative; background: #1a1d27; border-radius: 8px; border: 1px solid #2a2d3a; padding: 8px 12px; }
-  .seekbar-container { position: relative; height: 6px; background: #2a2d3a; border-radius: 3px; cursor: pointer; margin-bottom: 7px; }
+  .timeline-wrapper { position: relative; background: #141925; border-radius: 8px; border: 1px solid #2b3242; padding: 8px 12px; }
+  .seekbar-container { position: relative; height: 6px; background: #2b3242; border-radius: 3px; cursor: pointer; margin-bottom: 7px; }
   .seekbar-fill { height: 100%; background: #3b82f6; border-radius: 3px; pointer-events: none; }
   .seekbar-thumb { position: absolute; top: 50%; transform: translate(-50%, -50%); width: 13px; height: 13px; background: #fff; border-radius: 50%; box-shadow: 0 0 4px rgba(0,0,0,0.5); pointer-events: none; }
-  .markers-track { position: relative; height: 26px; background: #0f1117; border-radius: 4px; overflow: visible; }
+  .markers-track { position: relative; height: 26px; background: #0b0e14; border-radius: 4px; overflow: visible; }
   .marker { position: absolute; top: 2px; width: 4px; height: 22px; border-radius: 2px; transform: translateX(-50%); cursor: pointer; z-index: 2; }
   .marker:hover { width: 6px; z-index: 10; }
-  .marker-tooltip { display: none; position: absolute; bottom: 130%; left: 50%; transform: translateX(-50%); background: #1a1d27; border: 1px solid #3a3d4a; border-radius: 5px; padding: 3px 7px; font-size: 0.68rem; white-space: nowrap; color: #fff; z-index: 20; }
+  .marker-tooltip { display: none; position: absolute; bottom: 130%; left: 50%; transform: translateX(-50%); background: #141925; border: 1px solid #3a3d4a; border-radius: 5px; padding: 3px 7px; font-size: 0.68rem; white-space: nowrap; color: #fff; z-index: 20; }
   .marker:hover .marker-tooltip { display: block; }
   .legend { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 5px; }
   .legend-item { display: flex; align-items: center; gap: 4px; font-size: 0.7rem; color: #aaa; }
@@ -99,28 +100,28 @@
   .main.horizontal .video-wrapper { height: auto !important; width: var(--video-w, 45%); align-self: stretch; }
   .main.horizontal .video-resize-handle { width: 5px; height: auto !important; cursor: col-resize; }
   .main.horizontal .content-panel { overflow-y: auto; overflow-x: hidden; }
-  .layout-btn { background: #1a1d27; border: 1px solid #2a2d3a; border-radius: 6px; color: #888; font-size: 0.75rem; padding: 4px 10px; cursor: pointer; white-space: nowrap; flex-shrink: 0; transition: all 0.15s; }
-  .layout-btn:hover { background: #22253a; color: #e0e0e0; border-color: #3a3d4a; }
+  .layout-btn { background: #141925; border: 1px solid #2b3242; border-radius: 6px; color: #9ba6b9; font-size: 0.75rem; padding: 4px 10px; cursor: pointer; white-space: nowrap; flex-shrink: 0; transition: all 0.15s; }
+  .layout-btn:hover { background: #1e2433; color: #e9ecf3; border-color: #3a3d4a; }
   .layout-btn.active { border-color: #3b82f6; color: #3b82f6; }
   .list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; flex-shrink: 0; }
   .list-header h2 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #666; }
   .annotations-list { overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 3px; padding-right: 2px; }
-  .annotation-row { display: grid; grid-template-columns: 55px 90px 90px 110px 1fr 1fr auto auto auto; align-items: center; gap: 8px; background: #1a1d27; border-radius: 6px; padding: 5px 10px; border-left: 3px solid; font-size: 0.77rem; cursor: pointer; transition: background 0.1s; }
-  .annotation-row:hover { background: #22253a; }
+  .annotation-row { display: grid; grid-template-columns: 55px 90px 90px 110px 1fr 1fr auto auto auto; align-items: center; gap: 8px; background: #141925; border-radius: 6px; padding: 5px 10px; border-left: 3px solid; font-size: 0.77rem; cursor: pointer; transition: background 0.1s; }
+  .annotation-row:hover { background: #1e2433; }
   .ann-time { font-family: monospace; color: #aaa; font-size: 0.73rem; }
   .ann-type { font-weight: 700; }
   .ann-name { color: #bbb; }
   .ann-yt a { color: #3b82f6; font-size: 0.7rem; text-decoration: none; }
   .ann-yt a:hover { text-decoration: underline; }
-  .ann-possession { font-size: 0.72rem; color: #888; white-space: nowrap; }
+  .ann-possession { font-size: 0.72rem; color: #9ba6b9; white-space: nowrap; }
   .ann-comment { font-size: 0.72rem; color: #f97316; font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .ann-del { background: none; border: none; color: #555; cursor: pointer; font-size: 0.95rem; padding: 0 3px; }
+  .ann-del { background: none; border: none; color: #6c7689; cursor: pointer; font-size: 0.95rem; padding: 0 3px; }
   .ann-del:hover { color: #ef4444; }
-  .ann-comment-btn { background: none; border: none; color: #555; cursor: pointer; font-size: 0.82rem; padding: 0 3px; }
+  .ann-comment-btn { background: none; border: none; color: #6c7689; cursor: pointer; font-size: 0.82rem; padding: 0 3px; }
   .ann-comment-btn:hover { color: #3b82f6; }
   .ann-name-editable { cursor: pointer; border-bottom: 1px dashed #444; }
-  .ann-name-editable:hover { color: #e0e0e0; border-bottom-color: #888; }
-  .ann-name-select { background: #1a1d27; color: #e0e0e0; border: 1px solid #3b82f6; border-radius: 4px; font-size: 0.76rem; padding: 1px 4px; cursor: pointer; max-width: 100%; }
+  .ann-name-editable:hover { color: #e9ecf3; border-bottom-color: #9ba6b9; }
+  .ann-name-select { background: #141925; color: #e9ecf3; border: 1px solid #3b82f6; border-radius: 4px; font-size: 0.76rem; padding: 1px 4px; cursor: pointer; max-width: 100%; }
 
   /* Possession inconsistency highlighting */
   .annotation-row.inconsistent { background: rgba(249,115,22,0.08); }
@@ -133,45 +134,45 @@
 
   /* Comment editor modal */
   .comment-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100; }
-  .comment-dialog { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); z-index: 101; background: #1a1d27; border: 1px solid #3a3d4a; border-radius: 10px; padding: 16px; width: 440px; max-width: 92vw; display: flex; flex-direction: column; gap: 10px; }
+  .comment-dialog { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); z-index: 101; background: #141925; border: 1px solid #3a3d4a; border-radius: 10px; padding: 16px; width: 440px; max-width: 92vw; display: flex; flex-direction: column; gap: 10px; }
   .comment-dialog h3 { font-size: 0.82rem; color: #aaa; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
-  .comment-textarea { background: #0f1117; border: 1px solid #3a3d4a; border-radius: 6px; color: #e0e0e0; padding: 8px 10px; font-size: 0.82rem; resize: vertical; min-height: 110px; font-family: 'Segoe UI', sans-serif; line-height: 1.5; width: 100%; }
+  .comment-textarea { background: #0b0e14; border: 1px solid #3a3d4a; border-radius: 6px; color: #e9ecf3; padding: 8px 10px; font-size: 0.82rem; resize: vertical; min-height: 110px; font-family: 'Inter', 'Segoe UI', sans-serif; line-height: 1.5; width: 100%; }
   .comment-textarea:focus { outline: none; border-color: #3b82f6; }
   .comment-dialog-btns { display: flex; gap: 8px; justify-content: flex-end; }
-  .comment-hint { font-size: 0.68rem; color: #555; }
+  .comment-hint { font-size: 0.68rem; color: #6c7689; }
   .empty-state { color: #444; font-size: 0.8rem; text-align: center; padding: 20px; }
 
   /* Keys modal */
   .keys-dialog { width: 460px; }
-  .keys-row { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid #2a2d3a; }
+  .keys-row { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid #2b3242; }
   .keys-row:last-of-type { border-bottom: none; }
-  .keys-action { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: #e0e0e0; }
+  .keys-action { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: #e9ecf3; }
   .keys-swatch { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
-  .keys-key { font-family: 'Segoe UI', sans-serif; font-size: 0.82rem; font-weight: 700; background: #0f1117; border: 1px solid #3a3d4a; border-radius: 4px; padding: 3px 10px; min-width: 38px; text-align: center; color: #e0e0e0; }
+  .keys-key { font-family: 'Inter', 'Segoe UI', sans-serif; font-size: 0.82rem; font-weight: 700; background: #0b0e14; border: 1px solid #3a3d4a; border-radius: 4px; padding: 3px 10px; min-width: 38px; text-align: center; color: #e9ecf3; }
   .keys-key.listening { border-color: #3b82f6; color: #3b82f6; animation: keys-pulse 1s infinite; }
   @keyframes keys-pulse { 0%,100%{opacity:1} 50%{opacity:0.55} }
-  .keys-rebind { background: #2a2d3a; color: #e0e0e0; border: none; border-radius: 4px; padding: 3px 9px; font-size: 0.72rem; cursor: pointer; }
+  .keys-rebind { background: #2b3242; color: #e9ecf3; border: none; border-radius: 4px; padding: 3px 9px; font-size: 0.72rem; cursor: pointer; }
   .keys-rebind:hover { background: #3a3d4a; }
   .keys-error { font-size: 0.72rem; color: #ef4444; min-height: 1em; }
 
   /* Full game toggle */
-  .full-game-toggle { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; color: #ccc; cursor: pointer; background: #1a1d27; border: 1px solid #2a2d3a; border-radius: 8px; padding: 6px 12px; flex-shrink: 0; white-space: nowrap; }
+  .full-game-toggle { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; color: #ccc; cursor: pointer; background: #141925; border: 1px solid #2b3242; border-radius: 8px; padding: 6px 12px; flex-shrink: 0; white-space: nowrap; }
   .full-game-toggle input[type=checkbox] { accent-color: #3b82f6; width: 14px; height: 14px; cursor: pointer; }
 
   /* Meta bar */
-  .meta-bar { display: flex; gap: 8px; align-items: center; background: #1a1d27; border-radius: 8px; padding: 6px 10px; border: 1px solid #2a2d3a; flex-shrink: 0; flex-wrap: wrap; }
+  .meta-bar { display: flex; gap: 8px; align-items: center; background: #141925; border-radius: 8px; padding: 6px 10px; border: 1px solid #2b3242; flex-shrink: 0; flex-wrap: wrap; }
 
   /* Collapse toggle */
-  .collapse-toggle { display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; background: #1a1d27; border: 1px solid #2a2d3a; border-radius: 6px; padding: 3px 10px; flex-shrink: 0; color: #555; font-size: 0.72rem; user-select: none; transition: background 0.15s, color 0.15s; }
-  .collapse-toggle:hover { background: #22253a; color: #aaa; }
+  .collapse-toggle { display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; background: #141925; border: 1px solid #2b3242; border-radius: 6px; padding: 3px 10px; flex-shrink: 0; color: #6c7689; font-size: 0.72rem; user-select: none; transition: background 0.15s, color 0.15s; }
+  .collapse-toggle:hover { background: #1e2433; color: #aaa; }
   .collapse-toggle .chevron { transition: transform 0.2s; display: inline-block; }
   .collapse-toggle.collapsed .chevron { transform: rotate(-90deg); }
-  .meta-label { font-size: 0.72rem; color: #888; white-space: nowrap; }
-  .meta-sep { font-size: 0.78rem; color: #555; }
+  .meta-label { font-size: 0.72rem; color: #9ba6b9; white-space: nowrap; }
+  .meta-sep { font-size: 0.78rem; color: #6c7689; }
   .meta-input { width: 110px !important; }
 
   /* Team menu */
-  .team-menu { display: flex; gap: 8px; align-items: center; background: #1a1d27; border-radius: 8px; padding: 6px 10px; border: 1px solid #3b82f6; flex-shrink: 0; min-height: 36px; }
+  .team-menu { display: flex; gap: 8px; align-items: center; background: #141925; border-radius: 8px; padding: 6px 10px; border: 1px solid #3b82f6; flex-shrink: 0; min-height: 36px; }
   .team-label { font-size: 0.72rem; color: #3b82f6; margin-right: 4px; }
   .team-btn { border: none; border-radius: 6px; padding: 5px 16px; font-size: 0.78rem; font-weight: 700; cursor: pointer; transition: all 0.15s; }
   .team-btn:hover { filter: brightness(1.15); transform: translateY(-1px); }
@@ -221,17 +222,17 @@
 
 <header>
   <tr-logo compact></tr-logo>
-  <span style="width:1px;height:18px;background:#2a2d3a;flex-shrink:0"></span>
+  <span style="width:1px;height:18px;background:#2b3242;flex-shrink:0"></span>
   <h1>Annotator</h1>
   <span class="yt-label">YouTube URL:</span>
   <input class="yt-input" id="ytUrl" type="text" placeholder="https://www.youtube.com/watch?v=..." onkeydown="if(event.key==='Enter')loadYouTube()">
   <button class="btn btn-primary" onclick="loadYouTube()" style="padding:4px 10px;font-size:0.76rem">▶ Load YT</button>
   <nav style="display:flex;gap:4px;margin-left:auto;align-items:center">
     <button id="layoutBtn" class="layout-btn" onclick="toggleLayout()" title="Toggle video layout">↔ Side</button>
-    <a href="games.html" style="color:#888;text-decoration:none;font-size:0.8rem;padding:5px 10px;border-radius:6px;transition:background 0.15s" onmouseover="this.style.background='#22253a';this.style.color='#e0e0e0'" onmouseout="this.style.background='';this.style.color='#888'">Games</a>
-    <a href="dashboard.html" id="dashboardLink" style="display:none;color:#888;text-decoration:none;font-size:0.8rem;padding:5px 10px;border-radius:6px;transition:background 0.15s" onmouseover="this.style.background='#22253a';this.style.color='#e0e0e0'" onmouseout="this.style.background='';this.style.color='#888'">Dashboard</a>
-    <a href="viewer.html" style="color:#888;text-decoration:none;font-size:0.8rem;padding:5px 10px;border-radius:6px;transition:background 0.15s" onmouseover="this.style.background='#22253a';this.style.color='#e0e0e0'" onmouseout="this.style.background='';this.style.color='#888'">Events</a>
-    <a href="annotator.html" style="background:#22253a;color:#3b82f6;text-decoration:none;font-size:0.8rem;padding:5px 10px;border-radius:6px">Annotator</a>
+    <a href="games.html" style="color:#9ba6b9;text-decoration:none;font-size:0.8rem;padding:5px 10px;border-radius:6px;transition:background 0.15s" onmouseover="this.style.background='#1e2433';this.style.color='#e9ecf3'" onmouseout="this.style.background='';this.style.color='#9ba6b9'">Games</a>
+    <a href="dashboard.html" id="dashboardLink" style="display:none;color:#9ba6b9;text-decoration:none;font-size:0.8rem;padding:5px 10px;border-radius:6px;transition:background 0.15s" onmouseover="this.style.background='#1e2433';this.style.color='#e9ecf3'" onmouseout="this.style.background='';this.style.color='#9ba6b9'">Dashboard</a>
+    <a href="viewer.html" style="color:#9ba6b9;text-decoration:none;font-size:0.8rem;padding:5px 10px;border-radius:6px;transition:background 0.15s" onmouseover="this.style.background='#1e2433';this.style.color='#e9ecf3'" onmouseout="this.style.background='';this.style.color='#9ba6b9'">Events</a>
+    <a href="annotator.html" style="background:#1e2433;color:#3b82f6;text-decoration:none;font-size:0.8rem;padding:5px 10px;border-radius:6px">Annotator</a>
   </nav>
 </header>
 <script>{ if (TR.role() === 'admin') document.getElementById('dashboardLink').style.display = ''; }</script>
@@ -268,9 +269,9 @@
     <button class="btn btn-ghost" onclick="skip(5)" disabled id="skipFw">+5s</button>
     <button class="btn btn-ghost" onclick="gotoLastAnnotation()" id="lastAnnBtn" disabled title="Jump to last annotation">⏮ Last Tag</button>
     <span class="time-display" id="timeCurrent">0:00:00</span>
-    <span style="color:#555">/</span>
+    <span style="color:#6c7689">/</span>
     <span class="time-display" id="timeDuration">0:00:00</span>
-    <span style="font-size:0.72rem;color:#888">Speed:</span>
+    <span style="font-size:0.72rem;color:#9ba6b9">Speed:</span>
     <select id="speedSel" onchange="setSpeed()" disabled>
       <option value="0.25">0.25×</option>
       <option value="0.5">0.5×</option>
@@ -309,7 +310,7 @@
     <input class="yt-input meta-input" id="metaCompetition" placeholder="Competition" oninput="updateSheetPreview()">
     <input class="yt-input meta-input" id="metaId" placeholder="ID" style="width:70px !important" title="Optional disambiguator when same teams/comp/year/division play more than once" oninput="updateSheetPreview()">
     <span class="meta-sep">→</span>
-    <span id="sheetPreview" style="font-family:monospace;font-size:0.72rem;color:#555;white-space:nowrap">fill metadata to generate tab name</span>
+    <span id="sheetPreview" style="font-family:monospace;font-size:0.72rem;color:#6c7689;white-space:nowrap">fill metadata to generate tab name</span>
   </div>
 
   <!-- Action buttons -->
@@ -328,17 +329,17 @@
       <input id="clickDelayInput" type="number" min="0" max="9" step="1" value="0" style="width:36px;background:transparent;border:none;color:#fff;font-size:0.78rem;text-align:center;padding:0;outline:none" oninput="setClickDelay(this.value)">
       s
     </label>
-    <span style="width:1px;height:20px;background:#2a2d3a;margin:0 4px;flex-shrink:0"></span>
+    <span style="width:1px;height:20px;background:#2b3242;margin:0 4px;flex-shrink:0"></span>
     <button class="tag-btn" style="background:#22c55e;color:#000" data-type="Try" onclick="selectType('Try')">Try <kbd class="kbd-hint" data-action="Try" style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.15);padding:1px 4px;border-radius:3px">T</kbd></button>
     <button class="tag-btn" style="background:#f97316;color:#fff" data-type="Turnover" onclick="selectType('Turnover')">Turnover <kbd class="kbd-hint" data-action="Turnover" style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">U</kbd></button>
     <button class="tag-btn" style="background:#ef4444;color:#fff" data-type="Penalty Attack" onclick="selectType('Penalty Attack')">Pen Attack <kbd class="kbd-hint" data-action="Penalty Attack" style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">P</kbd></button>
     <button class="tag-btn" style="background:#b91c1c;color:#fff" data-type="Penalty Defence" onclick="selectType('Penalty Defence')">Pen Defence <kbd class="kbd-hint" data-action="Penalty Defence" style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">Q</kbd></button>
     <button class="tag-btn" style="background:#3b82f6;color:#fff" data-type="Game Event" onclick="selectType('Game Event')">Game Event <kbd class="kbd-hint" data-action="Game Event" style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">G</kbd></button>
     <button class="tag-btn" style="background:#a855f7;color:#fff" data-type="To Review" onclick="selectType('To Review')">To Review <kbd class="kbd-hint" data-action="To Review" style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">R</kbd></button>
-    <span id="sixthTouchSep" style="width:1px;height:20px;background:#2a2d3a;margin:0 4px;flex-shrink:0"></span>
+    <span id="sixthTouchSep" style="width:1px;height:20px;background:#2b3242;margin:0 4px;flex-shrink:0"></span>
     <button id="sixthTouchBtn" class="tag-btn" style="background:#c2410c;color:#fff" onclick="quickTag('Turnover','6th Touch')">6th Touch <kbd class="kbd-hint" data-action="6th Touch" style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">6</kbd></button>
     <button id="sixAgainBtn" class="tag-btn" style="background:#c2410c;color:#fff" onclick="quickTag('Turnover','6 Again')">6 Again <kbd class="kbd-hint" data-action="6 Again" style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">5</kbd></button>
-    <span style="width:1px;height:20px;background:#2a2d3a;margin:0 4px;flex-shrink:0"></span>
+    <span style="width:1px;height:20px;background:#2b3242;margin:0 4px;flex-shrink:0"></span>
     <button class="tag-btn" style="background:#3b82f6;color:#fff" onclick="quickBallLive()">Ball Live <kbd class="kbd-hint" data-action="Ball Live" style="font-size:0.62rem;opacity:0.5;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px">L</kbd></button>
     <span style="flex:1"></span>
     <button class="btn btn-ghost" id="openKeysBtn" onclick="openKeysModal()" title="Customize keyboard shortcuts" style="font-size:0.72rem;padding:4px 9px">⌨ Keys</button>
@@ -381,7 +382,7 @@
     <div class="list-header">
       <h2>Annotations (<span id="annCount">0</span>)</h2>
       <button id="fixAllBtn" style="display:none" onclick="fixAllInconsistencies()" title="Overwrite every possession owner so they follow the inferred chain from each half's Game Start">⚠ Fix <span id="inconsistentCount">0</span></button>
-      <label class="full-game-toggle" style="font-size:0.72rem;padding:4px 8px;border-color:#2a2d3a">
+      <label class="full-game-toggle" style="font-size:0.72rem;padding:4px 8px;border-color:#2b3242">
         <input type="checkbox" id="hideBallLiveToggle">
         Hide Ball Live
       </label>
@@ -1109,7 +1110,7 @@ function updateSheetPreview() {
   const name = metaToSheetName();
   const el = document.getElementById('sheetPreview');
   el.textContent = name || 'fill metadata to generate tab name';
-  el.style.color = name ? '#3b82f6' : '#555';
+  el.style.color = name ? '#3b82f6' : '#6c7689';
   document.getElementById('teamBtn1').textContent = displayTeam('Team 1');
   document.getElementById('teamBtn2').textContent = displayTeam('Team 2');
   if (annotations.length) renderList();
@@ -1419,7 +1420,7 @@ function closeKeysModal() {
 }
 function renderKeysModal() {
   const rows = Object.keys(DEFAULT_KEY_BINDINGS).map(action => {
-    const swatch = KEYS_SWATCHES[action] || '#888';
+    const swatch = KEYS_SWATCHES[action] || '#9ba6b9';
     const key = (keyBindings[action] || '').toUpperCase();
     const listening = keysListeningFor === action;
     return `<div class="keys-row">

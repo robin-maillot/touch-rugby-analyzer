@@ -8,7 +8,7 @@
   <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#0f1117">
+  <meta name="theme-color" content="#0b0e14">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -17,34 +17,16 @@
   <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
   <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
   <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
-  <style>
-    :root {
-      --bg:        #0f1117;
-      --surface:   #1a1d27;
-      --surface-2: #22253a;
-      --border:    #2a2d3a;
-      --border-l:  #1c1f2e;
-      --text:      #e0e0e0;
-      --muted:     #888;
-      --dim:       #555;
-      --accent:    #3b82f6;
-      --green:     #00c853;
-      --red:       #f44336;
-      --orange:    #ff9800;
-      --yellow:    #ffd600;
-    }
+  <link rel="stylesheet" href="css/theme.css">
+<style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+    body { font-family: 'Inter', 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
 
     /* ── Header ─────────────────────────────────────────────── */
     header { background: var(--surface); padding: 10px 20px; display: flex; align-items: center; gap: 14px; border-bottom: 1px solid var(--border); }
     .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
     .logo span { font-size: 1rem; font-weight: 600; color: #fff; white-space: nowrap; }
     .header-sep { width: 1px; height: 20px; background: var(--border); align-self: center; }
-    .header-nav { display: flex; gap: 4px; margin-left: auto; }
-    .header-nav a { color: var(--muted); text-decoration: none; font-size: 0.8rem; padding: 5px 10px; border-radius: 6px; transition: background 0.15s, color 0.15s; }
-    .header-nav a:hover { background: var(--surface-2); color: var(--text); }
-    .header-nav a.active { background: var(--surface-2); color: var(--accent); }
 
     /* ── Layout ─────────────────────────────────────────────── */
     main { padding: 20px 24px; max-width: 1120px; margin: 0 auto; }
@@ -193,7 +175,8 @@
 <header>
   <tr-logo></tr-logo>
   <div class="header-sep"></div>
-  <nav class="header-nav">
+  <button id="navToggle" class="nav-toggle" onclick="toggleNavMenu()" aria-label="Open page menu" aria-expanded="false" aria-controls="headerNav" aria-haspopup="true">☰</button>
+  <nav class="header-nav" id="headerNav">
     <a href="games.html">Games</a>
     <a href="dashboard.html" class="active">Dashboard</a>
     <a href="viewer.html">Events</a>
@@ -850,5 +833,6 @@ function cap(s) { return (s || '').replace(/\b\w/g, c => c.toUpperCase()); }
 function labelOf(t) { return t.division ? `${cap(t.name)} · ${t.division}` : cap(t.name); }
 function f1(n)  { return Number(n).toFixed(1); }
 </script>
+<script src="js/nav.js"></script>
 </body>
 </html>

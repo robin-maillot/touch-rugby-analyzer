@@ -8,7 +8,7 @@
   <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#0f1117">
+  <meta name="theme-color" content="#0b0e14">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -18,84 +18,81 @@
   <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
   <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-  <style>
+  <link rel="stylesheet" href="css/theme.css">
+<style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Segoe UI', sans-serif; background: #0f1117; color: #e0e0e0; min-height: 100vh; }
+    body { font-family: 'Inter', 'Segoe UI', sans-serif; background: #0b0e14; color: #e9ecf3; min-height: 100vh; }
 
-    header { background: #1a1d27; padding: 10px 20px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #2a2d3a; flex-wrap: wrap; }
+    header { background: #141925; padding: 10px 20px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #2b3242; flex-wrap: wrap; }
     .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
     .logo span { font-size: 1rem; font-weight: 600; color: #fff; white-space: nowrap; }
-    .header-nav { display: flex; gap: 4px; }
-    .header-nav a { color: #888; text-decoration: none; font-size: 0.8rem; padding: 5px 10px; border-radius: 6px; transition: background 0.15s, color 0.15s; }
-    .header-nav a:hover { background: #22253a; color: #e0e0e0; }
-    .header-nav a.active { background: #22253a; color: #3b82f6; }
-    .header-sep { width: 1px; height: 20px; background: #2a2d3a; margin: 0 4px; align-self: center; }
-    select { background: #2a2d3a; color: #ccc; border: 1px solid #3a3d4a; border-radius: 5px; padding: 5px 10px; font-size: 0.82rem; cursor: pointer; min-width: 280px; }
-    #status { font-size: 0.78rem; color: #888; }
+    .header-sep { width: 1px; height: 20px; background: #2b3242; margin: 0 4px; align-self: center; }
+    select { background: #2b3242; color: #ccc; border: 1px solid #3a3d4a; border-radius: 5px; padding: 5px 10px; font-size: 0.82rem; cursor: pointer; min-width: 280px; }
+    #status { font-size: 0.78rem; color: #9ba6b9; }
 
     main { padding: 20px 24px; max-width: 960px; margin: 0 auto; }
 
-    .card { background: #1a1d27; border: 1px solid #2a2d3a; border-radius: 10px; padding: 16px 20px; margin-bottom: 14px; }
+    .card { background: #141925; border: 1px solid #2b3242; border-radius: 10px; padding: 16px 20px; margin-bottom: 14px; }
 
     .game-title-row { display: flex; align-items: center; gap: 10px; }
     #gameTitle    { font-size: 1.15rem; font-weight: 700; color: #fff; }
     #gameSubtitle { font-size: 0.78rem; color: #777; margin-top: 3px; }
-    #gameTimingRow { display: flex; gap: 16px; margin-top: 8px; font-size: 0.78rem; color: #888; flex-wrap: wrap; }
+    #gameTimingRow { display: flex; gap: 16px; margin-top: 8px; font-size: 0.78rem; color: #9ba6b9; flex-wrap: wrap; }
     #gameTimingRow .timing-val { color: #ccc; font-weight: 600; }
     #viewEventsBtn, #compareHalvesBtn, #turnoverDistBtn, #downloadVideoBtn { text-decoration: none; background: none; border: 1px solid #3a3d4a; border-radius: 6px; padding: 4px 11px; font-size: 0.75rem; color: #aaa; cursor: pointer; white-space: nowrap; transition: border-color 0.12s, color 0.12s; }
     #viewEventsBtn:hover, #compareHalvesBtn:hover, #turnoverDistBtn:hover, #downloadVideoBtn:hover:not(:disabled) { border-color: var(--accent, #3b82f6); color: #fff; }
     #downloadVideoBtn:disabled { opacity: 0.5; cursor: default; }
 
     #commentText { flex: 1; white-space: pre-wrap; color: #ccc; font-size: 0.85rem; line-height: 1.45; }
-    #commentText:empty::before { content: 'No comment yet'; color: #555; font-style: italic; }
+    #commentText:empty::before { content: 'No comment yet'; color: #6c7689; font-style: italic; }
     #commentEditBtn { background: none; border: 1px solid #3a3d4a; color: #aaa; border-radius: 5px; padding: 3px 9px; font-size: 0.72rem; cursor: pointer; flex-shrink: 0; }
     #commentEditBtn:hover { border-color: #3b82f6; color: #fff; }
-    #commentTextarea { width: 100%; min-height: 70px; background: #0f1117; color: #e0e0e0; border: 1px solid #3a3d4a; border-radius: 6px; padding: 8px 10px; font-family: inherit; font-size: 0.85rem; line-height: 1.45; resize: vertical; }
+    #commentTextarea { width: 100%; min-height: 70px; background: #0b0e14; color: #e9ecf3; border: 1px solid #3a3d4a; border-radius: 6px; padding: 8px 10px; font-family: inherit; font-size: 0.85rem; line-height: 1.45; resize: vertical; }
     #commentTextarea:focus { outline: none; border-color: #3b82f6; }
     .comment-btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
-    .comment-btns button { background: #2a2d3a; color: #e0e0e0; border: 1px solid #3a3d4a; border-radius: 5px; padding: 4px 12px; font-size: 0.78rem; cursor: pointer; }
+    .comment-btns button { background: #2b3242; color: #e9ecf3; border: 1px solid #3a3d4a; border-radius: 5px; padding: 4px 12px; font-size: 0.78rem; cursor: pointer; }
     .comment-btns button:hover { background: #3a3d4a; }
     .comment-btns button.primary { background: #1d4ed8; border-color: #1d4ed8; }
     .comment-btns button.primary:hover { background: #2563eb; }
 
     table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
-    th { background: #0f1117; color: #aaa; padding: 8px 12px; text-align: left; font-weight: 600; border-bottom: 1px solid #2a2d3a; }
+    th { background: #0b0e14; color: #aaa; padding: 8px 12px; text-align: left; font-weight: 600; border-bottom: 1px solid #2b3242; }
     td { padding: 8px 12px; border-bottom: 1px solid #1f2230; color: #ddd; }
     tr:last-child td { border-bottom: none; }
     td.stat-hover { cursor: help; position: relative; }
-    td.stat-hover:hover { background: #1a1d27; color: #fff; }
+    td.stat-hover:hover { background: #141925; color: #fff; }
 
     /* ── Stat popover (penalty list on hover) ───────────────────── */
     #statPopover {
       position: fixed; z-index: 150; display: none;
-      background: #11131c; border: 1px solid #2a2d3a; border-radius: 8px;
+      background: #11131c; border: 1px solid #2b3242; border-radius: 8px;
       box-shadow: 0 8px 24px rgba(0,0,0,0.5);
       min-width: 240px; max-width: 360px; padding: 8px 0;
       font-size: 0.8rem;
     }
-    #statPopover .pop-head { padding: 4px 12px 8px; color: #888; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #1f2230; }
-    #statPopover .pop-empty { padding: 10px 12px; color: #555; font-style: italic; }
+    #statPopover .pop-head { padding: 4px 12px 8px; color: #9ba6b9; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #1f2230; }
+    #statPopover .pop-empty { padding: 10px 12px; color: #6c7689; font-style: italic; }
     #statPopover .pop-row {
       display: flex; gap: 10px; align-items: baseline;
       padding: 6px 12px; color: #ddd; cursor: pointer; text-decoration: none;
       border-left: 2px solid transparent;
     }
-    #statPopover .pop-row:hover { background: #1a1d27; border-left-color: #3b82f6; color: #fff; }
-    #statPopover .pop-time { font-family: ui-monospace, monospace; font-size: 0.74rem; color: #888; min-width: 56px; }
+    #statPopover .pop-row:hover { background: #141925; border-left-color: #3b82f6; color: #fff; }
+    #statPopover .pop-time { font-family: ui-monospace, monospace; font-size: 0.74rem; color: #9ba6b9; min-width: 56px; }
     #statPopover .pop-name { flex: 1; }
     #statPopover .pop-comment { color: #666; font-size: 0.72rem; font-style: italic; margin-left: 4px; }
-    #statPopover .pop-extlink { color: #555; font-size: 0.7rem; }
+    #statPopover .pop-extlink { color: #6c7689; font-size: 0.7rem; }
     #statPopover .pop-row:hover .pop-extlink { color: #3b82f6; }
 
-    #loading      { text-align: center; padding: 60px 24px; color: #888; font-size: 0.9rem; display: none; }
+    #loading      { text-align: center; padding: 60px 24px; color: #9ba6b9; font-size: 0.9rem; display: none; }
     #errMsg       { color: #ef4444; font-size: 0.82rem; padding: 12px 0; display: none; }
     #notAnalysable { display: none; text-align: center; padding: 80px 24px; }
-    #notAnalysable p { font-size: 1.1rem; font-weight: 600; color: #888; }
-    #notAnalysable .hint { font-size: 0.8rem; color: #555; margin-top: 8px; }
+    #notAnalysable p { font-size: 1.1rem; font-weight: 600; color: #9ba6b9; }
+    #notAnalysable .hint { font-size: 0.8rem; color: #6c7689; margin-top: 8px; }
     #gameContent { display: none; }
-    #selectPrompt { text-align: center; padding: 80px 24px; color: #555; font-size: 0.9rem; }
+    #selectPrompt { text-align: center; padding: 80px 24px; color: #6c7689; font-size: 0.9rem; }
 
-    .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid #2a2d3a; border-top-color: #3b82f6; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 8px; }
+    .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid #2b3242; border-top-color: #3b82f6; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 8px; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
     .chart-wrap { overflow-x: auto; width: 100%; }
@@ -103,9 +100,9 @@
     .card-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: #666; margin-bottom: 10px; }
 
     .half-toggle { display: flex; gap: 4px; margin-top: 10px; flex-wrap: wrap; }
-    .half-btn { background: #0f1117; border: 1px solid #2a2d3a; color: #888; border-radius: 5px; padding: 4px 12px; font-size: 0.78rem; cursor: pointer; transition: background 0.15s, color 0.15s; }
-    .half-btn:hover { background: #22253a; color: #e0e0e0; }
-    .half-btn.active { background: #22253a; color: #3b82f6; border-color: #3b82f6; }
+    .half-btn { background: #0b0e14; border: 1px solid #2b3242; color: #9ba6b9; border-radius: 5px; padding: 4px 12px; font-size: 0.78rem; cursor: pointer; transition: background 0.15s, color 0.15s; }
+    .half-btn:hover { background: #1e2433; color: #e9ecf3; }
+    .half-btn.active { background: #1e2433; color: #3b82f6; border-color: #3b82f6; }
 
     /* ── Compare Halves Modal ───────────────────────────────────── */
     #compareOverlay {
@@ -114,14 +111,14 @@
       padding: 16px; overflow-y: auto;
     }
     #compareCard {
-      background: #1a1d27; border: 1px solid #2a2d3a; border-radius: 12px;
+      background: #141925; border: 1px solid #2b3242; border-radius: 12px;
       max-width: 860px; width: 100%; max-height: 85dvh;
       display: flex; flex-direction: column;
       box-shadow: 0 8px 40px rgba(0,0,0,0.6); flex-shrink: 0;
     }
     .compare-header {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 14px 20px; border-bottom: 1px solid #2a2d3a; flex-shrink: 0;
+      padding: 14px 20px; border-bottom: 1px solid #2b3242; flex-shrink: 0;
     }
     .compare-title { font-size: 0.95rem; font-weight: 700; color: #fff; }
     .compare-close {
@@ -132,12 +129,12 @@
     .compare-close:hover { color: #fff; }
     .compare-header-actions { display: flex; align-items: center; gap: 8px; }
     .compare-export {
-      background: #1f2230; border: 1px solid #2a2d3a; color: #ccc;
+      background: #1f2230; border: 1px solid #2b3242; color: #ccc;
       font-size: 0.78rem; font-weight: 600; padding: 6px 12px;
       border-radius: 6px; cursor: pointer;
       transition: background 0.12s, color 0.12s, border-color 0.12s;
     }
-    .compare-export:hover    { background: #2a2d3a; color: #fff; border-color: #3b82f6; }
+    .compare-export:hover    { background: #2b3242; color: #fff; border-color: #3b82f6; }
     .compare-export:disabled { opacity: 0.5; cursor: not-allowed; }
     #compareBody { overflow-y: auto; padding: 4px 0; }
     .compare-scroll { overflow-x: auto; padding: 0 20px 16px; }
@@ -145,8 +142,8 @@
       width: 100%; border-collapse: collapse; font-size: 0.8rem; min-width: 480px;
     }
     .compare-table th {
-      background: #0f1117; color: #888; padding: 8px 12px;
-      font-weight: 600; border-bottom: 2px solid #2a2d3a; white-space: nowrap;
+      background: #0b0e14; color: #9ba6b9; padding: 8px 12px;
+      font-weight: 600; border-bottom: 2px solid #2b3242; white-space: nowrap;
       font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em;
     }
     .compare-table th:first-child, .compare-table th:nth-child(2) { text-align: left; }
@@ -162,9 +159,9 @@
     .compare-table .val-trailer { color: #ef4444; }
     .compare-table .val-neutral { color: #bbb; }
     .compare-table tr.section-row td {
-      background: #141720; color: #555; font-size: 0.63rem;
+      background: #141720; color: #6c7689; font-size: 0.63rem;
       text-transform: uppercase; letter-spacing: 0.09em;
-      padding: 10px 12px 5px; font-weight: 700; border-top: 1px solid #2a2d3a;
+      padding: 10px 12px 5px; font-weight: 700; border-top: 1px solid #2b3242;
     }
     .compare-table tbody tr.section-row:first-child td { border-top: none; }
     .compare-table tr.row-a td { border-bottom: none; }
@@ -176,7 +173,7 @@
       padding: 16px; overflow-y: auto;
     }
     #turnoverCard {
-      background: #1a1d27; border: 1px solid #2a2d3a; border-radius: 12px;
+      background: #141925; border: 1px solid #2b3242; border-radius: 12px;
       max-width: 600px; width: 100%; max-height: 85dvh;
       display: flex; flex-direction: column;
       box-shadow: 0 8px 40px rgba(0,0,0,0.6); flex-shrink: 0;
@@ -188,14 +185,14 @@
       border: 1px solid #3a3d4a !important;
       border-radius: 7px !important;
       padding: 8px 12px !important;
-      font-family: 'Segoe UI', sans-serif !important;
+      font-family: 'Inter', 'Segoe UI', sans-serif !important;
       font-size: 0.78rem !important;
-      color: #e0e0e0 !important;
+      color: #e9ecf3 !important;
       box-shadow: 0 4px 16px rgba(0,0,0,0.5) !important;
       pointer-events: none;
     }
-    .vega-tooltip td { color: #e0e0e0 !important; border: none !important; padding: 2px 6px 2px 0 !important; }
-    .vega-tooltip td.key { color: #888 !important; font-weight: 500; padding-right: 10px !important; white-space: nowrap; }
+    .vega-tooltip td { color: #e9ecf3 !important; border: none !important; padding: 2px 6px 2px 0 !important; }
+    .vega-tooltip td.key { color: #9ba6b9 !important; font-weight: 500; padding-right: 10px !important; white-space: nowrap; }
     .vega-tooltip td.value { color: #fff !important; font-weight: 600; }
   </style>
 <script src="js/config.js"></script>
@@ -209,7 +206,8 @@
   <div class="header-sep"></div>
   <select id="gameSelect" onchange="loadGame()"><option value="">Loading games…</option></select>
   <span id="status"></span>
-  <nav class="header-nav" style="margin-left:auto">
+  <button id="navToggle" class="nav-toggle" onclick="toggleNavMenu()" aria-label="Open page menu" aria-expanded="false" aria-controls="headerNav" aria-haspopup="true">☰</button>
+  <nav class="header-nav" id="headerNav">
     <a href="games.html" class="active">Games</a>
     <a href="dashboard.html" id="dashboardLink" style="display:none">Dashboard</a>
     <a href="viewer.html" id="eventsLink">Events</a>
@@ -339,11 +337,11 @@ async function getLiveVersion() {
 const MM_SS = "(datum.value < 0 ? '-' : '') + floor(abs(datum.value) / 60) + ':' + (floor(abs(datum.value) % 60) < 10 ? '0' : '') + floor(abs(datum.value) % 60)";
 
 const VEGA_CONFIG = {
-  background: '#1a1d27',
+  background: '#141925',
   title:  { color: '#ccc', fontSize: 13, font: 'Segoe UI' },
-  axis:   { gridColor: '#2a2d3a', labelColor: '#aaa', titleColor: '#888', tickColor: '#2a2d3a', domainColor: '#2a2d3a', labelFont: 'Segoe UI' },
-  legend: { labelColor: '#ccc', titleColor: '#888', labelFont: 'Segoe UI' },
-  view:   { stroke: '#2a2d3a' },
+  axis:   { gridColor: '#2b3242', labelColor: '#aaa', titleColor: '#9ba6b9', tickColor: '#2b3242', domainColor: '#2b3242', labelFont: 'Segoe UI' },
+  legend: { labelColor: '#ccc', titleColor: '#9ba6b9', labelFont: 'Segoe UI' },
+  view:   { stroke: '#2b3242' },
 };
 
 let _turnoverData = null; // { data: [{Team, Time}], teamNames } — refreshed per renderStats() call
@@ -1177,7 +1175,7 @@ async function exportCompareTable() {
   const origText = exportBtn.textContent;
 
   try {
-    const canvas = await html2canvas(card, { backgroundColor: '#1a1d27', scale: 2, useCORS: true });
+    const canvas = await html2canvas(card, { backgroundColor: '#141925', scale: 2, useCORS: true });
     const slug = s => String(s || '').toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
     const { team1, team2 } = currentGame;
     const filename = `${slug(team1) || 'team1'}-vs-${slug(team2) || 'team2'}-half-comparison.jpg`;
@@ -1278,5 +1276,6 @@ function buildCompareTable(periods, teamNames, { hasBallLive = true, hasDrives =
   return html;
 }
 </script>
+<script src="js/nav.js"></script>
 </body>
 </html>
