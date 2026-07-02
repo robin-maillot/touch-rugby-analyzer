@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Euro 2026 Vichy — Questionnaires joueurs</title>
+<style>
+:root { color-scheme: light; }
+* { box-sizing: border-box; }
+body { margin:0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background:#f4f6f8; color:#1a2733; line-height:1.45; }
+header { background:linear-gradient(120deg,#0b2545,#13457a); color:#fff; padding:22px 26px; }
+header h1 { margin:0 0 4px; font-size:22px; }
+header p { margin:0; opacity:.85; font-size:14px; }
+nav { display:flex; flex-wrap:wrap; gap:6px; padding:12px 20px; background:#fff; border-bottom:1px solid #e2e8f0; position:sticky; top:0; z-index:20; }
+nav button { border:1px solid #cbd5e1; background:#fff; color:#334155; padding:8px 14px; border-radius:20px; cursor:pointer; font-size:13px; font-weight:600; }
+nav button.active { background:#13457a; color:#fff; border-color:#13457a; }
+main { padding:20px 26px 60px; max-width:1180px; margin:0 auto; }
+section { display:none; }
+section.active { display:block; }
+h2 { font-size:19px; margin:6px 0 14px; color:#0b2545; }
+h3 { font-size:15px; margin:18px 0 8px; color:#13457a; }
+.note { background:#fff7ed; border:1px solid #fed7aa; color:#9a3412; padding:10px 14px; border-radius:8px; font-size:13px; margin-bottom:16px; }
+.grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:14px; }
+.card { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:14px 16px; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+.card h4 { margin:0 0 2px; font-size:16px; color:#0b2545; }
+.card .role { font-size:12px; color:#64748b; margin-bottom:8px; }
+.tags { margin:6px 0 10px; }
+.tag { display:inline-block; font-size:11px; font-weight:600; padding:2px 8px; border-radius:12px; margin:2px 4px 2px 0; }
+.t-stable{background:#dcfce7;color:#166534;} .t-anx{background:#fee2e2;color:#991b1b;}
+.t-calm{background:#e0f2fe;color:#075985;} .t-energy{background:#fef9c3;color:#854d0e;}
+.t-support{background:#ede9fe;color:#5b21b6;} .t-intro{background:#f1f5f9;color:#475569;}
+.kv { font-size:12.5px; margin:3px 0; }
+.kv b { color:#334155; }
+.flag { background:#fdecea; border-left:3px solid #dc2626; padding:6px 10px; font-size:12px; border-radius:4px; margin-top:8px; color:#7f1d1d; }
+table { border-collapse:collapse; width:100%; background:#fff; font-size:12.5px; }
+th,td { border:1px solid #e2e8f0; padding:7px 9px; text-align:left; vertical-align:top; }
+th { background:#0b2545; color:#fff; position:sticky; top:56px; font-size:12px; }
+tr:nth-child(even) td { background:#f8fafc; }
+.qblock { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:14px 16px; margin-bottom:16px; }
+.qblock h3 { margin-top:0; }
+.qrow { border-bottom:1px solid #f0f4f8; padding:5px 0; font-size:13px; }
+.qrow b { color:#0b2545; }
+.cluster { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:14px 18px; margin-bottom:14px; border-top:4px solid #13457a; }
+.cluster h3 { margin-top:0; }
+.members { font-size:13px; color:#334155; margin:6px 0; }
+.members span { display:inline-block; background:#eef2f7; border-radius:6px; padding:2px 8px; margin:2px 4px 2px 0; font-weight:600; }
+.room { display:flex; align-items:flex-start; gap:12px; background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:12px 16px; margin-bottom:10px; }
+.room.trio { border:1px solid #c7a2f0; background:#faf5ff; }
+.room .num { background:#13457a; color:#fff; font-weight:700; border-radius:8px; min-width:34px; height:34px; display:flex; align-items:center; justify-content:center; font-size:15px; }
+.room.trio .num { background:#7c3aed; }
+.room .pair { font-weight:700; color:#0b2545; font-size:15px; }
+.room .why { font-size:12.5px; color:#475569; margin-top:3px; }
+.legend { font-size:12px; color:#64748b; margin-bottom:14px; }
+select { padding:6px 10px; border-radius:8px; border:1px solid #cbd5e1; font-size:13px; }
+.reserve { font-size:12px; color:#94a3b8; margin-top:10px; }
+.optbtn { border:1px solid #cbd5e1; background:#fff; color:#334155; padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600; }
+.optbtn.active { background:#13457a; color:#fff; border-color:#13457a; }
+#optIntro h3 { margin:0 0 6px; }
+#optIntro p { margin:4px 0; font-size:13px; color:#334155; }
+.pro { color:#166534; } .con { color:#9a3412; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🏉 Euro 2026 — Vichy · Équipe de France Touch Hommes +30</h1>
+  <p>Synthèse des questionnaires « Gestion en compétition » · 16 joueurs présents au stage · Vue coach</p>
+</header>
+<nav>
+  <button data-t="apercu" class="active">Aperçu</button>
+  <button data-t="joueurs">Par joueur</button>
+  <button data-t="questions">Par question</button>
+  <button data-t="profils">Profils</button>
+  <button data-t="roomings">Roomings</button>
+</nav>
+<main>
+
+<!-- APERCU -->
+<section id="apercu" class="active">
+  <h2>Ce qui ressort du groupe</h2>
+  <div class="note">⚠️ 3 réserves écartés du stage : <b>Romain Canigiani</b>, <b>Gauthier Watrin</b>, <b>Johann Wambre</b> (non retenus). <b>16 joueurs</b> présents au stage (Erwann Le Gendre ajouté).<br>
+  Le questionnaire de <b>Jérôme Huvelin</b> est manuscrit et scanné : OCR partiellement lisible, profil à confirmer. Les cases cochées de <b>William Fievet</b>, <b>David Potrel</b> et <b>Erwann Le Gendre</b> n'ont pas été récupérées / peu renseignées ; leurs profils s'appuient sur le texte libre.</div>
+  <div class="grid">
+    <div class="card"><h4>Un groupe globalement stable</h4><p class="kv">La majorité se dit « rarement » stressée et passe vite à autre chose après une erreur. Peu de profils explosifs. Le stress vient surtout de l'intérieur (doute sur soi, sur sa légitimité) plus que de l'adversaire.</p></div>
+    <div class="card"><h4>Le besoin n°1 : le positif & la clarté</h4><p class="kv">Reviennent sans cesse : consignes claires / rôle clair, une ligne qui reste positive, et une consigne simple pour se relancer. Peu veulent qu'on leur dise « pourquoi t'as fait ça ».</p></div>
+    <div class="card"><h4>Deux leviers de récupération opposés</h4><p class="kv">Certains rechargent <b>en s'isolant</b> (Seb, David), d'autres <b>dans le collectif</b> (Cyril, Maxime, Bastien). À respecter dans les roomings.</p></div>
+    <div class="card"><h4>Points d'attention</h4><p class="kv">Quelques ruminations longues (Ian, William), un besoin de calme explicite (Adrien), une situation personnelle lourde (David), et de nouveaux venus en quête de repères (Bastien, Maxime sur les grands événements).</p></div>
+  </div>
+  <h3>Répartition rapide</h3>
+  <table>
+    <tr><th>Dimension</th><th>Tendance dominante</th><th>À surveiller</th></tr>
+    <tr><td>Stress avant-match</td><td>Rarement / Parfois</td><td>Ian (Souvent), Bastien (dépend du groupe)</td></tr>
+    <tr><td>Après une erreur</td><td>Passe vite à autre chose</td><td>Ian & William (rumination longue), Adrien (perte de confiance / repli)</td></tr>
+    <tr><td>Récupération mentale</td><td>Consigne simple + action suivante</td><td>Besoin d'isolement : Seb, David</td></tr>
+    <tr><td>Moment difficile d'équipe</td><td>Met de l'énergie / se concentre sur soi</td><td>Repli : Ian ; Leaders : Cyril, Dorian S-F</td></tr>
+  </table>
+</section>
+
+<!-- JOUEURS -->
+<section id="joueurs">
+  <h2>Fiche par joueur</h2>
+  <div class="legend">Filtrer par profil :
+    <select id="filterProfil">
+      <option value="all">Tous</option>
+      <option value="stable">Piliers stables</option>
+      <option value="calm">Calmes / introspectifs</option>
+      <option value="anx">Anxieux / ruminateurs</option>
+      <option value="energy">Énergiques / fédérateurs</option>
+      <option value="support">Soutiens émotionnels</option>
+    </select>
+  </div>
+  <div class="grid" id="playerCards"></div>
+</section>
+
+<!-- QUESTIONS -->
+<section id="questions">
+  <h2>Réponses par question</h2>
+  <div class="legend">Sélectionne une question pour comparer tout le groupe.</div>
+  <select id="qSelect"></select>
+  <div id="qContent" style="margin-top:14px;"></div>
+</section>
+
+<!-- PROFILS -->
+<section id="profils">
+  <h2>Regroupement par profils</h2>
+  <div class="note">Le questionnaire porte sur le <b>fonctionnement mental & émotionnel</b> : le regroupement principal est donc psychologique. Les repères <b>techniques / de poste</b> sont limités à ce que les joueurs ont mentionné et signalés quand disponibles.</div>
+  <div id="clusters"></div>
+  <h3>Repères techniques / de poste mentionnés</h3>
+  <table>
+    <tr><th>Joueur</th><th>Élément technique évoqué</th></tr>
+    <tr><td>Cyril Benistand</td><td>Leader de ligne (attaque) — doute parfois de sa légitimité de leader/suiveur</td></tr>
+    <tr><td>William Fievet</td><td>Changement de poste Middle → Link — besoin de reclarifier son rôle</td></tr>
+    <tr><td>Kevin Grassi</td><td>Routine gestuelle balle en main avant chaque match (EdF)</td></tr>
+    <tr><td>Hadrien Peres</td><td>Raisonne par critères de réalisation (combi / défense) plutôt que résultat</td></tr>
+    <tr><td>Autres</td><td>Pas d'info de poste dans le questionnaire — à compléter par le staff</td></tr>
+  </table>
+</section>
+
+<!-- ROOMINGS -->
+<section id="roomings">
+  <h2>Propositions de roomings — dernier entraînement</h2>
+  <div class="note">Effectif de <b>16 joueurs</b> → chaque option = <b>8 binômes</b>. Voici 3 axes de raisonnement différents ; choisis celui qui colle le mieux à ton objectif pour ce stage.<br><b>Règle transversale :</b> Erwann n'est jamais avec Bastien, ni avec un profil sensible au négatif (Ian, William, Adrien).</div>
+  <div class="legend" style="margin-bottom:6px;">Axe de raisonnement :</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
+    <button class="optbtn active" data-o="A">Option A · Confort & sérénité</button>
+    <button class="optbtn" data-o="B">Option B · Développement & mixité</button>
+    <button class="optbtn" data-o="C">Option C · Rythme de récupération</button>
+  </div>
+  <div id="optIntro" class="qblock" style="border-left:4px solid #13457a;"></div>
+  <div id="roomList"></div>
+  <div id="optNote"></div>
+</section>
+
+</main>
+<script>
+const players = [
+ {n:"Hadrien Peres", role:"Stable · autorégulé", pr:["stable","calm"], tags:[["Stable","t-stable"],["Calme","t-calm"]],
+  q1:"Calme · Rire/détente · Groupe · Revoir les consignes", q2:"Se sent bien physiquement.", q3:"Parfois — ventre noué, peu de pensées parasites ; respiration + coéquipiers", q4:"Ça booste + reste stable ; se concentre sur l'action d'après (critères, pas résultat)", q5:"Passe vite à autre chose ; peu d'impact", q6:"Respirer · consigne simple · le coach · l'action suivante", q7:"La concentration", q8:"Met de l'énergie + se concentre sur soi", q9:"Très stable émotionnellement ; optimise fraîcheur physique/mentale, repères temporels (RDV, nutrition), temps de pause", q10:"À Stirling, match bloqué → aurait aimé un conseil tactique simple d'un coach",
+  room:"Idéal comme binôme apaisant pour un joueur qui a besoin d'espace et de calme."},
+
+ {n:"Bastien Chavatte", role:"Fédérateur · sensible au négatif", pr:["energy","support"], tags:[["Fédérateur","t-energy"],["Sensible","t-anx"]],
+  q1:"Groupe — mais « dans sa tête », peu bavard les 15 min avant", q2:"Le sent dans les jambes (jambes coupées = mauvais stress)", q3:"Stresse si l'équipe stresse / mauvais état d'esprit", q4:"« Ok ça marche, faut le refaire » ; les retours positifs comptent autant que dans le dur", q5:"Dépend : ok si autre se trompe (encourage/Next) ; se ferme/rumine si on lui reproche de façon passive-agressive quand c'est lui", q6:"Pas seul, mais pas de « pourquoi t'as fait ça » ; veut discuter de l'erreur et positiver", q7:"Besoin de positif entre les matchs (Jérôme, Will = déconne saine)", q8:"Encourage sa ligne, voit le positif ou déconne sur le négatif", q9:"La pression extérieure/adverse (ne la subit pas)", q10:"Déstabilisé le 1er jour en jouant avec un profil peu encourageant → s'est refermé. Nouveau dans l'équipe, cherche des repères sur sa place.",
+  room:"⚠️ À NE PAS mettre avec un profil exigeant/critique. À associer à un gars chaleureux et positif (a nommé Jérôme et Will)."},
+
+ {n:"Cyril Benistand", role:"Leader énergique · exigeant avec soi", pr:["energy","support"], tags:[["Énergie","t-energy"],["Leader","t-support"]],
+  q1:"Calme · Groupe · Monter en intensité (pseudo-routine)", q2:"Connecté avec l'équipe et le staff, sereins et sûrs de leurs forces", q3:"Parfois — sensation de vide/spectateur, mais habitué ; sait que ça part au coup d'envoi", q4:"Réaliste : une bonne action ne garantit pas la suivante", q5:"Reste stable pour le groupe, apporte de l'énergie ; plus exigeant avec lui-même qu'avec les autres ; parfois trop dans le débrief", q6:"Préfère que les consignes viennent de l'extérieur quand la ligne doute (surtout offensif)", q7:"Se remettre en condition de match plusieurs fois/jour", q8:"Prend la parole (selon sa place), met de l'énergie", q9:"Aime la vie de groupe sans besoin de s'isoler ; reste dans l'énergie (parfois trop)", q10:"RAS. A besoin de sentir la confiance du staff/joueurs = légitimité ; groupe cette année homogène et soudé = confiance.",
+  room:"Social, fédérateur. Peut rassurer un joueur nerveux ; expérience Euro/CdM utile."},
+
+ {n:"Dorian Fays", role:"Décontracté · observateur", pr:["stable","energy"], tags:[["Décontracté","t-stable"],["Observateur","t-intro"]],
+  q1:"Rire/détente · Groupe", q2:"Échauffement qui se passe bien, pas d'élément perturbateur ; se reconcentre vite", q3:"Rarement — si une action bête loupée ; qu'on lui dise de switcher", q4:"Ça booste + pense déjà à la suite ; parler d'autre chose pour se reconcentrer", q5:"Peut s'énerver vite mais redescend très vite ; relativise", q6:"Consigne simple · humour · être seul quelques minutes", q7:"L'attente entre les matchs · fatigue physique", q8:"Observe et écoute, voit au moment venu", q9:"Son stress, ses émotions", q10:"Ne sait pas / rien de particulier",
+  room:"Souple, bon tampon. Supporte les tempéraments plus vifs (ex. quelqu'un qui râle)."},
+
+ {n:"Adrien Schaupp", role:"Introspectif · exige un binôme calme", pr:["calm","anx"], tags:[["Introspectif","t-intro"],["Ruminateur","t-anx"]],
+  q1:"Monter en intensité · Revoir les consignes · Être rassuré", q2:"Niveau de concentration, capacité à se projeter ; sinon se sent déconnecté et lâche en défense", q3:"Rarement en match — mais appréhension la veille (mille scénarios)", q4:"Ça booste + pense à la suite ; envie de « prouver »", q5:"Rumine · perd confiance · se renferme ; exigence élevée envers lui-même", q6:"Qu'on lui donne des conseils · consigne simple · action suivante · leaders qui parlent franchement", q7:"L'attente entre les matchs · la vie de groupe", q8:"Se concentre sur soi, montre son implication", q9:"Gère fatigue physique/mentale (a tendance à trop se préserver) ; détendu, réagit peu à chaud", q10:"A parfois besoin d'être seul. Besoin de partager sa chambre avec quelqu'un de CALME (a cité Gabriel à Vichy) ; sinon beaucoup moins détendu.",
+  room:"⚠️ Besoin explicite d'un binôme calme. Idéal : Gabriel."},
+
+ {n:"Baptiste Logeais", role:"Ancre stable · routine", pr:["stable","calm"], tags:[["Ultra-stable","t-stable"],["Routine","t-calm"]],
+  q1:"Monter en intensité · Routine précise · Bouger/s'activer", q2:"Calme, concentré, connecté à sa tâche sans stress ; monte en intensité via routine", q3:"Rarement — volonté d'être performant ; suit sa routine", q4:"Ça booste + pense à la suite ; profite sans s'attarder", q5:"Passe vite à autre chose ; peut y repenser le soir sans s'attarder", q6:"Respirer / se calmer", q7:"L'attente entre les matchs · chaleur", q8:"Pas le plus bavard ; apporte stabilité, recul, reste positif", q9:"Concentration, émotions, rester dans l'instant ; prend du recul après une erreur", q10:"Rien de particulier ; apprécie des moments calmes pour récupérer",
+  room:"Excellente ancre pour un joueur qui porte longtemps ses erreurs."},
+
+ {n:"Gabriel Du Jeu", role:"Calme rayonnant · positif", pr:["calm","stable","support"], tags:[["Calme","t-calm"],["Positif","t-stable"]],
+  q1:"Calme · Groupe · Monter en intensité", q2:"Idées claires, connaît son rôle, plan de jeu maîtrisé", q3:"Rarement — trop de stress/attente ; respirer, se mettre dans sa bulle", q4:"Ça booste ; l'action d'après", q5:"Passe vite / rumine quelques secondes → « NEXT »", q6:"Respirer · consigne simple · action suivante", q7:"Les émotions · l'attente · fatigue physique", q8:"Calme le groupe, met de l'énergie, se concentre sur soi ; « si je vais bien ça déteint sur les autres »", q9:"Gestion de l'émotion ; accepte l'erreur car il tente ; vit la pression comme un privilège", q10:"On a toujours besoin de quelqu'un pour aider à passer à la suite, se recentrer sur les bases",
+  room:"Binôme calme idéal (Adrien a validé la chambre avec lui à Vichy)."},
+
+ {n:"Kevin Grassi", role:"Routine / bulle · soutien des autres", pr:["calm","support"], tags:[["Routine","t-calm"],["Soutien","t-support"]],
+  q1:"(cases non cochées) — routine gestuelle balle en main", q2:"Ses petits exercices/routine balle en main en allant au terrain", q3:"Si match moyen avant, se dire de ne pas répéter ; se recentrer sur ce qu'on attend de lui", q4:"En match : très focus. Sur grosse victoire : peut se disperser/profiter", q5:"Si c'est lui : rumine (surtout truc bête) mais s'en sert ; si c'est un autre : rassure, conseille", q6:"(non coché)", q7:"(non coché)", q8:"(non coché)", q9:"Sa routine perso d'avant-match ; la pression avant/pendant", q10:"Aimerait des retours des coachs depuis la box ; rappeler des choses simples avant les matchs (ça part parfois dans tous les sens)",
+  room:"Respecte les bulles ; nature soutenante → peut accompagner un joueur anxieux."},
+
+ {n:"Sébastien Audinet", role:"Expérimenté · besoin de contrôle & de sieste", pr:["intro","stable"], tags:[["Expérimenté","t-stable"],["Isolement","t-intro"]],
+  q1:"Rire/détente (profiter sans foutre le bordel)", q2:"Sérénité & clarté : plan de jeu limpide dès la veille (a adoré le travail vidéo CdM)", q3:"Un peu de stress quand les matchs comptent ; pas de pensées polluantes", q4:"Pense déjà à la suite (parfois trop de fuite en avant)", q5:"Râle promptement et intensément pour évacuer puis passe vite ; conscient que ça peut polluer les autres", q6:"Parler à un coéquipier · humour · action suivante", q7:"Fatigue physique (échauffements longs)", q8:"Prend la parole, met de l'énergie", q9:"Fraîcheur mentale : sait s'isoler (sieste importante) pour ne pas subir les autres moments", q10:"Besoin de peser dans la prépa du groupe pour être en contrôle ; être en retrait le stresse. Deviendrait « mauvais » si un joueur polluait vraiment la vie de groupe.",
+  room:"Besoin de repos/sieste + binôme qui tolère qu'il râle. Éviter un profil très sensible au négatif."},
+
+ {n:"Dorian Saint Felix", role:"Intelligence émotionnelle · soutien", pr:["support","calm"], tags:[["Soutien","t-support"],["Conscient","t-calm"]],
+  q1:"Calme · Seul · Groupe · Intensité · Bouger (selon le besoin du moment)", q2:"État intérieur tranquille-stable, peu de pensées parasites, capable d'accompagner le groupe", q3:"Parfois — peur de l'échec/de l'inconnu ; se rassurer, respirer, accepter l'insécurité", q4:"Ça booste + reste stable ; next, garde la confiance", q5:"Passe vite ; analyse sa responsabilité ou aide un coéquipier à réajuster", q6:"Respirer · consigne simple · coach/partenaire qui rassure · évacuer la frustration d'un coup", q7:"Les émotions", q8:"Prend la parole, calme le groupe, se concentre sur soi pour être le meilleur point d'appui", q9:"Concentration, à l'écoute de ses besoins, montée en puissance sur la compétition", q10:"Besoin qu'on vienne lui demander comment il va, pour décharger ; besoin d'écoute et de réassurance",
+  room:"Excellent binôme pour un joueur anxieux (il checke et rassure) — mais a lui aussi besoin qu'on prenne de ses nouvelles."},
+
+ {n:"Ian Janet", role:"Anxieux · sur-analyse · rumine", pr:["anx"], tags:[["Stress élevé","t-anx"],["Ruminateur","t-anx"]],
+  q1:"Rire/détente · Groupe · Bouger", q2:"S'il arrive à NE PAS penser au match", q3:"SOUVENT — toutes les options d'attaque, 0 erreur en défense ; penser à autre chose / rire avec les copains", q4:"Ça booste + reste stable + pense à la suite", q5:"Rumine · veut se rattraper tout de suite · fait des retours ; rumine longtemps si l'impact est jugé important", q6:"Qu'on me donne des conseils · consigne simple · être seul quelques minutes · action suivante", q7:"La concentration · les tensions/frustrations · reprendre l'échauffement pour le dernier match", q8:"Se concentre sur soi ET se renferme", q9:"Les bons moments, l'attente, la récup, l'échauffement, la tension des matchs", q10:"Pas de besoin identifié",
+  room:"Le plus stressé du groupe. Binôme apaisant/léger qui l'aide à décrocher (rire = son levier)."},
+
+ {n:"David Potrel", role:"Calme · besoin de solitude · charge perso", pr:["calm","intro"], tags:[["Calme","t-calm"],["Besoin de solitude","t-intro"]],
+  q1:"(cases non récupérées) — lié à son niveau de calme", q2:"Niveau de calme ; la forme physique impacte le mental", q3:"Pensées perso/famille ; jouer, être dans le collectif, discuter avec partenaires/coachs pour recentrer", q4:"Rester concentré car la journée n'est pas finie", q5:"Peu de temps ; aime comprendre ce qui n'a pas marché", q6:"(non coché)", q7:"(non coché)", q8:"(non coché)", q9:"La concentration ; la connaissance des limites de son corps", q10:"Peu de moments de calme au stage → beaucoup de sollicitations cognitives ; aurait eu besoin d'être seul pour décharger.",
+  flag:"Confidentiel — a tenu à informer le staff : sa conjointe a une maladie rénale incurable (découverte en décembre). Pensée constamment présente en stage/compétition. À accompagner avec délicatesse.",
+  room:"Binôme calme, mature, respectueux de son besoin d'espace et de silence."},
+
+ {n:"William Fievet", role:"Sensible au groupe · erreurs qui durent · veut du franc", pr:["anx","calm"], tags:[["Ruminateur","t-anx"],["Besoin de calme","t-calm"]],
+  q1:"(surlignage non récupéré) — réponses surlignées dans le doc", q2:"Rassuré sur son niveau ; l'ambiance du groupe joue beaucoup ; rôle clair ; calme", q3:"« Serai-je à la hauteur ? décisif ? » ; qu'on le rassure : pas besoin de jouer le super-héros", q4:"Retour au calme dans la box pour ne pas se disperser ; prochaine action propre", q5:"Dépend de l'impact : une erreur à fort impact peut durer PLUSIEURS MOIS s'il ne peut se rattraper", q6:"Respirer / se calmer", q7:"(non précisé)", q8:"(non précisé)", q9:"Se reconcentrer pour les autres matchs ; bonne gestion de l'attention (parfois trop)", q10:"Reclarifier son rôle (Middle→Link) ; veut de la FRANCHISE, pas d'enjolivement ; points réguliers avec les coachs le soir (surtout après un match compliqué)",
+  room:"Environnement calme ; binôme honnête et stable qui ne le disperse pas."},
+
+ {n:"Maxime Taimiot", role:"Énergique · compétiteur · nerfs grands événements", pr:["energy","anx"], tags:[["Énergie","t-energy"],["Compétiteur","t-anx"]],
+  q1:"Groupe · Monter en intensité · Visualisation la veille (actions positives)", q2:"Sérénité, confiance, forte motivation, hyper focus, « tout connecte »", q3:"Parfois — peur de contre-performer/de perdre (plutôt du trac, positif) ; rester dans l'instant, activation, groupe ; voir les kinés si pépin physique", q4:"Ça booste + pense à la suite ; rester connecté au groupe, se rappeler les consignes", q5:"Se met en colère · veut se rattraper tout de suite · cherche à comprendre ; quelques minutes selon la gravité", q6:"Qu'on me donne des conseils · consigne simple", q7:"La fatigue physique", q8:"Met de l'énergie", q9:"Gère son stress perso, sa prépa mentale ; trouve des leviers pour rebondir", q10:"La gestion mentale d'un événement de grande ampleur lui est encore inconnue ; sait qu'il faut faire abstraction et rester dans son schéma",
+  room:"Binôme énergique/positif ; un joueur expérimenté peut le rassurer sur les grands événements."},
+
+ {n:"Jérôme Huvelin", role:"Manuscrit — profil partiel (à confirmer)", pr:["energy"], tags:[["À confirmer","t-intro"]],
+  q1:"(manuscrit) Groupe · Monter en intensité · Routine — à confirmer", q2:"(illisible)", q3:"Parfois (à confirmer)", q4:"(illisible)", q5:"(illisible)", q6:"Respirer (à confirmer)", q7:"Les émotions · concentration · tensions (à confirmer)", q8:"(illisible)", q9:"(illisible)", q10:"(illisible)",
+  flag:"Questionnaire manuscrit scanné — OCR peu fiable. À ressaisir/vérifier manuellement.",
+  room:"Cité par Bastien comme un gars avec qui décompresser (bonne humeur) → bon binôme pour Bastien."},
+
+ {n:"Erwann Le Gendre", role:"Compétiteur exigeant · peu démonstratif", pr:["stable"], tags:[["Compétiteur","t-stable"],["Peu démonstratif","t-intro"]],
+  q1:"(cases non renseignées)", q2:"« J'ai envie de jouer »", q3:"(non renseigné)", q4:"(non renseigné)", q5:"(non coché) — impact : quelques minutes", q6:"(non renseigné)", q7:"(non renseigné)", q8:"(non renseigné)", q9:"Garder la concentration au fil des matchs pour être prêt à chaque coup d'envoi", q10:"(rien indiqué)",
+  flag:"Questionnaire très peu renseigné (réponses brèves). Retour d'un coéquipier : excellent joueur et très apprécié EN DEHORS du terrain ; SUR le terrain, exigeant et direct — encourage peu, fait vite la remarque sur une erreur. À NE PAS associer à un profil sensible au négatif (Bastien a été déstabilisé en jouant/partageant avec lui).",
+  room:"Autonome et endurci émotionnellement (récupère en quelques minutes). Binôme robuste qui ne prend pas sa franchise personnellement (Seb, Dorian Fays)."}
+];
+
+const questions = [
+ {id:"q1", t:"1. Avant un match, de quoi as-tu le plus besoin ?"},
+ {id:"q2", t:"2. Comment sais-tu que tu es dans un bon état mental ?"},
+ {id:"q3", t:"3. Stress / pensées envahissantes avant un match ?"},
+ {id:"q4", t:"4. Après une bonne action / victoire, comment réagis-tu ?"},
+ {id:"q5", t:"5. Après une erreur / frustration, comment réagis-tu ?"},
+ {id:"q6", t:"6. Ce qui t'aide vraiment à revenir dans le match"},
+ {id:"q7", t:"7. Ce qui te fatigue le plus sur 2-3 matchs/jour"},
+ {id:"q8", t:"8. Ta réaction quand l'équipe traverse un moment difficile"},
+ {id:"q9", t:"9. Ce que tu gères bien seul mentalement"},
+ {id:"q10", t:"10. Un moment où tu aurais eu besoin de quelque chose"}
+];
+
+const clusters = [
+ {name:"A · Piliers stables & autorégulés", color:"#16a34a",
+  desc:"Calmes/autonomes, passent vite à autre chose, peu de maintenance émotionnelle. Excellents binômes-ancres. (Erwann : stable et endurci, mais exigeant/direct sur le terrain — voir sa fiche.)",
+  members:["Hadrien Peres","Baptiste Logeais","Gabriel Du Jeu","Dorian Fays","Erwann Le Gendre"]},
+ {name:"B · Calmes mais introspectifs (risque de repli)", color:"#0891b2",
+  desc:"Calmes en surface mais ruminent ou se renferment sous pression, besoin d'un environnement calme et parfois de solitude ; à aller chercher doucement.",
+  members:["Adrien Schaupp","David Potrel","Kevin Grassi"]},
+ {name:"C · Anxieux / ruminateurs en quête de réassurance", color:"#dc2626",
+  desc:"Stress plus marqué, sur-analyse, erreurs qui peuvent durer. Ont besoin de réassurance, de retours francs et d'un cadre calme.",
+  members:["Ian Janet","William Fievet"]},
+ {name:"D · Énergiques / fédérateurs", color:"#ca8a04",
+  desc:"Carburent au collectif et à l'énergie, mettent de l'énergie dans le dur, ont besoin de positif et d'humour.",
+  members:["Cyril Benistand","Maxime Taimiot","Bastien Chavatte","Jérôme Huvelin"]},
+ {name:"E · Soutiens émotionnels / expérimentés", color:"#7c3aed",
+  desc:"Forte intelligence émotionnelle et/ou expérience ; accompagnent le groupe, mais ont eux aussi des besoins (être checké, contrôle de la prépa, repos).",
+  members:["Dorian Saint Felix","Sébastien Audinet"]}
+];
+
+const options = {
+ A: {
+  title:"Option A · Confort & sérénité (bien-être d'abord)",
+  desc:["<b>Axe :</b> maximiser la sérénité avant le tournoi. On associe chaque joueur anxieux/introspectif à un stabilisateur ou un soutien, et on respecte à la lettre les préférences exprimées.",
+        "<b>Pour :</b> <span class='pro'>option la plus sûre, zéro friction, respecte les besoins explicites (Adrien, David, Bastien).</span>",
+        "<b>Attention :</b> <span class='con'>peu de brassage — les mêmes affinités se renforcent, développement collectif limité.</span>"],
+  rooms:[
+   {a:"Adrien Schaupp", b:"Gabriel Du Jeu", why:"Adrien a besoin explicite d'un binôme calme (validé à Vichy avec Gabriel). Gabriel = calme rayonnant et positif."},
+   {a:"Ian Janet", b:"Dorian Saint Felix", why:"Le plus stressé avec le meilleur soutien émotionnel : Dorian S-F va vers les autres et rassure, l'aide à décrocher."},
+   {a:"Bastien Chavatte", b:"Jérôme Huvelin", why:"Bastien (nouveau, sensible au négatif) a nommé Jérôme comme quelqu'un avec qui décompresser. Chaleur et positif garantis."},
+   {a:"William Fievet", b:"Baptiste Logeais", why:"William a besoin de calme et peut porter longtemps ses erreurs ; Baptiste est l'ancre ultra-stable qui apporte du recul."},
+   {a:"David Potrel", b:"Hadrien Peres", why:"David a besoin de calme, d'espace et de maturité (charge personnelle). Hadrien est stable et respecte les temps de récup."},
+   {a:"Kevin Grassi", b:"Dorian Fays", why:"Deux profils faciles à vivre et soutenants ; chambre décontractée et sans friction."},
+   {a:"Cyril Benistand", b:"Maxime Taimiot", why:"Deux profils énergie/collectif. Cyril (expérience Euro/CdM) peut rassurer Maxime sur les grands événements."},
+   {a:"Erwann Le Gendre", b:"Sébastien Audinet", why:"Deux tempéraments directs, autonomes et endurcis : Seb ne prend pas la franchise d'Erwann personnellement, et Erwann ne s'offusque pas que Seb râle. Zéro besoin de ménagement."}
+  ]},
+ B: {
+  title:"Option B · Développement & mixité de profils (croissance)",
+  desc:["<b>Axe :</b> brasser volontairement les tempéraments. Chaque chambre contient un « moteur » (leader / soutien / vétéran stable) associé à un profil à faire grandir (anxieux, nouveau, ou à sortir de sa zone). On mêle énergie et calme, et on intègre les nouveaux avec les cadres.",
+        "<b>Pour :</b> <span class='pro'>fait progresser les individus, intègre les nouveaux, renforce la cohésion transversale.</span>",
+        "<b>Attention :</b> <span class='con'>on sort Adrien de sa préférence « pur calme » (Baptiste reste posé mais différent) ; à assumer sur un dernier stage.</span>"],
+  rooms:[
+   {a:"Bastien Chavatte", b:"Cyril Benistand", why:"Intégrer le nouveau (Bastien) avec un cadre chaleureux et énergique. Cyril peut le rassurer sur sa légitimité — thème commun aux deux."},
+   {a:"Ian Janet", b:"Dorian Saint Felix", why:"Le plus anxieux avec le meilleur « coach émotionnel » du groupe : Dorian S-F l'aide à décrocher et à relativiser."},
+   {a:"Adrien Schaupp", b:"Baptiste Logeais", why:"Baptiste modélise la routine et le recul face à l'erreur — un levier direct contre la rumination d'Adrien. Reste assez calme pour être acceptable."},
+   {a:"William Fievet", b:"Hadrien Peres", why:"William veut du franc et du process ; Hadrien raisonne par critères de réalisation (pas résultat) — un modèle pour ses erreurs qui durent."},
+   {a:"Maxime Taimiot", b:"Sébastien Audinet", why:"Mentorat : l'expérience et la maîtrise de la prépa de Seb rassurent Maxime sur la gestion des grands événements."},
+   {a:"David Potrel", b:"Gabriel Du Jeu", why:"Gabriel, calme et positif mais chaleureux, tient compagnie à David sans envahir son espace."},
+   {a:"Erwann Le Gendre", b:"Kevin Grassi", why:"Développement pour Erwann : Kevin rassure et encourage naturellement les autres → l'expose au modèle « soutien de ligne ». Kevin est assez solide pour ne pas être heurté par la franchise d'Erwann."},
+   {a:"Dorian Fays", b:"Jérôme Huvelin", why:"Deux profils décontractés et positifs ; chambre facile et fédératrice."}
+  ]},
+ C: {
+  title:"Option C · Rythme de récupération (gestion de l'énergie)",
+  desc:["<b>Axe :</b> regrouper les joueurs selon leur façon de recharger. Un « étage calme » pour ceux qui rechargent en silence / en s'isolant, un « étage vivant » pour ceux qui rechargent dans le collectif et l'énergie — pour que personne ne subisse le rythme de l'autre.",
+        "<b>Pour :</b> <span class='pro'>respecte le clivage isolement / collectif très net dans les réponses ; récupération optimale entre les journées.</span>",
+        "<b>Attention :</b> <span class='con'>regroupe deux profils anxieux (Ian, William) chacun avec un stabilisateur — à checker ; Erwann n'a pas indiqué de préférence, placé côté « vivant » avec un partenaire robuste.</span>"],
+  rooms:[
+   {a:"David Potrel", b:"Sébastien Audinet", why:"ÉTAGE CALME — deux « isolateurs » matures qui ont besoin de silence/sieste et de contrôle de leur espace."},
+   {a:"Adrien Schaupp", b:"Kevin Grassi", why:"ÉTAGE CALME — Adrien (besoin de calme) + Kevin (bulle/routine, soutenant et discret)."},
+   {a:"Ian Janet", b:"Hadrien Peres", why:"ÉTAGE CALME — Ian récupère au calme (être seul quelques min) ; Hadrien, stable, ne perturbe pas et l'apaise."},
+   {a:"William Fievet", b:"Baptiste Logeais", why:"ÉTAGE CALME — William a besoin d'une box/chambre calme ; Baptiste, routine et recul, est l'ancre parfaite."},
+   {a:"Cyril Benistand", b:"Maxime Taimiot", why:"ÉTAGE VIVANT — deux moteurs qui rechargent dans l'énergie et le collectif."},
+   {a:"Bastien Chavatte", b:"Jérôme Huvelin", why:"ÉTAGE VIVANT — décompression, humour et positif (binôme validé par Bastien)."},
+   {a:"Gabriel Du Jeu", b:"Dorian Saint Felix", why:"ÉTAGE VIVANT — deux profils orientés groupe, positifs et faciles à vivre."},
+   {a:"Erwann Le Gendre", b:"Dorian Fays", why:"ÉTAGE VIVANT — Erwann (sans préférence de récup indiquée) avec Dorian Fays, imperturbable et souple : partenaire idéal pour absorber sa franchise."}
+  ]}
+};
+let currentOpt = "A";
+
+// render players
+const cardsEl = document.getElementById('playerCards');
+function renderPlayers(filter){
+  cardsEl.innerHTML='';
+  players.filter(p=>filter==='all'||p.pr.includes(filter)).forEach(p=>{
+    const tags = p.tags.map(t=>`<span class="tag ${t[1]}">${t[0]}</span>`).join('');
+    const flag = p.flag?`<div class="flag">🔒 ${p.flag}</div>`:'';
+    cardsEl.innerHTML+=`<div class="card">
+      <h4>${p.n}</h4><div class="role">${p.role}</div>
+      <div class="tags">${tags}</div>
+      <div class="kv"><b>Besoin avant-match :</b> ${p.q1}</div>
+      <div class="kv"><b>Stress :</b> ${p.q3}</div>
+      <div class="kv"><b>Après une erreur :</b> ${p.q5}</div>
+      <div class="kv"><b>Se relance avec :</b> ${p.q6}</div>
+      <div class="kv"><b>Gère seul :</b> ${p.q9}</div>
+      <div class="kv"><b>Besoin identifié :</b> ${p.q10}</div>
+      <div class="kv" style="margin-top:6px;color:#13457a;"><b>🛏️ Rooming :</b> ${p.room}</div>
+      ${flag}
+    </div>`;
+  });
+}
+renderPlayers('all');
+document.getElementById('filterProfil').addEventListener('change',e=>renderPlayers(e.target.value));
+
+// render questions
+const qSel = document.getElementById('qSelect');
+questions.forEach(q=>{ const o=document.createElement('option'); o.value=q.id; o.textContent=q.t; qSel.appendChild(o); });
+function renderQ(qid){
+  const q = questions.find(x=>x.id===qid);
+  let html = `<div class="qblock"><h3>${q.t}</h3>`;
+  players.forEach(p=>{ html+=`<div class="qrow"><b>${p.n} :</b> ${p[qid]||'—'}</div>`; });
+  html+='</div>';
+  document.getElementById('qContent').innerHTML=html;
+}
+qSel.addEventListener('change',e=>renderQ(e.target.value));
+renderQ('q1');
+
+// render clusters
+const clEl=document.getElementById('clusters');
+clusters.forEach(c=>{
+  clEl.innerHTML+=`<div class="cluster" style="border-top-color:${c.color}">
+    <h3 style="color:${c.color}">${c.name}</h3>
+    <div style="font-size:13px;color:#475569">${c.desc}</div>
+    <div class="members">${c.members.map(m=>`<span>${m}</span>`).join('')}</div>
+  </div>`;
+});
+
+// render rooms per option
+const rEl=document.getElementById('roomList');
+const introEl=document.getElementById('optIntro');
+function renderOption(key){
+  currentOpt=key;
+  const opt=options[key];
+  introEl.innerHTML=`<h3>${opt.title}</h3>`+opt.desc.map(d=>`<p>${d}</p>`).join('');
+  rEl.innerHTML='';
+  opt.rooms.forEach((r,i)=>{
+    const isTrio = !!r.c;
+    const names = isTrio ? `${r.a} &nbsp;·&nbsp; ${r.b} &nbsp;·&nbsp; ${r.c}` : `${r.a} &nbsp;·&nbsp; ${r.b}`;
+    const label = isTrio ? ' <span style="font-size:11px;color:#7c3aed;font-weight:700">(TRIO)</span>' : '';
+    rEl.innerHTML+=`<div class="room ${isTrio?'trio':''}"><div class="num">${i+1}</div>
+      <div><div class="pair">${names}${label}</div><div class="why">${r.why}</div></div></div>`;
+  });
+}
+renderOption('A');
+document.querySelectorAll('.optbtn').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('.optbtn').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    renderOption(b.dataset.o);
+  });
+});
+
+// nav
+document.querySelectorAll('nav button').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('section').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    document.getElementById(b.dataset.t).classList.add('active');
+    window.scrollTo(0,0);
+  });
+});
+</script>
+</body>
+</html>
