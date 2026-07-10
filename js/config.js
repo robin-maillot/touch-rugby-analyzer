@@ -128,10 +128,17 @@ TR.umamiIdentify = (extra) => {
 // login) so any group secret works, with a fast bypass back to login if there's
 // no session at all.
 TR.auth = (required) => {
-  if (!sessionStorage.getItem('password')) { window.location.replace('index.html'); return; }
+  // No session at all → send to login, remembering where to return afterwards.
+  if (!sessionStorage.getItem('password')) {
+    const here = location.pathname.split('/').pop() + location.search;
+    window.location.replace('index.html?next=' + encodeURIComponent(here));
+    return;
+  }
   const rank = { anon: 0, viewer: 1, staff: 2, admin: 3 };
   const need = { viewer: 1, staff: 2, admin: 3 };
-  if ((rank[TR.role()] || 0) < (need[required] || 0)) window.location.replace('index.html');
+  // Signed in but under-privileged → back to the menu with a "denied" note
+  // (no next=, so a re-login can't bounce straight back into a loop).
+  if ((rank[TR.role()] || 0) < (need[required] || 0)) window.location.replace('index.html?denied=1');
 };
 
 // Wipe per-user localStorage caches (action=list / action=all / game_*) when

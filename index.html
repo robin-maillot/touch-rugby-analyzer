@@ -84,6 +84,16 @@
       color: #ef4444; margin-top: 12px;
       display: none; font-size: 0.8rem;
     }
+    #login-note {
+      display: none; margin-bottom: 16px;
+      background: #1e2433; border: 1px solid #2b3242; border-radius: 6px;
+      padding: 9px 12px; color: #cbd5e1; font-size: 0.78rem; line-height: 1.4;
+    }
+    #access-note {
+      display: none; margin: 16px 24px -16px;
+      background: #3a2020; border: 1px solid #7f2d2d; border-radius: 8px;
+      padding: 10px 14px; color: #fecaca; font-size: 0.82rem;
+    }
 
     /* --- Main Content (Hidden Initially) --- */
     #app-content { display: none; background: #0b0e14; min-height: 100vh; }
@@ -117,6 +127,7 @@
     <div id="login-box">
       <h2>Restricted Access</h2>
       <p>Enter your access password to continue</p>
+      <div id="login-note" role="status"></div>
       <input type="password" id="password-input" placeholder="Password" />
       <button id="login-btn">Login</button>
       <div id="error-msg">Incorrect password</div>
@@ -128,6 +139,7 @@
       <tr-logo></tr-logo>
       <button id="logout-btn" type="button" title="Sign out and clear this device's saved login">Log out</button>
     </header>
+    <div id="access-note" role="alert">You don’t have access to that page — pick one below.</div>
     <div class="nav-cards">
       <a class="nav-card" href="games.html">
         <div class="card-icon">📊</div>
@@ -190,6 +202,21 @@
   const loginBtn    = document.getElementById('login-btn');
   const errorMsg    = document.getElementById('error-msg');
 
+  // Where a gated page bounced us from. Only accept a same-origin relative
+  // page (e.g. "analytics.html?game=x") — never an absolute/scheme URL — so
+  // this can't become an open redirect. Then clean the URL so a refresh or a
+  // later logout doesn't replay the note.
+  const _params = new URLSearchParams(location.search);
+  const _rawNext = _params.get('next') || '';
+  const NEXT = /^[a-zA-Z0-9_.-]+\.html(\?[^#]*)?$/.test(_rawNext) ? _rawNext : '';
+  if (NEXT) {
+    const note = document.getElementById('login-note');
+    note.textContent = 'Please sign in to continue.';
+    note.style.display = 'block';
+  }
+  if (_params.get('denied')) document.getElementById('access-note').style.display = 'block';
+  if (location.search) history.replaceState({}, '', 'index.html');
+
   // Returns { role, group } for a valid secret, or null. The group is persisted
   // into the session so pages (e.g. the field annotator) can show which group
   // their uploads will be attributed to.
@@ -211,6 +238,7 @@
     if (auth) {
       TR.saveSession(pwd, auth.role, auth.group);
       TR.umamiIdentify({ event: 'login' });
+      if (NEXT) { window.location.replace(NEXT); return; }   // return to the page they came from
       initApp(auth.role);
     } else {
       loginBtn.disabled = false;
