@@ -189,6 +189,12 @@
   .rank-foot span { font-size: 0.76rem; color: var(--muted); }
   .rank-foot button { background: var(--accent-strong); color: #fff; border: none; border-radius: 7px; padding: 8px 16px; font-size: 0.82rem; font-weight: 600; cursor: pointer; }
   .rank-foot button:disabled { opacity: 0.4; cursor: default; }
+  .rank-opts { display: flex; align-items: center; gap: 16px; padding: 10px 18px 0; flex-wrap: wrap; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+  .rank-opt { display: flex; align-items: center; gap: 6px; font-size: 0.76rem; color: var(--muted); }
+  .rank-opt select { min-width: 0; background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; font-size: 0.76rem; cursor: pointer; }
+  .rank-opt input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
+  .rank-dir { margin-left: auto; font-size: 0.78rem; line-height: 1; color: var(--text-muted); }
+  .rank-empty { padding: 24px; text-align: center; color: var(--dim); font-size: 0.82rem; }
   </style>
 <script src="js/config.js"></script>
 <script src="js/utils.js"></script>
@@ -373,6 +379,11 @@
             <input type="checkbox" id="plotShowAvg" checked onchange="renderPlot()" style="width:16px;height:16px;accent-color:var(--accent)"> Show means
           </label>
         </div>
+        <div class="pc"><label for="plotBoundary">Boundary</label>
+          <label style="display:flex;align-items:center;gap:7px;min-height:36px;font-size:0.82rem;color:var(--text);cursor:pointer" title="Draw the linear (LDA) line that best separates the two groups, with its classification accuracy">
+            <input type="checkbox" id="plotBoundary" onchange="renderPlot()" style="width:16px;height:16px;accent-color:var(--accent)"> LDA line
+          </label>
+        </div>
         <div class="pc"><label for="plotBestBtn">Auto-select</label>
           <button type="button" id="plotBestBtn" onclick="openRankModal()" title="Rank every axis by how well it separates the groups, then choose two" style="min-height:36px;background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:0.82rem;padding:0 12px">✨ Rank axes</button>
         </div>
@@ -408,6 +419,18 @@
     <div class="rank-head">
       <h3>Rank axes by group separation</h3>
       <button class="plot-close" onclick="closeRankModal()" aria-label="Close">✕</button>
+    </div>
+    <div class="rank-opts">
+      <label class="rank-opt">Score
+        <select id="rankMethod" onchange="rankRefresh()">
+          <option value="auc">AUC + direction</option>
+          <option value="paired">Paired (winner − loser)</option>
+          <option value="fisher">Fisher ratio</option>
+        </select>
+      </label>
+      <label class="rank-opt" style="cursor:pointer">
+        <input type="checkbox" id="rankExcludeTry" onchange="rankRefresh()"> Exclude try metrics
+      </label>
     </div>
     <div class="rank-sub" id="rankSub"></div>
     <div class="rank-list" id="rankList"></div>
@@ -1381,6 +1404,13 @@ function emptyMsg() {
           try_share: share(me.tries, opp.tries),
           poss_share: share(me.possTime, opp.possTime),
           completion_share: share(me.completion, opp.completion),
+          // differentials (mine − opponent) & defensive metrics
+          try_diff: teams.length < 2 ? null : me.tries - (opp.tries || 0),
+          turnover_diff: teams.length < 2 ? null : me.turnovers - (opp.turnovers || 0),
+          poss_time_diff: teams.length < 2 ? null : +(me.possTime - (opp.possTime || 0)).toFixed(1),
+          completion_diff: (me.completion == null || opp.completion == null) ? null : r3(me.completion - opp.completion),
+          forced_turnovers: teams.length < 2 ? null : (opp.turnovers || 0),
+          opp_completion_rate: opp.completion == null ? null : r3(opp.completion),
         });
       });
     }
@@ -1403,6 +1433,12 @@ function emptyMsg() {
       { key: 'try_share', label: 'Try share (mine / total)' },
       { key: 'poss_share', label: 'Possession-time share (mine / total)' },
       { key: 'completion_share', label: 'Completion-rate share (mine / total)' },
+      { key: 'try_diff', label: 'Try margin (mine − opp)' },
+      { key: 'turnover_diff', label: 'Turnover margin (mine − opp)' },
+      { key: 'poss_time_diff', label: 'Possession-time margin (s)' },
+      { key: 'completion_diff', label: 'Completion-rate margin (mine − opp)' },
+      { key: 'forced_turnovers', label: 'Forced turnovers (opp turnovers)' },
+      { key: 'opp_completion_rate', label: 'Opp completion rate (defence)' },
     ];
     return { rows, params };
   }
@@ -1459,6 +1495,59 @@ function emptyMsg() {
     btn.title = ok ? 'Rank every axis by how well it separates the groups, then choose two'
       : (classOf ? 'Need at least 2 groups in the current selection to rank axes'
                  : 'Pick a "Group by" (or enable Win/Loss) to rank axes');
+  }
+
+  // ── Decision boundary (2-group linear discriminant) ──────────────────────
+  // The two groups to separate for the boundary, using the same rule as the
+  // ranking: colour grouping if set, else Win/Loss. Needs exactly two classes.
+  function binaryClasses() {
+    const gKey = document.getElementById('plotGroup').value;
+    const splitWL = document.getElementById('plotSplitWL').checked;
+    const classOf = gKey ? (r => r[gKey]) : (splitWL ? (r => r.outcome) : null);
+    if (!classOf) return null;
+    const classes = [...new Set(DATA.rows.filter(passesFilters).map(classOf).filter(c => c != null && c !== '—'))];
+    const [pos, neg] = pickPair(classes);
+    if (!pos || !neg || pos === neg) return null;
+    return { classOf, pos, neg, extra: classes.length > 2 };
+  }
+
+  // Linear discriminant (LDA) line separating pos/neg on the current axes,
+  // with resubstitution accuracy. Returns line normal w, midpoint, and acc.
+  function computeBoundary(rows, classOf, pos, neg, xKey, yKey) {
+    const A = [], B = [];
+    rows.forEach(r => { const c = classOf(r); if (c === pos) A.push(r); else if (c === neg) B.push(r); });
+    if (A.length < 2 || B.length < 2) return null;
+    const mean = (arr, k) => arr.reduce((s, r) => s + (+r[k]), 0) / arr.length;
+    const mAx = mean(A, xKey), mAy = mean(A, yKey), mBx = mean(B, xKey), mBy = mean(B, yKey);
+    let sxx = 0, syy = 0, sxy = 0;
+    const scatter = (arr, mx, my) => arr.forEach(r => { const dx = r[xKey] - mx, dy = r[yKey] - my; sxx += dx * dx; syy += dy * dy; sxy += dx * dy; });
+    scatter(A, mAx, mAy); scatter(B, mBx, mBy);
+    const denom = A.length + B.length - 2;
+    if (denom < 1) return null;
+    let a = sxx / denom, d = syy / denom, b = sxy / denom;   // pooled covariance
+    let det = a * d - b * b;
+    if (Math.abs(det) < 1e-12) { a += 1e-9; d += 1e-9; det = a * d - b * b; }   // ridge for singular cov
+    if (Math.abs(det) < 1e-12) return null;
+    const dmx = mAx - mBx, dmy = mAy - mBy;
+    const w0 = (d * dmx - b * dmy) / det, w1 = (-b * dmx + a * dmy) / det;
+    const midx = (mAx + mBx) / 2, midy = (mAy + mBy) / 2;
+    const side = r => w0 * (r[xKey] - midx) + w1 * (r[yKey] - midy);   // >0 ⇒ predict pos
+    let correct = 0;
+    A.forEach(r => { if (side(r) > 0) correct++; });
+    B.forEach(r => { if (side(r) <= 0) correct++; });
+    return { w0, w1, midx, midy, acc: correct / (A.length + B.length) };
+  }
+
+  // Clip the infinite boundary line to the data's bounding box → 2 endpoints,
+  // so drawing it never expands the axis domains.
+  function clipBoundary(b, x0, x1, y0, y1) {
+    const { w0, w1, midx, midy } = b, pts = [];
+    const push = (x, y) => { if (x >= x0 - 1e-6 && x <= x1 + 1e-6 && y >= y0 - 1e-6 && y <= y1 + 1e-6) pts.push([x, y]); };
+    if (Math.abs(w1) > 1e-12) { const yAt = x => midy - w0 * (x - midx) / w1; push(x0, yAt(x0)); push(x1, yAt(x1)); }
+    if (Math.abs(w0) > 1e-12) { const xAt = y => midx - w1 * (y - midy) / w0; push(xAt(y0), y0); push(xAt(y1), y1); }
+    const uniq = [];
+    pts.forEach(p => { if (!uniq.some(q => Math.abs(q[0] - p[0]) < 1e-6 && Math.abs(q[1] - p[1]) < 1e-6)) uniq.push(p); });
+    return uniq.length >= 2 ? [uniq[0], uniq[1]] : null;
   }
 
   window.renderPlot = function () {
@@ -1533,7 +1622,33 @@ function emptyMsg() {
     };
     if (shapeEnc) mnEnc.shape = shapeEnc;   // share the shape scale → one merged "Result" legend
 
-    const layer = [{ mark: { type: 'point', filled: true, size: 80 }, encoding: ptEnc }];
+    // Optional LDA decision boundary between the two groups.
+    let boundaryNote = null, boundaryLayer = null;
+    if (document.getElementById('plotBoundary').checked) {
+      const bc = binaryClasses();
+      if (!bc) boundaryNote = 'boundary needs exactly 2 groups (enable Win/Loss or pick a 2-class grouping)';
+      else {
+        const bnd = computeBoundary(plotRows, bc.classOf, bc.pos, bc.neg, xKey, yKey);
+        if (!bnd) boundaryNote = 'boundary: need ≥2 points per group and two distinct axes';
+        else {
+          const xs = plotRows.map(r => +r[xKey]), ys = plotRows.map(r => +r[yKey]);
+          const seg = clipBoundary(bnd, Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys));
+          if (!seg) boundaryNote = 'boundary lies outside the plotted range';
+          else {
+            boundaryLayer = {
+              data: { values: seg.map(p => ({ [xKey]: p[0], [yKey]: p[1] })) },
+              mark: { type: 'line', color: '#ef4444', strokeDash: [6, 4], strokeWidth: 2, opacity: 0.9 },
+              encoding: { x: { field: xKey, type: 'quantitative' }, y: { field: yKey, type: 'quantitative' } },
+            };
+            boundaryNote = `LDA boundary (${bc.pos} vs ${bc.neg}) · ${(bnd.acc * 100).toFixed(0)}% classified correctly${bc.extra ? ' · other groups ignored' : ''}`;
+          }
+        }
+      }
+    }
+
+    const layer = [];
+    if (boundaryLayer) layer.push(boundaryLayer);   // under the points
+    layer.push({ mark: { type: 'point', filled: true, size: 80 }, encoding: ptEnc });
     if (showAvg) layer.push({ data: { values: means }, mark: { type: 'point', filled: false, size: 340, strokeWidth: 4 }, encoding: mnEnc });
 
     const spec = {
@@ -1550,30 +1665,82 @@ function emptyMsg() {
     const parts = [`${plotRows.length} team-game points`];
     if (splitWL) parts.push('● win / ▲ loss');
     if (showAvg) parts.push('hollow = mean');
+    if (boundaryNote) parts.push(boundaryNote);
     if (grouped) parts.push('click a legend label to hide / show that series');
     note.textContent = parts.join(' · ');
   };
 
-  // ── Rank axes by how well each separates the groups (1D Fisher ratio) ──
-  let RANK = [];        // [{key,label,score,n}] sorted best-first
-  let RANK_SEL = [];    // up to 2 chosen feature keys (order → [X, Y])
+  // ── Rank axes by how well each separates the groups ──────────────────────
+  // Two scoring methods: 1D Fisher ratio (between/within scatter) or AUC — the
+  // rank-based probability that a random point of the first group outranks a
+  // random point of the second (0.5 = no separation, 1 = perfect), plus a ▲/▼
+  // direction. The same helpers feed the optional decision boundary.
+  let RANK = [];        // [{key,label,score,n,dir?}] sorted best-first
+  let RANK_SEL = null;  // up to 2 chosen feature keys (order → [X, Y]); null = auto-pick
+  let RANK_CTX = null;  // {classOf, valid, classes, gLabel} captured when the modal opens
   const fmtScore = s => s === Infinity ? '∞' : s.toFixed(2);
+  const isTryKey = k => /tr(y|ies)/.test(k);   // cnt_try, try_share, try_diff, tries_per_possession
 
-  window.openRankModal = function () {
-    const note = document.getElementById('plotNote');
-    const gKey = document.getElementById('plotGroup').value;
-    const splitWL = document.getElementById('plotSplitWL').checked;
-    // Classes = the colour grouping, or Win/Loss when that's the only split.
-    const classOf = gKey ? (r => r[gKey]) : (splitWL ? (r => r.outcome) : null);
-    if (!classOf) { note.textContent = 'Rank axes: choose a "Group by" (or enable Win/Loss) so there are groups to separate.'; return; }
+  // AUC via Mann–Whitney U with tie handling → P(pos value > neg value).
+  function aucOf(pos, neg) {
+    if (!pos.length || !neg.length) return null;
+    const all = pos.map(v => ({ v, p: 1 })).concat(neg.map(v => ({ v, p: 0 }))).sort((a, b) => a.v - b.v);
+    let i = 0, rankSum = 0;
+    while (i < all.length) {
+      let j = i; while (j < all.length && all[j].v === all[i].v) j++;
+      const r = (i + 1 + j) / 2;                 // average 1-based rank across ties
+      for (let k = i; k < j; k++) if (all[k].p === 1) rankSum += r;
+      i = j;
+    }
+    const U = rankSum - pos.length * (pos.length + 1) / 2;
+    return U / (pos.length * neg.length);
+  }
 
-    const valid = DATA.rows.filter(passesFilters)
-      .filter(r => { const c = classOf(r); return c && c !== '—'; });
-    const classes = [...new Set(valid.map(classOf))];
-    if (classes.length < 2) { note.textContent = 'Rank axes: need at least 2 groups in the current selection.'; return; }
+  // The two classes to compare (AUC / boundary). Prefer Won vs Lost.
+  function pickPair(classes) {
+    if (classes.includes('Won') && classes.includes('Lost')) return ['Won', 'Lost'];
+    return classes.slice(0, 2);
+  }
 
-    // Global (unfiltered) spread per feature, so separation is scale-fair even
-    // when the selection has one point per group (e.g. a single game).
+  function computeRank(method, exclude) {
+    const { classOf, valid, classes } = RANK_CTX;
+    const params = DATA.params.filter(p => !(exclude && isTryKey(p.key)));
+
+    if (method === 'auc') {
+      const [pos, neg] = pickPair(classes);
+      return params.map(par => {
+        const posV = valid.filter(r => classOf(r) === pos).map(r => r[par.key]).filter(v => v != null);
+        const negV = valid.filter(r => classOf(r) === neg).map(r => r[par.key]).filter(v => v != null);
+        const a = aucOf(posV, negV);
+        if (a == null) return { key: par.key, label: par.label, score: -1, n: posV.length + negV.length };
+        return { key: par.key, label: par.label, score: Math.max(a, 1 - a), dir: a >= 0.5 ? 1 : -1, n: posV.length + negV.length };
+      }).filter(x => x.score >= 0).sort((a, b) => b.score - a.score);
+    }
+
+    if (method === 'paired') {
+      // Pair the winning and losing side of each game, then per metric look at
+      // the within-game difference (winner − loser). Cancels game-to-game noise
+      // and avoids double-counting the two mirror-image rows.
+      const byGame = {};
+      RANK_CTX.rowsAll.forEach(r => { if (r.outcome === 'Won' || r.outcome === 'Lost') (byGame[r.game] ||= {})[r.outcome] = r; });
+      const pairs = Object.values(byGame).filter(g => g.Won && g.Lost);
+      return params.map(par => {
+        const diffs = [];
+        pairs.forEach(g => { const w = g.Won[par.key], l = g.Lost[par.key]; if (w != null && l != null) diffs.push(w - l); });
+        const n = diffs.length;
+        if (n < 2) return { key: par.key, label: par.label, score: -1, n };
+        const wins = diffs.reduce((s, d) => s + (d > 0 ? 1 : d < 0 ? 0 : 0.5), 0);
+        const winRate = wins / n;                                   // sign test: share of games the winner leads
+        const mean = diffs.reduce((a, b) => a + b, 0) / n;
+        const sd = Math.sqrt(diffs.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1));
+        const dz = sd > 1e-9 ? mean / sd : (mean !== 0 ? Infinity : 0);   // paired Cohen's d
+        return { key: par.key, label: par.label, score: Math.max(winRate, 1 - winRate), dir: winRate >= 0.5 ? 1 : -1, n, dz };
+      }).filter(x => x.score >= 0).sort((a, b) => (b.score - a.score) || (Math.abs(b.dz) - Math.abs(a.dz)));
+    }
+
+    // Fisher ratio: between-class / within-class scatter. Globally standardised
+    // only so the single-game fallback (within = 0 → rank by between alone) is
+    // scale-fair; the ratio itself is scale-invariant.
     const gstd = {};
     DATA.params.forEach(par => {
       const v = DATA.rows.map(r => r[par.key]).filter(x => x != null);
@@ -1581,11 +1748,7 @@ function emptyMsg() {
       const m = v.reduce((a, b) => a + b, 0) / v.length;
       gstd[par.key] = Math.sqrt(v.reduce((a, b) => a + (b - m) ** 2, 0) / v.length);
     });
-
-    // Rank by between-class / within-class scatter on globally-standardised values.
-    // With one point per group (single game) within-scatter is 0, so fall back to
-    // ranking by between-group separation alone.
-    RANK = DATA.params.map(par => {
+    return params.map(par => {
       const sd = gstd[par.key];
       const pts = valid.map(r => ({ c: classOf(r), v: r[par.key] })).filter(p => p.v != null);
       const byC = {}; pts.forEach(p => { (byC[p.c] ||= []).push(p.v / sd); });
@@ -1600,23 +1763,74 @@ function emptyMsg() {
       });
       return { key: par.key, label: par.label, score: within > 1e-9 ? between / within : between, n: pts.length };
     }).filter(x => x.score >= 0).sort((a, b) => b.score - a.score);
+  }
 
-    if (!RANK.length) { note.textContent = 'Rank axes: not enough data to compare features.'; return; }
+  function renderRankList() {
+    if (!RANK_CTX) return;
+    const method = document.getElementById('rankMethod').value;
+    const exclude = document.getElementById('rankExcludeTry').checked;
+    const { classes, gLabel, valid } = RANK_CTX;
+    RANK = computeRank(method, exclude);
 
-    const gLabel = gKey ? ((GROUPS.find(g => g.key === gKey) || {}).label || gKey) : 'win / loss';
-    document.getElementById('rankSub').textContent = `Separating by ${gLabel} · ${classes.length} groups · ${valid.length} points · higher = more discriminative`;
-    document.getElementById('rankList').innerHTML = RANK.map((r, i) =>
-      `<div class="rank-item" data-key="${r.key}" onclick="toggleRank('${r.key}')">
+    const list = document.getElementById('rankList'), sub = document.getElementById('rankSub');
+    if (!RANK.length) { list.innerHTML = '<div class="rank-empty">Not enough data to compare these features.</div>'; sub.textContent = ''; RANK_SEL = []; updateRankSel(); return; }
+
+    if (method === 'auc') {
+      const [pos, neg] = pickPair(classes);
+      sub.textContent = `${pos} vs ${neg} · AUC 0.50 = no separation, 1.00 = perfect · ▲ ${pos} higher · ▼ ${pos} lower${classes.length > 2 ? ' · other groups ignored' : ''}`;
+    } else if (method === 'paired') {
+      const nGames = new Set(RANK_CTX.rowsAll.filter(r => r.outcome === 'Won' || r.outcome === 'Lost').map(r => r.game)).size;
+      sub.textContent = `Paired winner − loser · ${nGames} games · % = share of games the winner leads (50% = none) · ▲ winner higher · ▼ winner lower · grouping ignored`;
+    } else {
+      sub.textContent = `Separating by ${gLabel} · ${classes.length} groups · ${valid.length} points · Fisher ratio — higher = more separation`;
+    }
+
+    // Keep the current selection where possible; drop keys no longer listed
+    // (e.g. try metrics once excluded). null → auto-pick current axes or top 2.
+    if (RANK_SEL === null) {
+      const has = k => RANK.some(r => r.key === k);
+      const curX = document.getElementById('plotX').value, curY = document.getElementById('plotY').value;
+      RANK_SEL = (has(curX) && has(curY) && curX !== curY) ? [curX, curY] : RANK.slice(0, 2).map(r => r.key);
+    } else {
+      RANK_SEL = RANK_SEL.filter(k => RANK.some(r => r.key === k));
+    }
+
+    const dispScore = r => method === 'paired' ? `${Math.round(r.score * 100)}%` : fmtScore(r.score);
+    const scoreTitle = r => method === 'paired' && r.dz != null
+      ? `winner leads in ${Math.round((r.dir > 0 ? r.score : 1 - r.score) * 100)}% of ${r.n} games · paired d = ${fmtScore(Math.abs(r.dz))}` : '';
+    list.innerHTML = RANK.map((r, i) => {
+      const who = method === 'paired' ? 'winner' : 'first group';
+      const arrow = r.dir == null ? '' : `<span class="rank-dir" title="${who} tends ${r.dir > 0 ? 'higher' : 'lower'} on this metric">${r.dir > 0 ? '▲' : '▼'}</span>`;
+      return `<div class="rank-item" data-key="${r.key}" onclick="toggleRank('${r.key}')">
          <span class="rank-badge">${i + 1}</span>
          <span class="rank-label">${r.label}</span>
-         <span class="rank-score">${fmtScore(r.score)}</span>
-       </div>`).join('');
-
-    // Pre-select the current X/Y if they're in the list, else the top two.
-    const curX = document.getElementById('plotX').value, curY = document.getElementById('plotY').value;
-    const has = k => RANK.some(r => r.key === k);
-    RANK_SEL = (has(curX) && has(curY) && curX !== curY) ? [curX, curY] : RANK.slice(0, 2).map(r => r.key);
+         ${arrow}
+         <span class="rank-score" title="${scoreTitle(r)}">${dispScore(r)}</span>
+       </div>`;
+    }).join('');
     updateRankSel();
+  }
+  window.rankRefresh = renderRankList;
+
+  window.openRankModal = function () {
+    const note = document.getElementById('plotNote');
+    const gKey = document.getElementById('plotGroup').value;
+    const splitWL = document.getElementById('plotSplitWL').checked;
+    // Classes = the colour grouping, or Win/Loss when that's the only split.
+    const classOf = gKey ? (r => r[gKey]) : (splitWL ? (r => r.outcome) : null);
+    if (!classOf) { note.textContent = 'Rank axes: choose a "Group by" (or enable Win/Loss) so there are groups to separate.'; return; }
+
+    const valid = DATA.rows.filter(passesFilters)
+      .filter(r => { const c = classOf(r); return c && c !== '—'; });
+    const classes = [...new Set(valid.map(classOf))];
+    if (classes.length < 2) { note.textContent = 'Rank axes: need at least 2 groups in the current selection.'; return; }
+
+    const gLabel = gKey ? ((GROUPS.find(g => g.key === gKey) || {}).label || gKey) : 'win / loss';
+    // rowsAll = the filtered set regardless of grouping — paired mode pairs the
+    // Won and Lost side of each game, so it ignores the colour grouping.
+    RANK_CTX = { classOf, valid, classes, gLabel, rowsAll: DATA.rows.filter(passesFilters) };
+    RANK_SEL = null;              // auto-pick on open
+    renderRankList();
     document.getElementById('rankModal').classList.add('open');
   };
 
