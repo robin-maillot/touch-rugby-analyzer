@@ -5,7 +5,7 @@
 // YouTube) always go straight to the network so live data is never stale.
 //
 // Bump CACHE_VERSION whenever shell assets change to force a refresh.
-const CACHE_VERSION = 'trl-shell-v1';
+const CACHE_VERSION = 'trl-shell-v2';
 
 const SHELL = [
   'index.html',
@@ -65,7 +65,14 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE_VERSION).then((c) => c.put(req, copy));
           return res;
         })
-        .catch(() => caches.match(req).then((hit) => hit || caches.match('index.html')))
+        // Offline fallback: cached page, then app shell, then a synthetic
+        // response — respondWith() throws if it ever resolves to undefined.
+        .catch(() => caches.match(req)
+          .then((hit) => hit || caches.match('index.html'))
+          .then((hit) => hit || new Response(
+            '<h1>Offline</h1><p>No cached copy of this page is available.</p>',
+            { status: 503, statusText: 'Offline', headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+          )))
     );
     return;
   }
@@ -82,7 +89,8 @@ self.addEventListener('fetch', (event) => {
           return res;
         })
         .catch(() => hit);
-      return hit || network;
+      // Never resolve to undefined: respondWith() would throw a TypeError.
+      return hit || network.then((res) => res || Response.error());
     })
   );
 });
