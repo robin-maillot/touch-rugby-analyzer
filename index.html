@@ -289,7 +289,7 @@
     const admin        = (role === 'admin');
     document.getElementById('annotatorCard').style.display = staffOrAdmin ? '' : 'none';
     document.getElementById('fieldCard').style.display     = staffOrAdmin ? '' : 'none';
-    document.getElementById('backfillCard').style.display  = admin ? '' : 'none';
+    document.getElementById('backfillCard').style.display  = staffOrAdmin ? '' : 'none';
     document.getElementById('adminCard').style.display     = admin ? '' : 'none';
     document.getElementById('dashboardCard').style.display = admin ? '' : 'none';
     loginScreen.style.display = 'none';
