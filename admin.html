@@ -184,6 +184,9 @@ TR.auth('admin');
 
 let currentSheet = '_metadata';
 let state = { headers: [], rows: [] }; // rows: array of arrays (data rows, no header)
+// Bumped on every tab load; a resolving fetch renders only if it's still the
+// latest, so switching tabs mid-load can't paint a stale view over the new one.
+let loadSeq = 0;
 
 function setStatus(msg, kind) {
   const el = document.getElementById('status');
@@ -205,6 +208,7 @@ function selectTab(sheet) {
 function refresh() { currentSheet === '_stale' ? loadStale() : loadSheet(currentSheet); }
 
 async function loadSheet(sheet) {
+  const seq = ++loadSeq;
   document.getElementById('loading').style.display   = 'block';
   document.getElementById('gridWrap').style.display  = 'none';
   document.getElementById('staleWrap').style.display = 'none';
@@ -213,10 +217,12 @@ async function loadSheet(sheet) {
   try {
     const resp = await fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&action=admin_sheet&name=${TR.enc(sheet)}`);
     const res  = await resp.json();
+    if (seq !== loadSeq) return; // a newer tab load superseded this one
     if (!res.ok) throw new Error(res.error || 'Load failed');
     state = { headers: res.headers || [], rows: res.rows || [] };
     renderGrid();
   } catch (err) {
+    if (seq !== loadSeq) return;
     document.getElementById('loading').style.display = 'none';
     setStatus('Load failed: ' + err.message, 'bad');
   }
@@ -303,6 +309,7 @@ function addRow() {
 // Game-data tabs with no _metadata row (orphans left when a metadata row is
 // deleted). They don't appear in the games list but still take up space.
 async function loadStale() {
+  const seq = ++loadSeq;
   document.getElementById('loading').style.display   = 'block';
   document.getElementById('gridWrap').style.display  = 'none';
   document.getElementById('staleWrap').style.display = 'none';
@@ -311,9 +318,11 @@ async function loadStale() {
   try {
     const resp = await fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&action=admin_stale_sheets`);
     const res  = await resp.json();
+    if (seq !== loadSeq) return; // a newer tab load superseded this one
     if (!res.ok) throw new Error(res.error || 'Load failed');
     renderStale(res.stale || []);
   } catch (err) {
+    if (seq !== loadSeq) return;
     document.getElementById('loading').style.display = 'none';
     setStatus('Load failed: ' + err.message, 'bad');
   }
