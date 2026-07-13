@@ -118,6 +118,14 @@ function canSeeGame(auth, gameMeta) {
   return gs.indexOf(auth.group) >= 0;
 }
 
+// True when `auth` may edit a game's video links (backfill_youtube/gcs). Admins
+// always pass; staff may edit only games their group can already see, so they
+// can't touch games outside their group by POSTing a raw sheetName.
+function canEditGame(auth, sheetName) {
+  if (auth && auth.role === 'admin') return true;
+  return canSeeGame(auth, getMetadata()[sheetName]);
+}
+
 // ── Cache helpers ───────────────────────────────────────────────
 const CACHE_TTL = 300; // seconds (5 min)
 
@@ -416,25 +424,28 @@ function doPost(e) {
       return json({ ok: true, updated });
     }
 
-    // action=backfill_youtube → write YouTube links into a game tab
+    // action=backfill_youtube → write YouTube links into a game tab. Staff may
+    // do this for games in their own group; admins for any game.
     if (data.action === 'backfill_youtube') {
-      if (!isAdminSecret(data.secret)) return json({ ok: false, error: 'Admin access required.' });
+      if (!data.sheetName) return json({ ok: false, error: 'Missing sheetName parameter' });
+      if (!canEditGame(auth, data.sheetName)) return json({ ok: false, error: 'You can only edit games in your group.' });
       const updated = backfillYoutubeLink(data.sheetName, data.youtubeUrl, Number(data.offsetSeconds) || 0);
       cacheClear();
       return json({ ok: true, updated });
     }
 
-    // action=backfill_gcs → attach a GCS object path to a game (admin only).
-    // Empty string is valid — used to clear the link.
+    // action=backfill_gcs → attach a GCS object path to a game. Staff may do this
+    // for games in their own group; admins for any game. Empty string clears it.
     if (data.action === 'backfill_gcs') {
-      if (!isAdminSecret(data.secret)) return json({ ok: false, error: 'Admin access required.' });
       if (!data.sheetName) return json({ ok: false, error: 'Missing sheetName parameter' });
+      if (!canEditGame(auth, data.sheetName)) return json({ ok: false, error: 'You can only edit games in your group.' });
       writeMeta(data.sheetName, { gcsObject: String(data.gcsObject || '').trim() });
       cacheClear();
       return json({ ok: true });
     }
 
-    // action=backfill_groups → set the full Groups list for a game (admin only).
+    // action=backfill_groups → set the full Groups list for a game (admin only —
+    // Groups control access, so staff must not be able to change visibility).
     // Empty list / empty string is valid — removes all groups (admin-only visibility).
     if (data.action === 'backfill_groups') {
       if (!isAdminSecret(data.secret)) return json({ ok: false, error: 'Admin access required.' });

@@ -140,7 +140,11 @@
 </main>
 
 <script>
-TR.auth('admin');
+TR.auth('staff');
+
+// Groups control who can see a game, so only admins may edit them. Staff can
+// still add/update the video links for games their group can see.
+const IS_ADMIN = TR.role() === 'admin';
 
 function gameLabel(g) {
   if (g.team1 && g.team2) {
@@ -189,13 +193,14 @@ function renderCard(g, container) {
       </div>
       <button class="submit-btn" onclick="submitGcs(this, '${g.name}')">${g.gcsObject ? 'Update GCS' : 'Save GCS'}</button>
     </div>
+    ${IS_ADMIN ? `
     <div class="form-row">
       <div class="field">
         <label>Groups (space-separated; empty = admin-only; use ALL to make public to every logged-in user)</label>
         <input type="text" class="groups-input" placeholder="france_m30 england_m30  (or: ALL)" value="${(g.groups || []).join(' ')}">
       </div>
       <button class="submit-btn" onclick="submitGroups(this, '${g.name}')">${(g.groups && g.groups.length) ? 'Update Groups' : 'Save Groups'}</button>
-    </div>
+    </div>` : ''}
   `;
   container.appendChild(card);
 }
