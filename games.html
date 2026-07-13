@@ -98,6 +98,7 @@
     .chart-wrap { overflow-x: auto; width: 100%; }
     .vega-embed { width: 100% !important; }
     .card-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: #666; margin-bottom: 10px; }
+    .momentum-note { font-size: 0.72rem; color: #6b7688; margin-top: 8px; line-height: 1.4; }
 
     .half-toggle { display: flex; gap: 4px; margin-top: 10px; flex-wrap: wrap; }
     .half-btn { background: #0b0e14; border: 1px solid #2b3242; color: #9ba6b9; border-radius: 5px; padding: 4px 12px; font-size: 0.78rem; cursor: pointer; transition: background 0.15s, color 0.15s; }
@@ -277,6 +278,12 @@
     <div class="card">
       <div class="card-label">Team Statistics</div>
       <div id="metricsTable"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Momentum</div>
+      <div class="chart-wrap" id="vis-momentum"></div>
+      <div class="momentum-note" id="momentumNote"></div>
     </div>
   </div>
 </main>
@@ -848,6 +855,140 @@ function possessionSpec(data, teamNames, rangeStart, rangeEnd) {
   };
 }
 
+// ── Momentum ───────────────────────────────────────────────────
+// A leaky integrator over game time: momentum decays toward zero each second
+// (memory tau), gains a steady "pressure" drip toward whichever team holds a
+// live ball (ramping with how long the set has been sustained), and takes a
+// signed impulse on each event. Positive = team1, negative = team2.
+const MOMENTUM_PARAMS = { tau: 90, tryW: 7, penW: 1.6, rho: 0.05, smooth: 8 };
+
+// Gaussian smooth (centred) — rounds the leaky integrator's sharp event jumps
+// into clean swells so the curve reads like a flowing momentum wave, not a
+// series of exponential-decay spikes. sigma is in seconds (per-second samples).
+function smoothSeries(values, sigma) {
+  if (!sigma || sigma <= 0) return values.slice();
+  const radius = Math.ceil(sigma * 3);
+  const kern = [];
+  for (let i = -radius; i <= radius; i++) kern.push(Math.exp(-(i * i) / (2 * sigma * sigma)));
+  const out = new Array(values.length);
+  for (let i = 0; i < values.length; i++) {
+    let acc = 0, wsum = 0;
+    for (let k = -radius; k <= radius; k++) {
+      const j = i + k;
+      if (j < 0 || j >= values.length) continue;
+      const w = kern[k + radius];
+      acc += values[j] * w; wsum += w;
+    }
+    out[i] = acc / wsum;
+  }
+  return out;
+}
+
+function momentumWeights() {
+  const P = MOMENTUM_PARAMS;
+  return { Try: P.tryW, turnover: P.penW * 1.08, penAtk: P.penW, penDef: P.penW,
+           sixth: 1.0, sixAgain: 1.4, driveGood: 1.6, driveBad: 1.6 };
+}
+
+// The team an event's impulse favours + which weight to use (or null to skip).
+function momentumImpulseFor(e, teamNames) {
+  const owner = e._owner;
+  if (!owner) return null;
+  const other = owner === teamNames[0] ? teamNames[1] : teamNames[0];
+  switch (e.Type) {
+    case 'Try': return { team: owner, kind: 'Try' };
+    case 'Turnover':
+      if (e.Name === '6th Touch') return { team: owner, kind: 'sixth' };
+      if (e.Name === '6 Again')   return { team: owner, kind: 'sixAgain' };
+      return { team: other, kind: 'turnover' };               // ball won by defence
+    case 'Penalty Attack':  return { team: owner, kind: 'penAtk' };
+    case 'Penalty Defence': return { team: other, kind: 'penDef' };
+    case 'Game Event':
+      if (e.Name === 'Drive - Good') return { team: owner, kind: 'driveGood' };
+      if (e.Name === 'Drive - Bad')  return { team: other, kind: 'driveBad' };
+      return null;
+    default: return null;
+  }
+}
+
+// events: possession-tagged, non-To-Review, within the selected range (have _owner).
+// possessions: buildPossessionData output for the same set.
+function computeMomentumSeries(events, possessions, teamNames, rangeStart, rangeEnd) {
+  const P = MOMENTUM_PARAMS, W = momentumWeights(), t1 = teamNames[0];
+  const decay = Math.exp(-1 / P.tau), CAP = 40, RAMP = 2;
+
+  const sorted = [...events].sort((a, b) => a.GameTime - b.GameTime);
+  const dead = sorted.filter(e => e.Name === 'Ball Live').map(bl => {
+    const i = sorted.indexOf(bl), prev = i > 0 ? sorted[i - 1] : null;
+    return prev ? { start: prev.GameTime, end: bl.GameTime } : null;
+  }).filter(Boolean);
+  const inDead = t => dead.some(d => t > d.start && t < d.end);
+
+  const imp = {};
+  for (const e of events) {
+    const info = momentumImpulseFor(e, teamNames);
+    if (!info || !W[info.kind]) continue;
+    const s = Math.round(e.GameTime);
+    imp[s] = (imp[s] || 0) + (info.team === t1 ? 1 : -1) * W[info.kind];
+  }
+
+  const segs = [...possessions].sort((a, b) => a.Start - b.Start);
+  let si = 0, M = 0;
+  const series = [];
+  const startT = Math.floor(rangeStart), endT = Math.ceil(rangeEnd);
+  for (let t = startT; t <= endT; t++) {
+    M *= decay;
+    while (si < segs.length && segs[si].End < t) si++;
+    const seg = segs[si];
+    if (seg && t >= seg.Start && t <= seg.End && !inDead(t)) {
+      const press = P.rho * (1 + Math.min(t - seg.Start, CAP) / CAP * RAMP);
+      M += (seg.Team === t1 ? 1 : -1) * press;
+    }
+    if (imp[t]) M += imp[t];
+    series.push({ GameTime: t, M });
+  }
+  // Smooth for display so the curve flows instead of spiking on each event.
+  const sm = smoothSeries(series.map(p => p.M), P.smooth);
+  series.forEach((p, i) => { p.M = +sm[i].toFixed(3); });
+  return series;
+}
+
+function momentumValueAt(series, gameTime, startT) {
+  const i = Math.round(gameTime) - startT;
+  const pt = series[Math.max(0, Math.min(series.length - 1, i))];
+  return pt ? pt.M : 0;
+}
+
+function momentumSpec(series, tries, teamNames, rangeStart, rangeEnd) {
+  const xEnc = { field: 'GameTime', type: 'quantitative',
+                 scale: { domain: [rangeStart, rangeEnd], nice: false },
+                 axis: { labelExpr: MM_SS, title: 'Game Time' } };
+  const yAxis = { title: `← ${teamNames[1]}   ${teamNames[0]} →`, labels: false, ticks: false, domain: false, grid: false };
+  return {
+    $schema: 'https://vega.github.io/schema/vega-lite/v5.json',
+    width: 'container', height: 210, title: 'Momentum',
+    autosize: { type: 'fit', contains: 'padding' },
+    layer: [
+      { data: { values: series }, transform: [{ calculate: 'max(datum.M, 0)', as: 'pos' }],
+        mark: { type: 'area', color: '#00c853', opacity: 0.4, line: false, interpolate: 'monotone' },
+        encoding: { x: xEnc, y: { field: 'pos', type: 'quantitative', axis: yAxis } } },
+      { data: { values: series }, transform: [{ calculate: 'min(datum.M, 0)', as: 'neg' }],
+        mark: { type: 'area', color: '#f44336', opacity: 0.4, line: false, interpolate: 'monotone' },
+        encoding: { x: xEnc, y: { field: 'neg', type: 'quantitative' } } },
+      { data: { values: series }, mark: { type: 'line', color: '#c9d2e0', strokeWidth: 1.4, opacity: 0.9, interpolate: 'monotone' },
+        encoding: { x: xEnc, y: { field: 'M', type: 'quantitative' } } },
+      { mark: { type: 'rule', color: '#5c6883', strokeWidth: 1 }, encoding: { y: { datum: 0 } } },
+      { data: { values: tries }, mark: { type: 'point', filled: true, size: 70, stroke: '#0b0e14', strokeWidth: 1.2 },
+        encoding: {
+          x: xEnc, y: { field: 'M', type: 'quantitative' },
+          color: { field: 'Team', type: 'nominal', scale: { domain: teamNames, range: ['#00c853', '#f44336'] }, legend: null },
+          tooltip: [{ field: 'Team', type: 'nominal', title: 'Try' }, { field: 'GameTime', type: 'quantitative', format: '.0f', title: 'Time (s)' }],
+        } },
+    ],
+    resolve: { scale: { y: 'shared' } },
+  };
+}
+
 // ── Render ─────────────────────────────────────────────────────
 let currentGame = null;
 
@@ -998,14 +1139,24 @@ async function renderStats(halfValue) {
   const filtered  = events.filter(e => e.GameTime >= rangeStart && e.GameTime <= rangeEnd);
   const triesData = buildCumulativeData(filtered, 'Try', teamNames, rangeStart, rangeEnd, startLink, endLink, meta);
   const penData   = buildCumulativeData(filtered, ['Penalty', 'Penalty Attack', 'Penalty Defence'], teamNames, rangeStart, rangeEnd, startLink, endLink, meta);
-  const possData  = buildPossessionData(filtered.filter(e => e.Type !== 'To Review'), teamNames, meta);
+  const possInput = filtered.filter(e => e.Type !== 'To Review');
+  const possData  = buildPossessionData(possInput, teamNames, meta);
   const metrics   = buildMetrics(possData, teamNames, filtered);
+
+  // Momentum runs on the same possession-tagged events (which now carry _owner).
+  const momSeries = computeMomentumSeries(possInput, possData, teamNames, rangeStart, rangeEnd);
+  const startT    = Math.floor(rangeStart);
+  const momTries  = possInput.filter(e => e.Type === 'Try')
+    .map(e => ({ GameTime: e.GameTime, M: momentumValueAt(momSeries, e.GameTime, startT), Team: e._owner }));
+  document.getElementById('momentumNote').textContent =
+    `Leaky integrator · memory ${MOMENTUM_PARAMS.tau}s · try ${MOMENTUM_PARAMS.tryW} · penalty/turnover ${MOMENTUM_PARAMS.penW} · pressure ${MOMENTUM_PARAMS.rho}/s. Positive favours ${teamNames[0]}, negative ${teamNames[1]}.`;
 
   const opts = { config: VEGA_CONFIG, actions: false };
   const embedResults = await Promise.all([
     vegaEmbed('#vis-tries',      cumulativeSpec(triesData, 'Tries vs Time',     'Cumulative Tries',     teamNames), opts),
     vegaEmbed('#vis-penalties',  cumulativeSpec(penData,   'Penalties vs Time', 'Cumulative Penalties', teamNames), opts),
     vegaEmbed('#vis-possession', possessionSpec(possData, teamNames, rangeStart, rangeEnd), opts),
+    vegaEmbed('#vis-momentum',   momentumSpec(momSeries, momTries, teamNames, rangeStart, rangeEnd), opts),
   ]);
   for (const { view } of embedResults) {
     view.addEventListener('click', (event, item) => {
