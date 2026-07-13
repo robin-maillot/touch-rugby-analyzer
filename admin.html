@@ -83,10 +83,16 @@
       white-space: nowrap;
       position: sticky;
       top: 0;
+      z-index: 2;
       border-bottom: 1px solid var(--border);
     }
-    thead th.rownum, td.rownum { width: 34px; text-align: center; color: var(--text-muted); font-variant-numeric: tabular-nums; }
-    thead th.actions, td.actions { width: 44px; text-align: center; }
+    /* Wide sheets (_metadata, _live) overflow horizontally; pin the row-number
+       and actions columns so the delete button stays visible without scrolling. */
+    thead th.rownum, td.rownum { width: 34px; text-align: center; color: var(--text-muted); font-variant-numeric: tabular-nums; position: sticky; left: 0; z-index: 1; background: var(--bg); }
+    thead th.rownum { z-index: 4; background: var(--surface-2); }
+    thead th.actions, td.actions { width: 44px; text-align: center; position: sticky; right: 0; z-index: 1; background: var(--bg); border-left: 1px solid var(--border); }
+    thead th.actions { z-index: 4; background: var(--surface-2); }
+    tbody tr:nth-child(even) td.rownum, tbody tr:nth-child(even) td.actions { background: #0f1218; }
     tbody tr:nth-child(even) { background: rgba(255,255,255,0.015); }
     td { padding: 0; border-bottom: 1px solid var(--border); vertical-align: middle; }
     td input.cell {
@@ -252,25 +258,31 @@ async function saveCell(inp) {
   }
 }
 
-async function addRow() {
-  setStatus('Adding row…');
-  try {
-    const resp = await fetch(TR.APPS_SCRIPT_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ secret: TR.secret(), action: 'admin_add_row', sheet: currentSheet }),
-    });
-    const res = await resp.json();
-    if (!res.ok) throw new Error(res.error || 'Add failed');
-    await loadSheet(currentSheet);
-    setStatus('Row added', 'good');
-  } catch (err) {
-    setStatus('Add failed: ' + err.message, 'bad');
-  }
+// Add a blank row to the grid locally. We don't round-trip to the server here:
+// the sheet ignores an all-empty appended row (getDataRange() excludes blank
+// rows, so it would vanish on the next reload). Instead the row persists the
+// moment a cell is edited — admin_set_cell writes by absolute coordinates and
+// extends the sheet on its own.
+function addRow() {
+  if (!state.headers.length) { setStatus('Load a sheet first.', 'bad'); return; }
+  state.rows.push(state.headers.map(() => ''));
+  renderGrid();
+  const r = state.rows.length - 1;
+  const first = document.querySelector(`input.cell[data-row="${r}"][data-col="0"]`);
+  if (first) first.focus();
+  setStatus('New row added — type a value to save it', 'good');
 }
 
 async function deleteRow(r) {
-  const label = (state.rows[r] || []).slice(0, 3).filter(Boolean).join(' · ') || `row ${r + 1}`;
+  // A fully-blank row was never persisted (see addRow) — just drop it locally.
+  const rowVals = state.rows[r] || [];
+  if (rowVals.every(v => v == null || String(v) === '')) {
+    state.rows.splice(r, 1);
+    renderGrid();
+    setStatus('Row removed', 'good');
+    return;
+  }
+  const label = rowVals.slice(0, 3).filter(Boolean).join(' · ') || `row ${r + 1}`;
   if (!confirm(`Delete this row?\n\n${label}\n\nThis cannot be undone.`)) return;
   setStatus('Deleting…');
   try {
