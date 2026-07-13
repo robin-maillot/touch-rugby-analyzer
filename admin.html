@@ -114,6 +114,22 @@
     }
     .del-btn:hover { color: var(--bad); }
 
+    .tab-stale.active { border-color: var(--bad); background: rgba(239,68,68,0.12); color: #fff; }
+    #staleWrap { display: flex; flex-direction: column; gap: 8px; }
+    .stale-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 14px;
+    }
+    .stale-name { font-family: monospace; font-size: 0.85rem; color: var(--text); word-break: break-all; }
+    .stale-meta { margin-left: auto; font-size: 0.76rem; color: var(--text-muted); white-space: nowrap; }
+    .stale-row .del-btn { font-size: 1.1rem; }
+    .stale-empty { padding: 40px 16px; text-align: center; color: var(--text-muted); font-size: 0.85rem; }
+
     #loading, #empty { padding: 60px 24px; text-align: center; color: var(--text-muted); }
     .spinner { width: 30px; height: 30px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 14px; }
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -136,6 +152,7 @@
     <button class="tab" data-sheet="_metadata">_metadata</button>
     <button class="tab" data-sheet="_groups">_groups</button>
     <button class="tab" data-sheet="_live">_live</button>
+    <button class="tab tab-stale" data-sheet="_stale">⚠ stale sheets</button>
   </div>
 
   <div class="note">
@@ -146,7 +163,7 @@
   </div>
 
   <div class="toolbar">
-    <button class="btn" id="refreshBtn" onclick="loadSheet(currentSheet)">↻ Refresh</button>
+    <button class="btn" id="refreshBtn" onclick="refresh()">↻ Refresh</button>
     <button class="btn btn-primary" id="addRowBtn" onclick="addRow()">+ Add row</button>
     <span class="status" id="status"></span>
   </div>
@@ -159,6 +176,7 @@
       <tbody id="tbody"></tbody>
     </table>
   </div>
+  <div id="staleWrap" style="display:none"></div>
 </main>
 
 <script>
@@ -176,13 +194,21 @@ function setStatus(msg, kind) {
 function selectTab(sheet) {
   currentSheet = sheet;
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.sheet === sheet));
-  loadSheet(sheet);
+  // The stale-sheets view isn't an editable grid — hide "Add row" and route to
+  // its own loader. Every other tab is a real control sheet.
+  const isStale = sheet === '_stale';
+  document.getElementById('addRowBtn').style.display = isStale ? 'none' : '';
+  if (isStale) loadStale(); else loadSheet(sheet);
 }
 
+// Refresh button dispatches to whichever view is active.
+function refresh() { currentSheet === '_stale' ? loadStale() : loadSheet(currentSheet); }
+
 async function loadSheet(sheet) {
-  document.getElementById('loading').style.display  = 'block';
-  document.getElementById('gridWrap').style.display = 'none';
-  document.getElementById('empty').style.display    = 'none';
+  document.getElementById('loading').style.display   = 'block';
+  document.getElementById('gridWrap').style.display  = 'none';
+  document.getElementById('staleWrap').style.display = 'none';
+  document.getElementById('empty').style.display     = 'none';
   setStatus('');
   try {
     const resp = await fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&action=admin_sheet&name=${TR.enc(sheet)}`);
@@ -271,6 +297,63 @@ function addRow() {
   const first = document.querySelector(`input.cell[data-row="${r}"][data-col="0"]`);
   if (first) first.focus();
   setStatus('New row added — type a value to save it', 'good');
+}
+
+// ── Stale sheets ────────────────────────────────────────────────
+// Game-data tabs with no _metadata row (orphans left when a metadata row is
+// deleted). They don't appear in the games list but still take up space.
+async function loadStale() {
+  document.getElementById('loading').style.display   = 'block';
+  document.getElementById('gridWrap').style.display  = 'none';
+  document.getElementById('staleWrap').style.display = 'none';
+  document.getElementById('empty').style.display     = 'none';
+  setStatus('');
+  try {
+    const resp = await fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&action=admin_stale_sheets`);
+    const res  = await resp.json();
+    if (!res.ok) throw new Error(res.error || 'Load failed');
+    renderStale(res.stale || []);
+  } catch (err) {
+    document.getElementById('loading').style.display = 'none';
+    setStatus('Load failed: ' + err.message, 'bad');
+  }
+}
+
+function renderStale(list) {
+  document.getElementById('loading').style.display = 'none';
+  const wrap = document.getElementById('staleWrap');
+  if (!list.length) {
+    wrap.innerHTML = '<div class="stale-empty">No stale sheets — every data tab has a _metadata row. 🎉</div>';
+    wrap.style.display = 'flex';
+    return;
+  }
+  wrap.innerHTML = list.map(s =>
+    `<div class="stale-row">
+       <span class="stale-name">${escapeHtml(s.name)}</span>
+       <span class="stale-meta">${s.rows} data row${s.rows === 1 ? '' : 's'}</span>
+       <button class="del-btn" title="Delete sheet" data-name="${escapeAttr(s.name)}">✕</button>
+     </div>`).join('');
+  wrap.querySelectorAll('.del-btn').forEach(btn =>
+    btn.addEventListener('click', () => deleteStale(btn.dataset.name)));
+  wrap.style.display = 'flex';
+}
+
+async function deleteStale(name) {
+  if (!confirm(`Delete stale sheet "${name}"?\n\nThis permanently removes the data tab and cannot be undone.`)) return;
+  setStatus('Deleting…');
+  try {
+    const resp = await fetch(TR.APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ secret: TR.secret(), action: 'admin_delete_sheet', name }),
+    });
+    const res = await resp.json();
+    if (!res.ok) throw new Error(res.error || 'Delete failed');
+    await loadStale();
+    setStatus('Sheet deleted', 'good');
+  } catch (err) {
+    setStatus('Delete failed: ' + err.message, 'bad');
+  }
 }
 
 async function deleteRow(r) {

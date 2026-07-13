@@ -19,8 +19,9 @@ const META_COLS = ['Team 1', 'Team 2', 'Competition', 'Year', 'Division', 'Video
 // ── Auth helper ────────────────────────────────────────────────
 // Reads _groups (Group | Secret | Role) → Map<secret, {group, role}>.
 // Cached in script cache for CACHE_TTL so we don't hit the sheet on every
-// request. cacheClear() (called after writes) does NOT bust this — group
-// edits happen out-of-band in the Sheets UI, so a 5-min freshness lag is fine.
+// request. The generic cacheClear() does NOT bust this cache; callers that edit
+// _groups (the admin editor) must call clearGroupsCache() so a newly-added
+// secret is recognised at login immediately instead of after the TTL lapses.
 function getGroups() {
   const hit = cacheGet('groups');
   if (hit) {
@@ -49,6 +50,13 @@ function getGroups() {
 function authFor(secret) {
   if (!secret) return null;
   return getGroups().get(String(secret)) || null;
+}
+
+// Evict the cached _groups map so the next authFor()/getGroups() re-reads the
+// sheet. Call after any write that changes _groups (secrets, roles, groups),
+// otherwise login keeps rejecting a just-added secret until the cache expires.
+function clearGroupsCache() {
+  try { CacheService.getScriptCache().remove('groups'); } catch (e) {}
 }
 
 function isAdminSecret(secret) {
@@ -287,6 +295,20 @@ function doGet(e) {
       return json({ ok: true, name, headers: values[0] || [], rows: values.slice(1) });
     }
 
+    // action=admin_stale_sheets → game-data tabs in SHEET_ID that have no matching
+    // _metadata row (orphans left behind when a metadata row is deleted). They're
+    // invisible in the games list (which is metadata-driven) but still take up
+    // space, so surface them for cleanup. Admin only; never cached.
+    if (e.parameter.action === 'admin_stale_sheets') {
+      if (auth.role !== 'admin') return json({ ok: false, error: 'Admin access required.' });
+      const meta = getMetadata();
+      const ss   = SpreadsheetApp.openById(SHEET_ID);
+      const stale = ss.getSheets()
+        .filter(sh => !Object.prototype.hasOwnProperty.call(meta, sh.getName()))
+        .map(sh => ({ name: sh.getName(), rows: Math.max(0, sh.getLastRow() - 1) }));
+      return json({ ok: true, stale });
+    }
+
     // Cache key suffix: include version + caller's role/group so writes auto-invalidate
     // (version bumps on cacheClear) and group A never sees group B's cached payload.
     const cacheKeySuffix = ':v' + getSheetVersion() + ':' + (auth.role === 'admin' ? '*admin' : (auth.group || '*nogroup'));
@@ -451,6 +473,7 @@ function doPost(e) {
       if (!(r >= 0) || !(c >= 0)) return json({ ok: false, error: 'Bad cell coordinates.' });
       sheet.getRange(r + 2, c + 1).setValue(data.value == null ? '' : data.value);
       cacheClear();
+      if (data.sheet === GROUPS_SHEET) clearGroupsCache();
       return json({ ok: true });
     }
 
@@ -463,6 +486,7 @@ function doPost(e) {
       for (let i = 0; i < width; i++) row.push((data.values && data.values[i] != null) ? data.values[i] : '');
       sheet.appendRow(row);
       cacheClear();
+      if (data.sheet === GROUPS_SHEET) clearGroupsCache();
       return json({ ok: true, row: sheet.getLastRow() - 2 }); // 0-based data index of the new row
     }
 
@@ -473,6 +497,29 @@ function doPost(e) {
       const r = Number(data.row);
       if (!(r >= 0)) return json({ ok: false, error: 'Bad row index.' });
       sheet.deleteRow(r + 2);
+      cacheClear();
+      if (data.sheet === GROUPS_SHEET) clearGroupsCache();
+      return json({ ok: true });
+    }
+
+    // action=admin_delete_sheet → delete a stale game-data tab (one with no
+    // _metadata row). Guarded to stale tabs only, so an active game's data can't
+    // be nuked here — deleting a live game is a separate, deliberate flow. Also
+    // clears the tab's creator token and finalises any leftover _live row.
+    if (data.action === 'admin_delete_sheet') {
+      if (!isAdminSecret(data.secret)) return json({ ok: false, error: 'Admin access required.' });
+      const name = data.name;
+      if (!name) return json({ ok: false, error: 'Missing sheet name.' });
+      if (Object.prototype.hasOwnProperty.call(getMetadata(), name)) {
+        return json({ ok: false, error: 'Sheet is not stale (it has a _metadata row).' });
+      }
+      const ss    = SpreadsheetApp.openById(SHEET_ID);
+      const sheet = ss.getSheetByName(name);
+      if (!sheet) return json({ ok: false, error: 'Sheet not found.' });
+      if (ss.getSheets().length <= 1) return json({ ok: false, error: 'Cannot delete the only tab in the spreadsheet.' });
+      ss.deleteSheet(sheet);
+      setCreatorToken(name, ''); // drop leftover ownership token
+      clearLiveRow(name);        // finalise any stray live row (no-op if absent)
       cacheClear();
       return json({ ok: true });
     }
