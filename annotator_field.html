@@ -109,10 +109,8 @@
     .score-team { flex: 1; text-align: center; }
     .score-name { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .score-val  { font-size: 2.2rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
-    .score-sep        { font-size: 1.2rem; color: var(--border); padding: 0 6px; }
-    .clock-half-label { font-size: 0.62rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 4px; }
-    #halfClock        { font-size: 0.9rem; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; margin-top: 1px; }
-    #totalClock       { font-size: 0.62rem; color: var(--text-muted); font-variant-numeric: tabular-nums; margin-top: 2px; }
+    #halfClock        { font-size: 2.2rem; font-weight: 700; line-height: 1; color: var(--text); font-variant-numeric: tabular-nums; }
+    #totalClock       { font-size: 0.68rem; color: var(--text-muted); font-variant-numeric: tabular-nums; margin-top: 4px; }
 
     /* ── Main content ───────────────────────────────────────────── */
     main {
@@ -401,6 +399,28 @@
     }
     .recent-item { cursor: pointer; }
     .recent-item:active { background: var(--surface-2); }
+
+    /* edit modal: comment field + footer buttons */
+    .edit-comment {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      padding: 10px 12px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      line-height: 1.35;
+      resize: vertical;
+      outline: none;
+    }
+    .edit-comment:focus { border-color: var(--accent); }
+    .edit-comment::placeholder { color: #444; }
+    .edit-footer { display: flex; gap: 10px; margin: 4px 16px 16px; }
+    .edit-footer .stats-close-btn { margin: 0; width: auto; flex: 1; }
+    .edit-btn-save { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .edit-btn-save:active { filter: brightness(0.88); background: var(--accent); }
+    .recent-comment { flex-shrink: 0; font-size: 0.8rem; line-height: 1; }
   </style>
 <script src="js/config.js"></script>
 <script src="js/utils.js"></script>
@@ -477,8 +497,6 @@
     <div class="score-val"  id="scoreVal1">0</div>
   </div>
   <div style="text-align:center">
-    <div class="score-sep">–</div>
-    <div class="clock-half-label" id="halfLabel">—</div>
     <div id="halfClock">00:00</div>
     <div id="totalClock">00:00</div>
   </div>
@@ -535,10 +553,15 @@
   <div id="editCard">
     <div class="stats-handle"></div>
     <div style="padding:16px 20px 12px;border-bottom:1px solid var(--border)">
-      <div style="font-size:0.7rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Change Event</div>
+      <div style="font-size:0.7rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Edit Event</div>
       <div id="editCurrentLabel" style="font-size:1rem;font-weight:600"></div>
     </div>
-    <div style="padding:16px">
+    <div style="padding:16px 16px 4px">
+      <div style="font-size:0.7rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px">Comment</div>
+      <textarea id="editComment" class="edit-comment" rows="2" placeholder="Add a note (optional)…"></textarea>
+    </div>
+    <div style="padding:12px 16px 4px">
+      <div style="font-size:0.7rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px">Change type</div>
       <div class="event-grid two-col">
         <button class="evt-btn btn-try1"    onclick="applyEdit('Try','Other')">Try</button>
         <button class="evt-btn btn-turn"    onclick="applyEdit('Turnover','Other')">Turnover</button>
@@ -554,7 +577,10 @@
         <button class="evt-btn btn-game"    onclick="applyEdit('Game Event','Game End')">Game End</button>
       </div>
     </div>
-    <button class="stats-close-btn" onclick="closeEdit()">Cancel</button>
+    <div class="edit-footer">
+      <button class="stats-close-btn" onclick="closeEdit()">Cancel</button>
+      <button class="stats-close-btn edit-btn-save" onclick="saveComment()">Save</button>
+    </div>
   </div>
 </div>
 
@@ -874,6 +900,9 @@ function openEdit(index) {
   editingIndex = index;
   const a = annotations[index];
   document.getElementById('editCurrentLabel').textContent = eventLabel(a) + ' · ' + fmtClock(a.time);
+  // '?' is the placeholder marker To Review events carry — show a blank box so
+  // the annotator can type a real note over it.
+  document.getElementById('editComment').value = (a.comment && a.comment !== '?') ? a.comment : '';
   document.getElementById('editOverlay').classList.add('open');
 }
 
@@ -882,11 +911,27 @@ function closeEdit() {
   document.getElementById('editOverlay').classList.remove('open');
 }
 
+// Read the comment box back onto the annotation being edited. To Review events
+// keep the '?' marker when left blank so they still stand out downstream.
+function commitCommentField(a) {
+  const text = document.getElementById('editComment').value.trim();
+  a.comment = text || (a.type === 'To Review' ? '?' : '');
+}
+
+function saveComment() {
+  if (editingIndex === null) return;
+  commitCommentField(annotations[editingIndex]);
+  closeEdit();
+  updateUI();
+  saveSession();
+}
+
 function applyEdit(type, name) {
   if (editingIndex === null) return;
   const a = annotations[editingIndex];
   a.type = type;
   a.name = name;
+  commitCommentField(a);
   a.actionOwner = TR.inferActionOwner(a.possessionOwner, type, name);
   replayPossessionFrom(editingIndex + 1);
   closeEdit();
@@ -910,15 +955,21 @@ function updateUI() {
   document.getElementById('scoreVal2').textContent  = annotations.filter(a => a.type === 'Try' && a.actionOwner === 'Team 2').length;
 
   const gameStarts   = annotations.filter(a => a.name === 'Game Start');
+  const gameEnds     = annotations.filter(a => a.name === 'Game End');
   const firstStart   = gameStarts[0];
   const lastStart    = gameStarts[gameStarts.length - 1];
+  const lastEnd      = gameEnds[gameEnds.length - 1];
   const lastTime     = annotations.length ? annotations[annotations.length - 1].time : 0;
-  const halfElapsed  = lastStart  ? Math.max(0, lastTime - lastStart.time)  : 0;
+  const isOnBreak    = !!(lastStart && lastEnd && lastEnd.time > lastStart.time);
+  // On a break the half clock resets to 0 and counts the break from the whistle;
+  // otherwise it tracks the current half from its kick-off.
+  const halfRef      = isOnBreak ? lastEnd : lastStart;
+  const halfElapsed  = halfRef    ? Math.max(0, lastTime - halfRef.time)    : 0;
   const totalElapsed = firstStart ? Math.max(0, lastTime - firstStart.time) : 0;
-  const isOnBreak = lastStart && annotations.some(a => a.name === 'Game End' && a.time > lastStart.time);
-  document.getElementById('halfLabel').textContent  = !gameStarts.length ? '—' : isOnBreak ? 'Break' : ordinal(gameStarts.length) + ' Half';
   document.getElementById('halfClock').textContent  = fmtClock(halfElapsed);
-  document.getElementById('totalClock').textContent = 'Total ' + fmtClock(totalElapsed);
+  // Total line doubles as the phase indicator now the period label is gone.
+  const phase = !gameStarts.length ? '' : isOnBreak ? 'Break · ' : ordinal(gameStarts.length) + ' · ';
+  document.getElementById('totalClock').textContent = phase + 'Total ' + fmtClock(totalElapsed);
 
   const COLORS = { 'Try': '#22c55e', 'Turnover': '#f97316', 'Penalty Attack': '#ef4444', 'Penalty Defence': '#b91c1c', 'Game Event': '#3b82f6', 'To Review': '#7c3aed' };
   const el = document.getElementById('recentList');
@@ -946,10 +997,13 @@ function updateUI() {
     const team    = a.actionOwner === 'Team 1' ? (document.getElementById('metaTeam1').value.trim() || 'Team 1')
                                                 : (document.getElementById('metaTeam2').value.trim() || 'Team 2');
     const teamStr = a.type !== 'Game Event' ? ` · ${team}` : '';
+    const hasComment = a.comment && a.comment.trim() && a.comment !== '?';
+    const commentMark = hasComment ? '<span class="recent-comment" title="Has a comment">💬</span>' : '';
     return `<div class="recent-item" onclick="openEdit(${idx})">
       <div class="recent-dot" style="background:${color}"></div>
       <span class="recent-time">${fmtClock(a.time)}</span>
       <span class="recent-text">${eventLabel(a)}${teamStr}</span>
+      ${commentMark}
       <span style="color:var(--border);font-size:0.9rem;flex-shrink:0">›</span>
     </div>`;
   }).join('');
@@ -1003,11 +1057,18 @@ setInterval(() => {
   if (!wallStart) return;
   const gameStarts = annotations.filter(a => a.name === 'Game Start');
   if (!gameStarts.length) return;
+  const gameEnds  = annotations.filter(a => a.name === 'Game End');
+  const lastStart = gameStarts[gameStarts.length - 1];
+  const lastEnd   = gameEnds[gameEnds.length - 1];
+  const isOnBreak = !!(lastEnd && lastEnd.time > lastStart.time);
   const now            = Date.now();
   const firstStartWall = wallStart + gameStarts[0].time * 1000;
-  const lastStartWall  = wallStart + gameStarts[gameStarts.length - 1].time * 1000;
-  document.getElementById('halfClock').textContent  = fmtClock(Math.max(0, (now - lastStartWall)  / 1000));
-  document.getElementById('totalClock').textContent = 'Total ' + fmtClock(Math.max(0, (now - firstStartWall) / 1000));
+  // During a break the half clock counts up from the Game End whistle (resetting
+  // to 0); otherwise it counts the current half from its Game Start.
+  const halfRefWall    = wallStart + (isOnBreak ? lastEnd.time : lastStart.time) * 1000;
+  const phase = isOnBreak ? 'Break · ' : ordinal(gameStarts.length) + ' · ';
+  document.getElementById('halfClock').textContent  = fmtClock(Math.max(0, (now - halfRefWall)  / 1000));
+  document.getElementById('totalClock').textContent = phase + 'Total ' + fmtClock(Math.max(0, (now - firstStartWall) / 1000));
 }, 1000);
 
 // ── Live mode ──────────────────────────────────────────────────
