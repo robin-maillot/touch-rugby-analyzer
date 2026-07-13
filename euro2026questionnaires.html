@@ -58,12 +58,16 @@ select { padding:6px 10px; border-radius:8px; border:1px solid #cbd5e1; font-siz
 #optIntro h3 { margin:0 0 6px; }
 #optIntro p { margin:4px 0; font-size:13px; color:#334155; }
 .pro { color:#166534; } .con { color:#9a3412; }
+.techblock { background:#eef6ff; border:1px solid #cfe3fb; border-radius:6px; padding:8px 10px; margin-top:8px; font-size:12px; color:#274156; }
+.techblock b { color:#0b2545; } .wt { color:#7a94ad; font-style:italic; font-size:11px; }
+.techblock .lbl { color:#13457a; font-weight:600; }
+.techblock .none { color:#94a3b8; font-style:italic; }
 </style>
 </head>
 <body>
 <header>
   <h1>🏉 Euro 2026 — Vichy · Équipe de France Touch Hommes +30</h1>
-  <p>Synthèse des questionnaires « Gestion en compétition » · 16 joueurs présents au stage · Vue coach</p>
+  <p>Synthèse des questionnaires « Gestion en compétition » · 16 joueurs en chambres partagées · Vue coach</p>
 </header>
 <nav>
   <button data-t="apercu" class="active">Aperçu</button>
@@ -77,13 +81,15 @@ select { padding:6px 10px; border-radius:8px; border:1px solid #cbd5e1; font-siz
 <!-- APERCU -->
 <section id="apercu" class="active">
   <h2>Ce qui ressort du groupe</h2>
-  <div class="note">⚠️ 3 réserves écartés du stage : <b>Romain Canigiani</b>, <b>Gauthier Watrin</b>, <b>Johann Wambre</b> (non retenus). <b>16 joueurs</b> présents au stage (Erwann Le Gendre ajouté).<br>
-  Le questionnaire de <b>Jérôme Huvelin</b> est manuscrit et scanné : OCR partiellement lisible, profil à confirmer. Les cases cochées de <b>William Fievet</b>, <b>David Potrel</b> et <b>Erwann Le Gendre</b> n'ont pas été récupérées / peu renseignées ; leurs profils s'appuient sur le texte libre.</div>
+  <div class="note">⚠️ 2 réserves écartés : <b>Gauthier Watrin</b>, <b>Johann Wambre</b>. <b>Romain Canigiani</b> réintègre le groupe et <b>remplace Adrien Schaupp dans les chambres</b> — Adrien reste au stage mais dort dans une chambre de coach. Rooming = <b>16 joueurs / 8 binômes</b>.<br>
+  Les questionnaires de <b>Jérôme Huvelin</b> et <b>Romain Canigiani</b> sont manuscrits et scannés : OCR partiellement lisible, profils à confirmer. Les cases de <b>William Fievet</b>, <b>David Potrel</b> et <b>Erwann Le Gendre</b> sont peu renseignées ; leurs profils s'appuient sur le texte libre.<br>
+  📊 <b>Deux sources :</b> le questionnaire <b>mental « Gestion en compétition »</b> (récent = <b>source principale</b> des profils et roomings) et le questionnaire <b>technique « Roubaix » (avril)</b>, intégré comme <b>couche secondaire pondérée plus faible</b> (rôles de jeu, qualités, points forts) — visible dans chaque fiche et l'onglet Profils.</div>
   <div class="grid">
     <div class="card"><h4>Un groupe globalement stable</h4><p class="kv">La majorité se dit « rarement » stressée et passe vite à autre chose après une erreur. Peu de profils explosifs. Le stress vient surtout de l'intérieur (doute sur soi, sur sa légitimité) plus que de l'adversaire.</p></div>
     <div class="card"><h4>Le besoin n°1 : le positif & la clarté</h4><p class="kv">Reviennent sans cesse : consignes claires / rôle clair, une ligne qui reste positive, et une consigne simple pour se relancer. Peu veulent qu'on leur dise « pourquoi t'as fait ça ».</p></div>
     <div class="card"><h4>Deux leviers de récupération opposés</h4><p class="kv">Certains rechargent <b>en s'isolant</b> (Seb, David), d'autres <b>dans le collectif</b> (Cyril, Maxime, Bastien). À respecter dans les roomings.</p></div>
     <div class="card"><h4>Points d'attention</h4><p class="kv">Quelques ruminations longues (Ian, William), un besoin de calme explicite (Adrien), une situation personnelle lourde (David), et de nouveaux venus en quête de repères (Bastien, Maxime sur les grands événements).</p></div>
+    <div class="card"><h4>Lecture technique (Roubaix)</h4><p class="kv">Beaucoup se voient « soldats/socles » (Gabriel, Bastien, William, Maxime, Baptiste, Dorian Fays). Vrai réservoir de <b>meneurs/organisateurs</b> : Dorian S-F, Seb, Kevin, Ian, Erwann, Romain, Gabriel. Demandes de <b>leadership de ligne</b> : Erwann, Dorian S-F, Gabriel, William (par l'exemple). Axe collectif n°1 cité par presque tous : <b>communication</b> et efficacité offensive (5ᵉ toucher).</p></div>
   </div>
   <h3>Répartition rapide</h3>
   <table>
@@ -124,21 +130,16 @@ select { padding:6px 10px; border-radius:8px; border:1px solid #cbd5e1; font-siz
   <h2>Regroupement par profils</h2>
   <div class="note">Le questionnaire porte sur le <b>fonctionnement mental & émotionnel</b> : le regroupement principal est donc psychologique. Les repères <b>techniques / de poste</b> sont limités à ce que les joueurs ont mentionné et signalés quand disponibles.</div>
   <div id="clusters"></div>
-  <h3>Repères techniques / de poste mentionnés</h3>
-  <table>
-    <tr><th>Joueur</th><th>Élément technique évoqué</th></tr>
-    <tr><td>Cyril Benistand</td><td>Leader de ligne (attaque) — doute parfois de sa légitimité de leader/suiveur</td></tr>
-    <tr><td>William Fievet</td><td>Changement de poste Middle → Link — besoin de reclarifier son rôle</td></tr>
-    <tr><td>Kevin Grassi</td><td>Routine gestuelle balle en main avant chaque match (EdF)</td></tr>
-    <tr><td>Hadrien Peres</td><td>Raisonne par critères de réalisation (combi / défense) plutôt que résultat</td></tr>
-    <tr><td>Autres</td><td>Pas d'info de poste dans le questionnaire — à compléter par le staff</td></tr>
-  </table>
+  <h3>Profils techniques — questionnaire Roubaix (avril, pondéré plus faible)</h3>
+  <div class="legend">Auto-évaluation des joueurs : rôles de jeu, qualités et souhait de rôle. Utile pour composer/équilibrer les lignes ; secondaire par rapport au profil mental pour les roomings.</div>
+  <div id="techTable"></div>
 </section>
 
 <!-- ROOMINGS -->
 <section id="roomings">
   <h2>Propositions de roomings — dernier entraînement</h2>
-  <div class="note">Effectif de <b>16 joueurs</b> → chaque option = <b>8 binômes</b>. Voici 3 axes de raisonnement différents ; choisis celui qui colle le mieux à ton objectif pour ce stage.<br><b>Règle transversale :</b> Erwann n'est jamais avec Bastien, ni avec un profil sensible au négatif (Ian, William, Adrien).</div>
+  <div class="note">Effectif de <b>16 joueurs</b> → chaque option = <b>8 binômes</b>. Voici 3 axes de raisonnement différents ; choisis celui qui colle le mieux à ton objectif pour ce stage.<br><b>Règle transversale :</b> Erwann n'est jamais avec Bastien, ni avec un profil sensible au négatif (Ian, William, Romain). <b>Adrien Schaupp dort dans une chambre de coach</b> ; Romain Canigiani prend sa place dans les binômes.<br>
+  🏉 <b>Lecture technique (Roubaix), pondérée plus faible :</b> les binômes restent pilotés par le profil <b>mental</b>. Le technique n'a servi que de bonus quand il ne créait aucun conflit — ex. réunir des profils qui pourront débriefer le jeu ensemble (meneurs/organisateurs) sans jamais casser un équilibre mental.</div>
   <div class="legend" style="margin-bottom:6px;">Axe de raisonnement :</div>
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
     <button class="optbtn active" data-o="A">Option A · Confort & sérénité</button>
@@ -171,7 +172,7 @@ const players = [
 
  {n:"Adrien Schaupp", role:"Introspectif · exige un binôme calme", pr:["calm","anx"], tags:[["Introspectif","t-intro"],["Ruminateur","t-anx"]],
   q1:"Monter en intensité · Revoir les consignes · Être rassuré", q2:"Niveau de concentration, capacité à se projeter ; sinon se sent déconnecté et lâche en défense", q3:"Rarement en match — mais appréhension la veille (mille scénarios)", q4:"Ça booste + pense à la suite ; envie de « prouver »", q5:"Rumine · perd confiance · se renferme ; exigence élevée envers lui-même", q6:"Qu'on lui donne des conseils · consigne simple · action suivante · leaders qui parlent franchement", q7:"L'attente entre les matchs · la vie de groupe", q8:"Se concentre sur soi, montre son implication", q9:"Gère fatigue physique/mentale (a tendance à trop se préserver) ; détendu, réagit peu à chaud", q10:"A parfois besoin d'être seul. Besoin de partager sa chambre avec quelqu'un de CALME (a cité Gabriel à Vichy) ; sinon beaucoup moins détendu.",
-  room:"⚠️ Besoin explicite d'un binôme calme. Idéal : Gabriel."},
+  room:"⚠️ Ne partage PAS de chambre ce stage — dort dans une chambre de coach. Remplacé par Romain Canigiani dans les binômes. (Rappel : besoin explicite de calme si re-chambré à l'avenir.)"},
 
  {n:"Baptiste Logeais", role:"Ancre stable · routine", pr:["stable","calm"], tags:[["Ultra-stable","t-stable"],["Routine","t-calm"]],
   q1:"Monter en intensité · Routine précise · Bouger/s'activer", q2:"Calme, concentré, connecté à sa tâche sans stress ; monte en intensité via routine", q3:"Rarement — volonté d'être performant ; suit sa routine", q4:"Ça booste + pense à la suite ; profite sans s'attarder", q5:"Passe vite à autre chose ; peut y repenser le soir sans s'attarder", q6:"Respirer / se calmer", q7:"L'attente entre les matchs · chaleur", q8:"Pas le plus bavard ; apporte stabilité, recul, reste positif", q9:"Concentration, émotions, rester dans l'instant ; prend du recul après une erreur", q10:"Rien de particulier ; apprécie des moments calmes pour récupérer",
@@ -218,8 +219,34 @@ const players = [
  {n:"Erwann Le Gendre", role:"Compétiteur exigeant · peu démonstratif", pr:["stable"], tags:[["Compétiteur","t-stable"],["Peu démonstratif","t-intro"]],
   q1:"(cases non renseignées)", q2:"« J'ai envie de jouer »", q3:"(non renseigné)", q4:"(non renseigné)", q5:"(non coché) — impact : quelques minutes", q6:"(non renseigné)", q7:"(non renseigné)", q8:"(non renseigné)", q9:"Garder la concentration au fil des matchs pour être prêt à chaque coup d'envoi", q10:"(rien indiqué)",
   flag:"Questionnaire très peu renseigné (réponses brèves). Retour d'un coéquipier : excellent joueur et très apprécié EN DEHORS du terrain ; SUR le terrain, exigeant et direct — encourage peu, fait vite la remarque sur une erreur. À NE PAS associer à un profil sensible au négatif (Bastien a été déstabilisé en jouant/partageant avec lui).",
-  room:"Autonome et endurci émotionnellement (récupère en quelques minutes). Binôme robuste qui ne prend pas sa franchise personnellement (Seb, Dorian Fays)."}
+  room:"Autonome et endurci émotionnellement (récupère en quelques minutes). Binôme robuste qui ne prend pas sa franchise personnellement (Seb, Dorian Fays)."},
+
+ {n:"Romain Canigiani", role:"Manuscrit · besoin de réassurance (à confirmer)", pr:["anx","calm"], tags:[["Besoin de réassurance","t-anx"],["Manuscrit","t-intro"]],
+  q1:"(manuscrit) Calme · Bouger — à confirmer", q2:"(illisible)", q3:"Parfois (à confirmer)", q4:"Reste stable (à confirmer)", q5:"Rumine · veut se rattraper · perd confiance momentanément (à confirmer)", q6:"Qu'on me donne des conseils · consigne simple · le coach · l'action suivante (à confirmer)", q7:"Le stress · l'attente · les tensions (à confirmer)", q8:"Donne des conseils · met de l'énergie (à confirmer)", q9:"(illisible)", q10:"(illisible)",
+  flag:"Questionnaire manuscrit scanné — OCR peu fiable, à ressaisir/vérifier. Réintègre le groupe en remplacement d'Adrien dans les chambres.",
+  room:"Profil mental (manuscrit, incertain) : peut perdre confiance / besoin de réassurance → binôme calme et rassurant. NB : côté technique, c'est un connecteur solide, adaptable et leader en défense — moins fragile qu'il n'y paraît."}
 ];
+
+// ---- Technical layer (Roubaix questionnaire, April — weighted lower) ----
+const techData = {
+ "Hadrien Peres":{att:"Dumpeur, passeur gauche (20 m), scoopeur", def:"Touchers face au jeu, organisateur", qual:"Calme · Combattant · Créatif — step/agilité, endurance", role:"Apprend (pose des questions aux expérimentés), leader sur les efforts défensifs, sent l'énergie du groupe", souhait:"Le rôle que les coachs lui donneront", forts:"Off : passe gauche, step · Déf : placement/concentration pré-touch"},
+ "Bastien Chavatte":{att:"Dumpeur, passeur gauche, scoopeur", def:"Touchers face au jeu, lit le jeu", qual:"Adaptatif · Soldat · Calme — vitesse, step, endurance", role:"Fluidifie le jeu (rucks propres pour les incisifs), bon soldat", souhait:"Aimerait être + incisif (souci main gauche freine le plongeon) — ok avec son rôle", forts:"Off : rapidité/propreté des courses · Déf : bon suivi du jeu"},
+ "Cyril Benistand":{att:"Plongeur (retravaille plongeur/passeur à l'aile)", def:"Touchers, lit le jeu", qual:"Combattant · Leader — vitesse, endurance", role:"Apporte énergie, motivation, reste focus", souhait:"Apporter l'énergie au groupe quand besoin", forts:"Off : runner efficace sur combis (si confiance) · Déf : rapide à la ligne, adaptation répétée"},
+ "Dorian Fays":{att:"Passeur G+D, scoopeur", def:"Touchers, lit le jeu, parle beaucoup", qual:"Adaptatif · Soldat — step, endurance", role:"Tout nouveau — apporte joie et bonne humeur, parle pour aider", souhait:"Quelqu'un sur qui compter, dedans comme dehors", forts:"Passe des deux côtés, vision, communication"},
+ "Adrien Schaupp":{att:"Dumpeur", def:"Touchers face au jeu", qual:"Adaptatif · Calme — puissance, endurance", role:"Introverti, pas dans l'animation mais apaisant / bon esprit", souhait:"Le gars fiable à côté de qui on est bien, avec qui parler Touch et perso", forts:"Off : bonne course (rapide), polyvalent · Déf : gros touchés"},
+ "Baptiste Logeais":{att:"Scoopeur, plongeur (aérien, coin)", def:"Lit le jeu, plongeur déf, gère son link", qual:"Soldat · Calme · Combattant · Déterminé — vitesse, endurance", role:"Pas de rôle spécifique recherché ; ne veut PLUS du « cagoulin » / élection quotidienne (énergivore)", souhait:"—", forts:"Off : plongeon aérien, aime scooper · Déf : comm avec link/middles"},
+ "Gabriel Du Jeu":{att:"Passeur gauche, scoopeur, plongeur, organisateur", def:"Touchers, plongeur déf, organisateur", qual:"Soldat · Calme · Combattant — vitesse, step", role:"Socle — élément fiable et solide mentalement/physiquement", souhait:"Leader, pilier", forts:"Joue ce que la défense propose ; ne lâche rien en défense"},
+ "Kevin Grassi":{att:"Scoopeur, plongeur, organisateur", def:"Touchers, plongeur déf", qual:"Calme · Combattant · Leader — vitesse, step", role:"Rassure — on lui demande son avis / des rectifications quand ça coince sur la ligne", souhait:"Au cœur du groupe si ça vient naturellement", forts:"Touché déf tout terrain, anticipation, plongeon / prise de touché"},
+ "Sébastien Audinet":{att:"Dumpeur, passeur G+D, organisateur", def:"Lit le jeu, organisateur", qual:"Adaptatif · Combattant · Leader — step", role:"Aime l'organisation → lead sur ce sujet et sur la vie de groupe", souhait:"Se sentir utile au collectif", forts:"Off : lecture, diff sur la passe · Déf : lecture, rarement battu"},
+ "Dorian Saint Felix":{att:"Dumpeur, scoopeur, plongeur, organisateur", def:"Touchers, lit le jeu, plongeur déf, organisateur", qual:"Adaptatif · Soldat · Calme · Leader — step, endurance", role:"Expérimenté, leader naturel, calme, veille à la cohésion / solidarité", souhait:"Ajouter le rôle de leader de jeu offensif", forts:"Off : très propre techniquement, adaptable · Déf : lecture du jeu"},
+ "Ian Janet":{att:"Dumpeur, plongeur, organisateur, demi", def:"Touchers, lit le jeu, organisateur", qual:"Adaptatif · Calme · Combattant · Leader — step, endurance", role:"Pas de prise de parole en cercle (n'aime pas la pression) ; exigeant avec lui et un peu les autres ; communique beaucoup terrain + box, encourageant", souhait:"Rester joueur (pas de capitanat) ; joueur clé, prouvé sur le terrain", forts:"Off : plongeon, demi · Déf : vision du jeu, placement"},
+ "David Potrel":{att:"Dumpeur", def:"Touchers, lit le jeu", qual:"Adaptatif · Calme · Combattant — endurance", role:"Le pas stressé, calme, à l'écoute de tous, entre dans les délires du groupe", souhait:"Pas de rôle particulier — être hyper intégré", forts:"Off : prise d'intervalle, ruck · Déf : lecture de jeu"},
+ "William Fievet":{att:"Dumpeur, passeur droite, plongeur", def:"Touchers, plongeur déf", qual:"Soldat · Combattant — puissance/solidité", role:"Bon soldat fiable et brave, un mot pour faire rire ; au service du groupe", souhait:"Mettre les coéquipiers en confiance ; leader par l'exemple", forts:"Off : passes, grosses prises de touché · Déf : touchés défensifs"},
+ "Maxime Taimiot":{att:"Dumpeur, passeur gauche, plongeur", def:"Touchers face au jeu", qual:"Adaptatif · Soldat · Calme · Combattant — vitesse, endurance", role:"Soldat stabilisateur et besogneux, dangereux sur opportunités", souhait:"Rendre ce rôle + dangereux, offrir + d'options de jeu", forts:"Off : vitesse, bonne lecture · Déf : endurant"},
+ "Jérôme Huvelin":{none:true},
+ "Erwann Le Gendre":{att:"Passeur G+D, organisateur", def:"Touchers, lit le jeu, organisateur", qual:"Adaptatif · Calme · Combattant · Leader — step, endurance", role:"Peu renseigné", souhait:"Leader de ligne sur le terrain", forts:"Off : lecture du jeu, passe · Déf : lecture, prise de touché efficace"},
+ "Romain Canigiani":{att:"Passeur gauche, plongeur, organisateur, scoopeur (selon niveau adverse)", def:"Touchers, lit le jeu, plongeur déf, organisateur", qual:"Adaptatif · Soldat · Calme · Combattant · Créatif · Leader si besoin — vitesse, step, endurance", role:"Fait le lien ligne sortante/entrante, finit les coups, leader en défense, repère les failles adverses", souhait:"Aile box / aile opposé ; lien box pour gérer le T4", forts:"Off : plongeon (grand, steps) · Déf : montée/descente à la ligne, lecture, plongeon déf"}
+};
 
 const questions = [
  {id:"q1", t:"1. Avant un match, de quoi as-tu le plus besoin ?"},
@@ -243,7 +270,7 @@ const clusters = [
   members:["Adrien Schaupp","David Potrel","Kevin Grassi"]},
  {name:"C · Anxieux / ruminateurs en quête de réassurance", color:"#dc2626",
   desc:"Stress plus marqué, sur-analyse, erreurs qui peuvent durer. Ont besoin de réassurance, de retours francs et d'un cadre calme.",
-  members:["Ian Janet","William Fievet"]},
+  members:["Ian Janet","William Fievet","Romain Canigiani"]},
  {name:"D · Énergiques / fédérateurs", color:"#ca8a04",
   desc:"Carburent au collectif et à l'énergie, mettent de l'énergie dans le dur, ont besoin de positif et d'humour.",
   members:["Cyril Benistand","Maxime Taimiot","Bastien Chavatte","Jérôme Huvelin"]},
@@ -256,10 +283,10 @@ const options = {
  A: {
   title:"Option A · Confort & sérénité (bien-être d'abord)",
   desc:["<b>Axe :</b> maximiser la sérénité avant le tournoi. On associe chaque joueur anxieux/introspectif à un stabilisateur ou un soutien, et on respecte à la lettre les préférences exprimées.",
-        "<b>Pour :</b> <span class='pro'>option la plus sûre, zéro friction, respecte les besoins explicites (Adrien, David, Bastien).</span>",
+        "<b>Pour :</b> <span class='pro'>option la plus sûre, zéro friction, respecte les besoins explicites (David, Bastien) et rassure Romain pour sa réintégration.</span>",
         "<b>Attention :</b> <span class='con'>peu de brassage — les mêmes affinités se renforcent, développement collectif limité.</span>"],
   rooms:[
-   {a:"Adrien Schaupp", b:"Gabriel Du Jeu", why:"Adrien a besoin explicite d'un binôme calme (validé à Vichy avec Gabriel). Gabriel = calme rayonnant et positif."},
+   {a:"Romain Canigiani", b:"Gabriel Du Jeu", why:"Romain (réintègre le groupe) peut perdre confiance et cherche de la réassurance ; Gabriel, calme et positif, est le binôme rassurant idéal."},
    {a:"Ian Janet", b:"Dorian Saint Felix", why:"Le plus stressé avec le meilleur soutien émotionnel : Dorian S-F va vers les autres et rassure, l'aide à décrocher."},
    {a:"Bastien Chavatte", b:"Jérôme Huvelin", why:"Bastien (nouveau, sensible au négatif) a nommé Jérôme comme quelqu'un avec qui décompresser. Chaleur et positif garantis."},
    {a:"William Fievet", b:"Baptiste Logeais", why:"William a besoin de calme et peut porter longtemps ses erreurs ; Baptiste est l'ancre ultra-stable qui apporte du recul."},
@@ -272,11 +299,11 @@ const options = {
   title:"Option B · Développement & mixité de profils (croissance)",
   desc:["<b>Axe :</b> brasser volontairement les tempéraments. Chaque chambre contient un « moteur » (leader / soutien / vétéran stable) associé à un profil à faire grandir (anxieux, nouveau, ou à sortir de sa zone). On mêle énergie et calme, et on intègre les nouveaux avec les cadres.",
         "<b>Pour :</b> <span class='pro'>fait progresser les individus, intègre les nouveaux, renforce la cohésion transversale.</span>",
-        "<b>Attention :</b> <span class='con'>on sort Adrien de sa préférence « pur calme » (Baptiste reste posé mais différent) ; à assumer sur un dernier stage.</span>"],
+        "<b>Attention :</b> <span class='con'>on privilégie le brassage au confort ; Romain, en pleine réintégration, est mis avec une ancre (Baptiste) plutôt qu'un simple binôme rassurant — à surveiller.</span>"],
   rooms:[
    {a:"Bastien Chavatte", b:"Cyril Benistand", why:"Intégrer le nouveau (Bastien) avec un cadre chaleureux et énergique. Cyril peut le rassurer sur sa légitimité — thème commun aux deux."},
    {a:"Ian Janet", b:"Dorian Saint Felix", why:"Le plus anxieux avec le meilleur « coach émotionnel » du groupe : Dorian S-F l'aide à décrocher et à relativiser."},
-   {a:"Adrien Schaupp", b:"Baptiste Logeais", why:"Baptiste modélise la routine et le recul face à l'erreur — un levier direct contre la rumination d'Adrien. Reste assez calme pour être acceptable."},
+   {a:"Romain Canigiani", b:"Baptiste Logeais", why:"Baptiste modélise la routine et le recul face à l'erreur — utile pour Romain qui rumine et peut perdre confiance. Ancre stable et rassurante pour sa réintégration."},
    {a:"William Fievet", b:"Hadrien Peres", why:"William veut du franc et du process ; Hadrien raisonne par critères de réalisation (pas résultat) — un modèle pour ses erreurs qui durent."},
    {a:"Maxime Taimiot", b:"Sébastien Audinet", why:"Mentorat : l'expérience et la maîtrise de la prépa de Seb rassurent Maxime sur la gestion des grands événements."},
    {a:"David Potrel", b:"Gabriel Du Jeu", why:"Gabriel, calme et positif mais chaleureux, tient compagnie à David sans envahir son espace."},
@@ -290,7 +317,7 @@ const options = {
         "<b>Attention :</b> <span class='con'>regroupe deux profils anxieux (Ian, William) chacun avec un stabilisateur — à checker ; Erwann n'a pas indiqué de préférence, placé côté « vivant » avec un partenaire robuste.</span>"],
   rooms:[
    {a:"David Potrel", b:"Sébastien Audinet", why:"ÉTAGE CALME — deux « isolateurs » matures qui ont besoin de silence/sieste et de contrôle de leur espace."},
-   {a:"Adrien Schaupp", b:"Kevin Grassi", why:"ÉTAGE CALME — Adrien (besoin de calme) + Kevin (bulle/routine, soutenant et discret)."},
+   {a:"Romain Canigiani", b:"Kevin Grassi", why:"ÉTAGE CALME — Romain (calme, besoin de réassurance) + Kevin (bulle/routine, soutenant et discret) qui rassure naturellement."},
    {a:"Ian Janet", b:"Hadrien Peres", why:"ÉTAGE CALME — Ian récupère au calme (être seul quelques min) ; Hadrien, stable, ne perturbe pas et l'apaise."},
    {a:"William Fievet", b:"Baptiste Logeais", why:"ÉTAGE CALME — William a besoin d'une box/chambre calme ; Baptiste, routine et recul, est l'ancre parfaite."},
    {a:"Cyril Benistand", b:"Maxime Taimiot", why:"ÉTAGE VIVANT — deux moteurs qui rechargent dans l'énergie et le collectif."},
@@ -308,6 +335,19 @@ function renderPlayers(filter){
   players.filter(p=>filter==='all'||p.pr.includes(filter)).forEach(p=>{
     const tags = p.tags.map(t=>`<span class="tag ${t[1]}">${t[0]}</span>`).join('');
     const flag = p.flag?`<div class="flag">🔒 ${p.flag}</div>`:'';
+    const td = techData[p.n];
+    let tech;
+    if(!td){ tech=''; }
+    else if(td.none){ tech=`<div class="techblock"><b>🏉 Profil technique</b> <span class="wt">(Roubaix)</span> <span class="none">— pas de réponse au questionnaire technique.</span></div>`; }
+    else {
+      tech=`<div class="techblock"><b>🏉 Profil technique</b> <span class="wt">(Roubaix, avr. — pondéré + faible)</span>
+      <div><span class="lbl">Attaque :</span> ${td.att}</div>
+      <div><span class="lbl">Défense :</span> ${td.def}</div>
+      <div><span class="lbl">Qualités :</span> ${td.qual}</div>
+      <div><span class="lbl">Rôle perçu :</span> ${td.role}</div>
+      <div><span class="lbl">Souhait de rôle :</span> ${td.souhait}</div>
+      <div><span class="lbl">Points forts :</span> ${td.forts}</div></div>`;
+    }
     cardsEl.innerHTML+=`<div class="card">
       <h4>${p.n}</h4><div class="role">${p.role}</div>
       <div class="tags">${tags}</div>
@@ -319,6 +359,7 @@ function renderPlayers(filter){
       <div class="kv"><b>Besoin identifié :</b> ${p.q10}</div>
       <div class="kv" style="margin-top:6px;color:#13457a;"><b>🛏️ Rooming :</b> ${p.room}</div>
       ${flag}
+      ${tech}
     </div>`;
   });
 }
@@ -347,6 +388,19 @@ clusters.forEach(c=>{
     <div class="members">${c.members.map(m=>`<span>${m}</span>`).join('')}</div>
   </div>`;
 });
+
+// render technical table
+const techEl=document.getElementById('techTable');
+if(techEl){
+  let rows='';
+  players.forEach(p=>{
+    const td=techData[p.n];
+    if(!td) return;
+    if(td.none){ rows+=`<tr><td><b>${p.n}</b></td><td colspan="4" class="techblock" style="border:none;background:none"><span style="color:#94a3b8;font-style:italic">Pas de réponse au questionnaire technique</span></td></tr>`; return; }
+    rows+=`<tr><td><b>${p.n}</b></td><td>${td.att}</td><td>${td.def}</td><td>${td.qual}</td><td>${td.souhait}</td></tr>`;
+  });
+  techEl.innerHTML=`<table><tr><th>Joueur</th><th>Attaque</th><th>Défense</th><th>Qualités (autoéval.)</th><th>Souhait de rôle</th></tr>${rows}</table>`;
+}
 
 // render rooms per option
 const rEl=document.getElementById('roomList');
