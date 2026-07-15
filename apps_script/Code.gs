@@ -126,6 +126,19 @@ function canEditGame(auth, sheetName) {
   return canSeeGame(auth, getMetadata()[sheetName]);
 }
 
+// True when `auth` may OVERWRITE an existing game tab. Admins always; staff only
+// when their group is explicitly attached to the game. Stricter than canSeeGame:
+// the "ALL" wildcard grants read visibility, not override rights, and viewers
+// never qualify — overriding a tab is destructive, so it needs real ownership.
+function canOverrideGame(auth, sheetName) {
+  if (!auth) return false;
+  if (auth.role === 'admin') return true;
+  if (auth.role !== 'staff' || !auth.group) return false;
+  const meta = getMetadata()[sheetName];
+  const gs = (meta && meta.groups) || [];
+  return gs.indexOf(auth.group) >= 0;
+}
+
 // ── Cache helpers ───────────────────────────────────────────────
 const CACHE_TTL = 300; // seconds (5 min)
 
@@ -561,10 +574,13 @@ function doPost(e) {
       const ownsTab = data.creatorToken && getCreatorToken(data.sheetName) === data.creatorToken;
       if (!ownsTab) {
         if (!data.override) {
-          return json({ ok: false, error: `Tab "${data.sheetName}" already exists.`, tabExists: true });
+          // Echo the game's groups so the client can decide whether to offer the
+          // Override button (admins always; staff only for their own group).
+          const meta = getMetadata()[data.sheetName];
+          return json({ ok: false, error: `Tab "${data.sheetName}" already exists.`, tabExists: true, tabGroups: (meta && meta.groups) || [] });
         }
-        if (!isAdminSecret(data.secret)) {
-          return json({ ok: false, error: 'Admin access required to override.' });
+        if (!canOverrideGame(auth, data.sheetName)) {
+          return json({ ok: false, error: 'You can only override games in your group. Admin access is required otherwise.' });
         }
       }
       ss.deleteSheet(sheet);

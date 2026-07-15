@@ -1221,11 +1221,16 @@ async function pushToSheet(override = false) {
 
     if (!result.ok) {
       if (result.tabExists && !override) {
-        if (TR.role() === 'admin') {
+        // Admins can override any tab; staff only games explicitly in their group
+        // (the server enforces this too — this just decides whether to show the button).
+        const groups = result.tabGroups || [];
+        const canOverride = TR.role() === 'admin' ||
+          (TR.role() === 'staff' && TR.userGroup() && groups.indexOf(TR.userGroup()) >= 0);
+        if (canOverride) {
           document.getElementById('overrideBtn').style.display = '';
           alert(`Tab "${sheetName}" already exists. Click ⚠ Override Tab to replace it.`);
         } else {
-          alert(`Tab "${sheetName}" already exists. Admin access is required to override.`);
+          alert(`Tab "${sheetName}" already exists. You can only override games in your group; otherwise admin access is required.`);
         }
         btn.disabled = false;
         btn.textContent = '⬆ Push to Sheet';
