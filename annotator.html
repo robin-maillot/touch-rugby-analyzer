@@ -980,7 +980,12 @@ function fixOneInconsistency(id) {
   if (!ann) return;
   ann.possessionOwner = expected.get(id);
   ann.actionOwner = TR.inferActionOwner(ann.possessionOwner, ann.type, ann.name);
-  recomputeOwnersFrom(ann.time);
+  // Don't call recomputeOwnersFrom here: it re-derives this row from the PREVIOUS
+  // RECORDED owner (a different, non-re-seeding inference than the expected chain),
+  // which reverts the fix whenever an upstream override is what flagged this row.
+  // The expected chain advances from expected owners, so aligning one row to its
+  // expected value never changes any other row's expected value — nothing else to
+  // recompute; each remaining inconsistency is fixed on its own row.
   renderList();
   renderMarkers();
 }
@@ -1260,14 +1265,16 @@ function exportCSV() {
   const fullGame = isFullGame();
   const headers = ['Time','Type','Name','Possession Owner'];
   if (fullGame) headers.push('Turnover');
-  headers.push('To Review','Comment','Action Owner');
+  headers.push('To Review','Comment','Action Owner','YouTube Link');
   const rows = [headers.join(','),
     ...annotations.map(a => {
       const toReview = a.type === 'To Review' ? 'Yes' : '';
       const outType = a.type;
       const cols = [a.timeStr, outType, a.name, a.possessionOwner || ''];
       if (fullGame) cols.push(TR.isTurnover(a.type, a.name) ? 'Yes' : '');
-      cols.push(toReview, a.comment || '', a.actionOwner || '');
+      // Per-event YouTube deep link (timestamped to the event, 5s lookback);
+      // empty when no video URL is loaded.
+      cols.push(toReview, a.comment || '', a.actionOwner || '', ytLink(a.time));
       return cols.join(',');
     })
   ];
