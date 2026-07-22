@@ -181,7 +181,8 @@ function renderCard(g, container) {
       </div>
       <div class="field field-time">
         <label>First event time</label>
-        <input type="text" class="first-time-input" placeholder="0:00:00" pattern="\\d+:\\d{2}:\\d{2}">
+        <input type="text" class="first-time-input" placeholder="0:00:00" pattern="-?\\d+:\\d{2}(:\\d{2})?"
+               title="Load, then retime the first event to align the video. Use a negative value (e.g. -15:00) if the video starts after this event — earlier events then have no footage and are hidden.">
       </div>
       <button class="load-time-btn" onclick="loadFirstTime(this, '${g.name}')">Load time</button>
       <button class="submit-btn" onclick="submitYoutube(this, '${g.name}')">${g.youtubelink ? 'Update YT' : 'Save YT'}</button>
@@ -206,11 +207,16 @@ function renderCard(g, container) {
 }
 
 function parseHMS(str) {
+  str = String(str).trim();
+  const neg = str.startsWith('-');           // sign handled up front so -0:15:00 works
+  if (neg) str = str.slice(1);
   const parts = str.split(':').map(Number);
   if (parts.some(isNaN)) return NaN;
-  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
-  if (parts.length === 2) return parts[0] * 60 + parts[1];
-  return NaN;
+  let s;
+  if      (parts.length === 3) s = parts[0] * 3600 + parts[1] * 60 + parts[2];
+  else if (parts.length === 2) s = parts[0] * 60 + parts[1];
+  else return NaN;
+  return neg ? -s : s;
 }
 
 async function loadFirstTime(btn, sheetName) {
@@ -258,7 +264,10 @@ async function submitYoutube(btn, sheetName) {
   const firstTimeInput = card.querySelector('.first-time-input');
   const newTimeStr  = firstTimeInput?.value.trim();
   const origTimeStr = firstTimeInput?.dataset.original;
-  let offsetSeconds = 0;
+  // offsetSeconds is only SENT when the user actually retimes the first event —
+  // otherwise a plain URL update would clobber an existing offset. It may be
+  // negative (video that starts after kickoff: set the first event to e.g. -15:00).
+  let offsetSeconds;
   if (newTimeStr && !origTimeStr) {
     alert('Press "Load time" first so the current first-event time is known, then edit it to set the offset.');
     return;
@@ -266,7 +275,7 @@ async function submitYoutube(btn, sheetName) {
   if (newTimeStr && origTimeStr && newTimeStr !== origTimeStr) {
     const newSecs  = parseHMS(newTimeStr);
     const origSecs = parseHMS(origTimeStr);
-    if (isNaN(newSecs)) { alert(`Invalid time format "${newTimeStr}" — use h:mm:ss or m:ss.`); return; }
+    if (isNaN(newSecs) || isNaN(origSecs)) { alert(`Invalid time format "${newTimeStr}" — use h:mm:ss or m:ss (leading - allowed).`); return; }
     offsetSeconds = newSecs - origSecs;
   }
 
@@ -274,16 +283,12 @@ async function submitYoutube(btn, sheetName) {
   btn.textContent = '⏳ Saving…';
 
   try {
+    const body = { secret: TR.secret(), action: 'backfill_youtube', sheetName, youtubeUrl: value };
+    if (offsetSeconds != null) body.offsetSeconds = offsetSeconds;
     const resp = await fetch(TR.APPS_SCRIPT_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({
-        secret: TR.secret(),
-        action: 'backfill_youtube',
-        sheetName,
-        youtubeUrl: value,
-        offsetSeconds,
-      }),
+      body: JSON.stringify(body),
     });
     const result = await resp.json();
     if (!result.ok) throw new Error(result.error);

@@ -1221,6 +1221,8 @@ function showPenPopover(ev, cell) {
   } else {
     body = events
       .slice()
+      // When the game has a video, drop events before it starts (no footage).
+      .filter(e => !(meta && meta.youtubelink) || TR.player.hasVideoAt(meta, e._raw || 0))
       .sort((a, b) => (a._raw || 0) - (b._raw || 0))
       .map(e => {
         const link = meta ? TR.player.seekLink(meta, e._raw || 0) : '';

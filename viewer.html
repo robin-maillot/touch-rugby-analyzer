@@ -842,7 +842,16 @@ function processRows(rows) {
   // Hide rows from games that have no video (only once metadata has loaded;
   // skip on a cold cache so we don't hide everything before the list arrives).
   if (colGame >= 0 && Object.keys(gameMetaMap).length) {
-    allData = allData.filter(row => gameHasVideo(row[colGame]));
+    allData = allData.filter(row => {
+      if (!gameHasVideo(row[colGame])) return false;
+      // Drop events that happen before the video starts (negative video time) —
+      // there's no footage for them. Offset 0 keeps every event.
+      const meta  = gameMetaMap[row[colGame]];
+      const parts = (colTime >= 0 ? (row[colTime] || '') : '').split(':').map(Number);
+      const secs  = parts.length === 3 ? parts[0]*3600 + parts[1]*60 + parts[2]
+                  : parts.length === 2 ? parts[0]*60 + parts[1] : 0;
+      return TR.player.hasVideoAt(meta, secs);
+    });
   }
 
   filtered = [...allData];
@@ -1223,10 +1232,12 @@ function playFilteredRow(filteredIdx) {
   const gameKey = colGame >= 0 ? (row[colGame] || '') : '';
   const meta    = gameMetaMap[gameKey] || null;
 
-  const seekTo  = getLookbackStart(gameKey, secs);
-  activeEventSecs = secs;
+  // Table times are game-clock; the player seeks in video time. Convert at the
+  // boundary (getLookbackStart stays in game time; offset 0 → unchanged).
+  activeEventSecs = secs;                                        // game seconds
+  const seekTo  = toVideoSecs(meta, getLookbackStart(gameKey, secs));   // video seconds
   loopStart = seekTo;
-  loopEnd   = secs + linkOffsetAfter;
+  loopEnd   = toVideoSecs(meta, secs + linkOffsetAfter);
   const videoKey = videoKeyFor(meta);
 
   // Clip button reflects the *current* game's gcsObject, independent of whether
@@ -1797,7 +1808,7 @@ function setLinkOffset(val) {
   const n = Math.max(0, parseInt(val, 10) || 0);
   linkOffset = n;
   localStorage.setItem('linkOffset', n);
-  if (activeEventSecs != null) loopStart = Math.max(0, activeEventSecs - linkOffset);
+  if (activeEventSecs != null) loopStart = toVideoSecs(gameMetaMap[currentSheetName], activeEventSecs - linkOffset);
   refreshOffsetChips();
 }
 
@@ -1805,7 +1816,7 @@ function setLinkOffsetAfter(val) {
   const n = Math.max(0, parseInt(val, 10) || 0);
   linkOffsetAfter = n;
   localStorage.setItem('linkOffsetAfter', n);
-  if (activeEventSecs != null) loopEnd = activeEventSecs + linkOffsetAfter;
+  if (activeEventSecs != null) loopEnd = toVideoSecs(gameMetaMap[currentSheetName], activeEventSecs + linkOffsetAfter);
   refreshOffsetChips();
 }
 
@@ -1869,7 +1880,7 @@ function toggleFullPossession() {
   updatePagination();
   // Re-seek the active row if there is one.
   if (activeEventSecs != null && currentSheetName) {
-    const newStart = getLookbackStart(currentSheetName, activeEventSecs);
+    const newStart = toVideoSecs(gameMetaMap[currentSheetName], getLookbackStart(currentSheetName, activeEventSecs));
     loopStart = newStart;
     if (player && videoReady) player.seek(newStart);
   }
@@ -1879,6 +1890,13 @@ function toggleFullPossession() {
 // "Full possession" toggle. Falls back to `secs - linkOffset` when the
 // toggle is off, the game is not analyzable, there is no prior event,
 // or column metadata is missing. Capped at MAX_POSSESSION_LOOKBACK seconds.
+// Convert a game-clock time (table times, activeEventSecs) to the player's video
+// time, clamped to 0. Player seek/getTime and loop bounds are all video time;
+// offset 0 (the default) leaves everything unchanged.
+function toVideoSecs(meta, gameSecs) {
+  return Math.max(0, TR.player.videoTimeAt(meta, gameSecs));
+}
+
 function getLookbackStart(gameKey, secs) {
   const defaultStart = Math.max(0, secs - linkOffset);
   if (!fullPossession) return defaultStart;
@@ -1918,8 +1936,10 @@ function makeYtTimestampUrl(gameKey, timeStr) {
 function shareCurrentTimestamp(btn) {
   const meta = currentSheetName ? gameMetaMap[currentSheetName] : null;
   if (!meta || !player || !videoReady) return;
-  // seekLink applies a 5s lookback; add it back so the link lands exactly here.
-  const url = TR.player.seekLink(meta, player.getTime() + 5);
+  // player.getTime() is video time; seekLink expects game time (it re-applies the
+  // offset). Convert back, and add 5s to cancel seekLink's built-in lookback.
+  const gameSecs = player.getTime() - TR.player.videoTimeAt(meta, 0);
+  const url = TR.player.seekLink(meta, gameSecs + 5);
   if (!url) return;
   navigator.clipboard.writeText(url).then(() => {
     const prev = btn.innerHTML;

@@ -82,6 +82,7 @@ function getMetadata() {
   const goi  = col('gcs object');      // object path within the configured GCS bucket
   const ggi  = col('groups');          // space-separated list of group names allowed to see this game
   const cmi  = col('comment');         // free-form game-level note
+  const voi  = col('video offset');    // seconds added to game time to get video time (video start alignment)
 
   const meta = {};
   values.slice(1).forEach(row => {
@@ -100,6 +101,7 @@ function getMetadata() {
       gcsObject:   goi >= 0 ? row[goi] : '',
       groups:      ggi >= 0 ? String(row[ggi] || '').trim().split(/\s+/).filter(Boolean) : [],
       comment:     cmi >= 0 ? row[cmi] : '',
+      videoOffset: voi >= 0 ? (Number(row[voi]) || 0) : 0,
     };
   });
   return meta;
@@ -442,7 +444,8 @@ function doPost(e) {
     if (data.action === 'backfill_youtube') {
       if (!data.sheetName) return json({ ok: false, error: 'Missing sheetName parameter' });
       if (!canEditGame(auth, data.sheetName)) return json({ ok: false, error: 'You can only edit games in your group.' });
-      const updated = backfillYoutubeLink(data.sheetName, data.youtubeUrl, Number(data.offsetSeconds) || 0);
+      // Pass offsetSeconds through as-is (may be undefined → leave stored offset untouched).
+      const updated = backfillYoutubeLink(data.sheetName, data.youtubeUrl, data.offsetSeconds);
       cacheClear();
       return json({ ok: true, updated });
     }
@@ -685,6 +688,15 @@ function writeMeta(sheetName, meta) {
     values.forEach(row => { while (row.length < headers.length) row.push(''); });
   }
 
+  // Add 'Video Offset' column lazily (seconds added to game time → video time)
+  let voi = col('video offset');
+  if (voi < 0 && meta.videoOffset != null) {
+    sheet.getRange(1, headers.length + 1).setValue('Video Offset');
+    headers.push('video offset');
+    voi = headers.length - 1;
+    values.forEach(row => { while (row.length < headers.length) row.push(''); });
+  }
+
   // Find existing row, if any
   const numCols = headers.length;
   let existingRow = -1;
@@ -719,6 +731,7 @@ function writeMeta(sheetName, meta) {
   if (idi >= 0 && meta.id          != null) row[idi] = meta.id;
   if (goi >= 0 && meta.gcsObject   != null) row[goi] = meta.gcsObject;
   if (cmi >= 0 && meta.comment     != null) row[cmi] = meta.comment;
+  if (voi >= 0 && meta.videoOffset != null) row[voi] = meta.videoOffset;
 
   // Groups: `groups` replaces the cell wholesale; `addGroup` appends to whatever
   // is already there (de-duped). The two are independent — `groups` wins if both
@@ -861,34 +874,15 @@ function backfillYoutubeLink(sheetName, youtubeUrl, offsetSeconds) {
   if (!String(youtubeUrl || '').match(/(?:v=|youtu\.be\/|embed\/|live\/)([A-Za-z0-9_-]{11})/)) {
     throw new Error('Invalid YouTube URL — could not extract video ID.');
   }
-  writeMeta(sheetName, { youtubelink: youtubeUrl });
-
-  if (offsetSeconds && offsetSeconds !== 0) {
-    const values  = sheet.getDataRange().getDisplayValues();
-    if (values.length < 2) return 1;
-    const headers = values[0].map(s => s.toLowerCase().trim());
-    const timeIdx = headers.indexOf('time');
-    if (timeIdx < 0) return 1;
-
-    const newTimes = [];
-    for (let i = 1; i < values.length; i++) {
-      const timeStr = values[i][timeIdx];
-      const parts   = timeStr ? timeStr.split(':').map(Number) : [];
-      let secs;
-      if      (parts.length === 3) secs = parts[0]*3600 + parts[1]*60 + parts[2];
-      else if (parts.length === 2) secs = parts[0]*60   + parts[1];
-      else { newTimes.push([timeStr]); continue; }
-
-      const s   = Math.max(0, secs + offsetSeconds);
-      const h   = Math.floor(s / 3600);
-      const min = Math.floor((s % 3600) / 60);
-      const sec = Math.floor(s % 60);
-      newTimes.push([`${h}:${String(min).padStart(2,'0')}:${String(sec).padStart(2,'0')}`]);
-    }
-
-    sheet.getRange(2, timeIdx + 1, newTimes.length, 1).setValues(newTimes);
-  }
-
+  // Store the video URL and (non-destructively) the offset that aligns the video
+  // to the game clock: videoTime = gameTime + offset. Event times stay in game
+  // time, so this is reversible, keeps stats intact, and supports videos that
+  // start after kickoff (negative offset → early events simply have no footage).
+  const meta = { youtubelink: youtubeUrl };
+  // Only touch the offset when the caller explicitly provided one, so a plain
+  // URL update doesn't reset an existing alignment.
+  if (offsetSeconds != null && offsetSeconds !== '') meta.videoOffset = Number(offsetSeconds) || 0;
+  writeMeta(sheetName, meta);
   return 1;
 }
 

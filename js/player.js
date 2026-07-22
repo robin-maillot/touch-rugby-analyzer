@@ -126,10 +126,27 @@ TR.player = TR.player || {};
     return !!(meta && meta.gcsObject);
   };
 
+  // Convert a game-clock time (seconds) to a position within the video, using
+  // the game's stored videoOffset. Offset is ADDED to game time: a video that
+  // starts at the 15th game-minute has videoOffset = -900, so game 20:00 → 300s
+  // into the video. A negative result means the moment happened before the
+  // recording started (no footage for it).
+  TR.player.videoTimeAt = function (meta, seconds) {
+    return (Number(seconds) || 0) + ((meta && Number(meta.videoOffset)) || 0);
+  };
+
+  // Whether the game's video actually covers this game-clock moment.
+  TR.player.hasVideoAt = function (meta, seconds) {
+    return TR.player.videoTimeAt(meta, seconds) >= 0;
+  };
+
   // Build a deep-link URL that opens the video at a given moment.
   // The 5-second lookback matches the existing per-event seek behavior.
+  // Returns '' when the game has no video OR the moment precedes the recording.
   TR.player.seekLink = function (meta, seconds) {
-    const t = Math.max(0, Math.floor((Number(seconds) || 0) - 5));
+    const videoTime = TR.player.videoTimeAt(meta, seconds);
+    if (videoTime < 0) return '';                       // before the video starts
+    const t = Math.max(0, Math.floor(videoTime - 5));
     const vid = TR.extractVideoId(meta && meta.youtubelink);
     return vid ? `https://www.youtube.com/watch?v=${vid}&t=${t}s` : '';
   };
