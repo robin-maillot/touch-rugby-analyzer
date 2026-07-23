@@ -501,6 +501,11 @@ let wasPlaying = false;
 let videoMode = 'none'; // 'local' | 'youtube'
 let player = null;       // TR.player handle (current backend)
 let progressInterval = null;
+// Seconds added to a game-clock time to get the video position for the loaded
+// game (videoTime = gameTime + offset). Non-zero when the video starts after
+// kickoff. Event times stay in GAME time everywhere; we convert only at the
+// player boundary — seeking to an event and reading the clock when tagging.
+let currentVideoOffset = 0;
 
 const vid = document.getElementById('vid');
 
@@ -510,6 +515,10 @@ function isPaused()    { return !player || player.isPaused(); }
 function doPlay()  { if (player) player.play();  document.getElementById('playBtn').textContent = '⏸ Pause'; }
 function doPause() { if (player) player.pause(); document.getElementById('playBtn').textContent = '▶ Play'; }
 function setCurrentTime(t) { if (player) player.seek(t); }
+// Game clock ↔ video playback position (videoTime = gameTime + offset). Events
+// are stored/displayed in game time; only player seeks/reads cross this boundary.
+function gameToVideo(t) { return Math.max(0, (Number(t) || 0) + currentVideoOffset); }
+function videoToGame(t) { return (Number(t) || 0) - currentVideoOffset; }
 function setRate(r)        { if (player) player.setRate(r); }
 
 function onPlayerStateChange(state) {
@@ -673,7 +682,7 @@ function updateProgress() {
 }
 function gotoLastAnnotation() {
   if (!videoLoaded || annotations.length === 0) return;
-  setCurrentTime(annotations[annotations.length - 1].time);
+  seekTo(annotations[annotations.length - 1].time);
 }
 
 // ── Seek bar ───────────────────────────────────────────────────
@@ -702,9 +711,9 @@ function hideTeamMenu() { document.getElementById('teamMenu').style.display = 'n
 function selectTeam(team) { if (pendingType !== null) tag(pendingType, pendingName, team, pendingComment || ''); }
 
 function inferPossessionOwner() {
-  // Walk back through annotations strictly before the current video time
+  // Walk back through annotations strictly before the current game time
   // (annotations are sorted by time, so this correctly handles mid-game insertions).
-  const now = getTime();
+  const now = videoToGame(getTime());
   for (let i = annotations.length - 1; i >= 0; i--) {
     const ann = annotations[i];
     if (ann.time >= now) continue;
@@ -814,7 +823,7 @@ function selectSubType(type, name, comment = '') {
 // ── Tagging ────────────────────────────────────────────────────
 function tag(type, name, possessionOwner, comment = '') {
   if (!videoLoaded) return;
-  let t = getTime();
+  let t = videoToGame(getTime());   // player is in video time; events are stored in game time
   if (annotations.length > 0) t = Math.max(0, t - clickDelay);
   const actionOwner = TR.inferActionOwner(possessionOwner, type, name);
   annotations.push({ id: Date.now() + Math.random(), type, name, possessionOwner, actionOwner, comment, time: t, timeStr: TR.fmt(t) });
@@ -848,7 +857,9 @@ function ytLink(timeSeconds) {
   if (!url) return '';
   const m = url.match(/(?:v=|youtu\.be\/|embed\/|live\/)([A-Za-z0-9_-]{11})/);
   if (!m) return '';
-  const t = Math.max(0, Math.floor(timeSeconds) - 5);
+  const videoTime = (Number(timeSeconds) || 0) + currentVideoOffset;   // game → video
+  if (videoTime < 0) return '';                                        // before the video starts
+  const t = Math.max(0, Math.floor(videoTime) - 5);
   return `https://www.youtube.com/watch?v=${m[1]}&t=${t}s`;
 }
 
@@ -909,14 +920,15 @@ function renderMarkers() {
   const dur = getDuration();
   if (!dur) { track.innerHTML = ''; return; }
   track.innerHTML = annotations.map(a => {
-    const pct = (a.time / dur * 100).toFixed(3);
+    // Markers sit on the video timeline, so position by video time (game time + offset).
+    const pct = (gameToVideo(a.time) / dur * 100).toFixed(3);
     return `<div class="marker" style="left:${pct}%;background:${COLORS[a.type]}" onclick="seekTo(${a.time})">
       <div class="marker-tooltip">${a.type}${a.name ? ': '+a.name : ''} @ ${a.timeStr}</div>
     </div>`;
   }).join('');
 }
 
-function seekTo(t) { if (videoLoaded) setCurrentTime(t); }
+function seekTo(t) { if (videoLoaded) setCurrentTime(gameToVideo(t)); }
 
 function editAnnotationName(id) {
   const ann = annotations.find(a => a.id === id);
@@ -1054,6 +1066,11 @@ async function loadFromSheet() {
     const timeIdx      = col('time'), typeIdx = col('type'), nameIdx = col('name');
     const possIdx      = col('possession owner');
     const commentIdx   = col('comment'), actionOwnerIdx = col('action owner');
+
+    // Event times stay in GAME time (matching the sheet, stats, and the field
+    // annotator). The video may start after kickoff — remember the offset so we
+    // can convert game↔video time when seeking/tagging the player.
+    currentVideoOffset = Number(result.meta && result.meta.videoOffset) || 0;
 
     const loaded = result.rows.slice(1).map(r => {
       const timeStr = r[timeIdx] || '';
@@ -1288,6 +1305,7 @@ function exportCSV() {
 // ── CSV import ─────────────────────────────────────────────────
 function loadCSV(e) {
   const f = e.target.files[0]; if (!f) return;
+  currentVideoOffset = 0;   // a CSV carries no game offset; don't inherit a prior game's
   const reader = new FileReader();
   reader.onload = ev => {
     const allLines = ev.target.result.trim().split('\n').filter(l => l.trim());
