@@ -840,6 +840,13 @@ function tagGameEvent(name) {
   // single possession can't be double-tagged. The lock clears at the next
   // play-ending event (see driveAlreadyTagged).
   if ((name === 'Drive - Good' || name === 'Drive - Bad') && driveAlreadyTagged()) return;
+  // Teams alternate the tap-off each half, so a new half defaults to the
+  // opposite team of whoever started the previous half. (The very first half
+  // keeps the current selection.) Still user-overridable via the toggle.
+  if (name === 'Game Start') {
+    const prevStart = [...annotations].reverse().find(a => a.type === 'Game Event' && a.name === 'Game Start');
+    if (prevStart) setPossession(TR.otherTeam(prevStart.possessionOwner));
+  }
   tag('Game Event', name, possession);
 }
 
