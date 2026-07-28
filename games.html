@@ -27,6 +27,8 @@
     .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
     .logo span { font-size: 1rem; font-weight: 600; color: #fff; white-space: nowrap; }
     .header-sep { width: 1px; height: 20px; background: #2b3242; margin: 0 4px; align-self: center; }
+    .video-filter { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: #9ba6b9; cursor: pointer; white-space: nowrap; }
+    .video-filter input { width: 15px; height: 15px; accent-color: #3b82f6; cursor: pointer; margin: 0; }
     select { background: #2b3242; color: #ccc; border: 1px solid #3a3d4a; border-radius: 5px; padding: 5px 10px; font-size: 0.82rem; cursor: pointer; min-width: 280px; }
     #status { font-size: 0.78rem; color: #9ba6b9; }
 
@@ -206,6 +208,7 @@
   <tr-logo></tr-logo>
   <div class="header-sep"></div>
   <select id="gameSelect" onchange="loadGame()"><option value="">Loading games…</option></select>
+  <label class="video-filter" title="Show only games that have a video"><input type="checkbox" id="videoOnly" onchange="renderGameOptions()"> 📹 Video only</label>
   <span id="status"></span>
   <button id="navToggle" class="nav-toggle" onclick="toggleNavMenu()" aria-label="Open page menu" aria-expanded="false" aria-controls="headerNav" aria-haspopup="true">☰</button>
   <nav class="header-nav" id="headerNav">
@@ -359,24 +362,45 @@ window.addEventListener('DOMContentLoaded', fetchGameList);
 // Keyed by sheet tab name, populated in fetchGameList
 const gamesMeta = {};
 
+// Latest-first list of analyzable games; the picker is rendered from this so a
+// filter change doesn't need a refetch.
+let analyzableGames = [];
+const hasVideo = entry => !!TR.player.providerFor(entry);
+
 function applyGameList(result) {
-  const sel = document.getElementById('gameSelect');
-  sel.innerHTML = '<option value="">— Select a game —</option>';
   // Reverse API order so the latest game lands at the top of the picker.
-  const analyzable = result.sheets.filter(entry => entry.analyzable === 'TRUE').reverse();
-  analyzable.forEach(entry => {
-    gamesMeta[entry.name] = entry;
+  analyzableGames = result.sheets.filter(entry => entry.analyzable === 'TRUE').reverse();
+  analyzableGames.forEach(entry => { gamesMeta[entry.name] = entry; });
+  document.getElementById('videoOnly').checked = localStorage.getItem('tr.games.videoOnly') === '1';
+  renderGameOptions();
+  const urlGame = new URLSearchParams(location.search).get('game');
+  const sel = document.getElementById('gameSelect');
+  if (urlGame && !sel.value) {
+    sel.value = urlGame;
+    if (sel.value) loadGame();
+  }
+}
+
+// (Re)build the picker options from analyzableGames, honoring the "Video only"
+// filter and preserving the current selection when it survives the filter.
+function renderGameOptions() {
+  const sel = document.getElementById('gameSelect');
+  const videoOnly = document.getElementById('videoOnly').checked;
+  localStorage.setItem('tr.games.videoOnly', videoOnly ? '1' : '');
+  const current = sel.value;
+  const list = videoOnly ? analyzableGames.filter(hasVideo) : analyzableGames;
+  sel.innerHTML = '<option value="">— Select a game —</option>';
+  list.forEach(entry => {
     const opt = document.createElement('option');
     opt.value = entry.name;
     opt.textContent = TR.sheetNameToLabel(entry);
     sel.appendChild(opt);
   });
-  setStatus(`${analyzable.length} game${analyzable.length !== 1 ? 's' : ''}`);
-  const urlGame = new URLSearchParams(location.search).get('game');
-  if (urlGame && !sel.value) {
-    sel.value = urlGame;
-    if (sel.value) loadGame();
-  }
+  if (current && list.some(e => e.name === current)) sel.value = current;
+  const nVid = analyzableGames.filter(hasVideo).length;
+  setStatus(videoOnly
+    ? `${list.length} with video`
+    : `${analyzableGames.length} game${analyzableGames.length !== 1 ? 's' : ''} · ${nVid} with video`);
 }
 
 async function fetchGameList() {
