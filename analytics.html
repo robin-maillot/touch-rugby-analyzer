@@ -195,6 +195,24 @@
   .rank-opt input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
   .rank-dir { margin-left: auto; font-size: 0.78rem; line-height: 1; color: var(--text-muted); }
   .rank-empty { padding: 24px; text-align: center; color: var(--dim); font-size: 0.82rem; }
+  /* ── Game ranking (bottom section) ── */
+  .gr-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-bottom: 14px; }
+  .gr-metrics { display: flex; flex-wrap: wrap; gap: 6px; }
+  .gr-mbtn { background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); border-radius: 7px; padding: 6px 12px; font-size: 0.8rem; cursor: pointer; transition: border-color .12s, color .12s; }
+  .gr-mbtn:hover { border-color: var(--accent); color: var(--text); }
+  .gr-mbtn.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .gr-half { display: flex; align-items: center; gap: 7px; font-size: 0.82rem; color: var(--text); cursor: pointer; white-space: nowrap; }
+  .gr-half input { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; margin: 0; }
+  .gr-list { display: flex; flex-direction: column; }
+  .gr-row { display: flex; align-items: center; gap: 12px; padding: 7px 2px; border-bottom: 1px solid var(--border-l); }
+  .gr-row:last-child { border-bottom: none; }
+  .gr-rank { width: 26px; flex-shrink: 0; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 0.76rem; font-weight: 700; }
+  .gr-label { flex: 0 0 auto; width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.84rem; text-transform: capitalize; }
+  .gr-label .gr-sub { color: var(--muted); font-size: 0.7rem; text-transform: none; }
+  .gr-barwrap { flex: 1; min-width: 50px; height: 9px; background: var(--surface-2); border-radius: 99px; overflow: hidden; }
+  .gr-bar { display: block; height: 100%; background: var(--accent); border-radius: 99px; }
+  .gr-val { width: 68px; flex-shrink: 0; text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; font-size: 0.86rem; color: var(--text); }
+  @media (max-width: 620px) { .gr-label { width: 150px; } .gr-val { width: 54px; } }
   </style>
 <script src="js/config.js"></script>
 <script src="js/utils.js"></script>
@@ -353,6 +371,27 @@
           </table>
         </div>
       </div>
+    </div>
+
+    <!-- ─── Game ranking ───────────────────────────────────── -->
+    <div class="section" id="rankSection">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Rank games</div>
+          <div class="section-sub">Every analysable game ranked by the chosen metric</div>
+        </div>
+      </div>
+      <div class="gr-toolbar">
+        <div class="gr-metrics" id="grMetrics">
+          <button type="button" class="gr-mbtn active" data-metric="tries"     onclick="setRankMetric('tries', this)">Tries</button>
+          <button type="button" class="gr-mbtn"        data-metric="tryDiff"   onclick="setRankMetric('tryDiff', this)">Try diff</button>
+          <button type="button" class="gr-mbtn"        data-metric="deadPct"   onclick="setRankMetric('deadPct', this)">Dead ball %</button>
+          <button type="button" class="gr-mbtn"        data-metric="poss"      onclick="setRankMetric('poss', this)">Possessions</button>
+          <button type="button" class="gr-mbtn"        data-metric="penalties" onclick="setRankMetric('penalties', this)">Penalties</button>
+        </div>
+        <label class="gr-half"><input type="checkbox" id="rankByHalf" onchange="renderRanking()"> Split by half</label>
+      </div>
+      <div class="card"><div id="rankList" class="gr-list"></div></div>
     </div>
 
   </div>
@@ -527,6 +566,7 @@ function applyData(result) {
   populateFilters();
   renderTop();
   renderBottom();
+  renderRanking();
 }
 
 // ── Data parsing ─────────────────────────────────────────────
@@ -1153,6 +1193,111 @@ function escapeHtml(s) {
 
 function emptyMsg() {
   return '<div style="padding:30px;text-align:center;color:var(--dim);font-size:0.78rem">No data for the current filters.</div>';
+}
+
+// ── Game ranking (bottom section) ────────────────────────────
+let rankMetric = 'tries';
+function setRankMetric(metric, btn) {
+  rankMetric = metric;
+  document.querySelectorAll('#grMetrics .gr-mbtn').forEach(b => b.classList.toggle('active', b === btn));
+  renderRanking();
+}
+
+function rkParseTime(str) {
+  const p = String(str).split(':').map(Number);
+  if (p.length === 3) return p[0] * 3600 + p[1] * 60 + p[2];
+  if (p.length === 2) return p[0] * 60 + p[1];
+  return +str || 0;
+}
+
+// Metrics for one time-contiguous unit (a half, or a whole game). Times are raw
+// within a half (monotonic), so no cross-half offset handling is needed.
+function rkUnitMetrics(evs, t1, t2) {
+  const raw = evs.map(e => rkParseTime(e.time));
+  const duration = evs.length ? Math.max(0, raw[raw.length - 1] - raw[0]) : 0;
+  let dead = 0;
+  for (let i = 1; i < evs.length; i++) if (evs[i].name === 'Ball Live') dead += Math.max(0, raw[i] - raw[i - 1]);
+  const isTry = e => e.type === 'Try';
+  const tries = evs.filter(isTry).length;
+  const t1t = evs.filter(e => isTry(e) && e.actionOwner === t1).length;
+  const t2t = evs.filter(e => isTry(e) && e.actionOwner === t2).length;
+  const penalties = evs.filter(e => e.type === 'Penalty Attack' || e.type === 'Penalty Defence').length;
+  // Possession segments — same rule as the plot's possessionSegments.
+  const other = t => (t === t1 ? t2 : t1);
+  let cur = null;
+  evs.forEach((e, i) => {
+    const prev = i > 0 ? evs[i - 1] : null;
+    if (prev && prev.type === 'Try') cur = other(prev._own);
+    else if (e.owner) cur = e.owner;
+    e._own = cur;
+  });
+  let prevOwner = null, poss = 0;
+  evs.forEach((e, i) => {
+    const prev = i > 0 ? evs[i - 1] : null;
+    const newP = e._own !== prevOwner || e.name === 'Game Start' || (prev && prev.name === 'Game End') || (prev && prev.type === 'Try');
+    if (i === 0 || newP) poss++;
+    prevOwner = e._own;
+  });
+  return { duration, dead, deadPct: duration ? 100 * dead / duration : 0,
+           tries, t1t, t2t, tryDiff: Math.abs(t1t - t2t), penalties, poss };
+}
+
+// Split one game's (chronological) events into halves at each Game Start.
+function rkHalves(gevs) {
+  const halves = []; let cur = null;
+  gevs.forEach(e => {
+    if (e.type === 'Game Event' && e.name === 'Game Start') { cur = [e]; halves.push(cur); }
+    else if (cur) cur.push(e);
+  });
+  return halves.length ? halves : [gevs];
+}
+
+function renderRanking() {
+  const el = document.getElementById('rankList');
+  if (!el) return;
+  const byHalf = document.getElementById('rankByHalf').checked;
+  const evs = ALL_EVENTS.filter(e => e.analyzable);
+  const games = {};
+  evs.forEach(e => { (games[e.game] ||= []).push(e); });   // ALL_EVENTS order is chronological per game
+
+  const units = [];
+  for (const g in games) {
+    const gevs = games[g];
+    const t1 = gevs[0].team1, t2 = gevs[0].team2;
+    const label = t1 && t2 ? `${t1} vs ${t2}` : g;
+    const meta = [gevs[0].year, gevs[0].div, gevs[0].comp].filter(Boolean).join(' · ');
+    const halves = rkHalves(gevs);
+    if (byHalf) {
+      halves.forEach((h, i) => {
+        const m = rkUnitMetrics(h, t1, t2);
+        const tag = halves.length > 1 ? `H${i + 1}` : '';
+        units.push({ label, sub: [tag, meta].filter(Boolean).join(' · '), m });
+      });
+    } else {
+      const agg = { duration: 0, dead: 0, tries: 0, t1t: 0, t2t: 0, penalties: 0, poss: 0 };
+      halves.forEach(h => {
+        const m = rkUnitMetrics(h, t1, t2);
+        ['duration', 'dead', 'tries', 't1t', 't2t', 'penalties', 'poss'].forEach(k => agg[k] += m[k]);
+      });
+      agg.deadPct = agg.duration ? 100 * agg.dead / agg.duration : 0;
+      agg.tryDiff = Math.abs(agg.t1t - agg.t2t);
+      units.push({ label, sub: meta, m: agg });
+    }
+  }
+
+  const val = u => u.m[rankMetric] || 0;
+  units.sort((a, b) => val(b) - val(a));
+  const max = Math.max(1, ...units.map(val));
+  const fmt = v => rankMetric === 'deadPct' ? Math.round(v) + '%' : (Number.isInteger(v) ? v : v.toFixed(1));
+
+  el.innerHTML = units.length ? units.map((u, i) => `
+    <div class="gr-row">
+      <span class="gr-rank">${i + 1}</span>
+      <span class="gr-label">${escapeHtml(u.label)}${u.sub ? ` <span class="gr-sub">${escapeHtml(u.sub)}</span>` : ''}</span>
+      <span class="gr-barwrap"><span class="gr-bar" style="width:${(val(u) / max * 100).toFixed(1)}%"></span></span>
+      <span class="gr-val">${fmt(val(u))}</span>
+    </div>`).join('')
+    : '<div style="padding:20px;color:var(--muted);font-size:0.82rem">No analysable games.</div>';
 }
 </script>
 
