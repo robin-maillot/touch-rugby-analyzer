@@ -76,6 +76,7 @@ TR.saveSession = (password, role, group) => {
     localStorage.setItem('trl2_session', JSON.stringify(s));
   } catch (e) {}
   writeSessionCookie(s);
+  TR.exitOfflineMode();   // a real login supersedes offline mode
 };
 
 TR.logout = () => {
@@ -86,7 +87,51 @@ TR.logout = () => {
     localStorage.removeItem('trl2_session');
   } catch (e) {}
   clearSessionCookie();
+  TR.exitOfflineMode();
   window.location.replace('index.html');
+};
+
+// ── Offline mode ───────────────────────────────────────────────
+// A local-only mode for arriving at a pitch with no signal, where the password
+// can't be validated because validation needs the network. It unlocks the field
+// annotator — which keeps everything on the device — and nothing else: no sheet
+// reads and no uploads are possible until a real login happens. Games tagged
+// this way carry no identity, so they're attributed to whoever is signed in when
+// they're finally pushed.
+//
+// Stored in localStorage and mirrored to a cookie for the same reason the
+// session is: iOS standalone web apps don't reliably share localStorage across
+// their per-page webviews.
+TR.OFFLINE_KEY = 'trl2_offline';
+const OFFLINE_COOKIE = 'trl2_offline';
+
+function readOfflineCookie() {
+  try { return /(?:^|;\s*)trl2_offline=1(?:;|$)/.test(document.cookie); }
+  catch (e) { return false; }
+}
+
+function writeOfflineCookie(on) {
+  try {
+    const secure = location.protocol === 'https:' ? '; Secure' : '';
+    document.cookie = `${OFFLINE_COOKIE}=${on ? '1' : ''}; path=/; ` +
+      `max-age=${on ? 60 * 60 * 24 * 365 : 0}; SameSite=Lax${secure}`;
+  } catch (e) {}
+}
+
+TR.isOfflineMode = () => {
+  if (TR.secret()) return false;          // a real session always wins
+  try { if (localStorage.getItem(TR.OFFLINE_KEY) === '1') return true; } catch (e) {}
+  return readOfflineCookie();
+};
+
+TR.enterOfflineMode = () => {
+  try { localStorage.setItem(TR.OFFLINE_KEY, '1'); } catch (e) {}
+  writeOfflineCookie(true);
+};
+
+TR.exitOfflineMode = () => {
+  try { localStorage.removeItem(TR.OFFLINE_KEY); } catch (e) {}
+  writeOfflineCookie(false);
 };
 
 TR.secret = () => sessionStorage.getItem('password') || '';
@@ -127,7 +172,10 @@ TR.umamiIdentify = (extra) => {
 // required: 'viewer' | 'staff' | 'admin'. Uses the cached role (set by whoami at
 // login) so any group secret works, with a fast bypass back to login if there's
 // no session at all.
-TR.auth = (required) => {
+// opts.offline: this page works entirely on-device, so offline mode may open it
+// even though there's no account behind that mode.
+TR.auth = (required, opts) => {
+  if (opts && opts.offline && TR.isOfflineMode()) return;
   // No session at all → send to login, remembering where to return afterwards.
   if (!sessionStorage.getItem('password')) {
     const here = location.pathname.split('/').pop() + location.search;

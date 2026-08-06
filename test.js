@@ -5,12 +5,25 @@ const vm     = require('vm');
 const fs     = require('fs');
 const assert = require('assert/strict');
 
+// In-memory localStorage stand-in so the field-annotator game store can be
+// exercised here the same way it runs in the browser.
+function memStorage() {
+  const map = new Map();
+  return {
+    getItem:    k => (map.has(String(k)) ? map.get(String(k)) : null),
+    setItem:    (k, v) => map.set(String(k), String(v)),
+    removeItem: k => map.delete(String(k)),
+    clear:      () => map.clear(),
+  };
+}
+
 const ctx = vm.createContext({
   sessionStorage: { getItem: () => null },
+  localStorage:   memStorage(),
   window:         { location: { replace() {} } },
 });
 
-for (const f of ['js/config.js', 'js/utils.js', 'js/events.js', 'js/possession.js', 'js/consistency.js', 'js/player.js']) {
+for (const f of ['js/config.js', 'js/utils.js', 'js/events.js', 'js/possession.js', 'js/consistency.js', 'js/player.js', 'js/field_games.js']) {
   vm.runInContext(fs.readFileSync(f, 'utf8'), ctx);
 }
 
@@ -560,6 +573,278 @@ test('long realistic game: 8 events stay aligned end-to-end', () => {
   assert.equal(TR.getInconsistentIds(anns).size, 0);
 });
 
+
+// ── Offline mode ──────────────────────────────────────────────
+console.log('TR offline mode');
+
+test('off by default', () => {
+  ctx.localStorage.clear();
+  assert.equal(TR.isOfflineMode(), false);
+});
+
+test('enter / exit toggles the flag', () => {
+  ctx.localStorage.clear();
+  TR.enterOfflineMode();
+  assert.equal(ctx.localStorage.getItem('trl2_offline'), '1');
+  assert.equal(TR.isOfflineMode(), true);
+  TR.exitOfflineMode();
+  assert.equal(ctx.localStorage.getItem('trl2_offline'), null);
+  assert.equal(TR.isOfflineMode(), false);
+});
+
+test('a real session wins over the offline flag', () => {
+  ctx.localStorage.clear();
+  TR.enterOfflineMode();
+  const realSecret = TR.secret;
+  TR.secret = () => 'm30-staff';
+  assert.equal(TR.isOfflineMode(), false, 'signed in — not offline mode');
+  TR.secret = realSecret;
+});
+
+test('saveSession leaves offline mode', () => {
+  ctx.localStorage.clear();
+  TR.enterOfflineMode();
+  TR.saveSession('m30-staff', 'staff', 'm30');
+  assert.equal(ctx.localStorage.getItem('trl2_offline'), null);
+});
+
+test('exiting is idempotent', () => {
+  ctx.localStorage.clear();
+  TR.exitOfflineMode();
+  TR.exitOfflineMode();
+  assert.equal(TR.isOfflineMode(), false);
+});
+
+// ── TR.FieldGames ─────────────────────────────────────────────
+console.log('TR.FieldGames');
+
+const FG = TR.FieldGames;
+const resetStore = () => ctx.localStorage.clear();
+
+// Minimal annotation shaped like the ones the field annotator writes.
+const ann = (time, type, name, actionOwner) =>
+  ({ id: time, type, name, possessionOwner: actionOwner, actionOwner, comment: '', time });
+
+test('create registers the game in the index', () => {
+  resetStore();
+  const g = FG.create({ team1: 'France', team2: 'England' });
+  assert.deepEqual([...FG.ids()], [g.id]);
+  assert.equal(FG.get(g.id).meta.team1, 'France');
+  assert.equal(FG.get(g.id).status, 'active');
+});
+
+test('create fills missing meta keys', () => {
+  resetStore();
+  const g = FG.create({ team1: 'France' });
+  assert.equal(g.meta.team2, '');
+  assert.equal(g.meta.youtubelink, '');
+});
+
+test('games are isolated from each other', () => {
+  resetStore();
+  const a = FG.create({ team1: 'A' });
+  const b = FG.create({ team1: 'B' });
+  a.annotations.push(ann(0, 'Try', 'Scoop', 'Team 1'));
+  FG.save(a);
+  assert.equal(FG.get(a.id).annotations.length, 1);
+  assert.equal(FG.get(b.id).annotations.length, 0);
+  assert.equal(FG.ids().length, 2);
+});
+
+test('save bumps the revision; touch:false does not', () => {
+  resetStore();
+  const g = FG.create({});
+  assert.equal(g.revision, 0);
+  FG.save(g);
+  assert.equal(g.revision, 1);
+  FG.save(g, { touch: false });
+  assert.equal(g.revision, 1);
+});
+
+test('a new game is dirty and not uploaded', () => {
+  resetStore();
+  const g = FG.create({});
+  assert.equal(FG.isDirty(g), true);
+  assert.equal(FG.isUploaded(g), false);
+  assert.equal(FG.isSynced(g), false);
+});
+
+test('markSynced clears dirty; a later edit sets it again', () => {
+  resetStore();
+  const g = FG.create({});
+  g.annotations.push(ann(0, 'Try', 'Scoop', 'Team 1'));
+  FG.save(g);
+  FG.markSynced(g, '2026_m30_cup_a_b');
+  assert.equal(FG.isDirty(g), false);
+  assert.equal(FG.isSynced(g), true);
+  assert.equal(FG.get(g.id).sync.sheetName, '2026_m30_cup_a_b');
+
+  // An event-type correction keeps the count but must still re-push.
+  g.annotations[0].type = 'Turnover';
+  FG.save(g);
+  assert.equal(FG.isDirty(g), true);
+  assert.equal(FG.isUploaded(g), true, 'still uploaded once, just out of date');
+  assert.equal(FG.isSynced(g), false);
+});
+
+test('markSynced honours an explicit revision', () => {
+  resetStore();
+  const g = FG.create({});
+  FG.save(g);                       // revision 1 — what a push would send
+  const sent = g.revision;
+  FG.save(g);                       // revision 2 — tagged while in flight
+  FG.markSynced(g, 'tab', sent);
+  assert.equal(FG.isDirty(g), true, 'the in-flight event still needs pushing');
+  assert.equal(FG.isUploaded(g), true);
+});
+
+test('remove drops the record and the index entry', () => {
+  resetStore();
+  const a = FG.create({ team1: 'A' });
+  const b = FG.create({ team1: 'B' });
+  FG.remove(a.id);
+  assert.deepEqual([...FG.ids()], [b.id]);
+  assert.equal(FG.get(a.id), null);
+});
+
+test('removeSynced spares unsynced and dirty games', () => {
+  resetStore();
+  const clean = FG.create({ team1: 'clean' });
+  FG.markSynced(clean, 'tab-clean');
+  const dirty = FG.create({ team1: 'dirty' });
+  FG.markSynced(dirty, 'tab-dirty');
+  dirty.annotations.push(ann(0, 'Try', 'Scoop', 'Team 1'));
+  FG.save(dirty);
+  const never = FG.create({ team1: 'never' });
+
+  assert.equal(FG.removeSynced(), 1);
+  const left = FG.ids();
+  assert.equal(left.length, 2);
+  assert.ok(left.includes(dirty.id) && left.includes(never.id));
+});
+
+test('list is ordered by most recently edited', () => {
+  resetStore();
+  const a = FG.create({ team1: 'A' });
+  const b = FG.create({ team1: 'B' });
+  a.updatedAt = 5000; FG.save(a, { touch: false });
+  b.updatedAt = 9000; FG.save(b, { touch: false });
+  assert.deepEqual([...FG.list().map(g => g.meta.team1)], ['B', 'A']);
+});
+
+test('get returns null for an unknown id', () => {
+  resetStore();
+  assert.equal(FG.get('g_nope'), null);
+});
+
+test('normalize repairs a record from an older build', () => {
+  resetStore();
+  const g = FG.create({ team1: 'A' });
+  // Simulate a record written before status/sync/revision existed.
+  ctx.localStorage.setItem(FG.gameKey(g.id), JSON.stringify({ id: g.id, meta: { team1: 'A' } }));
+  const back = FG.get(g.id);
+  assert.equal(back.annotations.length, 0);
+  assert.equal(back.possession, 'Team 1');
+  assert.equal(back.status, 'active');
+  assert.equal(back.revision, 0);
+  assert.equal(back.sync.pushedAt, null);
+  assert.equal(typeof back.createdAt, 'number');
+});
+
+test('collisions finds other games sharing a tab name', () => {
+  resetStore();
+  const nameOf = g => [g.meta.year, g.meta.team1, g.meta.team2].filter(Boolean).join('_');
+  const a = FG.create({ year: '2026', team1: 'fra', team2: 'eng' });
+  const b = FG.create({ year: '2026', team1: 'fra', team2: 'eng' });
+  const c = FG.create({ year: '2026', team1: 'fra', team2: 'wal' });
+  assert.deepEqual([...FG.collisions(a, nameOf).map(g => g.id)], [b.id]);
+  assert.equal(FG.collisions(c, nameOf).length, 0);
+  // A game with no metadata yet can't collide with anything.
+  assert.equal(FG.collisions(FG.create({}), nameOf).length, 0);
+  // An explicit name wins over the record's stored metadata, so an unsaved
+  // keystroke in the Setup panel is reflected immediately.
+  assert.equal(FG.collisions(c, nameOf, '2026_fra_eng').length, 2);
+  assert.equal(FG.collisions(a, nameOf, '2026_fra_wal').length, 1);
+  assert.equal(FG.collisions(a, nameOf, '').length, 0);
+});
+
+test('summarize reports score, status and duration', () => {
+  resetStore();
+  const g = FG.create({ team1: 'France', team2: 'England', year: '2026', division: 'M30' });
+  g.annotations = [
+    ann(0,   'Game Event', 'Game Start', 'Team 1'),
+    ann(60,  'Try',        'Scoop',      'Team 1'),
+    ann(120, 'Try',        'Scoop',      'Team 2'),
+    ann(180, 'Try',        'Scoop',      'Team 1'),
+    ann(300, 'Game Event', 'Game End',   'Team 1'),
+  ];
+  g.status = 'finished';
+  FG.save(g);
+  const s = FG.summarize(g);
+  assert.equal(s.score1, 2);
+  assert.equal(s.score2, 1);
+  assert.equal(s.events, 5);
+  assert.equal(s.duration, 300);
+  assert.equal(s.status, 'finished');
+  assert.equal(s.subtitle, '2026 · M30');
+  assert.equal(s.titled, true);
+});
+
+test('summarize distinguishes new / running / paused', () => {
+  resetStore();
+  const g = FG.create({});
+  assert.equal(FG.summarize(g).status, 'new');
+
+  g.wallStart = Date.now();
+  g.annotations = [ann(0, 'Game Event', 'Game Start', 'Team 1')];
+  assert.equal(FG.summarize(g).status, 'running');
+
+  g.annotations.push(ann(600, 'Game Event', 'Game End', 'Team 1'));
+  assert.equal(FG.summarize(g).status, 'paused');
+
+  g.annotations.push(ann(700, 'Game Event', 'Game Start', 'Team 1'));
+  assert.equal(FG.summarize(g).status, 'running', 'second half restarts the clock');
+});
+
+test('summarize falls back to placeholder team names', () => {
+  resetStore();
+  const s = FG.summarize(FG.create({}));
+  assert.equal(s.team1, 'Team 1');
+  assert.equal(s.team2, 'Team 2');
+  assert.equal(s.titled, false);
+  assert.equal(s.duration, 0);
+});
+
+test('migrateLegacy imports the old single session once', () => {
+  resetStore();
+  ctx.localStorage.setItem('fieldAnnotatorSession', JSON.stringify({
+    annotations: [ann(0, 'Game Event', 'Game Start', 'Team 1'), ann(30, 'Try', 'Scoop', 'Team 1')],
+    possession: 'Team 2',
+    wallStart: 1234567890,
+    teamsSwapped: true,
+    creatorToken: 'tok-1',
+    meta: { team1: 'France', team2: 'England' },
+  }));
+  const g = FG.migrateLegacy();
+  assert.ok(g);
+  assert.equal(g.annotations.length, 2);
+  assert.equal(g.possession, 'Team 2');
+  assert.equal(g.wallStart, 1234567890);
+  assert.equal(g.teamsSwapped, true);
+  assert.equal(g.creatorToken, 'tok-1');
+  assert.equal(g.meta.team1, 'France');
+  assert.equal(FG.isDirty(g), true, 'imported games are assumed un-pushed');
+  assert.equal(ctx.localStorage.getItem('fieldAnnotatorSession'), null);
+  assert.equal(FG.migrateLegacy(), null, 'second run is a no-op');
+});
+
+test('migrateLegacy discards an empty session', () => {
+  resetStore();
+  ctx.localStorage.setItem('fieldAnnotatorSession', JSON.stringify({ annotations: [], meta: {} }));
+  assert.equal(FG.migrateLegacy(), null);
+  assert.equal(FG.ids().length, 0);
+  assert.equal(ctx.localStorage.getItem('fieldAnnotatorSession'), null);
+});
 
 // ─────────────────────────────────────────────────────────────
 console.log(`\n${passed} passed, ${failed} failed`);

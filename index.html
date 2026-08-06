@@ -95,6 +95,33 @@
       padding: 10px 14px; color: #fecaca; font-size: 0.82rem;
     }
 
+    /* --- Offline mode --- */
+    #offline-prompt { margin-top: 18px; padding-top: 16px; border-top: 1px solid #2b3242; }
+    #offline-hint { color: #6b7688; font-size: 0.74rem; line-height: 1.4; margin-bottom: 10px; }
+    #offline-btn {
+      width: 100%; padding: 9px;
+      background: transparent; color: #9ba6b9;
+      border: 1px solid #2b3242; border-radius: 6px;
+      font-size: 0.82rem; font-weight: 600; cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    #offline-btn:hover { border-color: #3b82f6; color: #e9ecf3; }
+    /* Promoted when the server is unreachable — that's exactly when it's wanted. */
+    #offline-prompt.urgent #offline-btn { border-color: #f97316; color: #fdba74; }
+    #offline-prompt.urgent #offline-hint { color: #fdba74; }
+    #offline-banner {
+      display: none; align-items: center; gap: 10px;
+      margin: 16px 24px -16px;
+      background: rgba(249,115,22,0.12); border: 1px solid #f97316; border-radius: 8px;
+      padding: 11px 14px; color: #fdba74; font-size: 0.82rem; line-height: 1.4;
+    }
+    #offline-banner strong { color: #f97316; }
+    #offline-banner button {
+      margin-left: auto; flex-shrink: 0;
+      background: #f97316; color: #000; border: none; border-radius: 6px;
+      padding: 7px 12px; font-size: 0.78rem; font-weight: 700; cursor: pointer;
+    }
+
     /* --- Main Content (Hidden Initially) --- */
     #app-content { display: none; background: #0b0e14; min-height: 100vh; }
 
@@ -131,6 +158,10 @@
       <input type="password" id="password-input" placeholder="Password" />
       <button id="login-btn">Login</button>
       <div id="error-msg">Incorrect password</div>
+      <div id="offline-prompt">
+        <div id="offline-hint">No connection? You can still tag a game on this device.</div>
+        <button id="offline-btn" type="button">📴 Use offline</button>
+      </div>
     </div>
   </div>
 
@@ -140,6 +171,10 @@
       <button id="logout-btn" type="button" title="Sign out and clear this device's saved login">Log out</button>
     </header>
     <div id="access-note" role="alert">You don’t have access to that page — pick one below.</div>
+    <div id="offline-banner" role="status">
+      <span><strong>Offline mode.</strong> Tag games on this device now — log in when you have signal to upload them, and they'll be saved under your account.</span>
+      <button type="button" id="offline-login-btn">Log in</button>
+    </div>
     <div class="nav-cards">
       <a class="nav-card" href="games.html">
         <div class="card-icon">📊</div>
@@ -217,16 +252,18 @@
   if (_params.get('denied')) document.getElementById('access-note').style.display = 'block';
   if (location.search) history.replaceState({}, '', 'index.html');
 
-  // Returns { role, group } for a valid secret, or null. The group is persisted
-  // into the session so pages (e.g. the field annotator) can show which group
-  // their uploads will be attributed to.
+  // Returns { role, group } for a valid secret, 'unreachable' when the server
+  // couldn't be reached at all, or null for a rejected password. Telling those
+  // two failures apart matters: a bad password should clear the session, a dead
+  // connection must not. The group is persisted into the session so pages (e.g.
+  // the field annotator) can show which group their uploads will be attributed to.
   async function whoami(secret) {
     try {
       const url  = `${TR.APPS_SCRIPT_URL}?secret=${encodeURIComponent(secret)}&action=whoami`;
       const resp = await fetch(url);
       const data = await resp.json();
       return data.ok ? { role: data.role, group: data.group || '' } : null;
-    } catch { return null; }
+    } catch { return 'unreachable'; }
   }
 
   async function checkPassword() {
@@ -235,23 +272,46 @@
     loginBtn.innerHTML = '<span class="spinner"></span>Verifying…';
     errorMsg.style.display = 'none';
     const auth = await whoami(pwd);
-    if (auth) {
-      TR.saveSession(pwd, auth.role, auth.group);
-      TR.umamiIdentify({ event: 'login' });
-      if (NEXT) { window.location.replace(NEXT); return; }   // return to the page they came from
-      initApp(auth.role);
-    } else {
-      loginBtn.disabled = false;
-      loginBtn.textContent = 'Login';
+    loginBtn.disabled = false;
+    loginBtn.textContent = 'Login';
+
+    if (auth === 'unreachable') {
+      // Can't validate without the network — offer the one thing that still works.
+      errorMsg.textContent = "Can't reach the server. Check your connection, or tag this game offline.";
+      errorMsg.style.display = 'block';
+      document.getElementById('offline-prompt').classList.add('urgent');
+      document.getElementById('offline-hint').textContent =
+        'Tag now, upload later — the game is saved on this device and goes to your account when you log in.';
+      return;
+    }
+    if (!auth) {
+      errorMsg.textContent = 'Incorrect password';
       errorMsg.style.display = 'block';
       passInput.value = '';
       passInput.focus();
+      return;
     }
+
+    TR.saveSession(pwd, auth.role, auth.group);
+    TR.umamiIdentify({ event: 'login' });
+    if (NEXT) { window.location.replace(NEXT); return; }   // return to the page they came from
+    initApp(auth.role);
   }
 
   loginBtn.addEventListener('click', checkPassword);
   passInput.addEventListener('keypress', e => { if (e.key === 'Enter') checkPassword(); });
   document.getElementById('logout-btn').addEventListener('click', () => TR.logout());
+
+  // Offline mode grants no server access — it only unlocks the field annotator,
+  // which stores its games on the device until someone logged in uploads them.
+  document.getElementById('offline-btn').addEventListener('click', () => {
+    TR.enterOfflineMode();
+    initApp('offline');
+  });
+  document.getElementById('offline-login-btn').addEventListener('click', () => {
+    TR.exitOfflineMode();
+    window.location.reload();
+  });
 
   // Skip the login screen if we already have a valid session. We render
   // immediately from the cached role to avoid a blank page while whoami is in
@@ -263,6 +323,9 @@
   if (cachedPwd && cachedRole) {
     initApp(cachedRole);
     whoami(cachedPwd).then(auth => {
+      // 'unreachable' means no network, not a revoked password — keep the
+      // session so a signal drop doesn't sign people out mid-tournament.
+      if (auth === 'unreachable') return;
       if (!auth) {
         TR.logout();
       } else {
@@ -274,6 +337,7 @@
     // Older session with no cached role — fall back to blocking validation.
     loginScreen.style.display = 'none';
     whoami(cachedPwd).then(auth => {
+      if (auth === 'unreachable') { initApp('offline'); return; }
       if (auth) {
         TR.saveSession(cachedPwd, auth.role, auth.group);
         initApp(auth.role);
@@ -281,17 +345,33 @@
         TR.logout();
       }
     });
+  } else if (TR.isOfflineMode()) {
+    initApp('offline');
   }
 
   // --- APP LOGIC ---
   function initApp(role) {
+    const offline      = (role === 'offline');
     const staffOrAdmin = (role === 'staff' || role === 'admin');
     const admin        = (role === 'admin');
-    document.getElementById('annotatorCard').style.display = staffOrAdmin ? '' : 'none';
-    document.getElementById('fieldCard').style.display     = staffOrAdmin ? '' : 'none';
-    document.getElementById('backfillCard').style.display  = staffOrAdmin ? '' : 'none';
-    document.getElementById('adminCard').style.display     = admin ? '' : 'none';
-    document.getElementById('dashboardCard').style.display = admin ? '' : 'none';
+    // Offline mode has no account behind it, so every page that reads from or
+    // writes to the sheet is hidden — only the on-device annotator is left.
+    document.querySelectorAll('.nav-card').forEach(card => {
+      if (offline) card.style.display = card.id === 'fieldCard' ? '' : 'none';
+    });
+    if (!offline) {
+      document.querySelectorAll('.nav-card').forEach(card => { card.style.display = ''; });
+      document.getElementById('annotatorCard').style.display = staffOrAdmin ? '' : 'none';
+      document.getElementById('fieldCard').style.display     = staffOrAdmin ? '' : 'none';
+      document.getElementById('backfillCard').style.display  = staffOrAdmin ? '' : 'none';
+      document.getElementById('adminCard').style.display     = admin ? '' : 'none';
+      document.getElementById('dashboardCard').style.display = admin ? '' : 'none';
+    }
+    document.getElementById('offline-banner').style.display = offline ? 'flex' : 'none';
+    const logout = document.getElementById('logout-btn');
+    logout.textContent = offline ? 'Exit offline' : 'Log out';
+    logout.title = offline ? 'Leave offline mode and return to the login screen'
+                           : 'Sign out and clear this device\'s saved login';
     loginScreen.style.display = 'none';
     appContent.style.display  = 'block';
   }

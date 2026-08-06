@@ -18,6 +18,18 @@ All pages are behind a password prompt on `index.html`. Three passwords exist:
 
 The password is stored in `sessionStorage` and used as the API secret for all calls to the Apps Script backend.
 
+### Offline mode
+
+Passwords are validated server-side, so with no signal there's nothing to validate against.
+**📴 Use offline** on the login screen opens a local-only mode for exactly that case — arriving
+at a pitch with no connection. It unlocks the **Field Annotator alone**, since that's the one
+page that works entirely on the device; every upload control is greyed out, and no sheet data
+can be read or written.
+
+Games tagged this way carry no identity — they're attributed to whoever is signed in when they
+are finally pushed. So the sideline flow is: tag offline → log in later with signal → open the
+game from the picker → upload, and it lands under that account's group.
+
 ---
 
 ## Development
@@ -135,11 +147,13 @@ Fill in Team 1, Team 2, Year, Division, Competition before pushing. The Google S
 
 Phone-first, video-less tagging designed for live use on the sideline. Timestamps are
 wall-clock based (first event = `0:00`), possession and score are inferred as you tap, and
-a Push produces the same sheet format as the video annotator.
+a Push produces the same sheet format as the video annotator. Opens on a **game picker**:
+every game you've tagged on this device, with its upload state, plus a New Game tile — so
+a tournament day is several games side by side rather than one session at a time.
 
-**See [FIELD_ANNOTATOR.md](FIELD_ANNOTATOR.md) for the full how-to-use guide** — setup,
-event buttons, Drive / Ball Live tagging, the live Stats sheet, live broadcasting, editing
-mistakes, session restore, and saving.
+**See [FIELD_ANNOTATOR.md](FIELD_ANNOTATOR.md) for the full how-to-use guide** — the game
+picker, setup, event buttons, Drive / Ball Live tagging, the live Stats sheet, live
+broadcasting, editing mistakes, finishing a game, and saving.
 
 ---
 

@@ -9,7 +9,8 @@ like any other.
 
 > Access: requires the **staff** or **admin** password (entered on `index.html`). The
 > password is reused as the API secret and also decides which **access group** your
-> uploads are tagged to.
+> uploads are tagged to. No signal at the pitch? Use **📴 Use offline** on the login
+> screen — see [Offline mode](#offline-mode) below.
 
 It's a PWA — on iOS/Android you can "Add to Home Screen" and run it full-screen.
 
@@ -17,16 +18,60 @@ It's a PWA — on iOS/Android you can "Add to Home Screen" and run it full-scree
 
 ## The 30-second version
 
-1. **⚙ Setup** → type the two team names (+ year / division / competition).
-2. Set **possession** (which team has the ball), then tap **Start** when the whistle goes
+1. Open the annotator → tap **＋ New Game** (or an existing game to carry on with it).
+2. **⚙ Setup** → type the two team names (+ year / division / competition).
+3. Set **possession** (which team has the ball), then tap **Start** when the whistle goes
    for kickoff.
-3. Tap events as they happen: **Try**, **Turnover**, **6th Touch**, **Pen Attack**,
+4. Tap events as they happen: **Try**, **Turnover**, **6th Touch**, **Pen Attack**,
    **Pen Defence**, **6 Again**.
-4. Possession and the scoreboard update themselves. Tap a **Recent** row to fix a mistake.
-5. Tap **Start** again at half time (it becomes **End**), and again for the second half.
-6. When the game is over, tap **End**, then **⬆ Push** to save it to the sheet.
+5. Possession and the scoreboard update themselves. Tap a **Recent** row to fix a mistake.
+6. Tap **Start** again at half time (it becomes **End**), and again for the second half.
+7. At full time tap **End**, then **⏹ Stop Game** and choose **⬆ Finish & Upload**.
 
 Everything below is detail on top of that loop.
+
+---
+
+## The game picker
+
+The annotator opens on a list of every game held on this device — you don't lose one game
+by starting another, so a tournament day is just a stack of tiles.
+
+```
+┌────────────────────────────────────────────┐
+│            ＋ New Game                      │
+├────────────────────────────────────────────┤
+│ GAMES ON THIS DEVICE      🗑 Delete uploaded │
+├────────────────────────────────────────────┤
+│ France vs England                      ✕   │
+│ 2026 · M30 · SENIORS CUP                   │
+│ 3–2 · 47 events · 24:10                    │
+│ 🏁 FINISHED   ⚠ NOT UPLOADED     ↺ Reopen  │
+└────────────────────────────────────────────┘
+```
+
+Each tile carries two badges:
+
+| Status | Meaning |
+|---|---|
+| **● Live** | The clock is running — a half is in progress. |
+| **⏸ Paused** | Started, currently between halves. |
+| **🏁 Finished** | Stopped for good; frozen (see below). |
+| **Not started** | Created, no kickoff tagged yet. |
+
+| Upload | Meaning |
+|---|---|
+| **☁ Synced** | In the sheet, with no changes since. |
+| **⚠ Unsynced changes** | Uploaded once, but you've corrected something since. |
+| **⚠ Not uploaded** | This device is the only copy. |
+
+- Tap a tile to open that game exactly where you left it — clock, possession, teams and all.
+- **✕** deletes a game. If it was never uploaded you're asked twice, because nothing else has it.
+- **🗑 Delete uploaded** clears out games that are safely in the sheet. Anything still
+  waiting to sync is deliberately left alone.
+- **← Games** in a game's header brings you back here; **← Hub** leaves for the main menu.
+
+> Games live in this browser's storage on this phone. Uploading is still the durable save.
 
 ---
 
@@ -34,7 +79,7 @@ Everything below is detail on top of that loop.
 
 ```
 ┌────────────────────────────────────────────────┐
-│ TR  Field Annotator   ←Back ⬆Push ⇆Swap 📊Stats │   header
+│ TR  Field Annotator  ←Games ⬆Push ⇆Swap 📊Stats │   header
 │                              ⚫Live  ⚙Setup       │
 ├────────────────────────────────────────────────┤
 │  France        00:00 (half)        England       │   scoreboard
@@ -49,6 +94,8 @@ Everything below is detail on top of that loop.
 │  GAME EVENTS                                     │
 │  [ Drive + ]      [ Drive − ]                    │
 │  [ Ball Live ] [ To Review ] [ ↩ Undo ]          │
+│                                                  │
+│  [ ⏹ Stop Game ]   (only between halves)         │
 │                                                  │
 │  RECENT                                          │
 │   12:30  Try · France            ›               │
@@ -155,6 +202,40 @@ automatically — e.g. a Pen Defence or a 6 Again is attributed to the *other* t
   recomputed automatically, so a correction near the start of the game ripples through
   cleanly.
 
+### 6. Finishing the game (⏹ Stop Game)
+
+**⏹ Stop Game** appears only **between halves** — i.e. once you've tagged **End**. That's
+deliberate: it means the recorded game always closes on the whistle rather than mid-play.
+
+Tapping it asks one question, which doubles as the upload prompt:
+
+- **⬆ Finish & Upload** — freezes the game and pushes it to the sheet in one go.
+- **Finish without uploading** — freezes it now, upload later.
+- With **no internet**, the upload option is replaced by a warning: *"No internet — this
+  game has not been uploaded. It's saved on this device only. Upload it later from the
+  games list."*
+
+Either way the game is **frozen**:
+
+- Both clocks stop for good and can't be restarted.
+- The event buttons, possession toggle, Start/End, Undo and ⚫ Live all disappear.
+- **Recent** expands to the *whole* event list, because correcting a type is the one thing
+  left to do — tap any row to change it (or add a comment). Game Start / Game End /
+  Ball Live / Drive conversions are hidden here, since changing those would break the
+  frozen clock and the Analyzable flag.
+
+If a game is frozen by mistake, **↺ Reopen** on its picker tile puts it back to paused and
+the clock picks up from real time again. You'll need to upload it again afterwards.
+
+### Don't forget to sync
+
+A finished game that isn't in the sheet shows a standing amber banner and keeps an
+**⬆ Upload now** button, and its tile reads **⚠ Not uploaded** — the warning doesn't go
+away until the push succeeds. If you correct an event type after uploading, the banner
+comes back as **⚠ Unsynced changes**, because that correction is only on the phone until
+you push again. A finished game that's still waiting also retries by itself the moment the
+device comes back online.
+
 ---
 
 ## Live stats (📊 Stats)
@@ -193,8 +274,9 @@ in (so it knows which game it is).
 - **⇆ Swap** — flips which team is shown on the left/right in the scoreboard, possession
   toggle, and stats. **Display only** — it doesn't change any recorded data, just matches
   the on-screen sides to where the teams actually are on the pitch.
-- **← Back** — returns to the hub. If you have unsaved events it confirms first (they're
-  restored when you come back).
+- **← Games** — returns to the game picker. Nothing is lost: the game keeps its clock and
+  events, and tapping its tile picks straight up again. From the picker, **← Hub** leaves
+  for the main menu.
 
 ---
 
@@ -210,6 +292,9 @@ so the game is immediately usable in Game Analysis, Dashboard, and the Viewer.
   admin-only) before continuing.
 - If a tab with the same name already exists, Push reports it. An **⚠ Override** button
   appears for **admins** to replace it; non-admins need admin help.
+- Two saved games with the same teams, competition, year and division would resolve to the
+  same tab and fight over it. Setup warns you when that's the case — give one of them an
+  **ID** to keep them apart.
 
 ### Video later
 There's no video here by design. To attach footage afterwards, an admin uses
@@ -219,16 +304,48 @@ right moments.
 
 ---
 
-## Your session is saved automatically
+## Offline mode
 
-Everything (events, metadata, possession, swap state) is stored in the browser's
-`localStorage` after every tap. If you close the tab, lose signal, or your phone sleeps,
-re-open the page and it offers to **restore the previous session** — so a dropped
-connection mid-game never loses your annotations. **🗑 Clear all data** in Setup wipes the
-saved session (double-confirmed; irreversible).
+Passwords are checked against the server, so with no connection there's nothing to check
+against. **📴 Use offline** on the login screen exists for that: it opens a local-only mode
+where the Field Annotator is the *only* page available, because it's the only one that
+works entirely on the device.
+
+In offline mode:
+
+- Tagging, the clock, live stats, editing and Stop Game all behave exactly as normal.
+- **⬆ Push** and **⚫ Live** are greyed out — there's no account to upload with.
+- **⏹ Stop Game** offers only *Finish game*, with a note that it hasn't been uploaded.
+- Setup shows *"Offline mode — this game stays on the device. It will be tagged to
+  whichever account uploads it later."*
+
+### Uploading afterwards
+
+Games tagged offline carry **no identity**, so they're attributed to whoever is signed in
+when they're finally pushed:
+
+1. Tag the game(s) offline and finish them. They sit in the picker marked **⚠ Not uploaded**.
+2. When you have signal, go to the hub and **log in** normally. (Logging in automatically
+   leaves offline mode; your games are untouched.)
+3. Open the Field Annotator, tap the game, and hit **⬆ Sync** — it uploads under your
+   account and is tagged to your group, exactly as if you'd been logged in all along.
+
+> Nothing expires and nothing is lost in the meantime — but the games only exist on that
+> one phone until you do step 3.
+
+---
+
+## Your games are saved automatically
+
+Everything (events, metadata, possession, swap state) is written to the browser's
+`localStorage` after every tap, under its own key per game. If you close the tab, lose
+signal, or your phone sleeps, just re-open the annotator and tap the game in the picker —
+it resumes exactly where it was, so a dropped connection mid-game never loses your
+annotations. Delete a game with the **✕** on its
+picker tile (double-confirmed when it hasn't been uploaded; irreversible).
 
 > Tip: pushing to the sheet is the durable save. `localStorage` is per-device and
-> per-browser — don't switch phones mid-game expecting the session to follow you.
+> per-browser — don't switch phones mid-game expecting the games to follow you.
 
 ---
 

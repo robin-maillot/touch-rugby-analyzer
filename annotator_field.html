@@ -421,11 +421,255 @@
     .edit-btn-save { background: var(--accent); color: #fff; border-color: var(--accent); }
     .edit-btn-save:active { filter: brightness(0.88); background: var(--accent); }
     .recent-comment { flex-shrink: 0; font-size: 0.8rem; line-height: 1; }
+
+    /* ── Game picker ────────────────────────────────────────────── */
+    /* Opaque full-screen layer over the annotator, so switching games is a
+       show/hide rather than a navigation (keeps all state in one page). */
+    #pickerScreen {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 150;
+      background: var(--bg);
+      overflow-y: auto;
+      flex-direction: column;
+    }
+    #pickerScreen.open { display: flex; }
+    .picker-main { padding: 14px 12px calc(24px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 10px; }
+    .picker-bar { display: flex; align-items: center; gap: 8px; }
+    .picker-bar .section-label { margin-bottom: 0; }
+    .picker-bar-actions { margin-left: auto; display: flex; gap: 6px; }
+
+    .new-game-btn {
+      width: 100%;
+      padding: 16px;
+      border-radius: 12px;
+      border: 2px dashed var(--accent);
+      background: rgba(59,130,246,0.10);
+      color: var(--accent);
+      font-size: 0.95rem;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .new-game-btn:active { filter: brightness(0.88); }
+
+    .game-tile {
+      position: relative;
+      display: block;
+      width: 100%;
+      text-align: left;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 42px 12px 14px;
+      color: var(--text);
+      font-family: inherit;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .game-tile:active { background: var(--surface-2); }
+    .game-tile.finished { opacity: 0.85; }
+    .tile-title { font-size: 0.95rem; font-weight: 600; }
+    .tile-title.untitled { color: var(--text-muted); font-style: italic; font-weight: 500; }
+    .tile-sub   { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 2px; }
+    .tile-line  { font-size: 0.78rem; color: var(--text-muted); margin-top: 6px; font-variant-numeric: tabular-nums; }
+    .tile-score { color: var(--text); font-weight: 700; }
+    .tile-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .badge {
+      font-size: 0.66rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 3px 7px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+    .badge-running  { color: var(--red);   border-color: var(--red);   background: rgba(239,68,68,0.10); }
+    .badge-paused   { color: var(--text-muted); border-color: var(--border); background: var(--surface-2); }
+    .badge-finished { color: var(--accent); border-color: var(--accent); background: rgba(59,130,246,0.12); }
+    .badge-new      { color: var(--text-muted); border-color: var(--border); background: var(--surface-2); }
+    .badge-synced   { color: var(--green); border-color: var(--green); background: rgba(34,197,94,0.10); }
+    .badge-unsynced { color: var(--orange); border-color: var(--orange); background: rgba(249,115,22,0.10); }
+    .tile-dot {
+      display: inline-block;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--red);
+      margin-right: 4px;
+      animation: pulse 1.4s ease-in-out infinite;
+      vertical-align: middle;
+    }
+
+    /* Per-tile delete. Sized to a comfortable tap target but visually light so
+       it doesn't compete with the tile itself. */
+    .tile-x {
+      position: absolute;
+      top: 6px; right: 6px;
+      width: 32px; height: 32px;
+      display: flex; align-items: center; justify-content: center;
+      background: none;
+      border: none;
+      border-radius: 8px;
+      color: var(--text-muted);
+      font-size: 1.05rem;
+      line-height: 1;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .tile-x:active { background: var(--surface-2); color: var(--red); }
+    .tile-reopen {
+      position: absolute;
+      bottom: 10px; right: 10px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-muted);
+      font-size: 0.7rem;
+      font-family: inherit;
+      padding: 5px 9px;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .tile-reopen:active { background: var(--border); color: var(--text); }
+    .picker-empty { color: var(--text-muted); font-size: 0.85rem; padding: 18px 4px; text-align: center; line-height: 1.5; }
+
+    /* ── Sync warning banner ────────────────────────────────────── */
+    #syncBanner {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      background: rgba(249,115,22,0.12);
+      border-bottom: 1px solid var(--orange);
+      color: #fdba74;
+      font-size: 0.78rem;
+      line-height: 1.35;
+      padding: 9px 14px;
+      flex-shrink: 0;
+    }
+    #syncBanner.open { display: flex; }
+    #syncBanner strong { color: var(--orange); }
+    #syncBanner button {
+      margin-left: auto;
+      flex-shrink: 0;
+      background: var(--orange);
+      color: #000;
+      border: none;
+      border-radius: 6px;
+      padding: 7px 11px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    #syncBanner button:disabled { opacity: 0.6; }
+
+    /* ── Stop game ──────────────────────────────────────────────── */
+    #stopGameBtn {
+      display: none;
+      width: 100%;
+      padding: 15px;
+      border-radius: 10px;
+      border: 2px solid var(--red);
+      background: rgba(239,68,68,0.10);
+      color: var(--red);
+      font-size: 0.92rem;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #stopGameBtn:active { filter: brightness(0.85); transform: scale(0.99); }
+
+    /* Offline mode: nothing can reach the server, so the upload controls are
+       greyed rather than left looking tappable. */
+    body.offline-mode .btn-hdr-push:disabled,
+    body.offline-mode .btn-live:disabled {
+      background: var(--surface-2);
+      border-color: var(--border);
+      color: var(--text-muted);
+      opacity: 0.7;
+    }
+
+    /* Finished games are frozen: everything that would add or remove an event
+       goes away, leaving only type corrections via the Recent list. */
+    body.game-finished .poss-toggle,
+    body.game-finished #gameEventsSection,
+    body.game-finished #liveBtn,
+    body.game-finished .edit-adv { display: none !important; }
+
+    #finishedBanner {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 11px 14px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+    body.game-finished #finishedBanner { display: flex; }
+
+    #stopOverlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      z-index: 200;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    #stopOverlay.open { display: flex; }
+    #stopCard {
+      background: var(--surface);
+      border-radius: 20px 20px 0 0;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    @media (min-width: 600px) {
+      #stopOverlay { align-items: center; padding: 24px; }
+      #stopCard { border-radius: 16px; max-width: 460px; }
+    }
+    .stop-title { font-size: 1.05rem; font-weight: 700; padding: 18px 20px 6px; }
+    .stop-body  { font-size: 0.84rem; color: var(--text-muted); line-height: 1.45; padding: 0 20px 14px; }
+    .stop-warn {
+      margin: 0 16px 14px;
+      background: rgba(249,115,22,0.12);
+      border: 1px solid var(--orange);
+      border-radius: 10px;
+      padding: 11px 13px;
+      font-size: 0.8rem;
+      line-height: 1.4;
+      color: #fdba74;
+    }
+    .stop-warn strong { color: var(--orange); }
+    .stop-actions { display: flex; flex-direction: column; gap: 8px; padding: 0 16px 16px; }
+    .stop-actions button {
+      padding: 14px;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text-muted);
+    }
+    .stop-actions .stop-primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
+    .stop-actions .stop-danger  { background: var(--surface-2); border-color: var(--red); color: var(--red); font-weight: 700; }
+    .stop-actions button:active { filter: brightness(0.88); }
   </style>
 <script src="js/config.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/events.js"></script>
 <script src="js/possession.js"></script>
+<script src="js/field_games.js"></script>
 </head>
 <body>
 
@@ -433,7 +677,7 @@
   <tr-logo compact></tr-logo>
   <h1>Field Annotator</h1>
   <div class="header-actions">
-    <a href="index.html" class="btn-icon" onclick="return confirmLeave()">← Back</a>
+    <button class="btn-icon" onclick="showPicker()">← Games</button>
     <button class="btn-icon btn-hdr-push" id="pushBtn"     onclick="pushToSheet()">⬆ Push</button>
     <button class="btn-icon btn-hdr-swap" id="swapBtn"     onclick="toggleSwap()">⇆ Swap</button>
     <button class="btn-icon btn-hdr-override" id="overrideBtn" style="display:none" onclick="pushToSheet(true)">⚠ Override</button>
@@ -445,6 +689,8 @@
     <button class="btn-icon"              onclick="toggleSettings()" id="settingsBtn">⚙ Setup</button>
   </div>
 </header>
+
+<div id="syncBanner"></div>
 
 <div id="settingsPanel" class="open">
   <div>
@@ -485,11 +731,8 @@
     </div>
   </div>
   <div id="sheetPreview">fill metadata to generate tab name</div>
+  <div id="sheetClashWarning" style="display:none;font-size:0.72rem;color:var(--orange);padding:2px 0"></div>
   <div id="groupInfo" style="font-size:0.72rem;padding:2px 0"></div>
-  <div>
-    <div class="settings-label">Saved Session</div>
-    <button class="btn-icon" onclick="clearSession()" style="background:#7f1d1d;color:#fff;border-color:#7f1d1d">🗑 Clear all data</button>
-  </div>
 </div>
 
 <div id="scoreboard">
@@ -529,7 +772,7 @@
     </div>
   </div>
 
-  <div>
+  <div id="gameEventsSection">
     <div class="section-label gated-label">Game Events</div>
     <div class="event-grid two-col gated-grid" style="margin-bottom: 8px">
       <button class="evt-btn btn-try1" id="driveGoodBtn"   onclick="tagGameEvent('Drive - Good')">Drive +</button>
@@ -542,12 +785,54 @@
     </div>
   </div>
 
+  <button id="stopGameBtn" onclick="openStopDialog()">⏹ Stop Game</button>
+
+  <div id="finishedBanner">
+    <span style="font-size:1rem">🏁</span>
+    <span><strong style="color:var(--text)">Game finished.</strong> The clock is stopped — tap any event below to correct its type.</span>
+  </div>
+
   <div>
-    <div class="section-label">Recent</div>
+    <div class="section-label" id="recentLabel">Recent</div>
     <div id="recentList"><div style="color:var(--text-muted);font-size:0.82rem;padding:8px 0">No events yet</div></div>
   </div>
 
 </main>
+
+<!-- Game picker — the landing view; every game lives on this device until pushed -->
+<div id="pickerScreen">
+  <header>
+    <tr-logo compact></tr-logo>
+    <h1>Field Annotator</h1>
+    <div class="header-actions">
+      <a href="index.html" class="btn-icon">← Hub</a>
+    </div>
+  </header>
+  <div class="picker-main">
+    <button class="new-game-btn" onclick="newGame()">＋ New Game</button>
+    <div class="picker-bar">
+      <div class="section-label">Games on this device</div>
+      <div class="picker-bar-actions">
+        <button class="btn-icon" id="deleteSyncedBtn" onclick="deleteSyncedGames()">🗑 Delete uploaded</button>
+      </div>
+    </div>
+    <div id="pickerList"></div>
+  </div>
+</div>
+
+<!-- Stop game confirmation -->
+<div id="stopOverlay" onclick="if(event.target===this)closeStopDialog()">
+  <div id="stopCard">
+    <div class="stats-handle"></div>
+    <div class="stop-title">Finish this game?</div>
+    <div class="stop-body">The clock stops permanently and no new events can be added. You'll still be able to correct event types and comments.</div>
+    <div class="stop-warn" id="stopOfflineWarn" style="display:none">
+      ⚠ <strong id="stopOfflineWarnTitle">No internet — this game has not been uploaded.</strong>
+      <span id="stopOfflineWarnBody">It's saved on this device only. Upload it later from the games list.</span>
+    </div>
+    <div class="stop-actions" id="stopActions"></div>
+  </div>
+</div>
 
 <!-- Edit event modal -->
 <div id="editOverlay" onclick="if(event.target===this)closeEdit()">
@@ -570,12 +855,12 @@
         <button class="evt-btn btn-turn"    onclick="applyEdit('Turnover','6th Touch')">6th Touch</button>
         <button class="evt-btn btn-pen-def" onclick="applyEdit('Penalty Defence','Other')">Pen Defence</button>
         <button class="evt-btn btn-turn"    style="opacity:0.65" onclick="applyEdit('Turnover','6 Again')">6 Again</button>
-        <button class="evt-btn btn-game"    onclick="applyEdit('Game Event','Ball Live')">Ball Live</button>
+        <button class="evt-btn btn-game     edit-adv" onclick="applyEdit('Game Event','Ball Live')">Ball Live</button>
         <button class="evt-btn btn-review"  onclick="applyEdit('To Review','To Review')">To Review</button>
-        <button class="evt-btn btn-try1"    onclick="applyEdit('Game Event','Drive - Good')">Drive +</button>
-        <button class="evt-btn btn-pen-atk" onclick="applyEdit('Game Event','Drive - Bad')">Drive −</button>
-        <button class="evt-btn btn-game"    onclick="applyEdit('Game Event','Game Start')">Game Start</button>
-        <button class="evt-btn btn-game"    onclick="applyEdit('Game Event','Game End')">Game End</button>
+        <button class="evt-btn btn-try1     edit-adv" onclick="applyEdit('Game Event','Drive - Good')">Drive +</button>
+        <button class="evt-btn btn-pen-atk  edit-adv" onclick="applyEdit('Game Event','Drive - Bad')">Drive −</button>
+        <button class="evt-btn btn-game     edit-adv" onclick="applyEdit('Game Event','Game Start')">Game Start</button>
+        <button class="evt-btn btn-game     edit-adv" onclick="applyEdit('Game Event','Game End')">Game End</button>
       </div>
     </div>
     <div class="edit-footer">
@@ -607,15 +892,45 @@
 </div>
 
 <script>
-TR.auth('staff');
+// Everything this page does lives on the device until a push, so it's the one
+// page offline mode can open without an account.
+TR.auth('staff', { offline: true });
+const OFFLINE = TR.isOfflineMode();
 
 window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('metaYear').value = String(new Date().getFullYear());
   document.getElementById('clickDelayInput').value = String(clickDelay);
-  maybeRestoreSession();
+  TR.FieldGames.migrateLegacy();  // fold a pre-multi-game session into the store
+  applyOfflineMode();
   updateGroupInfo();       // show cached group immediately…
-  refreshGroupFromServer(); // …then confirm/refresh from the authoritative source
-  updateUI();
+  if (!OFFLINE) refreshGroupFromServer(); // …then confirm from the authoritative source
+  showPicker();
+});
+
+// In offline mode there's no secret to push with, so every control that talks to
+// the server is disabled rather than left to fail. The games themselves are
+// unaffected — they're stored on the device and carry no identity, so they're
+// attributed to whoever is logged in when they're eventually uploaded.
+function applyOfflineMode() {
+  if (!OFFLINE) return;
+  document.body.classList.add('offline-mode');
+  [['pushBtn', 'Log in to upload this game'], ['liveBtn', 'Live broadcasting needs a connection']]
+    .forEach(([id, why]) => {
+      const b = document.getElementById(id);
+      b.disabled = true;
+      b.title = why;
+    });
+}
+
+// The phone's back gesture should step out of a game to the picker rather than
+// leaving the app entirely.
+window.addEventListener('popstate', () => { if (activeGame) showPicker(); });
+
+// A game finished without a connection syncs itself as soon as one appears.
+// Offline mode is excluded: there's no account to attribute the upload to.
+window.addEventListener('online', () => {
+  if (OFFLINE) return;
+  if (activeGame && activeGame.status === 'finished' && TR.FieldGames.isDirty(activeGame)) pushToSheet();
 });
 
 // Re-fetch role/group for the current secret and persist it, so the group
@@ -642,7 +957,10 @@ function updateGroupInfo() {
   if (!el) return;
   const role  = sessionStorage.getItem('role') || TR.role();
   const group = TR.userGroup();
-  if (role === 'admin') {
+  if (OFFLINE) {
+    el.innerHTML = '<span style="color:var(--orange)">📴 Offline mode — this game stays on the device. ' +
+      'It will be tagged to whichever account uploads it later.</span>';
+  } else if (role === 'admin') {
     el.innerHTML = '<span style="color:var(--text-muted)">Uploading as admin — set visibility in Backfill (no group auto-tagged).</span>';
   } else if (group) {
     el.innerHTML = `<span style="color:var(--text-muted)">Uploads tagged to group:</span> <strong style="color:var(--green)">${group}</strong>`;
@@ -652,6 +970,11 @@ function updateGroupInfo() {
 }
 
 // ── State ──────────────────────────────────────────────────────
+// The game record currently open in the annotator (null while the picker is
+// showing). The working variables below mirror its fields; saveSession() writes
+// them back. See js/field_games.js for the store.
+let activeGame   = null;
+let loading      = false;   // suppresses saves while a game is being loaded
 let annotations  = [];
 let possession   = 'Team 1';
 let wallStart    = null;
@@ -669,93 +992,201 @@ function setClickDelay(v) {
   localStorage.setItem('fieldClickDelay', String(n));
 }
 
-// ── Session persistence ───────────────────────────────────────
-const SESSION_KEY = 'fieldAnnotatorSession';
+// ── Game persistence ──────────────────────────────────────────
+const $ = id => document.getElementById(id);
 
-function saveSession() {
-  try {
-    const state = {
-      annotations,
-      possession,
-      wallStart,
-      teamsSwapped,
-      creatorToken,
-      meta: {
-        team1:       document.getElementById('metaTeam1').value,
-        team2:       document.getElementById('metaTeam2').value,
-        year:        document.getElementById('metaYear').value,
-        division:    document.getElementById('metaDivision').value,
-        competition: document.getElementById('metaCompetition').value,
-        id:          document.getElementById('metaId').value,
-        youtubelink: document.getElementById('metaYoutube').value,
-      },
-    };
-    localStorage.setItem(SESSION_KEY, JSON.stringify(state));
-  } catch (e) { /* quota or disabled — ignore */ }
+function readMetaFields() {
+  return {
+    team1:       $('metaTeam1').value,
+    team2:       $('metaTeam2').value,
+    year:        $('metaYear').value,
+    division:    $('metaDivision').value,
+    competition: $('metaCompetition').value,
+    id:          $('metaId').value,
+    youtubelink: $('metaYoutube').value,
+  };
 }
 
-function clearSavedSession() {
-  try { localStorage.removeItem(SESSION_KEY); } catch (e) {}
+// Persist the working state back onto the active game record. opts.touch:false
+// records the write without counting it as an edit — used for display-only
+// changes (the swap toggle) that shouldn't mark a synced game as out of date.
+function saveSession(opts) {
+  if (loading || !activeGame) return;
+  activeGame.annotations  = annotations;
+  activeGame.possession   = possession;
+  activeGame.wallStart    = wallStart;
+  activeGame.teamsSwapped = teamsSwapped;
+  activeGame.creatorToken = creatorToken;
+  activeGame.meta         = readMetaFields();
+  TR.FieldGames.save(activeGame, opts);
+  updateSyncUI();
 }
 
-function maybeRestoreSession() {
-  let saved;
-  try {
-    const raw = localStorage.getItem(SESSION_KEY);
-    if (!raw) return;
-    saved = JSON.parse(raw);
-  } catch (e) { return; }
-  if (!saved || !Array.isArray(saved.annotations) || !saved.annotations.length) return;
+function isFinished() { return !!activeGame && activeGame.status === 'finished'; }
 
-  const m = saved.meta || {};
-  const label = `${m.team1 || 'Team 1'} vs ${m.team2 || 'Team 2'} — ${saved.annotations.length} event${saved.annotations.length === 1 ? '' : 's'}`;
-  if (!confirm(`Restore previous session?\n\n${label}`)) {
-    clearSavedSession();
+// ── Game picker ───────────────────────────────────────────────
+function showPicker() {
+  if (activeGame) {
+    saveSession({ touch: false });
+    // Don't leave a broadcast running for a game we're no longer tagging.
+    if (liveMode) stopLive();
+  }
+  closeStats();
+  closeEdit();
+  closeStopDialog();
+  activeGame = null;
+  document.body.classList.remove('game-finished', 'game-running');
+  $('syncBanner').classList.remove('open');
+  renderPicker();
+  $('pickerScreen').classList.add('open');
+}
+
+function hidePicker() { $('pickerScreen').classList.remove('open'); }
+
+function relTime(ts) {
+  if (!ts) return '';
+  const s = Math.max(0, (Date.now() - ts) / 1000);
+  if (s < 90)    return 'just now';
+  if (s < 5400)  return Math.round(s / 60) + 'm ago';
+  if (s < 86400) return Math.round(s / 3600) + 'h ago';
+  return Math.round(s / 86400) + 'd ago';
+}
+
+const escapeHtml = s => String(s).replace(/[&<>"']/g, c =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function renderPicker() {
+  const games = TR.FieldGames.list();
+  const list  = $('pickerList');
+
+  $('deleteSyncedBtn').style.display = games.some(TR.FieldGames.isSynced) ? '' : 'none';
+
+  if (!games.length) {
+    list.innerHTML = '<div class="picker-empty">No games on this device yet.<br>Tap <strong>＋ New Game</strong> to start tagging.</div>';
     return;
   }
 
-  annotations = saved.annotations;
-  possession  = saved.possession || 'Team 1';
-  wallStart   = saved.wallStart || null;
-  creatorToken = saved.creatorToken || null;
-  if (m.team1       != null) document.getElementById('metaTeam1').value       = m.team1;
-  if (m.team2       != null) document.getElementById('metaTeam2').value       = m.team2;
-  if (m.year        != null) document.getElementById('metaYear').value        = m.year;
-  if (m.division    != null) document.getElementById('metaDivision').value    = m.division;
-  if (m.competition != null) document.getElementById('metaCompetition').value = m.competition;
-  if (m.id          != null) document.getElementById('metaId').value          = m.id;
-  if (m.youtubelink != null) document.getElementById('metaYoutube').value      = m.youtubelink;
-  document.getElementById('possBtn1').textContent = (m.team1 || '').trim() || 'Team 1';
-  document.getElementById('possBtn2').textContent = (m.team2 || '').trim() || 'Team 2';
-  setPossession(possession);
-  if (saved.teamsSwapped) toggleSwap();
-  updateSheetPreview();
+  const STATUS = {
+    running:  '<span class="badge badge-running"><span class="tile-dot"></span>Live</span>',
+    paused:   '<span class="badge badge-paused">⏸ Paused</span>',
+    finished: '<span class="badge badge-finished">🏁 Finished</span>',
+    new:      '<span class="badge badge-new">Not started</span>',
+  };
+
+  list.innerHTML = games.map(g => {
+    const s     = TR.FieldGames.summarize(g);
+    const title = s.titled ? `${escapeHtml(s.team1)} vs ${escapeHtml(s.team2)}` : 'Untitled game';
+    // An empty game has nothing to upload, so flagging it as un-uploaded would
+    // just be noise on a tile the annotator hasn't started yet.
+    const sync  = !s.events  ? ''
+                : s.synced   ? `<span class="badge badge-synced">☁ Synced ${relTime(g.sync.pushedAt)}</span>`
+                : s.uploaded ? '<span class="badge badge-unsynced">⚠ Unsynced changes</span>'
+                             : '<span class="badge badge-unsynced">⚠ Not uploaded</span>';
+    const meta  = [
+      s.events ? `<span class="tile-score">${s.score1}–${s.score2}</span>` : null,
+      `${s.events} event${s.events === 1 ? '' : 's'}`,
+      s.duration >= 1 ? fmtClock(s.duration) : null,
+    ].filter(Boolean);
+    return `<div style="position:relative;margin-bottom:8px">
+      <button class="game-tile ${s.status === 'finished' ? 'finished' : ''}" onclick="openGame('${g.id}')">
+        <div class="tile-title ${s.titled ? '' : 'untitled'}">${title}</div>
+        ${s.subtitle ? `<div class="tile-sub">${escapeHtml(s.subtitle)}</div>` : ''}
+        <div class="tile-line">${meta.join(' · ')}</div>
+        <div class="tile-badges">${STATUS[s.status]}${sync}</div>
+      </button>
+      <button class="tile-x" title="Delete this game" onclick="deleteGame('${g.id}')">✕</button>
+      ${s.status === 'finished' ? `<button class="tile-reopen" onclick="reopenGame('${g.id}')">↺ Reopen</button>` : ''}
+    </div>`;
+  }).join('');
 }
 
-function clearSession() {
-  const n = annotations.length;
-  if (!confirm(`Delete all session data?\n\n${n} event${n === 1 ? '' : 's'} and metadata will be erased. This cannot be undone.`)) return;
-  if (!confirm('Are you sure? This is permanent.')) return;
-  annotations  = [];
-  possession   = 'Team 1';
-  wallStart    = null;
-  creatorToken = null;
-  if (teamsSwapped) toggleSwap();
-  ['metaTeam1','metaTeam2','metaCompetition','metaId','metaYoutube'].forEach(id => document.getElementById(id).value = '');
-  document.getElementById('metaYear').value = String(new Date().getFullYear());
-  document.getElementById('metaDivision').value = '';
-  document.getElementById('possBtn1').textContent = 'Team 1';
-  document.getElementById('possBtn2').textContent = 'Team 2';
-  setPossession('Team 1');
-  clearSavedSession();
+function newGame() {
+  const rec = TR.FieldGames.create({ year: String(new Date().getFullYear()) });
+  openGame(rec.id, true);
+}
+
+function openGame(id, isNew) {
+  const rec = TR.FieldGames.get(id);
+  if (!rec) { renderPicker(); return; }
+  loadGame(rec, isNew);
+  hidePicker();
+  // Give the phone's back gesture something to pop back to the picker with.
+  try { history.pushState({ game: id }, '', location.pathname + location.search); } catch (e) {}
+}
+
+function loadGame(rec, isNew) {
+  loading    = true;
+  activeGame = rec;
+
+  annotations  = rec.annotations;
+  possession   = rec.possession;
+  wallStart    = rec.wallStart;
+  creatorToken = rec.creatorToken;
+
+  const m = rec.meta;
+  $('metaTeam1').value       = m.team1;
+  $('metaTeam2').value       = m.team2;
+  $('metaYear').value        = m.year || String(new Date().getFullYear());
+  $('metaDivision').value    = m.division;
+  $('metaCompetition').value = m.competition;
+  $('metaId').value          = m.id;
+  $('metaYoutube').value     = m.youtubelink;
+  $('possBtn1').textContent  = m.team1.trim() || 'Team 1';
+  $('possBtn2').textContent  = m.team2.trim() || 'Team 2';
+
+  setPossession(possession);
+  if (teamsSwapped !== !!rec.teamsSwapped) toggleSwap();
+  $('overrideBtn').style.display = 'none';
+
+  loading = false;
+  // Open Setup for a brand-new game (teams still need filling in); leave it shut
+  // when resuming so the tagging buttons are immediately to hand.
+  $('settingsPanel').classList.toggle('open', !!isNew);
   updateSheetPreview();
   updateUI();
+  updateSyncUI();
 }
 
-function confirmLeave() {
-  if (!annotations.length) return true;
-  const n = annotations.length;
-  return confirm(`You have ${n} event${n === 1 ? '' : 's'} saved. They'll be restored when you return. Leave?`);
+// Deleting is the only way to lose annotations, so an un-uploaded game asks
+// twice and says plainly that this device is the only copy.
+function confirmDelete(rec) {
+  const s     = TR.FieldGames.summarize(rec);
+  const label = s.titled ? `${s.team1} vs ${s.team2}` : 'Untitled game';
+  if (TR.FieldGames.isSynced(rec)) {
+    return confirm(`Delete "${label}"?\n\nIt's already uploaded to the sheet, so only the copy on this device is removed.`);
+  }
+  const what = TR.FieldGames.isUploaded(rec)
+    ? `"${label}" has changes that were never uploaded.`
+    : `"${label}" (${s.events} event${s.events === 1 ? '' : 's'}) has never been uploaded.`;
+  return confirm(`${what}\n\nThis device is the only copy — deleting it cannot be undone.\n\nDelete anyway?`)
+      && confirm('Are you sure? This is permanent.');
+}
+
+function deleteGame(id) {
+  const rec = TR.FieldGames.get(id);
+  if (!rec || !confirmDelete(rec)) return;
+  TR.FieldGames.remove(id);
+  renderPicker();
+}
+
+// Bulk cleanup — deliberately limited to games that are uploaded with no edits
+// since, so it can never destroy the only copy of anything.
+function deleteSyncedGames() {
+  const n = TR.FieldGames.list().filter(TR.FieldGames.isSynced).length;
+  if (!n) { alert('No uploaded games to delete.'); return; }
+  if (!confirm(`Delete ${n} uploaded game${n === 1 ? '' : 's'} from this device?\n\nThey're saved in the sheet, so nothing is lost. Games that still need uploading are kept.`)) return;
+  TR.FieldGames.removeSynced();
+  renderPicker();
+}
+
+function reopenGame(id) {
+  const rec = TR.FieldGames.get(id);
+  if (!rec) return;
+  if (!confirm('Reopen this game?\n\nThe clock restarts from real time and you can tag events again. You\'ll need to upload it again afterwards.')) return;
+  rec.status     = 'active';
+  rec.finishedAt = null;
+  TR.FieldGames.save(rec);
+  openGame(id);
 }
 
 // ── Time helpers ───────────────────────────────────────────────
@@ -808,7 +1239,8 @@ function toggleSwap() {
   h2.style.order = teamsSwapped ? '-1' : '1';
 
   document.getElementById('swapBtn').classList.toggle('active', teamsSwapped);
-  saveSession();
+  // Display-only: persist it, but don't let it mark an uploaded game as changed.
+  saveSession({ touch: false });
 }
 
 // ── Possession ─────────────────────────────────────────────────
@@ -820,7 +1252,10 @@ function setPossession(team) {
 }
 
 // ── Tagging ────────────────────────────────────────────────────
+// Every event-adding path funnels through tag() / tagToReview(), so freezing a
+// finished game is enforced in one place each.
 function tag(type, name, possessionOwner) {
+  if (isFinished()) return;
   let t = nowSeconds();
   if (annotations.length > 0) t = Math.max(0, t - clickDelay);
   const actionOwner = TR.inferActionOwner(possessionOwner, type, name);
@@ -871,6 +1306,7 @@ function tagGameEventToggle() {
 }
 
 function tagToReview() {
+  if (isFinished()) return;
   let t = nowSeconds();
   if (annotations.length > 0) t = Math.max(0, t - clickDelay);
   annotations.push({ id: Date.now() + Math.random(), type: 'To Review', name: 'To Review', possessionOwner: possession, actionOwner: possession, comment: '?', time: t, timeStr: TR.fmt(t) });
@@ -880,7 +1316,7 @@ function tagToReview() {
 }
 
 function undoLast() {
-  if (!annotations.length) return;
+  if (isFinished() || !annotations.length) return;
   const removed = annotations.pop();
   setPossession(removed.possessionOwner);
   updateUI();
@@ -969,15 +1405,25 @@ function updateUI() {
   const lastEnd      = gameEnds[gameEnds.length - 1];
   const lastTime     = annotations.length ? annotations[annotations.length - 1].time : 0;
   const isOnBreak    = !!(lastStart && lastEnd && lastEnd.time > lastStart.time);
-  // On a break the half clock resets to 0 and counts the break from the whistle;
-  // otherwise it tracks the current half from its kick-off.
-  const halfRef      = isOnBreak ? lastEnd : lastStart;
-  const halfElapsed  = halfRef    ? Math.max(0, lastTime - halfRef.time)    : 0;
-  const totalElapsed = firstStart ? Math.max(0, lastTime - firstStart.time) : 0;
-  document.getElementById('halfClock').textContent  = fmtClock(halfElapsed);
-  // Total line doubles as the phase indicator now the period label is gone.
-  const phase = !gameStarts.length ? '' : isOnBreak ? 'Break · ' : ordinal(gameStarts.length) + ' · ';
-  document.getElementById('totalClock').textContent = phase + 'Total ' + fmtClock(totalElapsed);
+  const finished     = isFinished();
+  if (finished) {
+    // Frozen: show what the final half and the whole game actually lasted,
+    // rather than the break-from-the-whistle reading the live clock would give.
+    const halfDur  = (lastEnd && lastStart)  ? Math.max(0, lastEnd.time - lastStart.time)  : 0;
+    const totalDur = (lastEnd && firstStart) ? Math.max(0, lastEnd.time - firstStart.time) : 0;
+    document.getElementById('halfClock').textContent  = fmtClock(halfDur);
+    document.getElementById('totalClock').textContent = 'Full time · Total ' + fmtClock(totalDur);
+  } else {
+    // On a break the half clock resets to 0 and counts the break from the whistle;
+    // otherwise it tracks the current half from its kick-off.
+    const halfRef      = isOnBreak ? lastEnd : lastStart;
+    const halfElapsed  = halfRef    ? Math.max(0, lastTime - halfRef.time)    : 0;
+    const totalElapsed = firstStart ? Math.max(0, lastTime - firstStart.time) : 0;
+    document.getElementById('halfClock').textContent  = fmtClock(halfElapsed);
+    // Total line doubles as the phase indicator now the period label is gone.
+    const phase = !gameStarts.length ? '' : isOnBreak ? 'Break · ' : ordinal(gameStarts.length) + ' · ';
+    document.getElementById('totalClock').textContent = phase + 'Total ' + fmtClock(totalElapsed);
+  }
 
   const COLORS = { 'Try': '#22c55e', 'Turnover': '#f97316', 'Penalty Attack': '#ef4444', 'Penalty Defence': '#b91c1c', 'Game Event': '#3b82f6', 'To Review': '#7c3aed' };
   const el = document.getElementById('recentList');
@@ -987,7 +1433,17 @@ function updateUI() {
   const gameBtn = document.getElementById('gameEventBtn');
   gameBtn.textContent = gameRunning ? 'End' : 'Start';
   gameBtn.classList.toggle('running', gameRunning);
-  document.body.classList.toggle('game-running', gameRunning);
+  document.body.classList.toggle('game-running', gameRunning && !finished);
+  document.body.classList.toggle('game-finished', finished);
+
+  // Stop is only offered on a paused game — you have to tag Game End first, so
+  // the recorded game always closes with the whistle rather than mid-play.
+  const paused = !finished && !!lastGameEvent && lastGameEvent.name === 'Game End';
+  document.getElementById('stopGameBtn').style.display = paused ? 'block' : 'none';
+
+  // A frozen game shows every event, since correcting a type is the only thing
+  // left to do and the last five wouldn't be enough to reach the mistake.
+  document.getElementById('recentLabel').textContent = finished ? 'All events — tap to correct' : 'Recent';
 
   // Lock Drive +/- once a drive is tagged this possession (avoids double-tagging)
   const driveLocked = driveAlreadyTagged();
@@ -998,7 +1454,8 @@ function updateUI() {
     el.innerHTML = '<div style="color:var(--text-muted);font-size:0.82rem;padding:8px 0">No events yet</div>';
     return;
   }
-  const recent = [...annotations].reverse().slice(0, 5);
+  const ordered = [...annotations].reverse();
+  const recent  = finished ? ordered : ordered.slice(0, 5);
   el.innerHTML = recent.map((a, ri) => {
     const idx     = annotations.length - 1 - ri;
     const color   = COLORS[a.type] || '#888';
@@ -1041,28 +1498,39 @@ function toggleSettings() {
   document.getElementById('settingsPanel').classList.toggle('open');
 }
 
-function metaToSheetName() {
-  const slug = s => s.trim().toLowerCase().replace(/\s+/g, '-');
-  const year  = slug(document.getElementById('metaYear').value);
-  const div   = slug(document.getElementById('metaDivision').value);
-  const comp  = slug(document.getElementById('metaCompetition').value);
-  const t1    = slug(document.getElementById('metaTeam1').value);
-  const t2    = slug(document.getElementById('metaTeam2').value);
-  const id    = slug(document.getElementById('metaId').value);
-  const base  = [year, div, comp, t1, t2].filter(Boolean).join('_');
+// Tab name for an arbitrary game's metadata — used both for the active game and
+// to spot other saved games that would land on the same tab.
+function metaToSheetNameFor(m) {
+  const slug = s => String(s == null ? '' : s).trim().toLowerCase().replace(/\s+/g, '-');
+  const base = [slug(m.year), slug(m.division), slug(m.competition), slug(m.team1), slug(m.team2)]
+    .filter(Boolean).join('_');
+  const id = slug(m.id);
   return id ? `${base}_${id}` : base;
 }
+
+function metaToSheetName() { return metaToSheetNameFor(readMetaFields()); }
 
 function updateSheetPreview() {
   const name = metaToSheetName();
   const el   = document.getElementById('sheetPreview');
   el.textContent = name || 'fill metadata to generate tab name';
   el.style.color = name ? '#3b82f6' : 'var(--text-muted)';
+
+  // Two saved games resolving to the same tab would fight over it on push (the
+  // second one gets "tab exists"). Nudge for an ID before that happens.
+  const warn = document.getElementById('sheetClashWarning');
+  const clashes = (activeGame && name)
+    ? TR.FieldGames.collisions(activeGame, g => metaToSheetNameFor(g.meta), name).length : 0;
+  warn.style.display = clashes ? '' : 'none';
+  warn.textContent = clashes
+    ? `⚠ ${clashes} other saved game${clashes === 1 ? '' : 's'} would use this same tab name — set an ID to keep them apart.`
+    : '';
 }
 
 // ── Clock ticker ───────────────────────────────────────────────
 setInterval(() => {
-  if (!wallStart) return;
+  // A finished game's clocks are frozen by updateUI() and must not tick on.
+  if (!activeGame || isFinished() || !wallStart) return;
   const gameStarts = annotations.filter(a => a.name === 'Game Start');
   if (!gameStarts.length) return;
   const gameEnds  = annotations.filter(a => a.name === 'Game End');
@@ -1081,6 +1549,7 @@ setInterval(() => {
 
 // ── Live mode ──────────────────────────────────────────────────
 function toggleLive() {
+  if (OFFLINE) return;   // broadcasting needs both a connection and an account
   const sheetName = metaToSheetName();
   if (!sheetName) { alert('Fill in team/competition details first.'); return; }
   liveMode = !liveMode;
@@ -1384,6 +1853,81 @@ function refreshStats() {
   document.getElementById('statsBody').innerHTML = html;
 }
 
+// ── Stop game ──────────────────────────────────────────────────
+// Offered only on a paused game (see updateUI). The dialog doubles as the
+// upload prompt so finishing and syncing are one decision, not two.
+function openStopDialog() {
+  if (!activeGame || isFinished()) return;
+  // Offline mode has no account to push with, so it always takes the no-upload
+  // path regardless of whether the device happens to have a connection.
+  const offline = OFFLINE || navigator.onLine === false;
+  document.getElementById('stopOfflineWarn').style.display = offline ? '' : 'none';
+  document.getElementById('stopOfflineWarnTitle').textContent = OFFLINE
+    ? 'Offline mode — this game has not been uploaded.'
+    : 'No internet — this game has not been uploaded.';
+  document.getElementById('stopOfflineWarnBody').textContent = OFFLINE
+    ? "It's saved on this device only. Log in when you have signal and upload it from the games list — it'll be saved under your account."
+    : "It's saved on this device only. Upload it later from the games list.";
+  document.getElementById('stopActions').innerHTML = offline
+    ? `<button class="stop-danger" onclick="confirmStop(false)">Finish game</button>
+       <button onclick="closeStopDialog()">Cancel</button>`
+    : `<button class="stop-primary" onclick="confirmStop(true)">⬆ Finish &amp; Upload</button>
+       <button class="stop-danger" onclick="confirmStop(false)">Finish without uploading</button>
+       <button onclick="closeStopDialog()">Cancel</button>`;
+  document.getElementById('stopOverlay').classList.add('open');
+}
+
+function closeStopDialog() {
+  document.getElementById('stopOverlay').classList.remove('open');
+}
+
+function confirmStop(upload) {
+  if (!activeGame || isFinished()) { closeStopDialog(); return; }
+  closeStopDialog();
+  if (liveMode) stopLive();
+  activeGame.status     = 'finished';
+  activeGame.finishedAt = Date.now();
+  saveSession();
+  updateUI();
+  // The push runs the normal path: if it fails for any reason the game is still
+  // frozen and simply stays flagged as needing a sync.
+  if (upload) pushToSheet();
+}
+
+// ── Sync state surface ─────────────────────────────────────────
+function pushBtnLabel() {
+  if (!isFinished()) return '⬆ Push';
+  return TR.FieldGames.isDirty(activeGame) ? '⬆ Sync' : '✓ Synced';
+}
+
+function updateSyncUI() {
+  const banner = document.getElementById('syncBanner');
+  const push   = document.getElementById('pushBtn');
+  if (!activeGame) { banner.classList.remove('open'); return; }
+
+  const dirty = TR.FieldGames.isDirty(activeGame);
+  // The standing warning is for finished games only — an in-progress game is
+  // expected to be unsaved, and a permanent banner would just become noise.
+  banner.classList.toggle('open', isFinished() && dirty);
+  if (isFinished() && dirty) {
+    // Offline mode can't upload at all, so the banner points at the one action
+    // that helps — signing in — rather than a button that would just fail.
+    banner.innerHTML = OFFLINE
+      ? '<span>📴 <strong>Offline mode</strong> — this game is saved on this device only. Log in to upload it under your account.</span>' +
+        '<button onclick="location.href=\'index.html\'">Log in</button>'
+      : TR.FieldGames.isUploaded(activeGame)
+      ? '<span>⚠ <strong>Unsynced changes</strong> — your latest corrections are only on this device.</span>' +
+        '<button onclick="pushToSheet()">⬆ Sync now</button>'
+      : '<span>⚠ <strong>Not uploaded</strong> — this game is saved on this device only. Don\'t forget to upload it later.</span>' +
+        '<button onclick="pushToSheet()">⬆ Upload now</button>';
+  }
+  // Leave the button alone mid-push — pushToSheet owns its label until it settles.
+  if (!pushing) {
+    push.textContent = OFFLINE ? '🔒 Push' : pushBtnLabel();
+    push.disabled    = OFFLINE || (isFinished() && !dirty);
+  }
+}
+
 // ── Push to sheet ──────────────────────────────────────────────
 // A game is analysable when it has a Game Start and its last event (by time)
 // is a Game End. Used both to set the Analyzable flag and to warn before push.
@@ -1393,7 +1937,14 @@ function isAnalysable() {
   return !!last && last.name === 'Game End';
 }
 
+let pushing = false;
+
 async function pushToSheet(override = false) {
+  if (pushing || !activeGame) return;
+  if (OFFLINE) {
+    alert('You\'re in offline mode, so there\'s no account to upload with.\n\nThis game is safe on this device — log in from the hub and upload it then. It will be saved under whichever account you use.');
+    return;
+  }
   if (!annotations.length) { alert('No events to push.'); return; }
   const sheetName = metaToSheetName();
   if (!sheetName) { alert('Fill in team/competition details first.'); return; }
@@ -1414,8 +1965,13 @@ async function pushToSheet(override = false) {
   }
 
   const btn = override ? document.getElementById('overrideBtn') : document.getElementById('pushBtn');
+  pushing = true;
   btn.disabled = true;
   btn.textContent = '⏳ Pushing…';
+
+  // The revision as it stands now: anything tagged while the request is in
+  // flight must still count as unsynced when this push lands.
+  const pushedRevision = activeGame.revision;
 
   // Mint a stable per-game token on first push so later pushes of this same game
   // (from this device) can overwrite the tab without admin override. Persist it
@@ -1423,7 +1979,9 @@ async function pushToSheet(override = false) {
   if (!creatorToken) {
     creatorToken = (crypto.randomUUID ? crypto.randomUUID()
                     : String(Date.now()) + '-' + Math.random().toString(36).slice(2));
-    saveSession();
+    // touch:false — minting the token isn't an edit, so it mustn't move the
+    // revision this push is about to be recorded against.
+    saveSession({ touch: false });
   }
 
   const rows = annotations.map(a => [a.timeStr, a.possessionOwner, a.type, a.name, '', a.comment, a.actionOwner]);
@@ -1462,10 +2020,12 @@ async function pushToSheet(override = false) {
         } else {
           alert(`Tab "${sheetName}" already exists. You can only override games in your group; otherwise admin access is required.`);
         }
-        btn.disabled = false; btn.textContent = '⬆ Push'; return;
+        pushing = false; btn.disabled = false; btn.textContent = override ? '⚠ Override' : pushBtnLabel();
+        updateSyncUI(); return;
       }
       alert('Error: ' + result.error);
-      btn.disabled = false; btn.textContent = override ? '⚠ Override' : '⬆ Push'; return;
+      pushing = false; btn.disabled = false; btn.textContent = override ? '⚠ Override' : pushBtnLabel();
+      updateSyncUI(); return;
     }
 
     document.getElementById('overrideBtn').style.display = 'none';
@@ -1473,14 +2033,24 @@ async function pushToSheet(override = false) {
     // the client's known group for older backends that don't return it.
     const savedGroup = (result.group != null ? result.group : TR.userGroup());
     btn.textContent = savedGroup ? `✓ ${result.appended} rows → ${savedGroup}` : `✓ ${result.appended} rows`;
-    // Keep the session (and its creatorToken) so the annotator can keep tagging
-    // and push the same game again — the backend will overwrite the tab it owns.
-    // Persist the token the server confirmed it stored, in case it was minted now.
-    saveSession();
-    setTimeout(() => { btn.disabled = false; btn.textContent = override ? '⚠ Override' : '⬆ Push'; }, 2500);
+    // Keep the game (and its creatorToken) so the annotator can keep tagging and
+    // push it again — the backend will overwrite the tab it owns. Recording the
+    // revision we actually sent is what clears the "not uploaded" warning.
+    saveSession({ touch: false });
+    TR.FieldGames.markSynced(activeGame, sheetName, pushedRevision);
+    updateSyncUI();   // clears the warning banner straight away
+    setTimeout(() => {
+      pushing = false;
+      btn.disabled = false;
+      btn.textContent = override ? '⚠ Override' : pushBtnLabel();
+      updateSyncUI();
+    }, 2500);
   } catch (err) {
-    alert('Network error: ' + err.message);
-    btn.disabled = false; btn.textContent = override ? '⚠ Override' : '⬆ Push';
+    // Offline, or the request never landed: the game stays flagged for a later
+    // sync rather than being silently treated as saved.
+    alert('Network error: ' + err.message + '\n\nThis game is still saved on this device — upload it again when you have a connection.');
+    pushing = false; btn.disabled = false; btn.textContent = override ? '⚠ Override' : pushBtnLabel();
+    updateSyncUI();
   }
 }
 </script>
