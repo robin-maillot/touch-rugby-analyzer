@@ -18,6 +18,12 @@ touch_rugby_analyzer/token.json
 .idea/
 *.iml
 
+# macOS
+.DS_Store
+
+# Claude Code local session state, agent config and scratch worktrees
+/.claude/
+
 # Misc
 *.csv
 
