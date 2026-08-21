@@ -213,6 +213,23 @@
     .recent-dot  { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
     .recent-time { font-variant-numeric: tabular-nums; color: var(--text-muted); font-size: 0.75rem; min-width: 52px; }
     .recent-text { flex: 1; }
+    /* Sub-type rides next to the event name rather than replacing it, so a row
+       reads "Turnover ⟨Ball Down⟩" instead of just "Ball Down". */
+    .recent-sub {
+      display: inline-block;
+      vertical-align: middle;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 1px 7px;
+      margin: 0 2px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+    /* Keeps "· Team" together when a long sub-type wraps the row onto two lines. */
+    .recent-team { white-space: nowrap; }
 
 
     /* ── Stats modal v2 ─────────────────────────────────────────── */
@@ -399,6 +416,37 @@
     }
     .recent-item { cursor: pointer; }
     .recent-item:active { background: var(--surface-2); }
+
+    /* edit modal: header row — event name + timestamp, with the sub-type menu
+       pinned to its right so the whole identity of the event is one line. */
+    .edit-head-row { display: flex; align-items: center; gap: 10px; }
+    .edit-subtype-wrap { position: relative; margin-left: auto; flex-shrink: 0; max-width: 55%; }
+    .edit-subtype-wrap::after {
+      content: '▾';
+      position: absolute;
+      right: 9px; top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+    .edit-subtype {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      color: var(--text-muted);
+      padding: 5px 24px 5px 11px;
+      font-size: 0.78rem;
+      font-family: inherit;
+      font-weight: 600;
+      outline: none;
+      cursor: pointer;
+    }
+    .edit-subtype:focus { border-color: var(--accent); }
+    .edit-subtype.set   { color: var(--accent); border-color: var(--accent); }
 
     /* edit modal: comment field + footer buttons */
     .edit-comment {
@@ -840,7 +888,12 @@
     <div class="stats-handle"></div>
     <div style="padding:16px 20px 12px;border-bottom:1px solid var(--border)">
       <div style="font-size:0.7rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Edit Event</div>
-      <div id="editCurrentLabel" style="font-size:1rem;font-weight:600"></div>
+      <div class="edit-head-row">
+        <div id="editCurrentLabel" style="font-size:1rem;font-weight:600"></div>
+        <span class="edit-subtype-wrap" id="editSubtypeWrap">
+          <select id="editSubtype" class="edit-subtype" aria-label="Sub-type" onchange="applySubtype()"></select>
+        </span>
+      </div>
     </div>
     <div style="padding:16px 16px 4px">
       <div style="font-size:0.7rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px">Comment</div>
@@ -1343,7 +1396,8 @@ function replayPossessionFrom(startIndex) {
 function openEdit(index) {
   editingIndex = index;
   const a = annotations[index];
-  document.getElementById('editCurrentLabel').textContent = eventLabel(a) + ' · ' + fmtClock(a.time);
+  document.getElementById('editCurrentLabel').textContent = eventBaseLabel(a) + ' · ' + fmtClock(a.time);
+  renderSubtypeMenu(a);
   // '?' is the placeholder marker To Review events carry — show a blank box so
   // the annotator can type a real note over it.
   document.getElementById('editComment').value = (a.comment && a.comment !== '?') ? a.comment : '';
@@ -1383,11 +1437,54 @@ function applyEdit(type, name) {
   saveSession();
 }
 
+// A plain <select> so phones get the native picker wheel for free. Only the
+// four play types carry a sub-type worth picking — Game Event and To Review
+// spell their detail out in the name itself, and each already has its own
+// button in the grid below.
+function renderSubtypeMenu(a) {
+  const wrap = document.getElementById('editSubtypeWrap');
+  const sel  = document.getElementById('editSubtype');
+  const opts = SUBTYPE_TYPES.includes(a.type) ? (TR.MENU[a.type] || []).slice() : [];
+  // Keep a name the canonical menu doesn't know rather than silently dropping it.
+  if (a.name && opts.length && !opts.includes(a.name)) opts.unshift(a.name);
+  wrap.style.display = opts.length ? '' : 'none';
+  sel.innerHTML = opts.map(o => `<option value="${o}"${o === a.name ? ' selected' : ''}>${o}</option>`).join('');
+  markSubtypeState();
+}
+
+function markSubtypeState() {
+  const sel = document.getElementById('editSubtype');
+  sel.classList.toggle('set', !!sel.value && sel.value !== 'Other');
+}
+
+// Applies straight away rather than waiting on Save, so the pick can't be lost
+// by dismissing the sheet — same as the type buttons. The sheet stays open so a
+// comment can still be added on top.
+function applySubtype() {
+  if (editingIndex === null) return;
+  const a = annotations[editingIndex];
+  a.name = document.getElementById('editSubtype').value;
+  a.actionOwner = TR.inferActionOwner(a.possessionOwner, a.type, a.name);
+  replayPossessionFrom(editingIndex + 1);
+  markSubtypeState();
+  updateUI();
+  saveSession();
+}
+
 // ── UI update ──────────────────────────────────────────────────
 const EVENT_LABELS = { 'Try': 'Try', 'Turnover': 'Turnover', 'Penalty Attack': 'Pen Attack', 'Penalty Defence': 'Pen Defence' };
-function eventLabel(a) {
-  if (a.name !== 'Other') return a.name;
-  return EVENT_LABELS[a.type] || a.type;
+const SUBTYPE_TYPES = ['Try', 'Turnover', 'Penalty Attack', 'Penalty Defence'];
+
+// The play types always show the type, with the sub-type displayed separately;
+// everything else (Game Event, To Review) carries its detail in the name.
+function eventBaseLabel(a) {
+  if (SUBTYPE_TYPES.includes(a.type)) return EVENT_LABELS[a.type] || a.type;
+  return a.name !== 'Other' ? a.name : (EVENT_LABELS[a.type] || a.type);
+}
+
+function eventSubtype(a) {
+  if (!SUBTYPE_TYPES.includes(a.type)) return '';
+  return a.name && a.name !== 'Other' ? a.name : '';
 }
 
 function updateUI() {
@@ -1461,13 +1558,14 @@ function updateUI() {
     const color   = COLORS[a.type] || '#888';
     const team    = a.actionOwner === 'Team 1' ? (document.getElementById('metaTeam1').value.trim() || 'Team 1')
                                                 : (document.getElementById('metaTeam2').value.trim() || 'Team 2');
-    const teamStr = a.type !== 'Game Event' ? ` · ${team}` : '';
+    const teamStr = a.type !== 'Game Event' ? ` <span class="recent-team">· ${team}</span>` : '';
+    const sub = eventSubtype(a);
     const hasComment = a.comment && a.comment.trim() && a.comment !== '?';
     const commentMark = hasComment ? '<span class="recent-comment" title="Has a comment">💬</span>' : '';
     return `<div class="recent-item" onclick="openEdit(${idx})">
       <div class="recent-dot" style="background:${color}"></div>
       <span class="recent-time">${fmtClock(a.time)}</span>
-      <span class="recent-text">${eventLabel(a)}${teamStr}</span>
+      <span class="recent-text">${eventBaseLabel(a)}${sub ? ` <span class="recent-sub">${sub}</span>` : ''}${teamStr}</span>
       ${commentMark}
       <span style="color:var(--border);font-size:0.9rem;flex-shrink:0">›</span>
     </div>`;

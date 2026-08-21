@@ -98,8 +98,8 @@ Each tile carries two badges:
 │  [ ⏹ Stop Game ]   (only between halves)         │
 │                                                  │
 │  RECENT                                          │
-│   12:30  Try · France            ›               │
-│   11:58  Turnover · England      ›               │
+│   12:30  Try ⟨32 - Scoop⟩ · France      ›        │
+│   11:58  Turnover ⟨Ball Down⟩ · England ›        │
 └────────────────────────────────────────────────┘
 ```
 
@@ -201,6 +201,12 @@ automatically — e.g. a Pen Defence or a 6 Again is attributed to the *other* t
   (Try → Turnover, etc.). Possession for every event *after* the edited one is
   recomputed automatically, so a correction near the start of the game ripples through
   cleanly.
+- The sheet's header row also carries a **sub-type** menu next to the event name and
+  timestamp — the detail behind the tag (`Ball Down`, `32 - Scoop`, `Offside`, …), drawn
+  from the same canonical list the video annotator uses. Picking one applies immediately
+  (no need to hit **Save**) and shows it as a pill beside the event name in **Recent**.
+  Only Try / Turnover / Pen Attack / Pen Defence offer it; Game Event and To Review
+  already spell their detail out in the name.
 
 ### 6. Finishing the game (⏹ Stop Game)
 
