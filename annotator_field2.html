@@ -720,15 +720,17 @@
        in the rail beside it, which keeps the pitch square-on and the
        controls under one thumb.
        ══════════════════════════════════════════════════════════════ */
-    body.game-running:not(.game-finished) main { gap: 8px; padding: 8px; }
+    body.game-running:not(.game-finished) main { gap: 8px; padding: 8px; overflow: hidden; }
     body.game-running:not(.game-finished) #settingsPanel { display: none; }
 
     #pitchSection { flex: 1; min-height: 0; display: none; flex-direction: column; gap: 7px; }
     body.game-running #pitchSection { display: flex; }
     body.game-finished #pitchSection { display: none; }
 
-    .pitch-stage { flex: 0 1 auto; min-height: 0; display: flex; gap: 7px; }
-    .pitch-wrap  { position: relative; flex: 1 1 auto; min-width: 0; aspect-ratio: 110 / 170; }
+    .pitch-stage { flex: 1 1 auto; min-height: 0; display: flex; gap: 7px; }
+    /* No explicit height: the row's default stretch gives it the stage's height,
+       and height:100% against an indefinite flex height collapses to zero. */
+    .pitch-wrap  { position: relative; flex: 1 1 auto; min-width: 0; }
     /* preserveAspectRatio="meet" letterboxes the pitch inside this box, so the
        scale stays uniform — which is what keeps the pins round and the pitch
        honest. Pointer coordinates come back through the SVG's own CTM, so the
@@ -739,9 +741,11 @@
     .turf     { fill: url(#turf); }
     .ln       { stroke: rgba(255,255,255,0.30); stroke-width: 0.4; vector-effect: non-scaling-stroke; }
     .try-ln   { stroke: rgba(255,255,255,0.75); stroke-width: 1.4; }
-    .half     { stroke: rgba(255,255,255,0.38); stroke-dasharray: 4 3; }
-    .ten      { stroke: rgba(255,255,255,0.26); stroke-dasharray: 6 3; }
-    .five     { stroke: rgba(255,255,255,0.18); stroke-dasharray: 2 3; }
+    /* Solid, so halfway reads as the reference line rather than as a third dashed
+       line among the two 10m lines flanking it. */
+    .half     { stroke: rgba(255,255,255,0.46); stroke-width: 0.7; }
+    .ten      { stroke: rgba(255,255,255,0.24); stroke-dasharray: 6 3; }
+    .seven    { stroke: rgba(255,255,255,0.30); stroke-dasharray: 3 2.5; }
     .own-band { fill: rgba(255,255,255,0.035); }
     #tryBand  { transition: fill .18s; }
     .band-label {
@@ -812,9 +816,11 @@
     /* ── Order while playing: pitch, status line, possession, recent. The pitch
          keeps a true shape and so can't fill a portrait screen's height; the
          controls and the last four take the slack rather than leaving a hole. ── */
-    body.game-running:not(.game-finished) #pitchSection { order: 1; flex: 0 0 auto; }
+    body.game-running:not(.game-finished) #pitchSection { order: 1; flex: 1 1 auto; min-height: 0; }
     body.game-running:not(.game-finished) #possWrap     { order: 2; flex: 0 0 auto; }
-    body.game-running:not(.game-finished) #recentWrap   { order: 3; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+    /* The last four give way to the pitch: capped and scrollable, so a long
+       history can never push the field off the bottom of the screen. */
+    body.game-running:not(.game-finished) #recentWrap   { order: 3; flex: 0 1 auto; min-height: 0; max-height: 34vh; overflow-y: auto; }
     body.game-running:not(.game-finished) #recentLabel  { display: none; }
     body.game-running:not(.game-finished) .recent-item  { padding: 7px 11px; }
 
@@ -2371,10 +2377,10 @@ function pitchSVG() {
   <rect x="0" y="${PITCH_LEN}" width="100" height="${PITCH_BAND}" class="own-band"/>
 
   ${line(0,  'try-ln')}${line(70, 'try-ln')}
-  ${line(5,  'five')}${line(65, 'five')}
-  ${line(10, 'ten')}${line(60, 'ten')}
+  ${line(7,  'seven')}${line(63, 'seven')}
+  ${line(25, 'ten')}${line(45, 'ten')}
   ${line(35, 'half')}
-  ${dist(5, '5')}${dist(10, '10')}${dist(60, '10')}${dist(65, '5')}
+  ${dist(7, '7')}${dist(63, '7')}${dist(25, '10')}${dist(45, '10')}
 
   <text id="tryBandLabel" x="50" y="${-PITCH_BAND / 2 + 2}" class="band-label">TRY</text>
 

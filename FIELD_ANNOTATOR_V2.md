@@ -31,8 +31,11 @@ everything pressable sits in a rail beside it:
 - **Penalties, Ball Live, Review and Undo** are in the rail, under one thumb.
 - The **last four events** sit below the pitch; tap one to correct it.
 
-The pitch is drawn to its real 50 m × 70 m proportions, with the 5 m and 10 m
-lines at each end and halfway — so a position on it means what it looks like.
+The pitch is drawn to its real 50 m × 70 m proportions, with the full Touch
+markings — a **7 m line** at each end, **10 m lines either side of halfway**, and
+halfway itself solid — so a position on it means what it looks like. The whole
+field is always on screen: it's fitted to whatever space is left rather than
+sized from the width, and the page never scrolls while a game is running.
 
 ### Attack-normalised: the pitch never turns round
 
@@ -169,8 +172,9 @@ tagged offline are attributed to whoever finally uploads them.
 - The previous set stays on the pitch as faded pins until the next one starts, so
   a turnover doesn't blank the screen you were reading.
 - The pitch keeps a true aspect rather than stretching to fill a portrait phone,
-  so it can't use the full height. The possession toggle and the last-four list
-  sit below it and take that slack, rather than leaving a hole.
+  so one dimension always has slack. The possession toggle and the last-four list
+  sit below it and take it; the last four is capped and scrollable so a long
+  history can never push the field off the bottom.
 - Only the newest pin is tappable. That tap means "the ball was lost here", and
   letting older pins take it would make the gesture ambiguous.
 - While a game is running the header drops its labels to icons and the scoreboard
