@@ -889,6 +889,66 @@
       body.game-running:not(.game-finished) .poss-toggle { flex-direction: column; }
     }
 
+    /* ── Field maps in the stats sheet ──────────────────────────
+       Both teams are drawn attacking upwards here, whichever ends they were
+       actually playing, because the map exists to compare them. ── */
+    .fmap-row { display: flex; gap: 10px; padding: 4px 16px 2px; }
+    .fmap { flex: 1 1 0; min-width: 0; }
+    .fmap-name {
+      display: flex; align-items: center; justify-content: center; gap: 5px;
+      font-size: 0.72rem; font-weight: 800; color: var(--text); margin-bottom: 4px;
+      white-space: nowrap; overflow: hidden;
+    }
+    .fmap svg { display: block; width: 100%; height: auto; border-radius: 6px; }
+    .fmap-foot { font-size: 0.62rem; color: var(--text-dim); text-align: center; margin-top: 4px; }
+    .fmap-key {
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 10px;
+      font-size: 0.62rem; color: var(--text-dim); padding: 2px 0 6px;
+    }
+    .fmap-key span { display: inline-flex; align-items: center; gap: 4px; }
+    .fmap-key i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+    .k-dot  { background: var(--accent); opacity: 0.6; }
+    .k-ring { border: 1.5px solid var(--orange); }
+    .k-try  { background: var(--green); }
+    .k-avg  { border-radius: 0 !important; height: 0 !important; width: 12px !important;
+              border-top: 2px dashed var(--text-muted); }
+
+    /* ── Charts ─────────────────────────────────────────────────
+       Thin marks, recessive grid, a 2px surface gap between every stacked
+       segment, and a legend that is always present — so the split reads even
+       where two hues are hard to tell apart. ── */
+    .cfig-row { display: flex; align-items: center; gap: 8px; padding: 3px 16px; }
+    .cfig-name {
+      flex: 0 0 74px; display: flex; align-items: center; gap: 5px;
+      font-size: 0.7rem; font-weight: 700; color: var(--text);
+      white-space: nowrap; overflow: hidden;
+    }
+    .cfig-name i, .fmap-name i {
+      width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; display: inline-block;
+    }
+    .cfig-name span, .fmap-name span { overflow: hidden; text-overflow: ellipsis; }
+    .cfig-val { flex: 0 0 auto; font-size: 0.68rem; color: var(--text-dim); font-variant-numeric: tabular-nums; min-width: 18px; text-align: right; }
+    .cbar { flex: 1 1 auto; min-width: 0; display: flex; gap: 2px; height: 22px; }
+    .cseg {
+      min-width: 3px; border-radius: 3px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.62rem; font-weight: 700; color: #fff;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.45);
+      overflow: hidden;
+    }
+    .cleg {
+      display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 2px 16px 6px;
+      font-size: 0.64rem; color: var(--text-muted);
+    }
+    .cleg span { display: inline-flex; align-items: center; gap: 5px; }
+    .cleg i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; flex-shrink: 0; }
+    .cnote { font-size: 0.62rem; color: var(--text-dim); padding: 2px 16px 10px; }
+
+    .cchart { display: block; width: calc(100% - 20px); height: auto; margin: 2px 10px 8px; }
+    .cgrid  { stroke: rgba(255,255,255,0.10); stroke-width: 1; }
+    .cgrid-10 { stroke-dasharray: 3 3; stroke: rgba(255,255,255,0.16); }
+    .cax    { fill: var(--text-dim); font-size: 8px; font-weight: 600; }
+
     /* Setup: the touch-upload switch */
     .v2-switch { display: flex; align-items: center; gap: 9px; font-size: 0.74rem; color: var(--text-muted); }
     .v2-switch input { width: 18px; height: 18px; accent-color: var(--accent); flex-shrink: 0; }
@@ -1744,7 +1804,12 @@ function updateUI() {
     const sub = eventSubtype(a);
     const hasComment = a.comment && a.comment.trim() && a.comment !== '?';
     const commentMark = hasComment ? '<span class="recent-comment" title="Has a comment">💬</span>' : '';
-    const posMark = a.x != null ? `<span class="recent-pos" title="Pitch position">${Math.round(a.x)},${Math.round(a.y)}</span>` : '';
+    // Raw coordinates mean nothing at a glance; metres upfield and a channel
+    // letter are what an analyst actually reads.
+    const posMark = a.x != null
+      ? `<span class="recent-pos" title="x ${Math.round(a.x)}, y ${Math.round(a.y)} (attack-normalised)">` +
+        `${a.x < 33.3 ? 'L' : a.x < 66.7 ? 'M' : 'R'} ${Math.round(a.y * Y_TO_M)}m</span>`
+      : '';
     return `<div class="recent-item" onclick="openEdit(${idx})">
       <div class="recent-dot" style="background:${color}"></div>
       <span class="recent-time">${fmtClock(a.time)}</span>
@@ -2042,6 +2107,8 @@ function refreshStats() {
   // Drives section only when drives were tagged. Omit them otherwise (kept in
   // sync with games.html).
   const hasBallLive = annotations.some(a => a.name === 'Ball Live');
+  const field = computeFieldStats();
+  const [fL, fR] = teamsSwapped ? [field.t2, field.t1] : [field.t1, field.t2];
   const hasDrives   = annotations.some(a => a.type === 'Game Event' && (a.name === 'Drive - Good' || a.name === 'Drive - Bad'));
 
   const sections = [
@@ -2070,6 +2137,26 @@ function refreshStats() {
         { label: 'Pen Defence',  n1: tL.penDef, pct1: tL.penDefPct, n2: tR.penDef, pct2: tR.penDefPct, r1: tL.penDef, r2: tR.penDef, hib: false },
       ],
     },
+    // Everything the positions buy. Absent for a game tagged without them, the
+    // same way Drives and Dead Ball sit out when they weren't tagged.
+    ...(field.any ? [{
+      label: 'Field position',
+      rows: [
+        { label: 'Avg start',           n1: fL.startM.toFixed(0) + 'm',  pct1: null, n2: fR.startM.toFixed(0) + 'm',  pct2: null, r1: fL.startM,   r2: fR.startM,   hib: true },
+        { label: 'Avg gain per set',    n1: (fL.gainM >= 0 ? '+' : '') + fL.gainM.toFixed(0) + 'm', pct1: null,
+                                        n2: (fR.gainM >= 0 ? '+' : '') + fR.gainM.toFixed(0) + 'm', pct2: null, r1: fL.gainM, r2: fR.gainM, hib: true },
+        { label: 'Territory',           n1: fL.territory.toFixed(0) + '%', pct1: null, n2: fR.territory.toFixed(0) + '%', pct2: null, r1: fL.territory, r2: fR.territory, hib: true },
+        { label: 'Touches per set',     n1: fL.touchesPer.toFixed(1),    pct1: null, n2: fR.touchesPer.toFixed(1),    pct2: null, r1: fL.touchesPer, r2: fR.touchesPer, hib: null },
+      ],
+    }, {
+      label: 'Inside the 10m',
+      rows: [
+        { label: 'Sets that got there', n1: fL.redSets + ' / ' + fL.sets, pct1: Math.round(fL.redPct), n2: fR.redSets + ' / ' + fR.sets, pct2: Math.round(fR.redPct), r1: fL.redSets, r2: fR.redSets, hib: true },
+        { label: 'Converted to a try',  n1: fL.redTries + ' / ' + fL.redSets, pct1: fL.redConvPct == null ? null : Math.round(fL.redConvPct),
+                                        n2: fR.redTries + ' / ' + fR.redSets, pct2: fR.redConvPct == null ? null : Math.round(fR.redConvPct),
+                                        r1: fL.redTries, r2: fR.redTries, hib: true },
+      ],
+    }] : []),
     ...(hasDrives ? [{
       label: 'Drives',
       rows: [
@@ -2083,8 +2170,9 @@ function refreshStats() {
     const rowsHtml = sec.rows.map(({ label, n1, pct1, n2, pct2, r1, r2, hib }) => {
       // Value colours
       let c1 = '', c2 = '';
-      if (hib === true)  { if (r1 > r2) c1 = 'win'; else if (r2 > r1) c2 = 'win'; }
-      if (hib === false) { if (r1 < r2) c1 = 'win'; else if (r2 < r1) c2 = 'bad'; }
+      const near = Math.abs(r1 - r2) < 0.05;
+      if (!near && hib === true)  { if (r1 > r2) c1 = 'win'; else c2 = 'win'; }
+      if (!near && hib === false) { if (r1 < r2) c1 = 'win'; else c2 = 'bad'; }
 
       // Proportion bar: left = Team 1's share, right = Team 2's share
       const total   = r1 + r2;
@@ -2095,7 +2183,7 @@ function refreshStats() {
       let bc1, bc2;
       if (hib === null) {
         bc1 = 'rgba(59,130,246,0.35)'; bc2 = 'rgba(59,130,246,0.2)';
-      } else if (r1 === r2) {
+      } else if (near) {
         bc1 = 'var(--surface-2)'; bc2 = 'var(--surface-2)';
       } else if (hib === true) {
         bc1 = r1 > r2 ? 'var(--green)' : 'var(--surface-2)';
@@ -2131,7 +2219,43 @@ function refreshStats() {
     return `<div class="stats-section">${sec.label}</div>${rowsHtml}`;
   }).join('');
 
-  document.getElementById('statsBody').innerHTML = html;
+  // The map goes on top: it's the thing you read first and the numbers explain it.
+  const sets  = field.any ? possessionSets() : [];
+  const names = { 'Team 1': t1.name, 'Team 2': t2.name };
+  const cols  = { 'Team 1': TEAM_COLOR['Team 1'], 'Team 2': TEAM_COLOR['Team 2'] };
+  const kL = teamsSwapped ? 'Team 2' : 'Team 1', kR = teamsSwapped ? 'Team 1' : 'Team 2';
+
+  const chartHtml = field.any ? `
+    <div class="stats-section">How sets end</div>
+    ${chartLegend(OUTCOMES.map(o => ({ label: o.label, color: o.color })))}
+    ${outcomeBar(sets.filter(x => x.owner === kL), names[kL], cols[kL])}
+    ${outcomeBar(sets.filter(x => x.owner === kR), names[kR], cols[kR])}
+
+    <div class="stats-section">How far each set got</div>
+    ${chartLegend([{ label: names[kL], color: cols[kL] }, { label: names[kR], color: cols[kR] },
+                   { label: 'try', color: '#16a34a' }])}
+    ${territorySVG(sets, names, cols)}
+
+    <div class="stats-section">Which channel</div>
+    ${channelBar(fL, names[kL], cols[kL])}
+    ${channelBar(fR, names[kR], cols[kR])}
+    <div class="cnote">left · middle · right thirds, share of that team's touches</div>
+  ` : '';
+
+  const mapHtml = field.any
+    ? `<div class="stats-section">Where they play</div>
+       <div class="fmap-row">
+         ${fieldMapSVG(fL, teamsSwapped ? 'Team 2' : 'Team 1', tL.name)}
+         ${fieldMapSVG(fR, teamsSwapped ? 'Team 1' : 'Team 2', tR.name)}
+       </div>
+       <div class="fmap-key">
+         <span><i class="k-dot"></i>touch</span>
+         <span><i class="k-ring"></i>ball lost</span>
+         <span><i class="k-try"></i>try</span>
+         <span><i class="k-avg"></i>avg end of set</span>
+       </div>`
+    : '';
+  document.getElementById('statsBody').innerHTML = mapHtml + chartHtml + html;
 }
 
 // ── Stop game ──────────────────────────────────────────────────
@@ -2760,6 +2884,220 @@ function deleteEvent() {
   else                          replayPossessionFrom(at);
   updateUI();
   saveSession();
+}
+
+
+// ══════════════════════════════════════════════════════════════════
+// Field stats — what the positions are actually for
+//
+// Everything here is derived from the stored attack-normalised coordinates, so
+// both teams are measured in the same frame however they were pointing: y = 0
+// is a team's own try line and y = 100 the one they're attacking, over 70m.
+// ══════════════════════════════════════════════════════════════════
+
+const Y_TO_M   = 0.7;                          // one y unit, in metres
+const RED_ZONE = 100 - (10 / 70 * 100);        // inside the opposition 10m line
+
+// One entry per possession, with the positions that possession covered.
+// Possessions with nothing positioned (a v1 game, or a set tagged entirely from
+// the buttons) are dropped rather than counted as zero-metre sets.
+function possessionSets() {
+  const sets = [];
+  let cur = null;
+  for (const a of annotations) {
+    if (a.type === 'To Review') continue;
+    if (a.type === 'Game Event') {
+      // A half boundary closes whatever was open; Ball Live belongs to the set.
+      if (a.name === 'Game Start' || a.name === 'Game End') { cur = null; }
+      continue;
+    }
+    if (!cur || cur.owner !== a.possessionOwner) {
+      cur = { owner: a.possessionOwner, touches: 0, pts: [], endType: null, endName: null };
+      sets.push(cur);
+    }
+    if (a.type === 'Touch') cur.touches++;
+    if (a.x != null) cur.pts.push({ x: a.x, y: a.y });
+    cur.endType = a.type;
+    cur.endName = a.name;
+  }
+  return sets.filter(s => s.pts.length).map(s => {
+    const ys = s.pts.map(p => p.y);
+    return Object.assign(s, {
+      startY: ys[0],
+      endY:   ys[ys.length - 1],
+      maxY:   Math.max(...ys),
+      gain:   ys[ys.length - 1] - ys[0],
+    });
+  });
+}
+
+const mean = arr => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+
+function computeFieldStats() {
+  const sets    = possessionSets();
+  const touches = annotations.filter(a => a.type === 'Touch' && a.x != null);
+
+  const forTeam = key => {
+    const mine = sets.filter(s => s.owner === key);
+    const myTouches = touches.filter(a => a.possessionOwner === key);
+    // "Red zone" = sets that got inside the opposition 10m. Converting those is
+    // a different question from scoring at all, and the more useful one: it
+    // separates getting there from finishing.
+    const red      = mine.filter(s => s.maxY >= RED_ZONE);
+    const redTries = red.filter(s => s.endType === 'Try');
+    const chan = [0, 0, 0];
+    myTouches.forEach(a => chan[a.x < 33.3 ? 0 : a.x < 66.7 ? 1 : 2]++);
+    const chanTotal = myTouches.length || 1;
+    return {
+      sets:        mine.length,
+      startM:      mean(mine.map(s => s.startY)) * Y_TO_M,
+      gainM:       mean(mine.map(s => s.gain))   * Y_TO_M,
+      endM:        mean(mine.map(s => s.endY))   * Y_TO_M,
+      perTouchM:   myTouches.length ? mean(mine.map(s => s.gain)) * Y_TO_M * mine.length / myTouches.length : 0,
+      touchesPer:  mean(mine.map(s => s.touches)),
+      territory:   myTouches.length ? myTouches.filter(a => a.y > 50).length / myTouches.length * 100 : 0,
+      redSets:     red.length,
+      redPct:      mine.length ? red.length / mine.length * 100 : 0,
+      redTries:    redTries.length,
+      redConvPct:  red.length ? redTries.length / red.length * 100 : null,
+      channels:    chan.map(c => Math.round(c / chanTotal * 100)),
+      touchPts:    myTouches.map(a => ({ x: a.x, y: a.y })),
+      tryPts:      annotations.filter(a => a.type === 'Try' && a.actionOwner === key && a.x != null).map(a => ({ x: a.x, y: a.y })),
+      lostPts:     annotations.filter(a => a.x != null && a.possessionOwner === key &&
+                     (a.type === 'Turnover' || a.type === 'Penalty Attack')).map(a => ({ x: a.x, y: a.y })),
+    };
+  };
+  return { t1: forTeam('Team 1'), t2: forTeam('Team 2'), any: sets.length > 0 };
+}
+
+// A small attack-normalised pitch per team: every touch as a dot, tries on the
+// line, lost ball marked, and a dashed line at the average end-of-set position —
+// "how far they usually get" in one glance. Both teams attack upwards here even
+// though the live pitch shows them attacking real ends, because the whole point
+// of the map is to compare them.
+function fieldMapSVG(stat, key, name) {
+  const color = TEAM_COLOR[key];
+  const vy    = y => (100 - y) / 100 * PITCH_LEN;
+  const dots  = stat.touchPts.map(p => `<circle cx="${p.x}" cy="${vy(p.y)}" r="2.6" fill="${color}" fill-opacity="0.5"/>`).join('');
+  const lost  = stat.lostPts.map(p => `<circle cx="${p.x}" cy="${vy(p.y)}" r="2.4" fill="none" stroke="var(--orange)" stroke-width="1"/>`).join('');
+  const tries = stat.tryPts.map(p => `<circle cx="${p.x}" cy="${vy(p.y)}" r="3.4" fill="var(--green)"/>`).join('');
+  const avg   = stat.sets
+    ? `<line x1="2" y1="${vy(stat.endM / Y_TO_M)}" x2="98" y2="${vy(stat.endM / Y_TO_M)}"
+             stroke="${color}" stroke-width="1.2" stroke-dasharray="4 3"/>`
+    : '';
+  return `<div class="fmap">
+    <div class="fmap-name"><i style="background:${color}"></i>${name}</div>
+    <svg viewBox="-3 -3 106 ${PITCH_LEN + 6}" preserveAspectRatio="xMidYMid meet">
+      <rect x="0" y="0" width="100" height="${PITCH_LEN}" rx="1.5" fill="#12301f" stroke="rgba(255,255,255,0.14)"/>
+      <line x1="0" y1="${vy(100)}" x2="100" y2="${vy(100)}" stroke="rgba(255,255,255,0.6)" stroke-width="1.4"/>
+      <line x1="0" y1="${vy(50)}"  x2="100" y2="${vy(50)}"  stroke="rgba(255,255,255,0.22)" stroke-dasharray="3 3"/>
+      <line x1="0" y1="${vy(RED_ZONE)}" x2="100" y2="${vy(RED_ZONE)}" stroke="rgba(255,255,255,0.14)" stroke-dasharray="2 3"/>
+      ${dots}${lost}${tries}${avg}
+    </svg>
+    <div class="fmap-foot">${stat.sets} set${stat.sets === 1 ? '' : 's'} · avg end ${stat.endM.toFixed(0)}m</div>
+  </div>`;
+}
+
+
+// ── Charts ─────────────────────────────────────────────────────
+// Inline SVG and flexbox, no libraries — the page has to work on a pitch with
+// no signal. The outcome palette was validated for colour-vision separation
+// against this sheet's surface: everything passes except green↔orange, which
+// sits in the 6–8 ΔE band for deuteranopia. That's why every segment also
+// carries a 2px gap, a legend entry and a direct label — identity is never
+// left to hue alone.
+const OUTCOMES = [
+  { key: 'Try',       label: 'Try',       color: '#16a34a' },
+  { key: 'Turnover',  label: 'Turnover',  color: '#ea580c' },
+  { key: '6th Touch', label: '6th touch', color: '#3b82f6' },
+  { key: 'Penalty',   label: 'Penalty',   color: '#ef4444' },
+];
+
+function outcomeOf(set) {
+  if (set.endType === 'Try')      return 'Try';
+  if (set.endType === 'Penalty Attack' || set.endType === 'Penalty Defence') return 'Penalty';
+  if (set.endType === 'Turnover') return set.endName === '6th Touch' ? '6th Touch' : 'Turnover';
+  return null;
+}
+
+// A 100%-wide bar of one team's set outcomes. Segments are gapped and labelled,
+// so the split survives both a colour-vision difference and a black-and-white
+// print of the screen.
+function outcomeBar(sets, name, color) {
+  const counts = {};
+  sets.forEach(s => { const o = outcomeOf(s); if (o) counts[o] = (counts[o] || 0) + 1; });
+  const total = Object.values(counts).reduce((a, b) => a + b, 0);
+  if (!total) return '';
+  const segs = OUTCOMES.filter(o => counts[o.key]).map(o => {
+    const pct = counts[o.key] / total * 100;
+    return `<div class="cseg" style="width:${pct}%;background:${o.color}"
+              title="${name} — ${counts[o.key]} of ${total} sets ended in a ${o.label.toLowerCase()}">` +
+           `${pct >= 13 ? counts[o.key] : ''}</div>`;
+  }).join('');
+  return `<div class="cfig-row">
+    <div class="cfig-name"><i style="background:${color}"></i>${name}</div>
+    <div class="cbar">${segs}</div>
+    <div class="cfig-val">${total}</div>
+  </div>`;
+}
+
+// One team's touches split left / middle / right. A single hue with gaps and
+// direct labels: the three parts are one team's whole, not three identities, so
+// giving them three colours would say something untrue.
+function channelBar(stat, name, color) {
+  if (!stat.touchPts.length) return '';
+  const names = ['Left', 'Middle', 'Right'];
+  const segs = stat.channels.map((pct, i) =>
+    `<div class="cseg" style="width:${pct}%;background:${color};opacity:${[0.68, 1, 0.68][i]}"
+       title="${name} — ${pct}% of touches down the ${names[i].toLowerCase()}">${pct >= 13 ? pct + '%' : ''}</div>`
+  ).join('');
+  return `<div class="cfig-row">
+    <div class="cfig-name"><i style="background:${color}"></i>${name}</div>
+    <div class="cbar">${segs}</div>
+    <div class="cfig-val">${stat.touchPts.length}</div>
+  </div>`;
+}
+
+// Every set in the order it happened, drawn as a bar from where it started to
+// where it ended, in metres up that team's own half of the field. Bars that rise
+// are territory won; bars that fall gave ground away. The dot marks a try.
+function territorySVG(sets, names, colors) {
+  if (sets.length < 2) return '';
+  const W = 320, H = 132, L = 26, R = 6, T = 10, B = 18;
+  const plotW = W - L - R, plotH = H - T - B;
+  const yOf = m => T + plotH - (Math.max(0, Math.min(70, m)) / 70) * plotH;
+  const step = plotW / sets.length;
+  const bw   = Math.max(2.5, Math.min(9, step - 2.5));
+
+  const grid = [[0, '0'], [35, '35m'], [70, '70m']].map(([m, lab]) =>
+    `<line x1="${L}" y1="${yOf(m)}" x2="${W - R}" y2="${yOf(m)}" class="cgrid"/>` +
+    `<text x="${L - 5}" y="${yOf(m) + 3}" class="cax" text-anchor="end">${lab}</text>`).join('') +
+    `<line x1="${L}" y1="${yOf(60)}" x2="${W - R}" y2="${yOf(60)}" class="cgrid cgrid-10"/>` +
+    `<text x="${W - R}" y="${yOf(60) - 3}" class="cax" text-anchor="end">opp. 10m</text>`;
+
+  const bars = sets.map((s, i) => {
+    const x  = L + step * i + (step - bw) / 2;
+    const y1 = yOf(s.startY * Y_TO_M), y2 = yOf(s.endY * Y_TO_M);
+    const c  = colors[s.owner];
+    const top = Math.min(y1, y2), h = Math.max(2, Math.abs(y2 - y1));
+    const tryDot = outcomeOf(s) === 'Try' ? `<circle cx="${x + bw / 2}" cy="${yOf(70) + 1}" r="2.6" fill="#16a34a"/>` : '';
+    return `<g><title>${names[s.owner]} — set ${i + 1}: ${(s.startY * Y_TO_M).toFixed(0)}m → ` +
+      `${(s.endY * Y_TO_M).toFixed(0)}m${outcomeOf(s) ? ', ' + outcomeOf(s).toLowerCase() : ''}</title>` +
+      `<rect x="${x}" y="${top}" width="${bw}" height="${h}" rx="${Math.min(2, bw / 2)}" fill="${c}" fill-opacity="0.85"/>` +
+      tryDot + `</g>`;
+  }).join('');
+
+  return `<svg class="cchart" viewBox="0 0 ${W} ${H}" role="img"
+      aria-label="Field position reached by each set, in order">
+    ${grid}${bars}
+    <text x="${L}" y="${H - 4}" class="cax">first set</text>
+    <text x="${W - R}" y="${H - 4}" class="cax" text-anchor="end">last set</text>
+  </svg>`;
+}
+
+function chartLegend(items) {
+  return `<div class="cleg">` + items.map(i =>
+    `<span><i style="background:${i.color}${i.opacity ? ';opacity:' + i.opacity : ''}"></i>${i.label}</span>`).join('') + `</div>`;
 }
 
 // ── Wiring ─────────────────────────────────────────────────────

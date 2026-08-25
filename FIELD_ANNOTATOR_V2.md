@@ -123,6 +123,63 @@ mid-game reload all leave the counter and the pins agreeing with each other.
 
 ---
 
+## Live stats — what the positions buy you
+
+The 📊 Stats sheet keeps everything v1 reported and opens with the thing you
+actually read first: **two pitch maps**, one per team, both drawn attacking
+upwards whichever ends they were really playing — because the point of the map
+is to compare them. Each shows every touch as a dot, a ring wherever that team
+lost the ball, tries on the line, and a dashed line at the **average end of
+set**: how far they usually get.
+
+Then three figures, all inline SVG and flexbox — no chart library, because the
+page has to work at a pitch with no signal.
+
+**How sets end** — one bar per team, split into Try / Turnover / 6th touch /
+Penalty. The share of sets a team simply gives away is the fastest read of the
+game there is.
+
+**How far each set got** — every set in the order it happened, drawn as a bar
+from where it started to where it ended, in metres up that team's half. Bars
+that rise won territory; bars that fall gave it away. A green dot marks a try.
+
+**Which channel** — each team's touches split into left / middle / right thirds.
+
+> The four outcome colours were run through a colour-vision check against this
+> sheet's surface. Every pair separates cleanly except green↔orange, which lands
+> in the marginal band for deuteranopia — so every segment also carries a gap, a
+> legend entry and a number on its face. No figure here asks you to tell two
+> things apart by hue alone.
+
+Underneath, two sections that only exist because the taps carry a position.
+Every distance is in metres up a 70 m field, measured from the team's own line.
+
+**Field position**
+
+| Row | What it tells you |
+|---|---|
+| **Avg start** | Where their sets begin. The single biggest driver of everything else. |
+| **Avg gain per set** | Metres from the first touch to wherever the set ended. Territory earned, not territory held. |
+| **Territory** | Share of their touches in the opposition half. |
+| **Touches per set** | Whether they're building sets or coughing them up early. |
+
+**Inside the 10m**
+
+| Row | What it tells you |
+|---|---|
+| **Sets that got there** | How often they reach the opposition 10 m line at all. |
+| **Converted to a try** | Of those, how many scored — getting there and finishing are different problems, and this separates them. |
+| **Left / mid / right** | Share of touches in each third across the pitch. A lopsided split is a pattern worth knowing about. |
+
+Both sections disappear for a game with no positions, the same way Drives and
+Dead Ball sit out when they weren't tagged.
+
+In the **Recent** strip each event carries its position as a channel letter and
+a distance — `R 58m`, `M 22m` — rather than raw coordinates, which read as
+nothing at a glance.
+
+---
+
 ## What reaches the Google Sheet
 
 The sheet keeps its seven-column shape (`Time, Possession Owner, Type, Name,
