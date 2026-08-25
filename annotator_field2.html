@@ -2266,7 +2266,9 @@ function commentWithPos(a) {
   if (a.x == null || a.y == null) return a.comment || '';
   const at = '@' + Math.round(a.x) + ',' + Math.round(a.y);
   const c  = (a.comment || '').trim();
-  return c && c !== '?' ? c + ' ' + at : at;
+  // '?' is the placeholder a To Review event carries when no note was typed.
+  // It's kept so a v2 row looks exactly like the v1 row it replaces.
+  return c ? c + ' ' + at : at;
 }
 
 async function pushToSheet(override = false) {

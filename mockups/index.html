@@ -15,6 +15,8 @@
   .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; }
   .card.pick { border-color: var(--green); }
   .frame { height: 420px; border: 0; width: 100%; background: #000; }
+  /* C is designed for a phone held sideways, so its preview gets a landscape box. */
+  .frame.wide { height: 230px; }
   .meta { padding: 14px 16px 16px; }
   .meta h2 { font-size: 0.95rem; margin-bottom: 3px; }
   .badge { display: inline-block; font-size: 0.6rem; font-weight: 800; letter-spacing: .07em; padding: 2px 7px; border-radius: 99px; background: var(--green); color: #06210f; margin-left: 6px; vertical-align: 2px; }
@@ -62,7 +64,7 @@
     </div>
 
     <div class="card">
-      <iframe class="frame" src="c-landscape.html"></iframe>
+      <iframe class="frame wide" src="c-landscape.html"></iframe>
       <div class="meta">
         <h2>C · Landscape two-thumb</h2>
         <p>Phone held sideways. Attack runs left→right, penalties under the left thumb, last-four down the right.</p>
