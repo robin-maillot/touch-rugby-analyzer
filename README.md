@@ -14,7 +14,7 @@ All pages are behind a password prompt on `index.html`. Three passwords exist:
 |---|---|
 | `m30` | Viewer — Game Analysis, Dashboard, Event Viewer, Live |
 | `m30-staff` | Staff — everything above + Annotator + Field Annotator |
-| `m30-admin` | Admin — everything above + Video Backfill + inline event editing in the viewer + sheet override |
+| `m30-admin` | Admin — everything above + Video Backfill + Field Annotator v2 + inline event editing in the viewer + sheet override |
 
 The password is stored in `sessionStorage` and used as the API secret for all calls to the Apps Script backend.
 
@@ -154,6 +154,23 @@ a tournament day is several games side by side rather than one session at a time
 **See [FIELD_ANNOTATOR.md](FIELD_ANNOTATOR.md) for the full how-to-use guide** — the game
 picker, setup, event buttons, Drive / Ball Live tagging, the live Stats sheet, live
 broadcasting, editing mistakes, finishing a game, and saving.
+
+---
+
+### Field Annotator v2 (`annotator_field2.html`)
+*Admin only*
+
+The same tool with the event grid replaced by a **pitch you tap**: each touch is a tap
+where it happened, tapping the pin again turns that touch into a turnover, the sixth tap
+is the handover, and the try band scores. Penalties stay as buttons at the top. The pitch
+is attack-normalised — whoever has the ball always attacks up the screen — and positions
+travel to the sheet in the Comment column as `@x,y` without changing its shape.
+
+Everything else (picker, clock, stats, live, editing, Stop Game, push) is v1's, and both
+annotators share the same on-device game store, so a game can be opened in either.
+
+**See [FIELD_ANNOTATOR_V2.md](FIELD_ANNOTATOR_V2.md) for the full guide**, and
+[`mockups/`](mockups/index.html) for the three layouts that were compared first.
 
 ---
 

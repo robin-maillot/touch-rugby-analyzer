@@ -206,6 +206,11 @@
         <div class="card-title">Field Annotator</div>
         <div class="card-desc">Live tagging without video</div>
       </a>
+      <a class="nav-card" href="annotator_field2.html" id="fieldV2Card" style="display:none">
+        <div class="card-icon">🗺️</div>
+        <div class="card-title">Field Annotator v2</div>
+        <div class="card-desc">Tag by tapping the pitch</div>
+      </a>
       <a class="nav-card" href="backfill.html" id="backfillCard" style="display:none">
         <div class="card-icon">🔗</div>
         <div class="card-title">Video Backfill</div>
@@ -356,13 +361,21 @@
     const admin        = (role === 'admin');
     // Offline mode has no account behind it, so every page that reads from or
     // writes to the sheet is hidden — only the on-device annotator is left.
+    // v2 is admin-only. Offline mode carries no role at all, so the card is
+    // offered there only on a device that has signed in as admin before —
+    // enough to reach it at a pitch with no signal, without exposing it on
+    // anyone else's phone.
+    const adminDevice = (() => { try { return localStorage.getItem('trl2_admin_device') === '1'; } catch (e) { return false; } })();
+    if (admin) { try { localStorage.setItem('trl2_admin_device', '1'); } catch (e) {} }
     document.querySelectorAll('.nav-card').forEach(card => {
-      if (offline) card.style.display = card.id === 'fieldCard' ? '' : 'none';
+      if (offline) card.style.display =
+        (card.id === 'fieldCard' || (card.id === 'fieldV2Card' && adminDevice)) ? '' : 'none';
     });
     if (!offline) {
       document.querySelectorAll('.nav-card').forEach(card => { card.style.display = ''; });
       document.getElementById('annotatorCard').style.display = staffOrAdmin ? '' : 'none';
       document.getElementById('fieldCard').style.display     = staffOrAdmin ? '' : 'none';
+      document.getElementById('fieldV2Card').style.display   = admin ? '' : 'none';
       document.getElementById('backfillCard').style.display  = staffOrAdmin ? '' : 'none';
       document.getElementById('adminCard').style.display     = admin ? '' : 'none';
       document.getElementById('dashboardCard').style.display = admin ? '' : 'none';

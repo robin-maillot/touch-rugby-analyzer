@@ -5,7 +5,7 @@
 // YouTube) always go straight to the network so live data is never stale.
 //
 // Bump CACHE_VERSION whenever shell assets change to force a refresh.
-const CACHE_VERSION = 'trl-shell-v3';
+const CACHE_VERSION = 'trl-shell-v4';
 
 const SHELL = [
   'index.html',
@@ -15,6 +15,7 @@ const SHELL = [
   'analytics.html',
   'annotator.html',
   'annotator_field.html',
+  'annotator_field2.html',
   'backfill.html',
   'live.html',
   'js/config.js',

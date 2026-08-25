@@ -1,0 +1,2706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Field Annotator v2</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0b0e14">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Touch Rugby">
+  <script defer src="https://cloud.umami.is/script.js" data-website-id="cb7fd4f2-fcd5-44d7-a8e4-70e9068870bb" data-auto-track="false"></script>
+  <link rel="stylesheet" href="css/theme.css">
+<style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* ── Header ─────────────────────────────────────────────────── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    header h1 { font-size: 0.9rem; font-weight: 600; }
+    .header-actions { margin-left: auto; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+    .btn-icon {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+    .btn-icon:active   { background: var(--surface-2); }
+    .btn-icon:disabled { opacity: 0.5; }
+    .btn-hdr-push     { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .btn-hdr-override { background: #7f1d1d; color: #fff; border-color: #7f1d1d; }
+    .btn-live.active  { color: var(--red); border-color: var(--red); background: rgba(239,68,68,0.08); }
+    .btn-hdr-swap.active { color: var(--accent); border-color: var(--accent); }
+    .btn-hdr-stats {
+      display: inline-flex; align-items: center; gap: 5px;
+      color: var(--accent); border-color: var(--accent);
+      background: rgba(59,130,246,0.12); font-weight: 600;
+    }
+    .btn-hdr-stats svg { flex-shrink: 0; }
+
+    /* ── Settings panel ─────────────────────────────────────────── */
+    #settingsPanel {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 16px;
+      display: none;
+      flex-direction: column;
+      gap: 10px;
+    }
+    #settingsPanel.open { display: flex; }
+    .settings-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .settings-row input,
+    .settings-row select {
+      flex: 1;
+      min-width: 80px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 8px 10px;
+      font-size: 0.85rem;
+      outline: none;
+    }
+    .settings-row input:focus,
+    .settings-row select:focus { border-color: var(--accent); }
+    .settings-row input::placeholder { color: #444; }
+    .settings-label { font-size: 0.72rem; color: var(--text-muted); margin-bottom: 2px; }
+    #sheetPreview {
+      font-size: 0.72rem;
+      font-family: monospace;
+      color: var(--text-muted);
+      padding: 4px 0;
+    }
+
+    /* ── Scoreboard ─────────────────────────────────────────────── */
+    #scoreboard {
+      background: var(--surface);
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .score-team { flex: 1; text-align: center; }
+    .score-name { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .score-val  { font-size: 2.2rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+    #halfClock        { font-size: 2.2rem; font-weight: 700; line-height: 1; color: var(--text); font-variant-numeric: tabular-nums; }
+    #totalClock       { font-size: 0.68rem; color: var(--text-muted); font-variant-numeric: tabular-nums; margin-top: 4px; }
+
+    /* ── Main content ───────────────────────────────────────────── */
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 14px 12px;
+      overflow-y: auto;
+    }
+
+    /* ── Possession toggle ──────────────────────────────────────── */
+    .section-label { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.06em; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px; }
+    .poss-toggle { display: flex; gap: 6px; }
+    .poss-btn {
+      flex: 1;
+      padding: 14px 8px;
+      border-radius: 10px;
+      border: 2px solid var(--border);
+      background: var(--surface);
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-align: center;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .poss-btn.active { border-color: var(--accent); background: rgba(59,130,246,0.12); color: var(--text); }
+
+    /* ── Event buttons ──────────────────────────────────────────── */
+    .event-grid { display: grid; gap: 8px; }
+    .event-grid.two-col   { grid-template-columns: 1fr 1fr; }
+    .event-grid.three-col { grid-template-columns: 1fr 1fr 1fr; }
+
+    .gated-section, .gated-label, .gated-button, .gated-grid { display: none; }
+    body.game-running .gated-section,
+    body.game-running .gated-label    { display: block; }
+    body.game-running .gated-grid     { display: grid; }
+    body.game-running .gated-button   { display: revert; }
+    body:not(.game-running) .btn-undo-big { grid-column: 1 / -1; }
+
+    .start-btn {
+      flex: 1;
+      padding: 14px 8px;
+      border-radius: 10px;
+      border: 2px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      -webkit-tap-highlight-color: transparent;
+      font-family: inherit;
+    }
+    .start-btn:active { filter: brightness(0.85); transform: scale(0.97); }
+    .start-btn.running {
+      background: rgba(34,197,94,0.12);
+      border-color: var(--green);
+      color: var(--green);
+    }
+
+    .evt-btn {
+      padding: 18px 12px;
+      border-radius: 10px;
+      border: none;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 0.02em;
+      transition: filter 0.1s, transform 0.1s;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    .evt-btn:active { filter: brightness(0.85); transform: scale(0.97); }
+    .evt-btn:disabled { opacity: 0.35 !important; cursor: not-allowed; }
+    .evt-btn:disabled:active { filter: none; transform: none; }
+
+    .btn-try1    { background: var(--green);      color: #000; }
+    .btn-turn    { background: var(--orange);     color: #fff; }
+    .btn-pen-atk { background: var(--red);        color: #fff; }
+    .btn-pen-def { background: var(--red-dark);   color: #fff; }
+    .btn-game    { background: var(--surface-2);  color: var(--text); border: 1px solid var(--border); }
+    .btn-review  { background: #4c1d95; color: #c4b5fd; border: 1px solid #6d28d9; }
+    .btn-undo-big{ background: var(--surface-2);  color: var(--text-muted); border: 1px solid var(--border); }
+
+    /* ── Recent events ──────────────────────────────────────────── */
+    #recentList { display: flex; flex-direction: column; gap: 4px; }
+    .recent-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 0.82rem;
+    }
+    .recent-dot  { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .recent-time { font-variant-numeric: tabular-nums; color: var(--text-muted); font-size: 0.75rem; min-width: 52px; }
+    .recent-text { flex: 1; }
+    /* Sub-type rides next to the event name rather than replacing it, so a row
+       reads "Turnover ⟨Ball Down⟩" instead of just "Ball Down". */
+    .recent-sub {
+      display: inline-block;
+      vertical-align: middle;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 1px 7px;
+      margin: 0 2px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+    /* Keeps "· Team" together when a long sub-type wraps the row onto two lines. */
+    .recent-team { white-space: nowrap; }
+
+
+    /* ── Stats modal v2 ─────────────────────────────────────────── */
+    #statsOverlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      z-index: 100;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    #statsOverlay.open { display: flex; }
+
+    /* Sheet up from bottom on mobile; centred dialog on wider screens */
+    #statsCard {
+      background: var(--surface);
+      border-radius: 20px 20px 0 0;
+      width: 100%;
+      max-height: 90dvh;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    @media (min-width: 600px) {
+      #statsOverlay { align-items: center; padding: 24px; }
+      #statsCard { border-radius: 16px; max-width: 520px; max-height: 85dvh; }
+    }
+
+    /* drag handle hint */
+    .stats-handle {
+      width: 36px; height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      margin: 10px auto 0;
+      flex-shrink: 0;
+    }
+    @media (min-width: 600px) { .stats-handle { display: none; } }
+
+    /* hero score at top of modal */
+    .stats-hero {
+      padding: 16px 20px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .stats-hero-team { flex: 1; text-align: center; }
+    .stats-hero-name {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .stats-hero-score {
+      font-size: 3rem;
+      font-weight: 700;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+      color: var(--text);
+    }
+    .stats-hero-score.win { color: var(--green); }
+    .stats-hero-sep { font-size: 1.4rem; color: var(--border); padding: 0 8px; flex-shrink: 0; }
+
+    /* game status line */
+    .stats-status {
+      text-align: center;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      padding: 0 20px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .stats-status .dot-live {
+      display: inline-block;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--red);
+      margin-right: 5px;
+      animation: pulse 1.4s ease-in-out infinite;
+      vertical-align: middle;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    /* section divider */
+    .stats-section {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      padding: 14px 16px 4px;
+    }
+
+    /* individual stat row */
+    .stat-row {
+      padding: 10px 16px 11px;
+      border-top: 1px solid var(--border);
+    }
+    .stat-row-label {
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+    .stat-row-values {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 8px;
+    }
+    .stat-cell { display: flex; flex-direction: column; }
+    .stat-cell:last-child { align-items: flex-end; }
+    .stat-num {
+      font-size: 1.75rem;
+      font-weight: 700;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+      color: var(--text);
+    }
+    .stat-num.win { color: var(--green); }
+    .stat-num.bad { color: var(--red); }
+    .stat-pct  { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+    .stat-team { font-size: 0.7rem;  color: var(--text-muted); margin-top: 3px; }
+
+    /* proportion bar */
+    .stat-bar {
+      height: 5px;
+      border-radius: 3px;
+      background: var(--bg);
+      overflow: hidden;
+      display: flex;
+      gap: 1px;
+    }
+    .stat-bar-seg {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.35s ease;
+    }
+
+    /* close button */
+    .stats-close-btn {
+      margin: 12px 16px 16px;
+      padding: 14px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      width: calc(100% - 32px);
+      -webkit-tap-highlight-color: transparent;
+      flex-shrink: 0;
+    }
+    .stats-close-btn:active { background: var(--border); }
+
+    /* ── Edit event modal ───────────────────────────────────────── */
+    #editOverlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      z-index: 100;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    #editOverlay.open { display: flex; }
+    #editCard {
+      background: var(--surface);
+      border-radius: 20px 20px 0 0;
+      width: 100%;
+      max-height: 90dvh;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    @media (min-width: 600px) {
+      #editOverlay { align-items: center; padding: 24px; }
+      #editCard { border-radius: 16px; max-width: 520px; }
+    }
+    .recent-item { cursor: pointer; }
+    .recent-item:active { background: var(--surface-2); }
+
+    /* edit modal: header row — event name + timestamp, with the sub-type menu
+       pinned to its right so the whole identity of the event is one line. */
+    .edit-head-row { display: flex; align-items: center; gap: 10px; }
+    .edit-subtype-wrap { position: relative; margin-left: auto; flex-shrink: 0; max-width: 55%; }
+    .edit-subtype-wrap::after {
+      content: '▾';
+      position: absolute;
+      right: 9px; top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+    .edit-subtype {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      color: var(--text-muted);
+      padding: 5px 24px 5px 11px;
+      font-size: 0.78rem;
+      font-family: inherit;
+      font-weight: 600;
+      outline: none;
+      cursor: pointer;
+    }
+    .edit-subtype:focus { border-color: var(--accent); }
+    .edit-subtype.set   { color: var(--accent); border-color: var(--accent); }
+
+    /* edit modal: comment field + footer buttons */
+    .edit-comment {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      padding: 10px 12px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      line-height: 1.35;
+      resize: vertical;
+      outline: none;
+    }
+    .edit-comment:focus { border-color: var(--accent); }
+    .edit-comment::placeholder { color: #444; }
+    .edit-footer { display: flex; gap: 10px; margin: 4px 16px 16px; }
+    .edit-footer .stats-close-btn { margin: 0; width: auto; flex: 1; }
+    .edit-btn-save { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .edit-btn-save:active { filter: brightness(0.88); background: var(--accent); }
+    .recent-comment { flex-shrink: 0; font-size: 0.8rem; line-height: 1; }
+
+    /* ── Game picker ────────────────────────────────────────────── */
+    /* Opaque full-screen layer over the annotator, so switching games is a
+       show/hide rather than a navigation (keeps all state in one page). */
+    #pickerScreen {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 150;
+      background: var(--bg);
+      overflow-y: auto;
+      flex-direction: column;
+    }
+    #pickerScreen.open { display: flex; }
+    .picker-main { padding: 14px 12px calc(24px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 10px; }
+    .picker-bar { display: flex; align-items: center; gap: 8px; }
+    .picker-bar .section-label { margin-bottom: 0; }
+    .picker-bar-actions { margin-left: auto; display: flex; gap: 6px; }
+
+    .new-game-btn {
+      width: 100%;
+      padding: 16px;
+      border-radius: 12px;
+      border: 2px dashed var(--accent);
+      background: rgba(59,130,246,0.10);
+      color: var(--accent);
+      font-size: 0.95rem;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .new-game-btn:active { filter: brightness(0.88); }
+
+    .game-tile {
+      position: relative;
+      display: block;
+      width: 100%;
+      text-align: left;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 42px 12px 14px;
+      color: var(--text);
+      font-family: inherit;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .game-tile:active { background: var(--surface-2); }
+    .game-tile.finished { opacity: 0.85; }
+    .tile-title { font-size: 0.95rem; font-weight: 600; }
+    .tile-title.untitled { color: var(--text-muted); font-style: italic; font-weight: 500; }
+    .tile-sub   { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 2px; }
+    .tile-line  { font-size: 0.78rem; color: var(--text-muted); margin-top: 6px; font-variant-numeric: tabular-nums; }
+    .tile-score { color: var(--text); font-weight: 700; }
+    .tile-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .badge {
+      font-size: 0.66rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 3px 7px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+    .badge-running  { color: var(--red);   border-color: var(--red);   background: rgba(239,68,68,0.10); }
+    .badge-paused   { color: var(--text-muted); border-color: var(--border); background: var(--surface-2); }
+    .badge-finished { color: var(--accent); border-color: var(--accent); background: rgba(59,130,246,0.12); }
+    .badge-new      { color: var(--text-muted); border-color: var(--border); background: var(--surface-2); }
+    .badge-synced   { color: var(--green); border-color: var(--green); background: rgba(34,197,94,0.10); }
+    .badge-unsynced { color: var(--orange); border-color: var(--orange); background: rgba(249,115,22,0.10); }
+    .tile-dot {
+      display: inline-block;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--red);
+      margin-right: 4px;
+      animation: pulse 1.4s ease-in-out infinite;
+      vertical-align: middle;
+    }
+
+    /* Per-tile delete. Sized to a comfortable tap target but visually light so
+       it doesn't compete with the tile itself. */
+    .tile-x {
+      position: absolute;
+      top: 6px; right: 6px;
+      width: 32px; height: 32px;
+      display: flex; align-items: center; justify-content: center;
+      background: none;
+      border: none;
+      border-radius: 8px;
+      color: var(--text-muted);
+      font-size: 1.05rem;
+      line-height: 1;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .tile-x:active { background: var(--surface-2); color: var(--red); }
+    .tile-reopen {
+      position: absolute;
+      bottom: 10px; right: 10px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-muted);
+      font-size: 0.7rem;
+      font-family: inherit;
+      padding: 5px 9px;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .tile-reopen:active { background: var(--border); color: var(--text); }
+    .picker-empty { color: var(--text-muted); font-size: 0.85rem; padding: 18px 4px; text-align: center; line-height: 1.5; }
+
+    /* ── Sync warning banner ────────────────────────────────────── */
+    #syncBanner {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      background: rgba(249,115,22,0.12);
+      border-bottom: 1px solid var(--orange);
+      color: #fdba74;
+      font-size: 0.78rem;
+      line-height: 1.35;
+      padding: 9px 14px;
+      flex-shrink: 0;
+    }
+    #syncBanner.open { display: flex; }
+    #syncBanner strong { color: var(--orange); }
+    #syncBanner button {
+      margin-left: auto;
+      flex-shrink: 0;
+      background: var(--orange);
+      color: #000;
+      border: none;
+      border-radius: 6px;
+      padding: 7px 11px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    #syncBanner button:disabled { opacity: 0.6; }
+
+    /* ── Stop game ──────────────────────────────────────────────── */
+    #stopGameBtn {
+      display: none;
+      width: 100%;
+      padding: 15px;
+      border-radius: 10px;
+      border: 2px solid var(--red);
+      background: rgba(239,68,68,0.10);
+      color: var(--red);
+      font-size: 0.92rem;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #stopGameBtn:active { filter: brightness(0.85); transform: scale(0.99); }
+
+    /* Offline mode: nothing can reach the server, so the upload controls are
+       greyed rather than left looking tappable. */
+    body.offline-mode .btn-hdr-push:disabled,
+    body.offline-mode .btn-live:disabled {
+      background: var(--surface-2);
+      border-color: var(--border);
+      color: var(--text-muted);
+      opacity: 0.7;
+    }
+
+    /* Finished games are frozen: everything that would add or remove an event
+       goes away, leaving only type corrections via the Recent list. */
+    body.game-finished .poss-toggle,
+    body.game-finished #gameEventsSection,
+    body.game-finished #liveBtn,
+    body.game-finished .edit-adv { display: none !important; }
+
+    #finishedBanner {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 11px 14px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+    body.game-finished #finishedBanner { display: flex; }
+
+    #stopOverlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      z-index: 200;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    #stopOverlay.open { display: flex; }
+    #stopCard {
+      background: var(--surface);
+      border-radius: 20px 20px 0 0;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    @media (min-width: 600px) {
+      #stopOverlay { align-items: center; padding: 24px; }
+      #stopCard { border-radius: 16px; max-width: 460px; }
+    }
+    .stop-title { font-size: 1.05rem; font-weight: 700; padding: 18px 20px 6px; }
+    .stop-body  { font-size: 0.84rem; color: var(--text-muted); line-height: 1.45; padding: 0 20px 14px; }
+    .stop-warn {
+      margin: 0 16px 14px;
+      background: rgba(249,115,22,0.12);
+      border: 1px solid var(--orange);
+      border-radius: 10px;
+      padding: 11px 13px;
+      font-size: 0.8rem;
+      line-height: 1.4;
+      color: #fdba74;
+    }
+    .stop-warn strong { color: var(--orange); }
+    .stop-actions { display: flex; flex-direction: column; gap: 8px; padding: 0 16px 16px; }
+    .stop-actions button {
+      padding: 14px;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text-muted);
+    }
+    .stop-actions .stop-primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
+    .stop-actions .stop-danger  { background: var(--surface-2); border-color: var(--red); color: var(--red); font-weight: 700; }
+    .stop-actions button:active { filter: brightness(0.88); }
+  
+    /* ══════════════════════════════════════════════════════════════
+       v2 — the pitch
+       The pitch is the primary control, so it takes every pixel the
+       rest of the layout doesn't need. While a game is running the
+       page stops scrolling entirely and the pitch absorbs the slack;
+       before kick-off and after full time it scrolls normally, since
+       there's setup and a full event list to read.
+       ══════════════════════════════════════════════════════════════ */
+    body.game-running:not(.game-finished) main { gap: 8px; padding: 8px calc(8px + env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) calc(8px + env(safe-area-inset-left)); }
+    body.game-running:not(.game-finished) #settingsPanel { display: none; }
+
+    #pitchSection { flex: 1; min-height: 0; display: none; flex-direction: column; gap: 7px; }
+    body.game-running #pitchSection { display: flex; }
+    body.game-finished #pitchSection { display: none; }
+
+    /* ── Penalties: a fixed row at the top, per the brief. Never moves,
+         so it can be hit without looking down. ── */
+    .pen-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; flex-shrink: 0; }
+    .pen-btn {
+      padding: 9px 4px 8px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text);
+      font-family: inherit; font-size: 0.82rem; font-weight: 700;
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+      transition: background .1s, border-color .1s, transform .06s;
+    }
+    .pen-btn:active { transform: scale(0.97); }
+    .pen-btn small { display: block; font-size: 0.56rem; font-weight: 600; color: var(--text-dim); margin-top: 1px; }
+    .pen-btn.armed { background: var(--yellow); border-color: var(--yellow); color: #17130a; }
+    .pen-btn.armed small { color: rgba(0,0,0,0.6); }
+
+    /* ── Pitch ── */
+    .pitch-wrap {
+      position: relative; flex: 1; min-height: 190px;
+      border-radius: 12px; overflow: hidden; border: 1px solid var(--border);
+    }
+    .pitch {
+      display: block; position: absolute; inset: 0; width: 100%; height: 100%;
+      touch-action: manipulation; cursor: crosshair;
+    }
+    .ln     { stroke: rgba(255,255,255,0.32); stroke-width: 0.45; vector-effect: non-scaling-stroke; }
+    .try-ln { stroke: rgba(255,255,255,0.72); stroke-width: 1.1; }
+    .half   { stroke-dasharray: 3 2.2; }
+    .five   { stroke: rgba(255,255,255,0.22); stroke-dasharray: 2 2; }
+    .ingoal   { fill: rgba(255,255,255,0.03); }
+    .try-band { fill: rgba(34,197,94,0.28); }
+    .band-label {
+      fill: rgba(255,255,255,0.5); font-size: 5px; font-weight: 800;
+      letter-spacing: 0.16em; text-anchor: middle;
+    }
+    .band-label.dim { fill: rgba(255,255,255,0.2); font-size: 3.2px; letter-spacing: 0.08em; font-weight: 600; }
+
+    /* Pins are HTML rather than SVG: the pitch stretches to fill whatever space
+       is left (preserveAspectRatio="none"), which would squash SVG circles into
+       ellipses. Percentage-positioned buttons stretch their position with the
+       pitch while staying round, and hit-test reliably under a thumb. */
+    #pinLayer { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+    .pin {
+      position: absolute; transform: translate(-50%, -50%);
+      width: 34px; height: 34px; border-radius: 50%; padding: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-family: inherit; font-size: 0.86rem; font-weight: 800; color: #fff;
+      background: var(--accent); border: 2px solid rgba(255,255,255,0.92);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+      -webkit-tap-highlight-color: transparent;
+    }
+    /* Only the newest pin is live: tapping it is the "lost the ball here"
+       gesture, and letting older pins take taps would make that ambiguous. */
+    .pin.live { pointer-events: auto; cursor: pointer; }
+    .pin.live::after {
+      content: ''; position: absolute; inset: -7px; border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.35);
+    }
+    .pin.live:active { transform: translate(-50%, -50%) scale(0.92); }
+    .pin-turnover { background: var(--orange); }
+    .pin-six      { background: var(--orange); font-size: 0.62rem; }
+    .pin-try      { background: var(--green);    color: #06210f; }
+    .pin-penatk   { background: var(--red); }
+    .pin-pendef   { background: var(--red-dark); }
+    .pin-again    { background: var(--yellow);   color: #17130a; font-size: 0.62rem; }
+    .pin-review   { background: var(--purple); }
+    .pin.stale { opacity: 0.26; border-color: rgba(255,255,255,0.4); box-shadow: none; }
+
+    /* ── Pitch overlays ── */
+    .pitch-ov { position: absolute; z-index: 3; pointer-events: none; }
+    #attackHud {
+      top: 6px; left: 50%; transform: translateX(-50%);
+      display: flex; align-items: center; gap: 6px;
+      background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.16);
+      border-radius: 99px; padding: 4px 12px;
+      font-size: 0.72rem; font-weight: 800; letter-spacing: 0.03em;
+      max-width: 90%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    #attackHud .arrow { color: var(--green); }
+    /* Sits clear of the try band, which is itself a tap target. */
+    #attackHud { top: calc(11.54% + 6px); }
+
+    #touchRail {
+      left: 8px; top: 50%; transform: translateY(-50%);
+      display: flex; flex-direction: column-reverse; gap: 8px;
+    }
+    .tdot {
+      width: 13px; height: 13px; border-radius: 50%;
+      background: rgba(255,255,255,0.13); border: 1px solid rgba(255,255,255,0.18);
+    }
+    .tdot.on   { background: var(--accent); border-color: var(--accent); }
+    .tdot.next { background: transparent; border-color: var(--orange); border-width: 2px; }
+
+    #pitchHint {
+      left: 0; right: 0; bottom: 7px; text-align: center;
+      font-size: 0.68rem; color: rgba(255,255,255,0.42); font-weight: 600;
+      padding: 0 12px;
+    }
+
+    /* ── Sub-type prompt: appears for a few seconds after an event that has
+         detail worth capturing, and is entirely optional. ── */
+    #subtypeBar {
+      display: none; gap: 5px; flex-shrink: 0;
+      overflow-x: auto; scrollbar-width: none; padding-bottom: 1px;
+    }
+    #subtypeBar.open { display: flex; }
+    #subtypeBar::-webkit-scrollbar { display: none; }
+    .sub-chip {
+      flex: 0 0 auto; padding: 7px 11px; border-radius: 99px;
+      background: var(--surface-2); border: 1px solid var(--border);
+      color: var(--text-muted); font-family: inherit; font-size: 0.74rem; font-weight: 600;
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+    }
+    .sub-chip.head { background: none; border: none; color: var(--text-dim); font-size: 0.66rem; padding-left: 2px; cursor: default; }
+    .sub-chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+    /* ── Compact game-event rail (Ball Live / Drive / Review / Undo) ── */
+    body.game-running:not(.game-finished) #gameEventsSection { flex-shrink: 0; }
+    .mini-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+    .mini-btn {
+      padding: 9px 2px; border-radius: 9px;
+      border: 1px solid var(--border); background: var(--surface-2); color: var(--text-muted);
+      font-family: inherit; font-size: 0.66rem; font-weight: 700; line-height: 1.2;
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+    }
+    .mini-btn:active { background: var(--surface-3); }
+    .mini-btn:disabled { opacity: 0.35; }
+    .mini-btn i { display: block; font-style: normal; font-size: 0.9rem; margin-bottom: 1px; }
+    .mini-btn.undo { color: var(--text); }
+
+    /* ── Recent, as a chip strip while playing and a list once finished ── */
+    body.game-running:not(.game-finished) #recentWrap { flex-shrink: 0; }
+    body.game-running:not(.game-finished) #recentLabel { display: none; }
+    body.game-running:not(.game-finished) #recentList {
+      flex-direction: row; gap: 6px; overflow-x: auto; scrollbar-width: none;
+    }
+    #recentList::-webkit-scrollbar { display: none; }
+    body.game-running:not(.game-finished) .recent-item {
+      flex: 0 0 auto; min-width: 96px; flex-wrap: wrap; padding: 7px 10px; gap: 5px;
+    }
+    body.game-running:not(.game-finished) .recent-item .recent-time { min-width: 0; }
+    body.game-running:not(.game-finished) .recent-item .chev { display: none; }
+
+    .recent-pos {
+      font-size: 0.62rem; color: var(--text-dim); font-variant-numeric: tabular-nums;
+      border: 1px solid var(--border-light); border-radius: 4px; padding: 0 4px;
+    }
+
+    /* ── Making room for the pitch ──────────────────────────────
+       v1's header and scoreboard are sized for a page that scrolls. Here the
+       pitch has to fit on screen with them, so while a game is running both
+       compress and the header actions become one scrolling row instead of
+       wrapping onto three. ── */
+    header h1 { white-space: nowrap; }
+    .btn-icon { white-space: nowrap; }
+    /* One tight row only while playing — off the pitch there's room to wrap. */
+    body.game-running:not(.game-finished) .header-actions { flex-wrap: nowrap; }
+    body.game-running:not(.game-finished) .btn-icon .lbl,
+    body.game-running:not(.game-finished) .btn-hdr-stats span { display: none; }
+    /* The scoreboard says what you're looking at; the title is just chrome. */
+    body.game-running:not(.game-finished) header h1 { display: none; }
+    body.game-running:not(.game-finished) header { padding: 6px 10px; }
+    body.game-running:not(.game-finished) .btn-icon { padding: 5px 8px; font-size: 0.72rem; }
+    body.game-running:not(.game-finished) #scoreboard { padding: 5px 14px; }
+    body.game-running:not(.game-finished) .score-val,
+    body.game-running:not(.game-finished) #halfClock  { font-size: 1.55rem; }
+    body.game-running:not(.game-finished) .score-name { font-size: 0.68rem; }
+    body.game-running:not(.game-finished) #totalClock { font-size: 0.6rem; margin-top: 2px; }
+    body.game-running:not(.game-finished) .poss-btn,
+    body.game-running:not(.game-finished) .start-btn  { padding: 9px 6px; font-size: 0.82rem; }
+
+    /* Setup: the touch-upload switch */
+    .v2-switch { display: flex; align-items: center; gap: 9px; font-size: 0.74rem; color: var(--text-muted); }
+    .v2-switch input { width: 18px; height: 18px; accent-color: var(--accent); flex-shrink: 0; }
+    .v2-badge {
+      font-size: 0.58rem; font-weight: 800; letter-spacing: 0.08em;
+      background: var(--purple); color: #fff; border-radius: 4px; padding: 2px 5px; vertical-align: 2px;
+    }
+  </style>
+<script src="js/config.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/events.js"></script>
+<script src="js/possession.js"></script>
+<script src="js/field_games.js"></script>
+</head>
+<body>
+
+<header>
+  <tr-logo compact></tr-logo>
+  <h1>Field Annotator <span class="v2-badge">V2</span></h1>
+  <div class="header-actions">
+    <button class="btn-icon" onclick="showPicker()">←<span class="lbl"> Games</span></button>
+    <button class="btn-icon btn-hdr-push" id="pushBtn"     onclick="pushToSheet()">⬆<span class="lbl"> Push</span></button>
+    <button class="btn-icon btn-hdr-swap" id="swapBtn"     onclick="toggleSwap()">⇆<span class="lbl"> Swap</span></button>
+    <button class="btn-icon btn-hdr-override" id="overrideBtn" style="display:none" onclick="pushToSheet(true)">⚠ Override</button>
+    <button class="btn-icon btn-hdr-stats" onclick="openStats()" title="View live stats">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="6" y1="20" x2="6" y2="13"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="18" y1="20" x2="18" y2="9"/></svg>
+      <span>Stats</span>
+    </button>
+    <button class="btn-icon btn-live"     id="liveBtn"     onclick="toggleLive()">⚫<span class="lbl"> Live</span></button>
+    <button class="btn-icon"              onclick="toggleSettings()" id="settingsBtn">⚙<span class="lbl"> Setup</span></button>
+  </div>
+</header>
+
+<div id="syncBanner"></div>
+
+<div id="settingsPanel" class="open">
+  <div>
+    <div class="settings-label">Teams</div>
+    <div class="settings-row">
+      <input id="metaTeam1" placeholder="Team 1" oninput="onMetaChange()">
+      <input id="metaTeam2" placeholder="Team 2" oninput="onMetaChange()">
+    </div>
+  </div>
+  <div>
+    <div class="settings-row">
+      <input id="metaYear"        placeholder="Year"        style="max-width:80px" oninput="onMetaChange()">
+      <select id="metaDivision" style="max-width:90px" onchange="onMetaChange()">
+        <option value="MXO">MXO</option>
+        <option value="MO">MO</option>
+        <option value="WO">WO</option>
+        <option value="M30">M30</option>
+        <option value="X30">X30</option>
+        <option value="W27">W27</option>
+        <option value="M40">M40</option>
+        <option value="W35">W35</option>
+        <option value="" selected>NONE</option>
+      </select>
+      <input id="metaCompetition" placeholder="Competition" oninput="onMetaChange()">
+      <input id="metaId" placeholder="ID" style="max-width:70px" title="Optional disambiguator for repeat fixtures" oninput="onMetaChange()">
+    </div>
+  </div>
+  <div>
+    <div class="settings-label">YouTube link or video ID (optional) — enables live video on the scoreboard</div>
+    <div class="settings-row">
+      <input id="metaYoutube" placeholder="youtu.be/… , watch?v=… , or 11-char ID" oninput="onMetaChange()" onchange="normalizeYoutubeInput()">
+    </div>
+  </div>
+  <div>
+    <div class="settings-label">Click delay (s) — subtracted from every tag after the first, to compensate for reaction time</div>
+    <div class="settings-row">
+      <input id="clickDelayInput" type="number" min="0" max="9" step="1" value="0" style="max-width:90px" oninput="setClickDelay(this.value)">
+    </div>
+  </div>
+  <div>
+    <label class="v2-switch">
+      <input type="checkbox" id="uploadTouchesInput" onchange="setUploadTouches(this.checked)">
+      <span>Upload the individual touches too (type <code>Touch</code>). Off by default: positions on
+      tries, turnovers and penalties always upload, but the touch-by-touch rows would add a lot of
+      lines to the sheet tab.</span>
+    </label>
+  </div>
+  <div id="sheetPreview">fill metadata to generate tab name</div>
+  <div id="sheetClashWarning" style="display:none;font-size:0.72rem;color:var(--orange);padding:2px 0"></div>
+  <div id="groupInfo" style="font-size:0.72rem;padding:2px 0"></div>
+</div>
+
+<div id="scoreboard">
+  <div class="score-team">
+    <div class="score-name" id="scoreName1">Team 1</div>
+    <div class="score-val"  id="scoreVal1">0</div>
+  </div>
+  <div style="text-align:center">
+    <div id="halfClock">00:00</div>
+    <div id="totalClock">00:00</div>
+  </div>
+  <div class="score-team">
+    <div class="score-name" id="scoreName2">Team 2</div>
+    <div class="score-val"  id="scoreVal2">0</div>
+  </div>
+</div>
+
+<main>
+
+  <div>
+    <div class="poss-toggle">
+      <button class="poss-btn active" id="possBtn1" onclick="setPossession('Team 1')">Team 1</button>
+      <button class="start-btn"       id="gameEventBtn" onclick="tagGameEventToggle()">Start</button>
+      <button class="poss-btn"        id="possBtn2" onclick="setPossession('Team 2')">Team 2</button>
+    </div>
+  </div>
+
+  <!-- The pitch replaces v1's event grid: penalties stay as buttons, everything
+       else is placed by tapping where it happened. -->
+  <div id="pitchSection">
+    <div class="pen-row">
+      <button class="pen-btn" id="penAtkBtn"   onclick="armPen('Penalty Attack')">Pen Attack<small>ball over</small></button>
+      <button class="pen-btn" id="penDefBtn"   onclick="armPen('Penalty Defence')">Pen Defence<small>keep ball</small></button>
+      <button class="pen-btn" id="sixAgainBtn" onclick="armPen('6 Again')">6 Again<small>touches reset</small></button>
+    </div>
+
+    <div class="pitch-wrap" id="pitchWrap">
+      <div class="pitch-ov" id="attackHud"><span class="arrow">&#9650;</span><span id="attackTeam">Team 1</span><span style="color:var(--text-dim);font-weight:600">attacking</span></div>
+      <div class="pitch-ov" id="touchRail"></div>
+      <div class="pitch-ov" id="pitchHint">Tap where the touch was made</div>
+      <div id="pinLayer"></div>
+    </div>
+
+    <div id="subtypeBar"></div>
+  </div>
+
+  <div id="gameEventsSection">
+    <div class="mini-row gated-grid">
+      <button class="mini-btn" onclick="tagGameEvent('Ball Live')"><i>&#9654;</i>Ball Live</button>
+      <button class="mini-btn" id="driveGoodBtn" onclick="tagGameEvent('Drive - Good')"><i>&#43;</i>Drive</button>
+      <button class="mini-btn" id="driveBadBtn"  onclick="tagGameEvent('Drive - Bad')"><i>&#8722;</i>Drive</button>
+      <button class="mini-btn" onclick="tagToReview()"><i>&#9873;</i>Review</button>
+      <button class="mini-btn undo" onclick="undoLast()"><i>&#8617;</i>Undo</button>
+    </div>
+  </div>
+
+  <button id="stopGameBtn" onclick="openStopDialog()">⏹ Stop Game</button>
+
+  <div id="finishedBanner">
+    <span style="font-size:1rem">🏁</span>
+    <span><strong style="color:var(--text)">Game finished.</strong> The clock is stopped — tap any event below to correct its type.</span>
+  </div>
+
+  <div id="recentWrap">
+    <div class="section-label" id="recentLabel">Recent</div>
+    <div id="recentList"><div style="color:var(--text-muted);font-size:0.82rem;padding:8px 0">No events yet</div></div>
+  </div>
+
+</main>
+
+<!-- Game picker — the landing view; every game lives on this device until pushed -->
+<div id="pickerScreen">
+  <header>
+    <tr-logo compact></tr-logo>
+    <h1>Field Annotator <span class="v2-badge">V2</span></h1>
+    <div class="header-actions">
+      <a href="index.html" class="btn-icon">← Hub</a>
+    </div>
+  </header>
+  <div class="picker-main">
+    <button class="new-game-btn" onclick="newGame()">＋ New Game</button>
+    <div class="picker-bar">
+      <div class="section-label">Games on this device</div>
+      <div class="picker-bar-actions">
+        <button class="btn-icon" id="deleteSyncedBtn" onclick="deleteSyncedGames()">🗑 Delete uploaded</button>
+      </div>
+    </div>
+    <div id="pickerList"></div>
+  </div>
+</div>
+
+<!-- Stop game confirmation -->
+<div id="stopOverlay" onclick="if(event.target===this)closeStopDialog()">
+  <div id="stopCard">
+    <div class="stats-handle"></div>
+    <div class="stop-title">Finish this game?</div>
+    <div class="stop-body">The clock stops permanently and no new events can be added. You'll still be able to correct event types and comments.</div>
+    <div class="stop-warn" id="stopOfflineWarn" style="display:none">
+      ⚠ <strong id="stopOfflineWarnTitle">No internet — this game has not been uploaded.</strong>
+      <span id="stopOfflineWarnBody">It's saved on this device only. Upload it later from the games list.</span>
+    </div>
+    <div class="stop-actions" id="stopActions"></div>
+  </div>
+</div>
+
+<!-- Edit event modal -->
+<div id="editOverlay" onclick="if(event.target===this)closeEdit()">
+  <div id="editCard">
+    <div class="stats-handle"></div>
+    <div style="padding:16px 20px 12px;border-bottom:1px solid var(--border)">
+      <div style="font-size:0.7rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Edit Event</div>
+      <div class="edit-head-row">
+        <div id="editCurrentLabel" style="font-size:1rem;font-weight:600"></div>
+        <span class="edit-subtype-wrap" id="editSubtypeWrap">
+          <select id="editSubtype" class="edit-subtype" aria-label="Sub-type" onchange="applySubtype()"></select>
+        </span>
+      </div>
+    </div>
+    <div style="padding:16px 16px 4px">
+      <div style="font-size:0.7rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px">Comment</div>
+      <textarea id="editComment" class="edit-comment" rows="2" placeholder="Add a note (optional)…"></textarea>
+    </div>
+    <div style="padding:12px 16px 4px">
+      <div style="font-size:0.7rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px">Change type</div>
+      <div class="event-grid two-col">
+        <button class="evt-btn btn-try1"    onclick="applyEdit('Try','Other')">Try</button>
+        <button class="evt-btn btn-turn"    onclick="applyEdit('Turnover','Other')">Turnover</button>
+        <button class="evt-btn btn-pen-atk" onclick="applyEdit('Penalty Attack','Other')">Pen Attack</button>
+        <button class="evt-btn btn-turn"    onclick="applyEdit('Turnover','6th Touch')">6th Touch</button>
+        <button class="evt-btn btn-pen-def" onclick="applyEdit('Penalty Defence','Other')">Pen Defence</button>
+        <button class="evt-btn btn-turn"    style="opacity:0.65" onclick="applyEdit('Turnover','6 Again')">6 Again</button>
+        <button class="evt-btn btn-game     edit-adv" onclick="applyEdit('Game Event','Ball Live')">Ball Live</button>
+        <button class="evt-btn btn-review"  onclick="applyEdit('To Review','To Review')">To Review</button>
+        <button class="evt-btn btn-try1     edit-adv" onclick="applyEdit('Game Event','Drive - Good')">Drive +</button>
+        <button class="evt-btn btn-pen-atk  edit-adv" onclick="applyEdit('Game Event','Drive - Bad')">Drive −</button>
+        <button class="evt-btn btn-game     edit-adv" onclick="applyEdit('Game Event','Game Start')">Game Start</button>
+        <button class="evt-btn btn-game     edit-adv" onclick="applyEdit('Game Event','Game End')">Game End</button>
+      </div>
+    </div>
+    <div class="edit-footer">
+      <button class="stats-close-btn" onclick="deleteEvent()" style="color:var(--red)">Delete</button>
+      <button class="stats-close-btn" onclick="closeEdit()">Cancel</button>
+      <button class="stats-close-btn edit-btn-save" onclick="saveComment()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Stats modal -->
+<div id="statsOverlay" onclick="if(event.target===this)closeStats()">
+  <div id="statsCard">
+    <div class="stats-handle"></div>
+    <div class="stats-hero">
+      <div class="stats-hero-team">
+        <div class="stats-hero-name"  id="heroName1">Team 1</div>
+        <div class="stats-hero-score" id="heroScore1">0</div>
+      </div>
+      <div class="stats-hero-sep">–</div>
+      <div class="stats-hero-team">
+        <div class="stats-hero-name"  id="heroName2">Team 2</div>
+        <div class="stats-hero-score" id="heroScore2">0</div>
+      </div>
+    </div>
+    <div class="stats-status" id="statsStatus"></div>
+    <div id="statsBody"></div>
+    <button class="stats-close-btn" onclick="closeStats()">Close</button>
+  </div>
+</div>
+
+<script>
+// Everything this page does lives on the device until a push, so it's the one
+// page offline mode can open without an account.
+TR.auth('admin', { offline: true });
+const OFFLINE = TR.isOfflineMode();
+
+window.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('metaYear').value = String(new Date().getFullYear());
+  document.getElementById('clickDelayInput').value = String(clickDelay);
+  TR.FieldGames.migrateLegacy();  // fold a pre-multi-game session into the store
+  applyOfflineMode();
+  updateGroupInfo();       // show cached group immediately…
+  if (!OFFLINE) refreshGroupFromServer(); // …then confirm from the authoritative source
+  showPicker();
+});
+
+// In offline mode there's no secret to push with, so every control that talks to
+// the server is disabled rather than left to fail. The games themselves are
+// unaffected — they're stored on the device and carry no identity, so they're
+// attributed to whoever is logged in when they're eventually uploaded.
+function applyOfflineMode() {
+  if (!OFFLINE) return;
+  document.body.classList.add('offline-mode');
+  [['pushBtn', 'Log in to upload this game'], ['liveBtn', 'Live broadcasting needs a connection']]
+    .forEach(([id, why]) => {
+      const b = document.getElementById(id);
+      b.disabled = true;
+      b.title = why;
+    });
+}
+
+// The phone's back gesture should step out of a game to the picker rather than
+// leaving the app entirely.
+window.addEventListener('popstate', () => { if (activeGame) showPicker(); });
+
+// A game finished without a connection syncs itself as soon as one appears.
+// Offline mode is excluded: there's no account to attribute the upload to.
+window.addEventListener('online', () => {
+  if (OFFLINE) return;
+  if (activeGame && activeGame.status === 'finished' && TR.FieldGames.isDirty(activeGame)) pushToSheet();
+});
+
+// Re-fetch role/group for the current secret and persist it, so the group
+// indicator and pre-push check are accurate even if this page was opened
+// directly (without going through the login screen first).
+async function refreshGroupFromServer() {
+  const secret = TR.secret();
+  if (!secret) return;
+  try {
+    const resp = await fetch(`${TR.APPS_SCRIPT_URL}?secret=${encodeURIComponent(secret)}&action=whoami`);
+    const data = await resp.json();
+    if (data && data.ok) {
+      TR.saveSession(secret, data.role, data.group || '');
+      updateGroupInfo();
+    }
+  } catch (e) { /* offline — keep cached value */ }
+}
+
+// Show which access group this push will be attributed to. The group is derived
+// server-side from the secret, so this mirrors exactly what gets stamped onto
+// the game's metadata row — it's a confirmation, not a separate source of truth.
+function updateGroupInfo() {
+  const el = document.getElementById('groupInfo');
+  if (!el) return;
+  const role  = sessionStorage.getItem('role') || TR.role();
+  const group = TR.userGroup();
+  if (OFFLINE) {
+    el.innerHTML = '<span style="color:var(--orange)">📴 Offline mode — this game stays on the device. ' +
+      'It will be tagged to whichever account uploads it later.</span>';
+  } else if (role === 'admin') {
+    el.innerHTML = '<span style="color:var(--text-muted)">Uploading as admin — set visibility in Backfill (no group auto-tagged).</span>';
+  } else if (group) {
+    el.innerHTML = `<span style="color:var(--text-muted)">Uploads tagged to group:</span> <strong style="color:var(--green)">${group}</strong>`;
+  } else {
+    el.innerHTML = '<span style="color:var(--red)">⚠ No group on your login — uploads will be admin-only. Re-login or check access.</span>';
+  }
+}
+
+// ── State ──────────────────────────────────────────────────────
+// The game record currently open in the annotator (null while the picker is
+// showing). The working variables below mirror its fields; saveSession() writes
+// them back. See js/field_games.js for the store.
+let activeGame   = null;
+let loading      = false;   // suppresses saves while a game is being loaded
+let annotations  = [];
+let possession   = 'Team 1';
+let wallStart    = null;
+// Per-game token, generated lazily on first push. Persisted with the session so
+// repeated pushes of the SAME game (created by this device) can overwrite the
+// existing tab without an admin override. Reset when a new game is started.
+let creatorToken = null;
+let liveMode     = false;
+let liveInterval = null;
+let clickDelay   = Math.min(9, Math.max(0, parseInt(localStorage.getItem('fieldClickDelay') || '0', 10) || 0));
+
+function setClickDelay(v) {
+  const n = Math.min(9, Math.max(0, parseInt(v, 10) || 0));
+  clickDelay = n;
+  localStorage.setItem('fieldClickDelay', String(n));
+}
+
+// ── Game persistence ──────────────────────────────────────────
+const $ = id => document.getElementById(id);
+
+function readMetaFields() {
+  return {
+    team1:       $('metaTeam1').value,
+    team2:       $('metaTeam2').value,
+    year:        $('metaYear').value,
+    division:    $('metaDivision').value,
+    competition: $('metaCompetition').value,
+    id:          $('metaId').value,
+    youtubelink: $('metaYoutube').value,
+  };
+}
+
+// Persist the working state back onto the active game record. opts.touch:false
+// records the write without counting it as an edit — used for display-only
+// changes (the swap toggle) that shouldn't mark a synced game as out of date.
+function saveSession(opts) {
+  if (loading || !activeGame) return;
+  activeGame.annotations  = annotations;
+  activeGame.possession   = possession;
+  activeGame.wallStart    = wallStart;
+  activeGame.teamsSwapped = teamsSwapped;
+  activeGame.creatorToken = creatorToken;
+  activeGame.meta         = readMetaFields();
+  TR.FieldGames.save(activeGame, opts);
+  updateSyncUI();
+}
+
+function isFinished() { return !!activeGame && activeGame.status === 'finished'; }
+
+// ── Game picker ───────────────────────────────────────────────
+function showPicker() {
+  if (activeGame) {
+    saveSession({ touch: false });
+    // Don't leave a broadcast running for a game we're no longer tagging.
+    if (liveMode) stopLive();
+  }
+  closeStats();
+  closeEdit();
+  closeStopDialog();
+  activeGame = null;
+  document.body.classList.remove('game-finished', 'game-running');
+  $('syncBanner').classList.remove('open');
+  renderPicker();
+  $('pickerScreen').classList.add('open');
+}
+
+function hidePicker() { $('pickerScreen').classList.remove('open'); }
+
+function relTime(ts) {
+  if (!ts) return '';
+  const s = Math.max(0, (Date.now() - ts) / 1000);
+  if (s < 90)    return 'just now';
+  if (s < 5400)  return Math.round(s / 60) + 'm ago';
+  if (s < 86400) return Math.round(s / 3600) + 'h ago';
+  return Math.round(s / 86400) + 'd ago';
+}
+
+const escapeHtml = s => String(s).replace(/[&<>"']/g, c =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function renderPicker() {
+  const games = TR.FieldGames.list();
+  const list  = $('pickerList');
+
+  $('deleteSyncedBtn').style.display = games.some(TR.FieldGames.isSynced) ? '' : 'none';
+
+  if (!games.length) {
+    list.innerHTML = '<div class="picker-empty">No games on this device yet.<br>Tap <strong>＋ New Game</strong> to start tagging.</div>';
+    return;
+  }
+
+  const STATUS = {
+    running:  '<span class="badge badge-running"><span class="tile-dot"></span>Live</span>',
+    paused:   '<span class="badge badge-paused">⏸ Paused</span>',
+    finished: '<span class="badge badge-finished">🏁 Finished</span>',
+    new:      '<span class="badge badge-new">Not started</span>',
+  };
+
+  list.innerHTML = games.map(g => {
+    const s     = TR.FieldGames.summarize(g);
+    const title = s.titled ? `${escapeHtml(s.team1)} vs ${escapeHtml(s.team2)}` : 'Untitled game';
+    // An empty game has nothing to upload, so flagging it as un-uploaded would
+    // just be noise on a tile the annotator hasn't started yet.
+    const sync  = !s.events  ? ''
+                : s.synced   ? `<span class="badge badge-synced">☁ Synced ${relTime(g.sync.pushedAt)}</span>`
+                : s.uploaded ? '<span class="badge badge-unsynced">⚠ Unsynced changes</span>'
+                             : '<span class="badge badge-unsynced">⚠ Not uploaded</span>';
+    const meta  = [
+      s.events ? `<span class="tile-score">${s.score1}–${s.score2}</span>` : null,
+      `${s.events} event${s.events === 1 ? '' : 's'}`,
+      s.duration >= 1 ? fmtClock(s.duration) : null,
+    ].filter(Boolean);
+    return `<div style="position:relative;margin-bottom:8px">
+      <button class="game-tile ${s.status === 'finished' ? 'finished' : ''}" onclick="openGame('${g.id}')">
+        <div class="tile-title ${s.titled ? '' : 'untitled'}">${title}</div>
+        ${s.subtitle ? `<div class="tile-sub">${escapeHtml(s.subtitle)}</div>` : ''}
+        <div class="tile-line">${meta.join(' · ')}</div>
+        <div class="tile-badges">${STATUS[s.status]}${sync}</div>
+      </button>
+      <button class="tile-x" title="Delete this game" onclick="deleteGame('${g.id}')">✕</button>
+      ${s.status === 'finished' ? `<button class="tile-reopen" onclick="reopenGame('${g.id}')">↺ Reopen</button>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function newGame() {
+  const rec = TR.FieldGames.create({ year: String(new Date().getFullYear()) });
+  openGame(rec.id, true);
+}
+
+function openGame(id, isNew) {
+  const rec = TR.FieldGames.get(id);
+  if (!rec) { renderPicker(); return; }
+  loadGame(rec, isNew);
+  hidePicker();
+  // Give the phone's back gesture something to pop back to the picker with.
+  try { history.pushState({ game: id }, '', location.pathname + location.search); } catch (e) {}
+}
+
+function loadGame(rec, isNew) {
+  loading    = true;
+  activeGame = rec;
+
+  annotations  = rec.annotations;
+  possession   = rec.possession;
+  wallStart    = rec.wallStart;
+  creatorToken = rec.creatorToken;
+
+  const m = rec.meta;
+  $('metaTeam1').value       = m.team1;
+  $('metaTeam2').value       = m.team2;
+  $('metaYear').value        = m.year || String(new Date().getFullYear());
+  $('metaDivision').value    = m.division;
+  $('metaCompetition').value = m.competition;
+  $('metaId').value          = m.id;
+  $('metaYoutube').value     = m.youtubelink;
+  $('possBtn1').textContent  = m.team1.trim() || 'Team 1';
+  $('possBtn2').textContent  = m.team2.trim() || 'Team 2';
+
+  setPossession(possession);
+  if (teamsSwapped !== !!rec.teamsSwapped) toggleSwap();
+  armedPen = null;
+  closeSubtype();
+  $('overrideBtn').style.display = 'none';
+
+  loading = false;
+  // Open Setup for a brand-new game (teams still need filling in); leave it shut
+  // when resuming so the tagging buttons are immediately to hand.
+  $('settingsPanel').classList.toggle('open', !!isNew);
+  updateSheetPreview();
+  updateUI();
+  updateSyncUI();
+}
+
+// Deleting is the only way to lose annotations, so an un-uploaded game asks
+// twice and says plainly that this device is the only copy.
+function confirmDelete(rec) {
+  const s     = TR.FieldGames.summarize(rec);
+  const label = s.titled ? `${s.team1} vs ${s.team2}` : 'Untitled game';
+  if (TR.FieldGames.isSynced(rec)) {
+    return confirm(`Delete "${label}"?\n\nIt's already uploaded to the sheet, so only the copy on this device is removed.`);
+  }
+  const what = TR.FieldGames.isUploaded(rec)
+    ? `"${label}" has changes that were never uploaded.`
+    : `"${label}" (${s.events} event${s.events === 1 ? '' : 's'}) has never been uploaded.`;
+  return confirm(`${what}\n\nThis device is the only copy — deleting it cannot be undone.\n\nDelete anyway?`)
+      && confirm('Are you sure? This is permanent.');
+}
+
+function deleteGame(id) {
+  const rec = TR.FieldGames.get(id);
+  if (!rec || !confirmDelete(rec)) return;
+  TR.FieldGames.remove(id);
+  renderPicker();
+}
+
+// Bulk cleanup — deliberately limited to games that are uploaded with no edits
+// since, so it can never destroy the only copy of anything.
+function deleteSyncedGames() {
+  const n = TR.FieldGames.list().filter(TR.FieldGames.isSynced).length;
+  if (!n) { alert('No uploaded games to delete.'); return; }
+  if (!confirm(`Delete ${n} uploaded game${n === 1 ? '' : 's'} from this device?\n\nThey're saved in the sheet, so nothing is lost. Games that still need uploading are kept.`)) return;
+  TR.FieldGames.removeSynced();
+  renderPicker();
+}
+
+function reopenGame(id) {
+  const rec = TR.FieldGames.get(id);
+  if (!rec) return;
+  if (!confirm('Reopen this game?\n\nThe clock restarts from real time and you can tag events again. You\'ll need to upload it again afterwards.')) return;
+  rec.status     = 'active';
+  rec.finishedAt = null;
+  TR.FieldGames.save(rec);
+  openGame(id);
+}
+
+// ── Time helpers ───────────────────────────────────────────────
+function nowSeconds() {
+  if (wallStart === null) { wallStart = Date.now(); return 0; }
+  return (Date.now() - wallStart) / 1000;
+}
+
+function fmtClock(s) {
+  const m = Math.floor(s / 60), sec = Math.floor(s % 60);
+  return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+}
+
+function ordinal(n) {
+  const s = ['th','st','nd','rd'];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+// ── Team swap ──────────────────────────────────────────────────
+let teamsSwapped = false;
+function toggleSwap() {
+  teamsSwapped = !teamsSwapped;
+
+  // Possession + Start/End buttons (3-column row, Start/End stays in middle)
+  const poss    = document.querySelector('.poss-toggle');
+  const btn1    = document.getElementById('possBtn1');
+  const btn2    = document.getElementById('possBtn2');
+  const gameBtn = document.getElementById('gameEventBtn');
+  if (teamsSwapped) {
+    poss.appendChild(btn2);
+    poss.appendChild(gameBtn);
+    poss.appendChild(btn1);
+  } else {
+    poss.appendChild(btn1);
+    poss.appendChild(gameBtn);
+    poss.appendChild(btn2);
+  }
+
+  // Scoreboard (flex order; center div stays at default order:0)
+  const s1 = document.getElementById('scoreName1').closest('.score-team');
+  const s2 = document.getElementById('scoreName2').closest('.score-team');
+  s1.style.order = teamsSwapped ? '1' : '-1';
+  s2.style.order = teamsSwapped ? '-1' : '1';
+
+  // Stats hero (same technique)
+  const h1 = document.getElementById('heroName1').closest('.stats-hero-team');
+  const h2 = document.getElementById('heroName2').closest('.stats-hero-team');
+  h1.style.order = teamsSwapped ? '1' : '-1';
+  h2.style.order = teamsSwapped ? '-1' : '1';
+
+  document.getElementById('swapBtn').classList.toggle('active', teamsSwapped);
+  // Display-only: persist it, but don't let it mark an uploaded game as changed.
+  saveSession({ touch: false });
+}
+
+// ── Possession ─────────────────────────────────────────────────
+function setPossession(team) {
+  possession = team;
+  document.getElementById('possBtn1').classList.toggle('active', team === 'Team 1');
+  document.getElementById('possBtn2').classList.toggle('active', team === 'Team 2');
+  saveSession();
+}
+
+// ── Tagging ────────────────────────────────────────────────────
+// Every event-adding path funnels through tag() / tagToReview(), so freezing a
+// finished game is enforced in one place each.
+// `pos` is the attack-normalised pitch position of the tap, when there is one.
+// Events tagged from a button rather than the pitch (Game Start, Ball Live, a
+// Drive rating) simply carry no position.
+function tag(type, name, possessionOwner, pos) {
+  if (isFinished()) return;
+  let t = nowSeconds();
+  if (annotations.length > 0) t = Math.max(0, t - clickDelay);
+  const actionOwner = TR.inferActionOwner(possessionOwner, type, name);
+  annotations.push({ id: Date.now() + Math.random(), type, name, possessionOwner, actionOwner, comment: '', time: t, timeStr: TR.fmt(t),
+                     x: pos ? pos.x : null, y: pos ? pos.y : null });
+
+  const next = TR.inferPossessionAfter(possessionOwner, type, name);
+  if (next !== possessionOwner) setPossession(next);
+
+  updateUI();
+  saveSession();
+  if (liveMode) pushLiveUpdate();
+}
+
+function tagWithPossession(type, name) { tag(type, name, possession); }
+function tagGameEvent(name) {
+  // Drive +/- is a per-possession rating: allow only one per possession so a
+  // single possession can't be double-tagged. The lock clears at the next
+  // play-ending event (see driveAlreadyTagged).
+  if ((name === 'Drive - Good' || name === 'Drive - Bad') && driveAlreadyTagged()) return;
+  // Teams alternate the tap-off each half, so a new half defaults to the
+  // opposite team of whoever started the previous half. (The very first half
+  // keeps the current selection.) Still user-overridable via the toggle.
+  if (name === 'Game Start') {
+    const prevStart = [...annotations].reverse().find(a => a.type === 'Game Event' && a.name === 'Game Start');
+    if (prevStart) setPossession(TR.otherTeam(prevStart.possessionOwner));
+  }
+  tag('Game Event', name, possession);
+}
+
+// True if a Drive +/- has already been tagged in the current possession. A
+// possession runs until the next play-ending event (Try / Turnover / Penalty /
+// Game Start / End) — i.e. any annotation that isn't a Game Event or To Review.
+// Ball Live is the dead-time lead-in to a possession, so it isn't a boundary.
+function driveAlreadyTagged() {
+  for (let i = annotations.length - 1; i >= 0; i--) {
+    const a = annotations[i];
+    if (a.type === 'Game Event' && (a.name === 'Drive - Good' || a.name === 'Drive - Bad')) return true;
+    if (a.type === 'Touch' || a.type === 'To Review' || a.name === 'Ball Live') continue;
+    return false; // play-ending event reached — current possession has no drive yet
+  }
+  return false;
+}
+
+function tagGameEventToggle() {
+  const gameEventAnnots = annotations.filter(a => a.name === 'Game Start' || a.name === 'Game End');
+  const last = gameEventAnnots[gameEventAnnots.length - 1];
+  tagGameEvent(last && last.name === 'Game Start' ? 'Game End' : 'Game Start');
+}
+
+function tagToReview() {
+  if (isFinished()) return;
+  let t = nowSeconds();
+  if (annotations.length > 0) t = Math.max(0, t - clickDelay);
+  const at = lastKnownPoint();
+  annotations.push({ id: Date.now() + Math.random(), type: 'To Review', name: 'To Review', possessionOwner: possession, actionOwner: possession, comment: '?', time: t, timeStr: TR.fmt(t), x: at.x, y: at.y });
+  updateUI();
+  saveSession();
+  if (liveMode) pushLiveUpdate();
+}
+
+function undoLast() {
+  if (isFinished() || !annotations.length) return;
+  const removed = annotations.pop();
+  setPossession(removed.possessionOwner);
+  updateUI();
+  saveSession();
+}
+
+// ── Edit event ─────────────────────────────────────────────────
+let editingIndex = null;
+
+function computePossAfter(a) {
+  return TR.inferPossessionAfter(a.possessionOwner, a.type, a.name);
+}
+
+function replayPossessionFrom(startIndex) {
+  for (let i = startIndex; i < annotations.length; i++) {
+    const newPoss = computePossAfter(annotations[i - 1]);
+    annotations[i].possessionOwner = newPoss;
+    annotations[i].actionOwner = TR.inferActionOwner(newPoss, annotations[i].type, annotations[i].name);
+  }
+  const last = annotations[annotations.length - 1];
+  setPossession(last ? computePossAfter(last) : 'Team 1');
+}
+
+function openEdit(index) {
+  editingIndex = index;
+  const a = annotations[index];
+  document.getElementById('editCurrentLabel').textContent = eventBaseLabel(a) + ' · ' + fmtClock(a.time);
+  renderSubtypeMenu(a);
+  // '?' is the placeholder marker To Review events carry — show a blank box so
+  // the annotator can type a real note over it.
+  document.getElementById('editComment').value = (a.comment && a.comment !== '?') ? a.comment : '';
+  document.getElementById('editOverlay').classList.add('open');
+}
+
+function closeEdit() {
+  editingIndex = null;
+  document.getElementById('editOverlay').classList.remove('open');
+}
+
+// Read the comment box back onto the annotation being edited. To Review events
+// keep the '?' marker when left blank so they still stand out downstream.
+function commitCommentField(a) {
+  const text = document.getElementById('editComment').value.trim();
+  a.comment = text || (a.type === 'To Review' ? '?' : '');
+}
+
+function saveComment() {
+  if (editingIndex === null) return;
+  commitCommentField(annotations[editingIndex]);
+  closeEdit();
+  updateUI();
+  saveSession();
+}
+
+function applyEdit(type, name) {
+  if (editingIndex === null) return;
+  const a = annotations[editingIndex];
+  a.type = type;
+  a.name = name;
+  commitCommentField(a);
+  a.actionOwner = TR.inferActionOwner(a.possessionOwner, type, name);
+  replayPossessionFrom(editingIndex + 1);
+  closeEdit();
+  updateUI();
+  saveSession();
+}
+
+// A plain <select> so phones get the native picker wheel for free. Only the
+// four play types carry a sub-type worth picking — Game Event and To Review
+// spell their detail out in the name itself, and each already has its own
+// button in the grid below.
+function renderSubtypeMenu(a) {
+  const wrap = document.getElementById('editSubtypeWrap');
+  const sel  = document.getElementById('editSubtype');
+  const opts = SUBTYPE_TYPES.includes(a.type) ? (TR.MENU[a.type] || []).slice() : [];
+  // Keep a name the canonical menu doesn't know rather than silently dropping it.
+  if (a.name && opts.length && !opts.includes(a.name)) opts.unshift(a.name);
+  wrap.style.display = opts.length ? '' : 'none';
+  sel.innerHTML = opts.map(o => `<option value="${o}"${o === a.name ? ' selected' : ''}>${o}</option>`).join('');
+  markSubtypeState();
+}
+
+function markSubtypeState() {
+  const sel = document.getElementById('editSubtype');
+  sel.classList.toggle('set', !!sel.value && sel.value !== 'Other');
+}
+
+// Applies straight away rather than waiting on Save, so the pick can't be lost
+// by dismissing the sheet — same as the type buttons. The sheet stays open so a
+// comment can still be added on top.
+function applySubtype() {
+  if (editingIndex === null) return;
+  const a = annotations[editingIndex];
+  a.name = document.getElementById('editSubtype').value;
+  a.actionOwner = TR.inferActionOwner(a.possessionOwner, a.type, a.name);
+  replayPossessionFrom(editingIndex + 1);
+  markSubtypeState();
+  updateUI();
+  saveSession();
+}
+
+// ── UI update ──────────────────────────────────────────────────
+const EVENT_LABELS = { 'Try': 'Try', 'Turnover': 'Turnover', 'Penalty Attack': 'Pen Attack', 'Penalty Defence': 'Pen Defence' };
+const SUBTYPE_TYPES = ['Try', 'Turnover', 'Penalty Attack', 'Penalty Defence'];
+
+// The play types always show the type, with the sub-type displayed separately;
+// everything else (Game Event, To Review) carries its detail in the name.
+function eventBaseLabel(a) {
+  if (SUBTYPE_TYPES.includes(a.type)) return EVENT_LABELS[a.type] || a.type;
+  return a.name !== 'Other' ? a.name : (EVENT_LABELS[a.type] || a.type);
+}
+
+function eventSubtype(a) {
+  if (!SUBTYPE_TYPES.includes(a.type)) return '';
+  return a.name && a.name !== 'Other' ? a.name : '';
+}
+
+function updateUI() {
+  // Every path that mutates the list (tag, undo, edit, delete, pin conversion)
+  // funnels through here, so renumbering once here covers all of them.
+  renumberTouches();
+  const t1 = document.getElementById('metaTeam1').value.trim() || 'Team 1';
+  const t2 = document.getElementById('metaTeam2').value.trim() || 'Team 2';
+  document.getElementById('scoreName1').textContent = t1;
+  document.getElementById('scoreName2').textContent = t2;
+  document.getElementById('scoreVal1').textContent  = annotations.filter(a => a.type === 'Try' && a.actionOwner === 'Team 1').length;
+  document.getElementById('scoreVal2').textContent  = annotations.filter(a => a.type === 'Try' && a.actionOwner === 'Team 2').length;
+
+  const gameStarts   = annotations.filter(a => a.name === 'Game Start');
+  const gameEnds     = annotations.filter(a => a.name === 'Game End');
+  const firstStart   = gameStarts[0];
+  const lastStart    = gameStarts[gameStarts.length - 1];
+  const lastEnd      = gameEnds[gameEnds.length - 1];
+  const lastTime     = annotations.length ? annotations[annotations.length - 1].time : 0;
+  const isOnBreak    = !!(lastStart && lastEnd && lastEnd.time > lastStart.time);
+  const finished     = isFinished();
+  if (finished) {
+    // Frozen: show what the final half and the whole game actually lasted,
+    // rather than the break-from-the-whistle reading the live clock would give.
+    const halfDur  = (lastEnd && lastStart)  ? Math.max(0, lastEnd.time - lastStart.time)  : 0;
+    const totalDur = (lastEnd && firstStart) ? Math.max(0, lastEnd.time - firstStart.time) : 0;
+    document.getElementById('halfClock').textContent  = fmtClock(halfDur);
+    document.getElementById('totalClock').textContent = 'Full time · Total ' + fmtClock(totalDur);
+  } else {
+    // On a break the half clock resets to 0 and counts the break from the whistle;
+    // otherwise it tracks the current half from its kick-off.
+    const halfRef      = isOnBreak ? lastEnd : lastStart;
+    const halfElapsed  = halfRef    ? Math.max(0, lastTime - halfRef.time)    : 0;
+    const totalElapsed = firstStart ? Math.max(0, lastTime - firstStart.time) : 0;
+    document.getElementById('halfClock').textContent  = fmtClock(halfElapsed);
+    // Total line doubles as the phase indicator now the period label is gone.
+    const phase = !gameStarts.length ? '' : isOnBreak ? 'Break · ' : ordinal(gameStarts.length) + ' · ';
+    document.getElementById('totalClock').textContent = phase + 'Total ' + fmtClock(totalElapsed);
+  }
+
+  const COLORS = { 'Try': '#22c55e', 'Turnover': '#f97316', 'Penalty Attack': '#ef4444', 'Penalty Defence': '#b91c1c', 'Game Event': '#3b82f6', 'To Review': '#7c3aed', 'Touch': '#3b82f6' };
+  const el = document.getElementById('recentList');
+  const gameEventAnnots = annotations.filter(a => a.name === 'Game Start' || a.name === 'Game End');
+  const lastGameEvent   = gameEventAnnots[gameEventAnnots.length - 1];
+  const gameRunning     = !!(lastGameEvent && lastGameEvent.name === 'Game Start');
+  const gameBtn = document.getElementById('gameEventBtn');
+  gameBtn.textContent = gameRunning ? 'End' : 'Start';
+  gameBtn.classList.toggle('running', gameRunning);
+  document.body.classList.toggle('game-running', gameRunning && !finished);
+  document.body.classList.toggle('game-finished', finished);
+
+  // Stop is only offered on a paused game — you have to tag Game End first, so
+  // the recorded game always closes with the whistle rather than mid-play.
+  const paused = !finished && !!lastGameEvent && lastGameEvent.name === 'Game End';
+  document.getElementById('stopGameBtn').style.display = paused ? 'block' : 'none';
+
+  // A frozen game shows every event, since correcting a type is the only thing
+  // left to do and the last five wouldn't be enough to reach the mistake.
+  document.getElementById('recentLabel').textContent = finished ? 'All events — tap to correct' : 'Recent';
+
+  // Lock Drive +/- once a drive is tagged this possession (avoids double-tagging)
+  const driveLocked = driveAlreadyTagged();
+  document.getElementById('driveGoodBtn').disabled = driveLocked;
+  document.getElementById('driveBadBtn').disabled  = driveLocked;
+
+  renderPitch();
+
+  if (!annotations.length) {
+    el.innerHTML = '<div style="color:var(--text-muted);font-size:0.82rem;padding:8px 0">No events yet</div>';
+    return;
+  }
+  const ordered = [...annotations].reverse();
+  const recent  = finished ? ordered : ordered.slice(0, 4);
+  el.innerHTML = recent.map((a, ri) => {
+    const idx     = annotations.length - 1 - ri;
+    const color   = COLORS[a.type] || '#888';
+    const team    = a.actionOwner === 'Team 1' ? (document.getElementById('metaTeam1').value.trim() || 'Team 1')
+                                                : (document.getElementById('metaTeam2').value.trim() || 'Team 2');
+    const teamStr = a.type !== 'Game Event' ? ` <span class="recent-team">· ${team}</span>` : '';
+    const sub = eventSubtype(a);
+    const hasComment = a.comment && a.comment.trim() && a.comment !== '?';
+    const commentMark = hasComment ? '<span class="recent-comment" title="Has a comment">💬</span>' : '';
+    const posMark = a.x != null ? `<span class="recent-pos" title="Pitch position">${Math.round(a.x)},${Math.round(a.y)}</span>` : '';
+    return `<div class="recent-item" onclick="openEdit(${idx})">
+      <div class="recent-dot" style="background:${color}"></div>
+      <span class="recent-time">${fmtClock(a.time)}</span>
+      <span class="recent-text">${eventBaseLabel(a)}${sub ? ` <span class="recent-sub">${sub}</span>` : ''}${teamStr}</span>
+      ${posMark}${commentMark}
+      <span class="chev" style="color:var(--border);font-size:0.9rem;flex-shrink:0">›</span>
+    </div>`;
+  }).join('');
+}
+
+function onMetaChange() {
+  const t1 = document.getElementById('metaTeam1').value.trim() || 'Team 1';
+  const t2 = document.getElementById('metaTeam2').value.trim() || 'Team 2';
+  document.getElementById('possBtn1').textContent = t1;
+  document.getElementById('possBtn2').textContent = t2;
+  updateUI();
+  updateSheetPreview();
+  saveSession();
+}
+
+// On blur, rewrite the field to the canonical watch URL (TR.normalizeYoutubeUrl
+// accepts a full URL or a bare 11-char ID; leaves unrecognised input as typed).
+function normalizeYoutubeInput() {
+  const el   = document.getElementById('metaYoutube');
+  const norm = TR.normalizeYoutubeUrl(el.value);
+  if (norm) el.value = norm;
+  onMetaChange();
+}
+
+// ── Settings panel ─────────────────────────────────────────────
+function toggleSettings() {
+  document.getElementById('settingsPanel').classList.toggle('open');
+}
+
+// Tab name for an arbitrary game's metadata — used both for the active game and
+// to spot other saved games that would land on the same tab.
+function metaToSheetNameFor(m) {
+  const slug = s => String(s == null ? '' : s).trim().toLowerCase().replace(/\s+/g, '-');
+  const base = [slug(m.year), slug(m.division), slug(m.competition), slug(m.team1), slug(m.team2)]
+    .filter(Boolean).join('_');
+  const id = slug(m.id);
+  return id ? `${base}_${id}` : base;
+}
+
+function metaToSheetName() { return metaToSheetNameFor(readMetaFields()); }
+
+function updateSheetPreview() {
+  const name = metaToSheetName();
+  const el   = document.getElementById('sheetPreview');
+  el.textContent = name || 'fill metadata to generate tab name';
+  el.style.color = name ? '#3b82f6' : 'var(--text-muted)';
+
+  // Two saved games resolving to the same tab would fight over it on push (the
+  // second one gets "tab exists"). Nudge for an ID before that happens.
+  const warn = document.getElementById('sheetClashWarning');
+  const clashes = (activeGame && name)
+    ? TR.FieldGames.collisions(activeGame, g => metaToSheetNameFor(g.meta), name).length : 0;
+  warn.style.display = clashes ? '' : 'none';
+  warn.textContent = clashes
+    ? `⚠ ${clashes} other saved game${clashes === 1 ? '' : 's'} would use this same tab name — set an ID to keep them apart.`
+    : '';
+}
+
+// ── Clock ticker ───────────────────────────────────────────────
+setInterval(() => {
+  // A finished game's clocks are frozen by updateUI() and must not tick on.
+  if (!activeGame || isFinished() || !wallStart) return;
+  const gameStarts = annotations.filter(a => a.name === 'Game Start');
+  if (!gameStarts.length) return;
+  const gameEnds  = annotations.filter(a => a.name === 'Game End');
+  const lastStart = gameStarts[gameStarts.length - 1];
+  const lastEnd   = gameEnds[gameEnds.length - 1];
+  const isOnBreak = !!(lastEnd && lastEnd.time > lastStart.time);
+  const now            = Date.now();
+  const firstStartWall = wallStart + gameStarts[0].time * 1000;
+  // During a break the half clock counts up from the Game End whistle (resetting
+  // to 0); otherwise it counts the current half from its Game Start.
+  const halfRefWall    = wallStart + (isOnBreak ? lastEnd.time : lastStart.time) * 1000;
+  const phase = isOnBreak ? 'Break · ' : ordinal(gameStarts.length) + ' · ';
+  document.getElementById('halfClock').textContent  = fmtClock(Math.max(0, (now - halfRefWall)  / 1000));
+  document.getElementById('totalClock').textContent = phase + 'Total ' + fmtClock(Math.max(0, (now - firstStartWall) / 1000));
+}, 1000);
+
+// ── Live mode ──────────────────────────────────────────────────
+function toggleLive() {
+  if (OFFLINE) return;   // broadcasting needs both a connection and an account
+  const sheetName = metaToSheetName();
+  if (!sheetName) { alert('Fill in team/competition details first.'); return; }
+  liveMode = !liveMode;
+  const btn = document.getElementById('liveBtn');
+  if (liveMode) {
+    btn.textContent = '🔴 Live';
+    btn.classList.add('active');
+    pushLiveUpdate();
+    liveInterval = setInterval(pushLiveUpdate, 30000);
+    window.addEventListener('beforeunload', stopLive);
+  } else {
+    stopLive();
+  }
+}
+
+function stopLive() {
+  liveMode = false;
+  clearInterval(liveInterval);
+  liveInterval = null;
+  const btn = document.getElementById('liveBtn');
+  if (btn) { btn.textContent = '⚫ Live'; btn.classList.remove('active'); }
+  const sheetName = metaToSheetName();
+  if (sheetName) {
+    fetch(TR.APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ secret: TR.secret(), action: 'live_clear', sheetName }),
+    }).catch(() => {});
+  }
+}
+
+function pushLiveUpdate() {
+  const sheetName = metaToSheetName();
+  if (!sheetName) return;
+  const team1 = document.getElementById('metaTeam1').value.trim() || 'Team 1';
+  const team2 = document.getElementById('metaTeam2').value.trim() || 'Team 2';
+  const score1 = annotations.filter(a => a.type === 'Try' && a.actionOwner === 'Team 1').length;
+  const score2 = annotations.filter(a => a.type === 'Try' && a.actionOwner === 'Team 2').length;
+  const gameStart     = annotations.find(a => a.name === 'Game Start');
+  const gameStartWall = gameStart ? wallStart + gameStart.time * 1000 : (wallStart || Date.now());
+  const timeSeconds   = Math.max(0, (Date.now() - gameStartWall) / 1000);
+  const { t1, t2 } = computeStats();
+  // Event log surfaced on live.html: tries (for running score), penalties, and
+  // half markers. Old `{scorer,time}` rows (no `type`) are still rendered as tries.
+  const LIVE_EVENT_TYPES = new Set(['Try', 'Penalty Attack', 'Penalty Defence']);
+  const events = annotations
+    .filter(a => LIVE_EVENT_TYPES.has(a.type) || a.name === 'Game Start' || a.name === 'Game End')
+    .map(a => ({
+      time:   Math.floor(a.time),
+      scorer: a.actionOwner || '',
+      type:   (a.name === 'Game Start' || a.name === 'Game End') ? a.name : a.type,
+    }))
+    .sort((a, b) => a.time - b.time);
+  fetch(TR.APPS_SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({ secret: TR.secret(), action: 'live_update', sheetName, team1, team2, score1, score2, timeSeconds, poss1: t1.possessions, poss2: t2.possessions, comps1: t1.compsNum, comps2: t2.compsNum, triesJson: JSON.stringify(events), youtubelink: TR.normalizeYoutubeUrl(document.getElementById('metaYoutube').value) }),
+  }).catch(() => {});
+}
+
+// ── Stats modal ────────────────────────────────────────────────
+let statsRefreshInterval = null;
+
+function computeStats() {
+  const t1name = document.getElementById('metaTeam1').value.trim() || 'Team 1';
+  const t2name = document.getElementById('metaTeam2').value.trim() || 'Team 2';
+
+  const evts = annotations.filter(a => a.type !== 'To Review' && a.type !== 'Game Event');
+
+  // Group consecutive events by possessionOwner into possession segments
+  const segs = [];
+  let cur = null;
+  for (const e of evts) {
+    if (!cur || e.possessionOwner !== cur.owner) {
+      if (cur) segs.push(cur);
+      cur = { owner: e.possessionOwner, events: [e] };
+    } else {
+      cur.events.push(e);
+    }
+  }
+  if (cur) segs.push(cur);
+
+  // Pre-compute dead-ball intervals: [prev event time → Ball Live time]
+  const sorted    = [...annotations].sort((a, b) => a.time - b.time);
+  const deadSlots = sorted
+    .filter(a => a.name === 'Ball Live')
+    .map(bl => {
+      const idx  = sorted.indexOf(bl);
+      const prev = idx > 0 ? sorted[idx - 1] : null;
+      return prev ? { start: prev.time, end: bl.time } : null;
+    })
+    .filter(Boolean);
+
+  // Each possession starts where the previous ended (or from Game Start)
+  const gameStart = annotations.find(a => a.name === 'Game Start');
+  const t0 = gameStart ? gameStart.time : (evts.length ? evts[0].time : 0);
+  for (let i = 0; i < segs.length; i++) {
+    const last      = segs[i].events[segs[i].events.length - 1];
+    segs[i].endType = last.type;
+    segs[i].endName = last.name;
+    segs[i].end     = last.time;
+    segs[i].start   = i === 0 ? t0 : segs[i - 1].end;
+    const deadInSeg = deadSlots.filter(d => d.start >= segs[i].start && d.end <= segs[i].end);
+    const deadTime  = deadInSeg.reduce((s, d) => s + (d.end - d.start), 0);
+    segs[i].duration = Math.max(0, segs[i].end - segs[i].start - deadTime);
+  }
+
+  // Avg turnover time: dead ball gap after each turnover trigger, attributed to receiving team
+  const TO_TRIGGERS = new Set(['Turnover', 'Penalty Attack', 'Penalty Defence']);
+  const turnoverTimes = { 'Team 1': [], 'Team 2': [] };
+  let sIdx = 0;
+  for (let i = 0; i < sorted.length; i++) {
+    const evt = sorted[i];
+    if (!TO_TRIGGERS.has(evt.type)) continue;
+    if (evt.type === 'Turnover' && evt.name === '6 Again') continue;
+    while (sIdx < segs.length - 1 && segs[sIdx].end < evt.time) sIdx++;
+    const nextSeg = segs[sIdx + 1];
+    if (!nextSeg) continue;
+    const next = sorted[i + 1];
+    const dt = (next && next.name === 'Ball Live') ? Math.max(0, next.time - evt.time) : 0;
+    if (turnoverTimes[nextSeg.owner]) turnoverTimes[nextSeg.owner].push(dt);
+  }
+  const avgTO = arr => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+
+  const statFor = key => {
+    const mine   = segs.filter(s => s.owner === key);
+    const tries  = mine.filter(s => s.endType === 'Try').length;
+    const comps  = mine.filter(s => s.endType === 'Try' || s.endName === '6th Touch').length;
+    const penAtk = annotations.filter(a => a.type === 'Penalty Attack'  && a.actionOwner === key).length;
+    const penDef = annotations.filter(a => a.type === 'Penalty Defence' && a.actionOwner === key).length;
+    const driveGood = annotations.filter(a => a.type === 'Game Event' && a.name === 'Drive - Good' && a.actionOwner === key).length;
+    const driveBad  = annotations.filter(a => a.type === 'Game Event' && a.name === 'Drive - Bad'  && a.actionOwner === key).length;
+    const total    = mine.reduce((s, p) => s + p.duration, 0);
+    const avg      = mine.length ? total / mine.length : 0;
+    const deadBallRaw = mine.reduce((sum, seg) => {
+      const inSeg = deadSlots.filter(d => d.start >= seg.start && d.end <= seg.end);
+      return sum + inSeg.reduce((s, d) => s + (d.end - d.start), 0);
+    }, 0);
+    const avgTurnoverRaw = avgTO(turnoverTimes[key]);
+    return {
+      score:       annotations.filter(a => a.type === 'Try' && a.actionOwner === key).length,
+      possessions: mine.length,
+      triesNum:    tries,
+      compsNum:    comps,
+      compsPct:    mine.length ? Math.round(comps  / mine.length * 100) : null,
+      penAtk,      penAtkPct: mine.length ? Math.round(penAtk / mine.length * 100) : null,
+      penDef,
+      driveGood,   driveGoodPct: mine.length ? Math.round(driveGood / mine.length * 100) : null,
+      driveBad,    driveBadPct:  mine.length ? Math.round(driveBad  / mine.length * 100) : null,
+      avgTime:     avg.toFixed(1),    avgTimeRaw:  avg,
+      totalTime:   total.toFixed(1),  totalTimeRaw:total,
+      deadBall:    deadBallRaw.toFixed(1), deadBallRaw,
+      avgTurnover: avgTurnoverRaw.toFixed(1), avgTurnoverRaw,
+    };
+  };
+
+  const t1 = { name: t1name, ...statFor('Team 1') };
+  const t2 = { name: t2name, ...statFor('Team 2') };
+  t1.penDefPct = t2.possessions ? Math.round(t1.penDef / t2.possessions * 100) : null;
+  t2.penDefPct = t1.possessions ? Math.round(t2.penDef / t1.possessions * 100) : null;
+  return { t1, t2 };
+}
+
+function openStats() {
+  refreshStats();
+  document.getElementById('statsOverlay').classList.add('open');
+  statsRefreshInterval = setInterval(refreshStats, 5000);
+}
+
+function closeStats() {
+  document.getElementById('statsOverlay').classList.remove('open');
+  clearInterval(statsRefreshInterval);
+  statsRefreshInterval = null;
+}
+
+function refreshStats() {
+  const { t1, t2 } = computeStats();
+
+  // Hero scores
+  document.getElementById('heroName1').textContent  = t1.name;
+  document.getElementById('heroName2').textContent  = t2.name;
+  document.getElementById('heroScore1').textContent = t1.score;
+  document.getElementById('heroScore2').textContent = t2.score;
+  document.getElementById('heroScore1').className   = 'stats-hero-score' + (t1.score > t2.score ? ' win' : '');
+  document.getElementById('heroScore2').className   = 'stats-hero-score' + (t2.score > t1.score ? ' win' : '');
+
+  // Game status
+  const hasStart  = annotations.some(a => a.name === 'Game Start');
+  const hasEnd    = annotations.some(a => a.name === 'Game End');
+  const gsAnnot   = annotations.find(a => a.name === 'Game Start');
+  const gsWall    = gsAnnot && wallStart ? wallStart + gsAnnot.time * 1000 : null;
+  let statusHtml  = '';
+  if (!hasStart) {
+    statusHtml = 'No game started';
+  } else if (hasEnd) {
+    statusHtml = 'Full time';
+  } else {
+    const elapsed = gsWall ? Math.max(0, (Date.now() - gsWall) / 1000) : 0;
+    statusHtml = `<span class="dot-live"></span>In progress · ${fmtClock(elapsed)}`;
+  }
+  document.getElementById('statsStatus').innerHTML = statusHtml;
+
+  // Stat sections — tL/tR respects the swap toggle
+  // Each row: { label, n1, pct1, n2, pct2, r1, r2, hib }
+  // hib: true = higher better, false = lower better, null = informational
+  const [tL, tR] = teamsSwapped ? [t2, t1] : [t1, t2];
+
+  // Dead Ball / Avg Turnover are only meaningful with Ball Live events; the
+  // Drives section only when drives were tagged. Omit them otherwise (kept in
+  // sync with games.html).
+  const hasBallLive = annotations.some(a => a.name === 'Ball Live');
+  const hasDrives   = annotations.some(a => a.type === 'Game Event' && (a.name === 'Drive - Good' || a.name === 'Drive - Bad'));
+
+  const sections = [
+    {
+      label: 'Scoring',
+      rows: [
+        { label: 'Tries',        n1: tL.triesNum + ' / ' + tL.possessions, pct1: null, n2: tR.triesNum + ' / ' + tR.possessions, pct2: null, r1: tL.triesNum, r2: tR.triesNum, hib: true  },
+        { label: 'Completions',  n1: tL.compsNum + ' / ' + tL.possessions, pct1: tL.compsPct, n2: tR.compsNum + ' / ' + tR.possessions, pct2: tR.compsPct, r1: tL.compsNum, r2: tR.compsNum, hib: true  },
+      ],
+    },
+    {
+      label: 'Possession',
+      rows: [
+        { label: 'Avg Time (s)',  n1: tL.avgTime,   pct1: null, n2: tR.avgTime,   pct2: null, r1: tL.avgTimeRaw,   r2: tR.avgTimeRaw,   hib: null  },
+        { label: 'Total Time (s)',n1: tL.totalTime, pct1: null, n2: tR.totalTime, pct2: null, r1: tL.totalTimeRaw, r2: tR.totalTimeRaw, hib: null  },
+        ...(hasBallLive ? [
+          { label: 'Dead Ball (s)', n1: tL.deadBall,  pct1: null, n2: tR.deadBall,  pct2: null, r1: tL.deadBallRaw,  r2: tR.deadBallRaw,  hib: false },
+          { label: 'Avg Turnover (s)', n1: tL.avgTurnover, pct1: null, n2: tR.avgTurnover, pct2: null, r1: tL.avgTurnoverRaw, r2: tR.avgTurnoverRaw, hib: false },
+        ] : []),
+      ],
+    },
+    {
+      label: 'Discipline',
+      rows: [
+        { label: 'Pen Attack',   n1: tL.penAtk + '/' + tL.possessions, pct1: tL.penAtkPct, n2: tR.penAtk + '/' + tR.possessions, pct2: tR.penAtkPct, r1: tL.penAtk, r2: tR.penAtk, hib: false },
+        { label: 'Pen Defence',  n1: tL.penDef, pct1: tL.penDefPct, n2: tR.penDef, pct2: tR.penDefPct, r1: tL.penDef, r2: tR.penDef, hib: false },
+      ],
+    },
+    ...(hasDrives ? [{
+      label: 'Drives',
+      rows: [
+        { label: 'Drive +',  n1: tL.driveGood + ' / ' + tL.possessions, pct1: tL.driveGoodPct, n2: tR.driveGood + ' / ' + tR.possessions, pct2: tR.driveGoodPct, r1: tL.driveGood, r2: tR.driveGood, hib: true  },
+        { label: 'Drive −',  n1: tL.driveBad  + ' / ' + tL.possessions, pct1: tL.driveBadPct,  n2: tR.driveBad  + ' / ' + tR.possessions, pct2: tR.driveBadPct,  r1: tL.driveBad,  r2: tR.driveBad,  hib: false },
+      ],
+    }] : []),
+  ];
+
+  const html = sections.map(sec => {
+    const rowsHtml = sec.rows.map(({ label, n1, pct1, n2, pct2, r1, r2, hib }) => {
+      // Value colours
+      let c1 = '', c2 = '';
+      if (hib === true)  { if (r1 > r2) c1 = 'win'; else if (r2 > r1) c2 = 'win'; }
+      if (hib === false) { if (r1 < r2) c1 = 'win'; else if (r2 < r1) c2 = 'bad'; }
+
+      // Proportion bar: left = Team 1's share, right = Team 2's share
+      const total   = r1 + r2;
+      const share1  = total > 0 ? (r1 / total * 100).toFixed(1) : 50;
+      const share2  = total > 0 ? (100 - share1) : 50;
+
+      // Bar segment colours
+      let bc1, bc2;
+      if (hib === null) {
+        bc1 = 'rgba(59,130,246,0.35)'; bc2 = 'rgba(59,130,246,0.2)';
+      } else if (r1 === r2) {
+        bc1 = 'var(--surface-2)'; bc2 = 'var(--surface-2)';
+      } else if (hib === true) {
+        bc1 = r1 > r2 ? 'var(--green)' : 'var(--surface-2)';
+        bc2 = r2 > r1 ? 'var(--green)' : 'var(--surface-2)';
+      } else {
+        bc1 = r1 < r2 ? 'var(--green)' : 'var(--red)';
+        bc2 = r2 < r1 ? 'var(--green)' : 'var(--red)';
+      }
+
+      const pctStr1 = pct1 != null ? `<div class="stat-pct">${pct1}%</div>` : '';
+      const pctStr2 = pct2 != null ? `<div class="stat-pct">${pct2}%</div>` : '';
+
+      return `<div class="stat-row">
+        <div class="stat-row-label">${label}</div>
+        <div class="stat-row-values">
+          <div class="stat-cell">
+            <div class="stat-num ${c1}">${n1}</div>
+            ${pctStr1}
+            <div class="stat-team">${tL.name}</div>
+          </div>
+          <div class="stat-cell">
+            <div class="stat-num ${c2}">${n2}</div>
+            ${pctStr2}
+            <div class="stat-team">${tR.name}</div>
+          </div>
+        </div>
+        <div class="stat-bar">
+          <div class="stat-bar-seg" style="width:${share1}%;background:${bc1}"></div>
+          <div class="stat-bar-seg" style="width:${share2}%;background:${bc2}"></div>
+        </div>
+      </div>`;
+    }).join('');
+    return `<div class="stats-section">${sec.label}</div>${rowsHtml}`;
+  }).join('');
+
+  document.getElementById('statsBody').innerHTML = html;
+}
+
+// ── Stop game ──────────────────────────────────────────────────
+// Offered only on a paused game (see updateUI). The dialog doubles as the
+// upload prompt so finishing and syncing are one decision, not two.
+function openStopDialog() {
+  if (!activeGame || isFinished()) return;
+  // Offline mode has no account to push with, so it always takes the no-upload
+  // path regardless of whether the device happens to have a connection.
+  const offline = OFFLINE || navigator.onLine === false;
+  document.getElementById('stopOfflineWarn').style.display = offline ? '' : 'none';
+  document.getElementById('stopOfflineWarnTitle').textContent = OFFLINE
+    ? 'Offline mode — this game has not been uploaded.'
+    : 'No internet — this game has not been uploaded.';
+  document.getElementById('stopOfflineWarnBody').textContent = OFFLINE
+    ? "It's saved on this device only. Log in when you have signal and upload it from the games list — it'll be saved under your account."
+    : "It's saved on this device only. Upload it later from the games list.";
+  document.getElementById('stopActions').innerHTML = offline
+    ? `<button class="stop-danger" onclick="confirmStop(false)">Finish game</button>
+       <button onclick="closeStopDialog()">Cancel</button>`
+    : `<button class="stop-primary" onclick="confirmStop(true)">⬆ Finish &amp; Upload</button>
+       <button class="stop-danger" onclick="confirmStop(false)">Finish without uploading</button>
+       <button onclick="closeStopDialog()">Cancel</button>`;
+  document.getElementById('stopOverlay').classList.add('open');
+}
+
+function closeStopDialog() {
+  document.getElementById('stopOverlay').classList.remove('open');
+}
+
+function confirmStop(upload) {
+  if (!activeGame || isFinished()) { closeStopDialog(); return; }
+  closeStopDialog();
+  if (liveMode) stopLive();
+  activeGame.status     = 'finished';
+  activeGame.finishedAt = Date.now();
+  saveSession();
+  updateUI();
+  // The push runs the normal path: if it fails for any reason the game is still
+  // frozen and simply stays flagged as needing a sync.
+  if (upload) pushToSheet();
+}
+
+// ── Sync state surface ─────────────────────────────────────────
+function pushBtnLabel() {
+  if (!isFinished()) return '⬆ Push';
+  return TR.FieldGames.isDirty(activeGame) ? '⬆ Sync' : '✓ Synced';
+}
+
+function updateSyncUI() {
+  const banner = document.getElementById('syncBanner');
+  const push   = document.getElementById('pushBtn');
+  if (!activeGame) { banner.classList.remove('open'); return; }
+
+  const dirty = TR.FieldGames.isDirty(activeGame);
+  // The standing warning is for finished games only — an in-progress game is
+  // expected to be unsaved, and a permanent banner would just become noise.
+  banner.classList.toggle('open', isFinished() && dirty);
+  if (isFinished() && dirty) {
+    // Offline mode can't upload at all, so the banner points at the one action
+    // that helps — signing in — rather than a button that would just fail.
+    banner.innerHTML = OFFLINE
+      ? '<span>📴 <strong>Offline mode</strong> — this game is saved on this device only. Log in to upload it under your account.</span>' +
+        '<button onclick="location.href=\'index.html\'">Log in</button>'
+      : TR.FieldGames.isUploaded(activeGame)
+      ? '<span>⚠ <strong>Unsynced changes</strong> — your latest corrections are only on this device.</span>' +
+        '<button onclick="pushToSheet()">⬆ Sync now</button>'
+      : '<span>⚠ <strong>Not uploaded</strong> — this game is saved on this device only. Don\'t forget to upload it later.</span>' +
+        '<button onclick="pushToSheet()">⬆ Upload now</button>';
+  }
+  // Leave the button alone mid-push — pushToSheet owns its label until it settles.
+  if (!pushing) {
+    push.textContent = OFFLINE ? '🔒 Push' : pushBtnLabel();
+    push.disabled    = OFFLINE || (isFinished() && !dirty);
+  }
+}
+
+// ── Push to sheet ──────────────────────────────────────────────
+// A game is analysable when it has a Game Start and its last event (by time)
+// is a Game End. Used both to set the Analyzable flag and to warn before push.
+function isAnalysable() {
+  if (!annotations.some(a => a.name === 'Game Start')) return false;
+  const last = [...annotations].sort((a, b) => a.time - b.time).pop();
+  return !!last && last.name === 'Game End';
+}
+
+let pushing = false;
+
+// The sheet has one free-text column, so that's where the pitch position goes:
+// "@62,48" (x,y, both 0-100, attack-normalised). Anything already in the comment
+// is kept in front of it.
+function commentWithPos(a) {
+  if (a.x == null || a.y == null) return a.comment || '';
+  const at = '@' + Math.round(a.x) + ',' + Math.round(a.y);
+  const c  = (a.comment || '').trim();
+  return c && c !== '?' ? c + ' ' + at : at;
+}
+
+async function pushToSheet(override = false) {
+  if (pushing || !activeGame) return;
+  if (OFFLINE) {
+    alert('You\'re in offline mode, so there\'s no account to upload with.\n\nThis game is safe on this device — log in from the hub and upload it then. It will be saved under whichever account you use.');
+    return;
+  }
+  if (!annotations.filter(a => uploadTouches || a.type !== 'Touch').length) {
+    alert('No events to push.' + (annotations.length ? '\n\nThis game has only touch events, and uploading those is switched off in Setup.' : ''));
+    return;
+  }
+  const sheetName = metaToSheetName();
+  if (!sheetName) { alert('Fill in team/competition details first.'); return; }
+
+  // A game is only analysable if it has a Game Start and ends with a Game End.
+  // Warn loudly before pushing a game that doesn't, so it isn't silently saved
+  // as non-analysable (Analyzable=FALSE) — the usual cause is forgetting to tag
+  // Game End before pushing.
+  if (!isAnalysable()) {
+    if (!confirm('This game doesn\'t end with a "Game End" event, so it will be saved as NOT analysable (it won\'t appear in stats/dashboards). Tag Game End first to make it analysable.\n\nPush anyway?')) return;
+  }
+
+  // Warn before saving an un-grouped game: a non-admin secret with no group
+  // means the upload won't be attributed to any group and will be admin-only.
+  const role = sessionStorage.getItem('role') || TR.role();
+  if (role !== 'admin' && !TR.userGroup()) {
+    if (!confirm('Your login has no access group, so this game will be saved without one (admin-only visibility). Push anyway?')) return;
+  }
+
+  const btn = override ? document.getElementById('overrideBtn') : document.getElementById('pushBtn');
+  pushing = true;
+  btn.disabled = true;
+  btn.textContent = '⏳ Pushing…';
+
+  // The revision as it stands now: anything tagged while the request is in
+  // flight must still count as unsynced when this push lands.
+  const pushedRevision = activeGame.revision;
+
+  // Mint a stable per-game token on first push so later pushes of this same game
+  // (from this device) can overwrite the tab without admin override. Persist it
+  // immediately so a reload mid-game keeps the ability to re-push.
+  if (!creatorToken) {
+    creatorToken = (crypto.randomUUID ? crypto.randomUUID()
+                    : String(Date.now()) + '-' + Math.random().toString(36).slice(2));
+    // touch:false — minting the token isn't an edit, so it mustn't move the
+    // revision this push is about to be recorded against.
+    saveSession({ touch: false });
+  }
+
+  const rows = annotations
+    .filter(a => uploadTouches || a.type !== 'Touch')
+    .map(a => [a.timeStr, a.possessionOwner, a.type, a.name, '', commentWithPos(a), a.actionOwner]);
+
+  try {
+    const analyzable = isAnalysable() ? 'TRUE' : 'FALSE';
+    const body = {
+      secret: TR.secret(), sheetName, rows, creatorToken,
+      meta: {
+        team1:       document.getElementById('metaTeam1').value.trim(),
+        team2:       document.getElementById('metaTeam2').value.trim(),
+        year:        document.getElementById('metaYear').value.trim(),
+        division:    document.getElementById('metaDivision').value.trim(),
+        competition: document.getElementById('metaCompetition').value.trim(),
+        id:          document.getElementById('metaId').value.trim(),
+        video:       '',
+        youtubelink: TR.normalizeYoutubeUrl(document.getElementById('metaYoutube').value),
+        analyzable,
+      },
+    };
+    if (override) body.override = true;
+
+    const resp   = await fetch(TR.APPS_SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(body) });
+    const result = await resp.json();
+
+    if (!result.ok) {
+      if (result.tabExists && !override) {
+        // Admins can override any tab; staff only games explicitly in their group
+        // (the server enforces this too — this just decides whether to show the button).
+        const groups = result.tabGroups || [];
+        const canOverride = TR.role() === 'admin' ||
+          (TR.role() === 'staff' && TR.userGroup() && groups.indexOf(TR.userGroup()) >= 0);
+        if (canOverride) {
+          document.getElementById('overrideBtn').style.display = '';
+          alert(`Tab "${sheetName}" already exists. Tap ⚠ Override to replace it.`);
+        } else {
+          alert(`Tab "${sheetName}" already exists. You can only override games in your group; otherwise admin access is required.`);
+        }
+        pushing = false; btn.disabled = false; btn.textContent = override ? '⚠ Override' : pushBtnLabel();
+        updateSyncUI(); return;
+      }
+      alert('Error: ' + result.error);
+      pushing = false; btn.disabled = false; btn.textContent = override ? '⚠ Override' : pushBtnLabel();
+      updateSyncUI(); return;
+    }
+
+    document.getElementById('overrideBtn').style.display = 'none';
+    // Prefer the group the server actually stamped (result.group); fall back to
+    // the client's known group for older backends that don't return it.
+    const savedGroup = (result.group != null ? result.group : TR.userGroup());
+    btn.textContent = savedGroup ? `✓ ${result.appended} rows → ${savedGroup}` : `✓ ${result.appended} rows`;
+    // Keep the game (and its creatorToken) so the annotator can keep tagging and
+    // push it again — the backend will overwrite the tab it owns. Recording the
+    // revision we actually sent is what clears the "not uploaded" warning.
+    saveSession({ touch: false });
+    TR.FieldGames.markSynced(activeGame, sheetName, pushedRevision);
+    updateSyncUI();   // clears the warning banner straight away
+    setTimeout(() => {
+      pushing = false;
+      btn.disabled = false;
+      btn.textContent = override ? '⚠ Override' : pushBtnLabel();
+      updateSyncUI();
+    }, 2500);
+  } catch (err) {
+    // Offline, or the request never landed: the game stays flagged for a later
+    // sync rather than being silently treated as saved.
+    alert('Network error: ' + err.message + '\n\nThis game is still saved on this device — upload it again when you have a connection.');
+    pushing = false; btn.disabled = false; btn.textContent = override ? '⚠ Override' : pushBtnLabel();
+    updateSyncUI();
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// v2 — the pitch
+//
+// Positions are attack-normalised: x runs 0..100 across the pitch from the
+// attacking team's left, and y runs 0 (their own try line) to 100 (the try line
+// they're attacking). The team in possession therefore always attacks *up* the
+// screen, so "forward" never moves and one tap means the same thing all game —
+// which is the whole reason the pitch can be tapped without looking at it.
+//
+// The pitch adds no state of its own: touch numbers, which pins to draw and
+// which one is live are all derived from `annotations`, so undo, edit, reload
+// and possession replay stay correct for free.
+// ══════════════════════════════════════════════════════════════════
+
+const PITCH_BAND = 15;                       // in-goal depth, in y units
+const PITCH_SPAN = 100 + PITCH_BAND * 2;     // full viewBox height
+const PEN_KINDS  = ['Penalty Attack', 'Penalty Defence', '6 Again'];
+
+let armedPen   = null;    // a penalty waiting to be placed by the next pitch tap
+let subtypeIdx = null;    // the event the sub-type strip is currently offering
+let subtypeTimer = null;
+
+// Whether the touch-by-touch rows go up with the rest. Off by default: the
+// positions that matter most (tries, turnovers, penalties) always upload, and
+// the touches would multiply the row count of every sheet tab.
+let uploadTouches = localStorage.getItem('fieldUploadTouches') === '1';
+function setUploadTouches(on) {
+  uploadTouches = !!on;
+  try { localStorage.setItem('fieldUploadTouches', on ? '1' : '0'); } catch (e) {}
+  updateSyncUI();
+}
+
+function pitchSVG() {
+  const h = (y, cls) => `<line x1="0" y1="${y}" x2="100" y2="${y}" class="${cls}"/>`;
+  return `
+<svg class="pitch" viewBox="0 ${-PITCH_BAND} 100 ${PITCH_SPAN}" preserveAspectRatio="none" aria-hidden="true">
+  <defs><linearGradient id="turf" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#12301f"/><stop offset="100%" stop-color="#0d2417"/>
+  </linearGradient></defs>
+  <rect x="0" y="${-PITCH_BAND}" width="100" height="${PITCH_SPAN}" fill="url(#turf)"/>
+  <rect x="0" y="${-PITCH_BAND}" width="100" height="${PITCH_BAND}" class="ingoal try-band"/>
+  <rect x="0" y="100"            width="100" height="${PITCH_BAND}" class="ingoal"/>
+  ${h(0, 'ln try-ln')}${h(100, 'ln try-ln')}
+  ${h(7.1, 'ln five')}${h(92.9, 'ln five')}
+  ${h(50, 'ln half')}
+  <text x="12" y="${-PITCH_BAND / 2 + 2}" class="band-label">TRY</text>
+  <text x="88" y="${-PITCH_BAND / 2 + 2}" class="band-label">TRY</text>
+  <text x="50" y="104.6" class="band-label dim">own in-goal</text>
+</svg>`;
+}
+
+// ── Reading the current set out of the event list ──────────────
+// A "set" is one possession. Everything that doesn't end a possession — the
+// touches themselves, Ball Live, Drive ratings, To Review — belongs to the set
+// in progress; anything else closes it.
+function isSetFiller(a) {
+  if (a.type === 'Touch' || a.type === 'To Review') return true;
+  return a.type === 'Game Event' && a.name !== 'Game Start' && a.name !== 'Game End';
+}
+
+// Events tagged since the last possession-ending event, oldest first.
+function currentSet() {
+  const out = [];
+  for (let i = annotations.length - 1; i >= 0 && isSetFiller(annotations[i]); i--) out.unshift(annotations[i]);
+  return out;
+}
+
+// The set before it, including the event that ended it — kept on the pitch as
+// faded pins so a turnover doesn't blank the screen you were just reading.
+function previousSet() {
+  let i = annotations.length - 1;
+  while (i >= 0 && isSetFiller(annotations[i])) i--;
+  if (i < 0) return [];
+  const out = [annotations[i]];
+  for (let j = i - 1; j >= 0 && isSetFiller(annotations[j]); j--) out.unshift(annotations[j]);
+  return out;
+}
+
+function touchCount() { return currentSet().filter(a => a.type === 'Touch').length; }
+
+// Touch numbers are positional, so any edit that removes or retypes one has to
+// renumber the rest of its set. Called from updateUI so every path that mutates
+// the list — undo, edit, delete, pin conversion — is covered in one place.
+function renumberTouches() {
+  let n = 0;
+  for (const a of annotations) {
+    if (a.type === 'Touch') { a.name = 'Touch ' + (++n); continue; }
+    if (!isSetFiller(a)) n = 0;
+  }
+}
+
+function isGameRunning() {
+  const ge   = annotations.filter(a => a.name === 'Game Start' || a.name === 'Game End');
+  const last = ge[ge.length - 1];
+  return !!(last && last.name === 'Game Start');
+}
+
+// ── Pins ───────────────────────────────────────────────────────
+function pinKind(a) {
+  switch (a.type) {
+    case 'Touch':            return 'touch';
+    case 'Try':              return 'try';
+    case 'Penalty Attack':   return 'penatk';
+    case 'Penalty Defence':  return 'pendef';
+    case 'To Review':        return 'review';
+    case 'Turnover':         return a.name === '6 Again' ? 'again' : a.name === '6th Touch' ? 'six' : 'turnover';
+    default:                 return 'touch';
+  }
+}
+function pinLabel(a) {
+  switch (a.type) {
+    case 'Touch':            return a.name.replace('Touch ', '');
+    case 'Try':              return '✓';
+    case 'Penalty Attack':
+    case 'Penalty Defence':  return 'P';
+    case 'To Review':        return '⚑';
+    case 'Turnover':         return a.name === '6 Again' ? '6A' : a.name === '6th Touch' ? '6th' : '✕';
+    default:                 return '·';
+  }
+}
+
+function pinHTML(a, active, live) {
+  if (a.x == null || a.y == null) return '';
+  const top = (100 - a.y + PITCH_BAND) / PITCH_SPAN * 100;
+  return `<button class="pin pin-${pinKind(a)}${active ? '' : ' stale'}${live ? ' live' : ''}"` +
+    ` data-idx="${annotations.indexOf(a)}"${live ? '' : ' tabindex="-1"'}` +
+    ` style="left:${a.x.toFixed(2)}%;top:${top.toFixed(2)}%">${pinLabel(a)}</button>`;
+}
+
+function renderPitch() {
+  const layer = document.getElementById('pinLayer');
+  if (!layer) return;
+  const cur  = currentSet();
+  const last = cur[cur.length - 1];
+  // Only the newest pin is tappable, and only while it's still a touch: that tap
+  // means "the ball was lost right here", so letting older pins take it would
+  // make the gesture ambiguous.
+  const live = last && last.type === 'Touch' && !isFinished() ? last : null;
+
+  const prev = previousSet();
+  layer.innerHTML = prev.map(a => pinHTML(a, !cur.length, false)).join('') +
+                    cur.map(a => pinHTML(a, true, a === live)).join('');
+
+  const n = touchCount();
+  document.getElementById('touchRail').innerHTML = [1, 2, 3, 4, 5, 6]
+    .map(i => `<span class="tdot ${i <= n ? 'on' : i === n + 1 ? 'next' : ''}"></span>`).join('');
+
+  document.getElementById('attackTeam').textContent = possession === 'Team 1'
+    ? (document.getElementById('metaTeam1').value.trim() || 'Team 1')
+    : (document.getElementById('metaTeam2').value.trim() || 'Team 2');
+
+  PEN_KINDS.forEach(k => {
+    const el = document.getElementById(k === 'Penalty Attack' ? 'penAtkBtn' : k === 'Penalty Defence' ? 'penDefBtn' : 'sixAgainBtn');
+    if (el) el.classList.toggle('armed', armedPen === k);
+  });
+
+  document.getElementById('pitchHint').textContent =
+      armedPen ? `Tap where the ${penLabel(armedPen)} was — or tap it again for the last spot`
+    : n >= 5   ? 'Next tap is the 6th touch — ball hands over'
+    : live     ? 'Tap the numbered pin if the ball was lost there'
+    :            'Tap where the touch was made';
+}
+
+function penLabel(kind) {
+  return kind === 'Penalty Attack' ? 'Pen Attack' : kind === 'Penalty Defence' ? 'Pen Defence' : '6 Again';
+}
+
+// ── Tapping ────────────────────────────────────────────────────
+function pitchPoint(ev) {
+  const r  = document.getElementById('pitchWrap').getBoundingClientRect();
+  const px = Math.min(1, Math.max(0, (ev.clientX - r.left) / r.width));
+  const py = Math.min(1, Math.max(0, (ev.clientY - r.top)  / r.height));
+  const vy = -PITCH_BAND + py * PITCH_SPAN;   // viewBox y; below zero is the try band
+  return {
+    x:     +(px * 100).toFixed(1),
+    y:     +Math.min(100, Math.max(0, 100 - vy)).toFixed(1),
+    inTry: vy < 0,
+  };
+}
+
+function onPitchTap(ev) {
+  if (isFinished() || !isGameRunning()) return;
+  const pt = pitchPoint(ev);
+  if (armedPen) { placePen(pt); return; }
+  if (pt.inTry) { tag('Try', 'Other', possession, pt); offerSubtype(); return; }
+
+  const n = touchCount() + 1;
+  // The sixth touch is the handover itself, so it's tagged as the possession's
+  // ending event rather than as another touch.
+  if (n >= 6) { tag('Turnover', '6th Touch', possession, pt); return; }
+  tag('Touch', 'Touch ' + n, possession, pt);
+}
+
+// "Tap the pin again" — the ball was lost at that touch. Converting in place
+// keeps the position and the timestamp of the touch it turned over on.
+function onPinTap(idx) {
+  const a = annotations[idx];
+  if (!a || a.type !== 'Touch' || isFinished()) return;
+  a.type = 'Turnover';
+  a.name = 'Other';
+  a.actionOwner = TR.inferActionOwner(a.possessionOwner, a.type, a.name);
+  setPossession(TR.inferPossessionAfter(a.possessionOwner, a.type, a.name));
+  offerSubtype(idx);
+  updateUI();
+  saveSession();
+  if (liveMode) pushLiveUpdate();
+}
+
+// ── Penalties ──────────────────────────────────────────────────
+function armPen(kind) {
+  if (isFinished() || !isGameRunning()) return;
+  // Arming twice drops the penalty where the ball already is, so a penalty never
+  // costs two taps unless the placement is worth one.
+  if (armedPen === kind) { placePen(lastKnownPoint()); return; }
+  armedPen = kind;
+  renderPitch();
+}
+
+function placePen(pt) {
+  const kind = armedPen;
+  armedPen = null;
+  if (!kind) return;
+  if (kind === '6 Again') tag('Turnover', '6 Again', possession, pt);
+  else                    tag(kind, 'Other', possession, pt);
+  offerSubtype();
+}
+
+function lastKnownPoint() {
+  for (let i = annotations.length - 1; i >= 0; i--) {
+    if (annotations[i].x != null) return { x: annotations[i].x, y: annotations[i].y };
+  }
+  return { x: 50, y: 50 };
+}
+
+// ── Sub-type strip ─────────────────────────────────────────────
+// Offered for a few seconds after an event that has detail worth capturing, and
+// entirely optional: ignoring it leaves the event as "Other", exactly as v1's
+// buttons do.
+function offerSubtype(idx) {
+  const i   = idx == null ? annotations.length - 1 : idx;
+  const a   = annotations[i];
+  const bar = document.getElementById('subtypeBar');
+  if (!a || !SUBTYPE_TYPES.includes(a.type)) { closeSubtype(); return; }
+  subtypeIdx = i;
+  bar.innerHTML = `<span class="sub-chip head">${EVENT_LABELS[a.type] || a.type} —</span>` +
+    (TR.MENU[a.type] || []).filter(n => n !== 'Other')
+      .map(n => `<button class="sub-chip" data-sub="${n}">${n}</button>`).join('');
+  bar.classList.add('open');
+  clearTimeout(subtypeTimer);
+  subtypeTimer = setTimeout(closeSubtype, 10000);
+}
+
+function closeSubtype() {
+  clearTimeout(subtypeTimer);
+  subtypeIdx = null;
+  const bar = document.getElementById('subtypeBar');
+  if (bar) { bar.classList.remove('open'); bar.innerHTML = ''; }
+}
+
+function pickSubtype(name) {
+  if (subtypeIdx === null) return;
+  const a = annotations[subtypeIdx];
+  const i = subtypeIdx;
+  closeSubtype();
+  if (!a) return;
+  a.name = name;
+  a.actionOwner = TR.inferActionOwner(a.possessionOwner, a.type, a.name);
+  // Some sub-types change whether the ball turns over at all (6 Again keeps it),
+  // so re-derive possession from the corrected name instead of leaving the
+  // guess made when the event was first tagged.
+  if (i === annotations.length - 1) setPossession(TR.inferPossessionAfter(a.possessionOwner, a.type, a.name));
+  else replayPossessionFrom(i + 1);
+  updateUI();
+  saveSession();
+}
+
+// ── Deleting a single event ────────────────────────────────────
+// Undo only reaches the newest event; a mis-tap three touches ago needs this.
+function deleteEvent() {
+  if (editingIndex === null) return;
+  const a = annotations[editingIndex];
+  if (!confirm(`Delete "${eventBaseLabel(a)}" at ${fmtClock(a.time)}?\n\nPossession is recalculated for everything after it.`)) return;
+  const at = editingIndex;
+  annotations.splice(at, 1);
+  closeEdit();
+  if (!annotations.length)      setPossession('Team 1');
+  else if (at === 0)            replayPossessionFrom(1);
+  else                          replayPossessionFrom(at);
+  updateUI();
+  saveSession();
+}
+
+// ── Wiring ─────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  const wrap = document.getElementById('pitchWrap');
+  wrap.insertAdjacentHTML('afterbegin', pitchSVG());
+  document.getElementById('uploadTouchesInput').checked = uploadTouches;
+
+  // One listener on the wrapper: the overlays are pointer-events:none and the
+  // stale pins are inert, so anything that isn't the live pin is a pitch tap.
+  wrap.addEventListener('click', ev => {
+    const pin = ev.target.closest('.pin.live');
+    if (pin) { onPinTap(+pin.dataset.idx); return; }
+    onPitchTap(ev);
+  });
+
+  document.getElementById('subtypeBar').addEventListener('click', ev => {
+    const chip = ev.target.closest('[data-sub]');
+    if (chip) pickSubtype(chip.dataset.sub);
+  });
+});
+
+</script>
+</body>
+</html>
