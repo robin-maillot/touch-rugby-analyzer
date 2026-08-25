@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Field Annotator v2 — mockups</title>
+<link rel="stylesheet" href="../css/theme.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', -apple-system, sans-serif; padding: 28px 20px 60px; }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+  h1 { font-size: 1.3rem; margin-bottom: 6px; }
+  .sub { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 26px; line-height: 1.55; max-width: 62ch; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 16px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; }
+  .card.pick { border-color: var(--green); }
+  .frame { height: 420px; border: 0; width: 100%; background: #000; }
+  .meta { padding: 14px 16px 16px; }
+  .meta h2 { font-size: 0.95rem; margin-bottom: 3px; }
+  .badge { display: inline-block; font-size: 0.6rem; font-weight: 800; letter-spacing: .07em; padding: 2px 7px; border-radius: 99px; background: var(--green); color: #06210f; margin-left: 6px; vertical-align: 2px; }
+  .meta p { font-size: 0.78rem; color: var(--text-muted); line-height: 1.5; margin-top: 6px; }
+  .meta ul { margin: 8px 0 0 16px; font-size: 0.76rem; color: var(--text-muted); line-height: 1.6; }
+  .open { display: inline-block; margin-top: 12px; font-size: 0.78rem; font-weight: 700; color: var(--accent); text-decoration: none; }
+  .note { margin-top: 30px; font-size: 0.78rem; color: var(--text-dim); line-height: 1.6; max-width: 70ch; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Field Annotator v2 — three layouts</h1>
+  <p class="sub">All three are live: tap the pitch to lay touches 1–6, tap a pin to turn it into a
+  turnover, tap the try band at the attacking end to score, and arm a penalty then place it
+  (or tap the armed button twice to drop it at the last ball position). The pitch is
+  attack-normalised — whoever has the ball always attacks the same way, so "forward" never moves.</p>
+
+  <div class="grid">
+    <div class="card pick">
+      <iframe class="frame" src="a-fullbleed.html"></iframe>
+      <div class="meta">
+        <h2>A · Full-bleed pitch<span class="badge">BUILT</span></h2>
+        <p>The pitch is the screen. Score strip on top, everything else floats over the turf.</p>
+        <ul>
+          <li>Biggest tap target by a wide margin — the thing you hit most is the thing that's largest.</li>
+          <li>Penalties pinned under the try band; controls on the right edge, out of the tap path.</li>
+          <li>Last four as a scrollable chip strip along the bottom.</li>
+        </ul>
+        <a class="open" href="a-fullbleed.html">Open full screen →</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <iframe class="frame" src="b-splitdeck.html"></iframe>
+      <div class="meta">
+        <h2>B · Split deck</h2>
+        <p>Pitch on top, a fixed button deck below. Closest in feel to the v1 annotator.</p>
+        <ul>
+          <li>Most legible: nothing overlaps the pitch, every control is labelled.</li>
+          <li>Costs roughly half the screen, so pitch taps are less precise.</li>
+          <li>Best if you want v2 to feel like v1 with a pitch bolted on.</li>
+        </ul>
+        <a class="open" href="b-splitdeck.html">Open full screen →</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <iframe class="frame" src="c-landscape.html"></iframe>
+      <div class="meta">
+        <h2>C · Landscape two-thumb</h2>
+        <p>Phone held sideways. Attack runs left→right, penalties under the left thumb, last-four down the right.</p>
+        <ul>
+          <li>The pitch's real 70×50 shape fits landscape far better than portrait.</li>
+          <li>Both thumbs work; nothing overlays the playing area.</li>
+          <li>Awkward one-handed, and a landscape-only tool is a worse PWA.</li>
+        </ul>
+        <a class="open" href="c-landscape.html">Open full screen →</a>
+      </div>
+    </div>
+  </div>
+
+  <p class="note"><strong>Recommendation: A.</strong> Tagging live is a speed-and-accuracy problem, and
+  A spends the whole screen on the one control that needs both. B's deck is more readable but you
+  read it once and then never look at it again — while the pitch is what your eye is on for eighty
+  minutes. C's geometry is genuinely better, but a landscape-locked page is a worse home-screen app
+  and worse one-handed on a sideline. A borrows C's best idea (the attack-normalised pitch) without
+  the orientation lock.</p>
+</div>
+</body>
+</html>

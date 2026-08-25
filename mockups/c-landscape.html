@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Mockup C — Landscape two-thumb</title>
+<link rel="stylesheet" href="../css/theme.css">
+<link rel="stylesheet" href="mock.css?v=4">
+<style>
+  body { display: flex; flex-direction: column; height: 100dvh; }
+
+  /* ── Top bar: score, clock and possession in one line, because landscape is
+       short on height and every row costs pitch. ── */
+  .bar {
+    flex-shrink: 0; display: flex; align-items: center; gap: 10px;
+    padding: 5px 10px; background: var(--surface); border-bottom: 1px solid var(--border);
+  }
+  .bar .team { display: flex; align-items: baseline; gap: 6px; }
+  .bar .nm { font-size: 0.72rem; font-weight: 800; color: var(--text-muted); }
+  .bar .team.on .nm { color: var(--accent); }
+  .bar .sc { font-size: 1.25rem; font-weight: 800; line-height: 1; }
+  .bar .clk { font-size: 0.95rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .bar .half { font-size: 0.6rem; color: var(--text-dim); }
+  .bar .spacer { flex: 1; }
+  .bar .btn { padding: 6px 10px; font-size: 0.68rem; font-weight: 700; }
+
+  /* Penalties sit in the top-left corner — under the left thumb in a two-handed
+     landscape grip, mirroring the game controls under the right. */
+  .stage { flex: 1; min-height: 0; display: flex; }
+  .rail {
+    flex: 0 0 88px; background: var(--surface); display: flex; flex-direction: column;
+    gap: 5px; padding: 6px; border-right: 1px solid var(--border);
+  }
+  .rail.right { border-right: none; border-left: 1px solid var(--border); flex-basis: 104px; }
+  .rail .hd { font-size: 0.55rem; font-weight: 800; letter-spacing: 0.1em; color: var(--text-dim); padding: 1px 2px; }
+  .rail .btn { padding: 9px 4px; font-size: 0.7rem; line-height: 1.15; }
+  .rail .btn small { display: block; font-size: 0.53rem; font-weight: 600; color: var(--text-dim); }
+  .rail .btn.armed { background: var(--yellow); border-color: var(--yellow); color: #17130a; }
+  .rail .btn.armed small { color: rgba(0,0,0,0.55); }
+
+  .pitch-wrap { flex: 1; min-width: 0; }
+  .attacking {
+    position: absolute; top: 5px; right: 8px; z-index: 5;
+    background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.16); border-radius: 99px;
+    padding: 3px 10px; font-size: 0.68rem; font-weight: 800;
+  }
+  .attacking .arrow { color: var(--green); }
+  .touches {
+    position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%); z-index: 5;
+    display: flex; gap: 7px; background: rgba(0,0,0,0.45); border-radius: 99px; padding: 5px 10px;
+  }
+  .touches .tdot { width: 12px; height: 12px; }
+
+  /* Last four stacked down the right rail, newest at the top — glanceable
+     without ever leaving the pitch. */
+  .recent { display: flex; flex-direction: column; gap: 4px; overflow: hidden; }
+  .rec {
+    padding: 5px 7px; border-radius: 7px; cursor: pointer;
+    background: var(--surface-2); border: 1px solid var(--border); border-left-width: 3px;
+  }
+  .rec .l { font-size: 0.68rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rec .m { font-size: 0.55rem; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+  .rec.k-try      { border-left-color: var(--green); }
+  .rec.k-turnover { border-left-color: var(--red); }
+  .rec.k-pen      { border-left-color: var(--yellow); }
+  .rec.k-touch    { border-left-color: var(--accent); }
+
+  @media (orientation: portrait) {
+    .rotate-hint {
+      position: fixed; inset: auto 0 46px 0; z-index: 70; text-align: center;
+      font-size: 0.72rem; color: var(--orange); pointer-events: none;
+    }
+  }
+  @media (orientation: landscape) { .rotate-hint { display: none; } }
+</style>
+</head>
+<body>
+
+<div class="mock-tag">MOCKUP C · landscape &nbsp;<a href="index.html">all three →</a></div>
+
+<div class="bar">
+  <div class="team" id="t1"><span class="nm">FRA</span><span class="sc" id="s1">3</span></div>
+  <div><div class="clk" id="clk">12:22</div><div class="half">1st half</div></div>
+  <div class="team" id="t2"><span class="sc" id="s2">2</span><span class="nm">ENG</span></div>
+  <div class="spacer"></div>
+  <button class="btn">📊 Stats</button>
+  <button class="btn">⬆ Push</button>
+  <button class="btn">⚙</button>
+</div>
+
+<div class="stage">
+  <div class="rail" id="pens">
+    <div class="hd">PENALTY</div>
+    <button class="btn" data-pen="Pen Atk">Pen Atk<small>we won it</small></button>
+    <button class="btn" data-pen="Pen Def">Pen Def<small>we gave it</small></button>
+    <button class="btn" data-pen="6 Again">6 Again<small>keep ball</small></button>
+    <div style="flex:1"></div>
+    <button class="btn ghost" id="undo">↩ Undo</button>
+  </div>
+
+  <div class="pitch-wrap" id="wrap">
+    <div class="attacking"><span id="attTeam">FRA</span> attacking <span class="arrow">▶</span></div>
+    <div class="touches dot-row" id="touches"></div>
+  </div>
+
+  <div class="rail right">
+    <div class="hd">LAST 4</div>
+    <div class="recent" id="recent"></div>
+    <div style="flex:1"></div>
+    <button class="btn ghost" style="font-size:.64rem">▶ Ball Live</button>
+    <button class="btn ghost" style="font-size:.64rem">± Drive</button>
+  </div>
+</div>
+
+<div class="rotate-hint">↻ designed for landscape — turn the phone</div>
+
+<script src="mock.js?v=4"></script>
+<script>
+  const LS = true;
+  const st = Mock.makeState();
+  const wrap = document.getElementById('wrap');
+  wrap.insertAdjacentHTML('afterbegin', Mock.pitchSVG({ landscape: LS }));
+  const svg = wrap.querySelector('svg.pitch');
+  wrap.insertAdjacentHTML('beforeend', '<div class="pin-layer" id="pinLayer"></div>');
+  const pinLayer = document.getElementById('pinLayer');
+
+  pinLayer.addEventListener('click', ev => {
+    const pinEl = ev.target.closest('.pin');
+    if (!pinEl) return;
+    // Tapping a pin promotes that touch to a turnover — the "tap it again"
+    // gesture, so losing the ball never needs a separate button.
+    if (Mock.promote(st, +pinEl.dataset.i)) render();
+  });
+
+  svg.addEventListener('click', ev => {
+    Mock.tap(st, Mock.pointAt(svg, ev, LS));
+    render();
+  });
+
+  document.getElementById('pens').addEventListener('click', ev => {
+    const b = ev.target.closest('[data-pen]');
+    if (!b) return;
+    if (st.armed === b.dataset.pen) {
+      const last = st.pins[st.pins.length - 1] || { x: 50, y: 50 };
+      Mock.tap(st, { x: last.x, y: last.y });
+    } else st.armed = b.dataset.pen;
+    render();
+  });
+
+  document.getElementById('undo').addEventListener('click', () => { Mock.undo(st); render(); });
+
+  function render() {
+    Mock.renderPins(pinLayer, st, LS);
+    document.getElementById('attTeam').textContent = st.possession;
+    document.getElementById('s1').textContent = st.score.FRA;
+    document.getElementById('s2').textContent = st.score.ENG;
+    document.getElementById('clk').textContent = Mock.fmt(st.clock);
+    document.getElementById('t1').classList.toggle('on', st.possession === 'FRA');
+    document.getElementById('t2').classList.toggle('on', st.possession === 'ENG');
+    document.getElementById('touches').innerHTML = [1,2,3,4,5,6]
+      .map(n => `<span class="tdot ${n <= st.touch ? (n === 6 ? 'last' : 'on') : ''}"></span>`).join('');
+    document.querySelectorAll('#pens .btn')
+      .forEach(b => b.classList.toggle('armed', st.armed === b.dataset.pen));
+    document.getElementById('recent').innerHTML = st.log.slice(0, 4).map(e =>
+      `<div class="rec k-${e.kind}"><div class="l">${e.label}</div><div class="m">${e.t} · ${e.team}</div></div>`
+    ).join('') || '<div class="rec" style="opacity:.4"><div class="l">no events</div></div>';
+  }
+  render();
+</script>
+</body>
+</html>

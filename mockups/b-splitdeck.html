@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Mockup B — Split deck</title>
+<link rel="stylesheet" href="../css/theme.css">
+<link rel="stylesheet" href="mock.css?v=4">
+<style>
+  body { display: flex; flex-direction: column; height: 100dvh; }
+
+  .score {
+    flex-shrink: 0; display: grid; grid-template-columns: 1fr auto 1fr;
+    align-items: center; gap: 8px; padding: 9px 14px;
+    background: var(--surface); border-bottom: 1px solid var(--border);
+  }
+  .score .team { text-align: center; }
+  .score .team.on .nm { color: var(--accent); }
+  .score .nm { font-size: 0.72rem; font-weight: 700; color: var(--text-muted); }
+  .score .sc { font-size: 1.7rem; font-weight: 800; line-height: 1.05; }
+  .score .clk b { display: block; font-size: 1.1rem; font-weight: 700; font-variant-numeric: tabular-nums; text-align: center; }
+  .score .clk span { font-size: 0.6rem; color: var(--text-dim); }
+
+  /* Penalties get their own band above the pitch — a fixed target that never
+     moves, so it can be hit without looking. */
+  .pens { flex-shrink: 0; display: flex; gap: 6px; padding: 7px 8px; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .pens .btn { flex: 1; padding: 10px 4px; font-size: 0.76rem; }
+  .pens .btn small { display: block; font-size: 0.56rem; font-weight: 600; color: var(--text-dim); margin-top: 1px; }
+  .pens .btn.armed { background: var(--yellow); border-color: var(--yellow); color: #17130a; }
+  .pens .btn.armed small { color: rgba(0,0,0,0.55); }
+
+  /* The pitch takes what's left after the deck — roughly half the screen. */
+  .pitch-wrap { flex: 1; min-height: 120px; border-bottom: 1px solid var(--border); }
+  .attacking {
+    position: absolute; top: calc(11.54% + 5px); left: 50%; transform: translateX(-50%); z-index: 5;
+    background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.16); border-radius: 99px;
+    padding: 3px 11px; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.03em;
+  }
+  .attacking .arrow { color: var(--green); }
+
+  /* ── Deck ──────────────────────────────────────────────────── */
+  .deck { flex-shrink: 0; background: var(--surface); padding: 8px 8px calc(8px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 7px; }
+  .touchbar { display: flex; align-items: center; gap: 10px; padding: 0 2px; }
+  .touchbar .lbl { font-size: 0.62rem; font-weight: 700; color: var(--text-dim); letter-spacing: 0.08em; }
+  .touchbar .tdot { width: 15px; height: 15px; }
+  .touchbar .undo { margin-left: auto; padding: 6px 13px; font-size: 0.76rem; }
+
+  .row { display: flex; gap: 6px; }
+  .row .btn { flex: 1; padding: 11px 4px; font-size: 0.74rem; }
+
+  /* Last four as full rows — the most legible form, at the cost of screen. */
+  .recent { display: flex; flex-direction: column; gap: 4px; }
+  .rec {
+    display: flex; align-items: center; gap: 9px; padding: 7px 10px; cursor: pointer;
+    background: var(--surface-2); border: 1px solid var(--border); border-left-width: 3px; border-radius: 8px;
+  }
+  .rec .t { font-size: 0.68rem; color: var(--text-dim); font-variant-numeric: tabular-nums; width: 40px; }
+  .rec .l { font-size: 0.8rem; font-weight: 700; }
+  .rec .tm { margin-left: auto; font-size: 0.68rem; color: var(--text-muted); font-weight: 700; }
+  .rec .go { color: var(--text-dim); font-size: 0.8rem; }
+  .rec.k-try      { border-left-color: var(--green); }
+  .rec.k-turnover { border-left-color: var(--red); }
+  .rec.k-pen      { border-left-color: var(--yellow); }
+  .rec.k-touch    { border-left-color: var(--accent); }
+</style>
+</head>
+<body>
+
+<div class="mock-tag">MOCKUP B · split deck &nbsp;<a href="index.html">all three →</a></div>
+
+<div class="score">
+  <div class="team" id="t1"><div class="nm">FRA</div><div class="sc" id="s1">3</div></div>
+  <div class="clk"><b id="clk">12:22</b><span>1st half</span></div>
+  <div class="team" id="t2"><div class="nm">ENG</div><div class="sc" id="s2">2</div></div>
+</div>
+
+<div class="pens" id="pens">
+  <button class="btn" data-pen="Pen Atk">Pen Atk<small>we won it</small></button>
+  <button class="btn" data-pen="Pen Def">Pen Def<small>we gave it</small></button>
+  <button class="btn" data-pen="6 Again">6 Again<small>keep ball</small></button>
+</div>
+
+<div class="pitch-wrap" id="wrap">
+  <div class="attacking"><span class="arrow">▲</span> <span id="attTeam">FRA</span> attacking</div>
+</div>
+
+<div class="deck">
+  <div class="touchbar">
+    <span class="lbl">TOUCH</span>
+    <span class="dot-row" id="touches"></span>
+    <button class="btn undo" id="undo">↩ Undo</button>
+  </div>
+  <div class="row">
+    <button class="btn ghost">▶ Ball Live</button>
+    <button class="btn ghost">Drive +</button>
+    <button class="btn ghost">Drive −</button>
+    <button class="btn ghost">⚑ Review</button>
+  </div>
+  <div class="recent" id="recent"></div>
+</div>
+
+
+<script src="mock.js?v=4"></script>
+<script>
+  const st = Mock.makeState();
+  const wrap = document.getElementById('wrap');
+  wrap.insertAdjacentHTML('afterbegin', Mock.pitchSVG());
+  const svg = wrap.querySelector('svg.pitch');
+  wrap.insertAdjacentHTML('beforeend', '<div class="pin-layer" id="pinLayer"></div>');
+  const pinLayer = document.getElementById('pinLayer');
+
+  pinLayer.addEventListener('click', ev => {
+    const pinEl = ev.target.closest('.pin');
+    if (!pinEl) return;
+    // Tapping a pin promotes that touch to a turnover — the "tap it again"
+    // gesture, so losing the ball never needs a separate button.
+    if (Mock.promote(st, +pinEl.dataset.i)) render();
+  });
+
+  svg.addEventListener('click', ev => {
+    Mock.tap(st, Mock.pointAt(svg, ev));
+    render();
+  });
+
+  document.getElementById('pens').addEventListener('click', ev => {
+    const b = ev.target.closest('[data-pen]');
+    if (!b) return;
+    if (st.armed === b.dataset.pen) {
+      const last = st.pins[st.pins.length - 1] || { x: 50, y: 50 };
+      Mock.tap(st, { x: last.x, y: last.y });
+    } else st.armed = b.dataset.pen;
+    render();
+  });
+
+  document.getElementById('undo').addEventListener('click', () => { Mock.undo(st); render(); });
+
+  function render() {
+    Mock.renderPins(pinLayer, st);
+    document.getElementById('attTeam').textContent = st.possession;
+    document.getElementById('s1').textContent = st.score.FRA;
+    document.getElementById('s2').textContent = st.score.ENG;
+    document.getElementById('clk').textContent = Mock.fmt(st.clock);
+    document.getElementById('t1').classList.toggle('on', st.possession === 'FRA');
+    document.getElementById('t2').classList.toggle('on', st.possession === 'ENG');
+    document.getElementById('touches').innerHTML = [1,2,3,4,5,6]
+      .map(n => `<span class="tdot ${n <= st.touch ? (n === 6 ? 'last' : 'on') : ''}"></span>`).join('');
+    document.querySelectorAll('#pens .btn')
+      .forEach(b => b.classList.toggle('armed', st.armed === b.dataset.pen));
+    const rows = st.log.slice(0, 4);
+    document.getElementById('recent').innerHTML = rows.length ? rows.map(e =>
+      `<div class="rec k-${e.kind}"><span class="t">${e.t}</span><span class="l">${e.label}</span>` +
+      `<span class="tm">${e.team}</span><span class="go">›</span></div>`
+    ).join('') : '<div class="rec" style="opacity:.4"><span class="l">Tap the pitch to tag a touch</span></div>';
+  }
+  render();
+</script>
+</body>
+</html>

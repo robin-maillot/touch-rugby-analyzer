@@ -1,0 +1,71 @@
+/* Shared look for the Field Annotator v2 mockups. Layout-specific rules live in
+   each mockup file; this is only the pitch, the pins and the common chrome. */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg); color: var(--text);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  min-height: 100dvh; overflow: hidden;
+  -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+}
+
+/* ── Pitch ─────────────────────────────────────────────────── */
+.pitch-wrap { position: relative; overflow: hidden; }
+.pitch { display: block; width: 100%; height: 100%; touch-action: manipulation; cursor: crosshair; }
+.ln        { stroke: rgba(255,255,255,0.34); stroke-width: 0.45; vector-effect: non-scaling-stroke; }
+.try-ln    { stroke: rgba(255,255,255,0.72); stroke-width: 1.1; }
+.half      { stroke-dasharray: 3 2.2; }
+.five      { stroke: rgba(255,255,255,0.24); stroke-dasharray: 2 2; }
+.ingoal    { fill: rgba(255,255,255,0.045); }
+.try-band  { fill: rgba(34,197,94,0.30); }
+.own-band  { fill: rgba(255,255,255,0.03); }
+.band-label {
+  fill: rgba(255,255,255,0.55); font-size: 5px; font-weight: 800;
+  letter-spacing: 0.18em; text-anchor: middle;
+}
+.band-label.dim { fill: rgba(255,255,255,0.24); font-size: 3.4px; letter-spacing: 0.1em; font-weight: 600; }
+.edge-label { fill: rgba(255,255,255,0.22); font-size: 3px; font-weight: 600; }
+
+/* ── Pins ──────────────────────────────────────────────────── */
+.pin-layer { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+.pin {
+  position: absolute; transform: translate(-50%, -50%); pointer-events: auto;
+  width: 32px; height: 32px; border-radius: 50%; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-family: inherit; font-size: 0.82rem; font-weight: 800; color: #fff;
+  background: var(--accent); border: 2px solid rgba(255,255,255,0.9);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.55); cursor: pointer;
+  transition: opacity .15s;
+}
+.pin-turnover { background: var(--red); }
+.pin-try      { background: var(--green); color: #06210f; }
+.pin-pen      { background: var(--yellow); color: #17130a; }
+.pin.stale    { opacity: 0.3; border-color: rgba(255,255,255,0.45); box-shadow: none; }
+
+/* ── Common chrome ─────────────────────────────────────────── */
+/* A slim bar in normal flow rather than a floating chip, so it can never sit on
+   top of a control the layout is meant to be judged on. */
+.mock-tag {
+  flex-shrink: 0; display: flex; align-items: center; gap: 8px;
+  padding: 3px 10px; background: #000; border-bottom: 1px solid var(--border);
+  color: var(--text-dim); font-size: 0.6rem; font-weight: 700; letter-spacing: 0.06em;
+}
+.mock-tag a { margin-left: auto; color: var(--accent); text-decoration: none; }
+
+.btn {
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--text);
+  border-radius: 10px; font-family: inherit; font-weight: 700; cursor: pointer;
+  transition: background .1s, border-color .1s, transform .06s;
+}
+.btn:active { transform: scale(0.97); background: var(--surface-3); }
+.btn.armed  { background: var(--yellow); border-color: var(--yellow); color: #17130a; }
+.btn.ghost  { background: transparent; color: var(--text-muted); }
+
+.team-chip { font-weight: 800; letter-spacing: 0.02em; }
+.dot-row { display: flex; gap: 5px; }
+.tdot {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.16);
+}
+.tdot.on   { background: var(--accent); border-color: var(--accent); }
+.tdot.last { background: var(--orange); border-color: var(--orange); }
