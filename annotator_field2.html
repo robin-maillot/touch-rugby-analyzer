@@ -644,7 +644,6 @@
     /* Finished games are frozen: everything that would add or remove an event
        goes away, leaving only type corrections via the Recent list. */
     body.game-finished .poss-toggle,
-    body.game-finished #gameEventsSection,
     body.game-finished #liveBtn,
     body.game-finished .edit-adv { display: none !important; }
 
@@ -715,184 +714,135 @@
   
     /* ══════════════════════════════════════════════════════════════
        v2 — the pitch
-       The pitch is the primary control, so it takes every pixel the
-       rest of the layout doesn't need. While a game is running the
-       page stops scrolling entirely and the pitch absorbs the slack;
-       before kick-off and after full time it scrolls normally, since
-       there's setup and a full event list to read.
+       The pitch is drawn to its true 50m × 70m proportions, so it reads
+       as a pitch rather than a stretched box and the 5m/10m lines mean
+       what they say. Everything you press while a game is running lives
+       in the rail beside it, which keeps the pitch square-on and the
+       controls under one thumb.
        ══════════════════════════════════════════════════════════════ */
-    body.game-running:not(.game-finished) main { gap: 8px; padding: 8px calc(8px + env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) calc(8px + env(safe-area-inset-left)); }
+    body.game-running:not(.game-finished) main { gap: 8px; padding: 8px; }
     body.game-running:not(.game-finished) #settingsPanel { display: none; }
 
     #pitchSection { flex: 1; min-height: 0; display: none; flex-direction: column; gap: 7px; }
     body.game-running #pitchSection { display: flex; }
     body.game-finished #pitchSection { display: none; }
 
-    /* ── Penalties: a fixed row at the top, per the brief. Never moves,
-         so it can be hit without looking down. ── */
-    .pen-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; flex-shrink: 0; }
-    .pen-btn {
-      padding: 9px 4px 8px;
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      background: var(--surface-2);
-      color: var(--text);
-      font-family: inherit; font-size: 0.82rem; font-weight: 700;
+    .pitch-stage { flex: 0 1 auto; min-height: 0; display: flex; gap: 7px; }
+    .pitch-wrap  { position: relative; flex: 1 1 auto; min-width: 0; aspect-ratio: 110 / 170; }
+    /* preserveAspectRatio="meet" letterboxes the pitch inside this box, so the
+       scale stays uniform — which is what keeps the pins round and the pitch
+       honest. Pointer coordinates come back through the SVG's own CTM, so the
+       letterboxing never has to be accounted for by hand. */
+    .pitch { display: block; position: absolute; inset: 0; width: 100%; height: 100%;
+             touch-action: manipulation; cursor: crosshair; }
+
+    .turf     { fill: url(#turf); }
+    .ln       { stroke: rgba(255,255,255,0.30); stroke-width: 0.4; vector-effect: non-scaling-stroke; }
+    .try-ln   { stroke: rgba(255,255,255,0.75); stroke-width: 1.4; }
+    .half     { stroke: rgba(255,255,255,0.38); stroke-dasharray: 4 3; }
+    .ten      { stroke: rgba(255,255,255,0.26); stroke-dasharray: 6 3; }
+    .five     { stroke: rgba(255,255,255,0.18); stroke-dasharray: 2 3; }
+    .own-band { fill: rgba(255,255,255,0.035); }
+    #tryBand  { transition: fill .18s; }
+    .band-label {
+      font-size: 6px; font-weight: 800; letter-spacing: 0.14em;
+      text-anchor: middle; pointer-events: none;
+    }
+    #tryBandLabel  { fill: #fff; }
+    .band-label.dim { fill: rgba(255,255,255,0.22); font-size: 4px; letter-spacing: 0.08em; font-weight: 600; }
+    .dist-label { fill: rgba(255,255,255,0.20); font-size: 3.6px; font-weight: 600; pointer-events: none; }
+
+    /* ── Pins ── */
+    .pin       { cursor: default; }
+    .pin-dot   { stroke: rgba(255,255,255,0.92); stroke-width: 0.7; }
+    .pin-txt   { fill: #fff; font-size: 4.6px; font-weight: 800; text-anchor: middle; pointer-events: none; }
+    .pin-txt.sm { font-size: 3.4px; }
+    /* Only the newest pin is live: tapping it is the "lost the ball here"
+       gesture, and letting older pins take taps would make that ambiguous. */
+    .pin.live  { cursor: pointer; }
+    .pin.live .pin-ring { fill: none; stroke: rgba(255,255,255,0.4); stroke-width: 0.6; }
+    .pin.stale { opacity: 0.26; }
+    .pin.stale .pin-dot { stroke: rgba(255,255,255,0.4); }
+    /* The tap-off after a try or a kick-off: the ball is on halfway, and the
+       count hasn't started. Drawn hollow so it never reads as a tagged event. */
+    .pin-restart .pin-dot { fill: none; stroke-dasharray: 2 1.6; stroke-width: 0.8; }
+    .pin-restart .pin-txt { fill: rgba(255,255,255,0.75); }
+
+    .tdot-bg { fill: rgba(255,255,255,0.10); stroke: rgba(255,255,255,0.16); stroke-width: 0.3; }
+
+    /* ── Action rail ── */
+    .act-rail {
+      flex: 0 0 82px; display: flex; flex-direction: column; gap: 5px;
+      overflow-y: auto; scrollbar-width: none;
+    }
+    .act-rail::-webkit-scrollbar { display: none; }
+    .rail-btn {
+      flex: 0 0 62px;
+      border-radius: 10px; border: 1px solid var(--border);
+      background: var(--surface-2); color: var(--text);
+      font-family: inherit; font-size: 0.76rem; font-weight: 700; line-height: 1.15;
       cursor: pointer; -webkit-tap-highlight-color: transparent;
       transition: background .1s, border-color .1s, transform .06s;
     }
-    .pen-btn:active { transform: scale(0.97); }
-    .pen-btn small { display: block; font-size: 0.56rem; font-weight: 600; color: var(--text-dim); margin-top: 1px; }
-    .pen-btn.armed { background: var(--yellow); border-color: var(--yellow); color: #17130a; }
-    .pen-btn.armed small { color: rgba(0,0,0,0.6); }
+    .rail-btn:active { transform: scale(0.96); background: var(--surface-3); }
+    .rail-btn small  { display: block; font-size: 0.55rem; font-weight: 600; color: var(--text-dim); margin-top: 1px; }
+    .rail-btn.armed  { background: var(--yellow); border-color: var(--yellow); color: #17130a; }
+    .rail-btn.armed small { color: rgba(0,0,0,0.6); }
+    .rail-btn.minor  { flex: 0 0 auto; padding: 9px 2px; font-size: 0.66rem; color: var(--text-muted); }
+    /* Pushes the minor buttons to the bottom of the rail, where the thumb sits. */
+    .rail-sep { flex: 1 1 auto; min-height: 4px; }
+    .rail-btn.minor:first-of-type { margin-top: 4px; border-top-color: var(--text-dim); }
 
-    /* ── Pitch ── */
-    .pitch-wrap {
-      position: relative; flex: 1; min-height: 190px;
-      border-radius: 12px; overflow: hidden; border: 1px solid var(--border);
+    /* ── One status line under the pitch: the sub-type prompt when there's
+         something worth refining, otherwise what the next tap will do. ── */
+    #pitchStatus {
+      flex-shrink: 0; display: flex; align-items: center; gap: 5px; min-height: 30px;
+      overflow-x: auto; scrollbar-width: none;
     }
-    .pitch {
-      display: block; position: absolute; inset: 0; width: 100%; height: 100%;
-      touch-action: manipulation; cursor: crosshair;
-    }
-    .ln     { stroke: rgba(255,255,255,0.32); stroke-width: 0.45; vector-effect: non-scaling-stroke; }
-    .try-ln { stroke: rgba(255,255,255,0.72); stroke-width: 1.1; }
-    .half   { stroke-dasharray: 3 2.2; }
-    .five   { stroke: rgba(255,255,255,0.22); stroke-dasharray: 2 2; }
-    .ingoal   { fill: rgba(255,255,255,0.03); }
-    .try-band { fill: rgba(34,197,94,0.28); }
-    .band-label {
-      fill: rgba(255,255,255,0.5); font-size: 5px; font-weight: 800;
-      letter-spacing: 0.16em; text-anchor: middle;
-    }
-    .band-label.dim { fill: rgba(255,255,255,0.2); font-size: 3.2px; letter-spacing: 0.08em; font-weight: 600; }
-
-    /* Pins are HTML rather than SVG: the pitch stretches to fill whatever space
-       is left (preserveAspectRatio="none"), which would squash SVG circles into
-       ellipses. Percentage-positioned buttons stretch their position with the
-       pitch while staying round, and hit-test reliably under a thumb. */
-    #pinLayer { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
-    .pin {
-      position: absolute; transform: translate(-50%, -50%);
-      width: 34px; height: 34px; border-radius: 50%; padding: 0;
-      display: flex; align-items: center; justify-content: center;
-      font-family: inherit; font-size: 0.86rem; font-weight: 800; color: #fff;
-      background: var(--accent); border: 2px solid rgba(255,255,255,0.92);
-      box-shadow: 0 2px 8px rgba(0,0,0,0.5);
-      -webkit-tap-highlight-color: transparent;
-    }
-    /* Only the newest pin is live: tapping it is the "lost the ball here"
-       gesture, and letting older pins take taps would make that ambiguous. */
-    .pin.live { pointer-events: auto; cursor: pointer; }
-    .pin.live::after {
-      content: ''; position: absolute; inset: -7px; border-radius: 50%;
-      border: 2px solid rgba(255,255,255,0.35);
-    }
-    .pin.live:active { transform: translate(-50%, -50%) scale(0.92); }
-    .pin-turnover { background: var(--orange); }
-    .pin-six      { background: var(--orange); font-size: 0.62rem; }
-    .pin-try      { background: var(--green);    color: #06210f; }
-    .pin-penatk   { background: var(--red); }
-    .pin-pendef   { background: var(--red-dark); }
-    .pin-again    { background: var(--yellow);   color: #17130a; font-size: 0.62rem; }
-    .pin-review   { background: var(--purple); }
-    .pin.stale { opacity: 0.26; border-color: rgba(255,255,255,0.4); box-shadow: none; }
-
-    /* ── Pitch overlays ── */
-    .pitch-ov { position: absolute; z-index: 3; pointer-events: none; }
-    #attackHud {
-      top: 6px; left: 50%; transform: translateX(-50%);
-      display: flex; align-items: center; gap: 6px;
-      background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.16);
-      border-radius: 99px; padding: 4px 12px;
-      font-size: 0.72rem; font-weight: 800; letter-spacing: 0.03em;
-      max-width: 90%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    #attackHud .arrow { color: var(--green); }
-    /* Sits clear of the try band, which is itself a tap target. */
-    #attackHud { top: calc(11.54% + 6px); }
-
-    #touchRail {
-      left: 8px; top: 50%; transform: translateY(-50%);
-      display: flex; flex-direction: column-reverse; gap: 8px;
-    }
-    .tdot {
-      width: 13px; height: 13px; border-radius: 50%;
-      background: rgba(255,255,255,0.13); border: 1px solid rgba(255,255,255,0.18);
-    }
-    .tdot.on   { background: var(--accent); border-color: var(--accent); }
-    .tdot.next { background: transparent; border-color: var(--orange); border-width: 2px; }
-
-    #pitchHint {
-      left: 0; right: 0; bottom: 7px; text-align: center;
-      font-size: 0.68rem; color: rgba(255,255,255,0.42); font-weight: 600;
-      padding: 0 12px;
-    }
-
-    /* ── Sub-type prompt: appears for a few seconds after an event that has
-         detail worth capturing, and is entirely optional. ── */
-    #subtypeBar {
-      display: none; gap: 5px; flex-shrink: 0;
-      overflow-x: auto; scrollbar-width: none; padding-bottom: 1px;
-    }
-    #subtypeBar.open { display: flex; }
-    #subtypeBar::-webkit-scrollbar { display: none; }
+    #pitchStatus::-webkit-scrollbar { display: none; }
+    #pitchHint { font-size: 0.7rem; color: var(--text-dim); font-weight: 600; padding-left: 2px; }
     .sub-chip {
-      flex: 0 0 auto; padding: 7px 11px; border-radius: 99px;
+      flex: 0 0 auto; padding: 6px 11px; border-radius: 99px;
       background: var(--surface-2); border: 1px solid var(--border);
-      color: var(--text-muted); font-family: inherit; font-size: 0.74rem; font-weight: 600;
+      color: var(--text-muted); font-family: inherit; font-size: 0.73rem; font-weight: 600;
       cursor: pointer; -webkit-tap-highlight-color: transparent;
     }
-    .sub-chip.head { background: none; border: none; color: var(--text-dim); font-size: 0.66rem; padding-left: 2px; cursor: default; }
-    .sub-chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .sub-chip.head { background: none; border: none; color: var(--text-dim); font-size: 0.65rem; padding-left: 2px; cursor: default; }
 
-    /* ── Compact game-event rail (Ball Live / Drive / Review / Undo) ── */
-    body.game-running:not(.game-finished) #gameEventsSection { flex-shrink: 0; }
-    .mini-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
-    .mini-btn {
-      padding: 9px 2px; border-radius: 9px;
-      border: 1px solid var(--border); background: var(--surface-2); color: var(--text-muted);
-      font-family: inherit; font-size: 0.66rem; font-weight: 700; line-height: 1.2;
-      cursor: pointer; -webkit-tap-highlight-color: transparent;
-    }
-    .mini-btn:active { background: var(--surface-3); }
-    .mini-btn:disabled { opacity: 0.35; }
-    .mini-btn i { display: block; font-style: normal; font-size: 0.9rem; margin-bottom: 1px; }
-    .mini-btn.undo { color: var(--text); }
-
-    /* ── Recent, as a chip strip while playing and a list once finished ── */
-    body.game-running:not(.game-finished) #recentWrap { flex-shrink: 0; }
-    body.game-running:not(.game-finished) #recentLabel { display: none; }
-    body.game-running:not(.game-finished) #recentList {
-      flex-direction: row; gap: 6px; overflow-x: auto; scrollbar-width: none;
-    }
-    #recentList::-webkit-scrollbar { display: none; }
-    body.game-running:not(.game-finished) .recent-item {
-      flex: 0 0 auto; min-width: 96px; flex-wrap: wrap; padding: 7px 10px; gap: 5px;
-    }
-    body.game-running:not(.game-finished) .recent-item .recent-time { min-width: 0; }
-    body.game-running:not(.game-finished) .recent-item .chev { display: none; }
+    /* ── Order while playing: pitch, status line, possession, recent. The pitch
+         keeps a true shape and so can't fill a portrait screen's height; the
+         controls and the last four take the slack rather than leaving a hole. ── */
+    body.game-running:not(.game-finished) #pitchSection { order: 1; flex: 0 0 auto; }
+    body.game-running:not(.game-finished) #possWrap     { order: 2; flex: 0 0 auto; }
+    body.game-running:not(.game-finished) #recentWrap   { order: 3; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+    body.game-running:not(.game-finished) #recentLabel  { display: none; }
+    body.game-running:not(.game-finished) .recent-item  { padding: 7px 11px; }
 
     .recent-pos {
       font-size: 0.62rem; color: var(--text-dim); font-variant-numeric: tabular-nums;
       border: 1px solid var(--border-light); border-radius: 4px; padding: 0 4px;
     }
 
+    /* Possession reads by colour as well as position, and the same two colours
+       tint the try band and the current set's pins — so a possession change is
+       visible everywhere at once rather than in one small label. */
+    #possBtn1.active { border-color: #3b82f6; background: rgba(59,130,246,0.14); color: var(--text); }
+    #possBtn2.active { border-color: #f59e0b; background: rgba(245,158,11,0.14); color: var(--text); }
+
     /* ── Making room for the pitch ──────────────────────────────
        v1's header and scoreboard are sized for a page that scrolls. Here the
        pitch has to fit on screen with them, so while a game is running both
-       compress and the header actions become one scrolling row instead of
-       wrapping onto three. ── */
+       compress and the header buttons drop their labels. ── */
     header h1 { white-space: nowrap; }
     .btn-icon { white-space: nowrap; }
     /* One tight row only while playing — off the pitch there's room to wrap. */
     body.game-running:not(.game-finished) .header-actions { flex-wrap: nowrap; }
+    body.game-running:not(.game-finished) header { padding: 6px 10px; }
+    body.game-running:not(.game-finished) .btn-icon { padding: 5px 8px; font-size: 0.72rem; }
     body.game-running:not(.game-finished) .btn-icon .lbl,
     body.game-running:not(.game-finished) .btn-hdr-stats span { display: none; }
     /* The scoreboard says what you're looking at; the title is just chrome. */
     body.game-running:not(.game-finished) header h1 { display: none; }
-    body.game-running:not(.game-finished) header { padding: 6px 10px; }
-    body.game-running:not(.game-finished) .btn-icon { padding: 5px 8px; font-size: 0.72rem; }
     body.game-running:not(.game-finished) #scoreboard { padding: 5px 14px; }
     body.game-running:not(.game-finished) .score-val,
     body.game-running:not(.game-finished) #halfClock  { font-size: 1.55rem; }
@@ -1004,7 +954,7 @@
 
 <main>
 
-  <div>
+  <div id="possWrap">
     <div class="poss-toggle">
       <button class="poss-btn active" id="possBtn1" onclick="setPossession('Team 1')">Team 1</button>
       <button class="start-btn"       id="gameEventBtn" onclick="tagGameEventToggle()">Start</button>
@@ -1012,33 +962,23 @@
     </div>
   </div>
 
-  <!-- The pitch replaces v1's event grid: penalties stay as buttons, everything
-       else is placed by tapping where it happened. -->
+  <!-- The pitch replaces v1's event grid: penalties and the game events stay as
+       buttons, in a rail beside the pitch rather than above and below it, so the
+       pitch keeps a true shape and everything pressable is under one thumb. -->
   <div id="pitchSection">
-    <div class="pen-row">
-      <button class="pen-btn" id="penAtkBtn"   onclick="armPen('Penalty Attack')">Pen Attack<small>ball over</small></button>
-      <button class="pen-btn" id="penDefBtn"   onclick="armPen('Penalty Defence')">Pen Defence<small>keep ball</small></button>
-      <button class="pen-btn" id="sixAgainBtn" onclick="armPen('6 Again')">6 Again<small>touches reset</small></button>
+    <div class="pitch-stage">
+      <div class="pitch-wrap" id="pitchWrap"></div>
+      <div class="act-rail">
+        <button class="rail-btn" id="penAtkBtn"   onclick="armPen('Penalty Attack')">Pen Atk<small>ball over</small></button>
+        <button class="rail-btn" id="penDefBtn"   onclick="armPen('Penalty Defence')">Pen Def<small>keep ball</small></button>
+        <button class="rail-btn" id="sixAgainBtn" onclick="armPen('6 Again')">6 Again<small>count resets</small></button>
+        <div class="rail-sep"></div>
+        <button class="rail-btn minor" onclick="tagGameEvent('Ball Live')">&#9654; Ball Live</button>
+        <button class="rail-btn minor" onclick="tagToReview()">&#9873; Review</button>
+        <button class="rail-btn minor" onclick="undoLast()">&#8617; Undo</button>
+      </div>
     </div>
-
-    <div class="pitch-wrap" id="pitchWrap">
-      <div class="pitch-ov" id="attackHud"><span class="arrow">&#9650;</span><span id="attackTeam">Team 1</span><span style="color:var(--text-dim);font-weight:600">attacking</span></div>
-      <div class="pitch-ov" id="touchRail"></div>
-      <div class="pitch-ov" id="pitchHint">Tap where the touch was made</div>
-      <div id="pinLayer"></div>
-    </div>
-
-    <div id="subtypeBar"></div>
-  </div>
-
-  <div id="gameEventsSection">
-    <div class="mini-row gated-grid">
-      <button class="mini-btn" onclick="tagGameEvent('Ball Live')"><i>&#9654;</i>Ball Live</button>
-      <button class="mini-btn" id="driveGoodBtn" onclick="tagGameEvent('Drive - Good')"><i>&#43;</i>Drive</button>
-      <button class="mini-btn" id="driveBadBtn"  onclick="tagGameEvent('Drive - Bad')"><i>&#8722;</i>Drive</button>
-      <button class="mini-btn" onclick="tagToReview()"><i>&#9873;</i>Review</button>
-      <button class="mini-btn undo" onclick="undoLast()"><i>&#8617;</i>Undo</button>
-    </div>
+    <div id="pitchStatus"><span id="pitchHint">Tap where the touch was made</span></div>
   </div>
 
   <button id="stopGameBtn" onclick="openStopDialog()">⏹ Stop Game</button>
@@ -1118,8 +1058,6 @@
         <button class="evt-btn btn-turn"    style="opacity:0.65" onclick="applyEdit('Turnover','6 Again')">6 Again</button>
         <button class="evt-btn btn-game     edit-adv" onclick="applyEdit('Game Event','Ball Live')">Ball Live</button>
         <button class="evt-btn btn-review"  onclick="applyEdit('To Review','To Review')">To Review</button>
-        <button class="evt-btn btn-try1     edit-adv" onclick="applyEdit('Game Event','Drive - Good')">Drive +</button>
-        <button class="evt-btn btn-pen-atk  edit-adv" onclick="applyEdit('Game Event','Drive - Bad')">Drive −</button>
         <button class="evt-btn btn-game     edit-adv" onclick="applyEdit('Game Event','Game Start')">Game Start</button>
         <button class="evt-btn btn-game     edit-adv" onclick="applyEdit('Game Event','Game End')">Game End</button>
       </div>
@@ -1539,10 +1477,6 @@ function tag(type, name, possessionOwner, pos) {
 
 function tagWithPossession(type, name) { tag(type, name, possession); }
 function tagGameEvent(name) {
-  // Drive +/- is a per-possession rating: allow only one per possession so a
-  // single possession can't be double-tagged. The lock clears at the next
-  // play-ending event (see driveAlreadyTagged).
-  if ((name === 'Drive - Good' || name === 'Drive - Bad') && driveAlreadyTagged()) return;
   // Teams alternate the tap-off each half, so a new half defaults to the
   // opposite team of whoever started the previous half. (The very first half
   // keeps the current selection.) Still user-overridable via the toggle.
@@ -1551,20 +1485,6 @@ function tagGameEvent(name) {
     if (prevStart) setPossession(TR.otherTeam(prevStart.possessionOwner));
   }
   tag('Game Event', name, possession);
-}
-
-// True if a Drive +/- has already been tagged in the current possession. A
-// possession runs until the next play-ending event (Try / Turnover / Penalty /
-// Game Start / End) — i.e. any annotation that isn't a Game Event or To Review.
-// Ball Live is the dead-time lead-in to a possession, so it isn't a boundary.
-function driveAlreadyTagged() {
-  for (let i = annotations.length - 1; i >= 0; i--) {
-    const a = annotations[i];
-    if (a.type === 'Game Event' && (a.name === 'Drive - Good' || a.name === 'Drive - Bad')) return true;
-    if (a.type === 'Touch' || a.type === 'To Review' || a.name === 'Ball Live') continue;
-    return false; // play-ending event reached — current possession has no drive yet
-  }
-  return false;
 }
 
 function tagGameEventToggle() {
@@ -1761,11 +1681,6 @@ function updateUI() {
   // left to do and the last five wouldn't be enough to reach the mistake.
   document.getElementById('recentLabel').textContent = finished ? 'All events — tap to correct' : 'Recent';
 
-  // Lock Drive +/- once a drive is tagged this possession (avoids double-tagging)
-  const driveLocked = driveAlreadyTagged();
-  document.getElementById('driveGoodBtn').disabled = driveLocked;
-  document.getElementById('driveBadBtn').disabled  = driveLocked;
-
   renderPitch();
 
   if (!annotations.length) {
@@ -1776,7 +1691,9 @@ function updateUI() {
   const recent  = finished ? ordered : ordered.slice(0, 4);
   el.innerHTML = recent.map((a, ri) => {
     const idx     = annotations.length - 1 - ri;
-    const color   = COLORS[a.type] || '#888';
+    // Touches carry their team's colour here too, so the strip reads as the same
+    // set of pins you just tapped rather than a wall of identical blue dots.
+    const color   = a.type === 'Touch' ? (TEAM_COLOR[a.possessionOwner] || '#888') : (COLORS[a.type] || '#888');
     const team    = a.actionOwner === 'Team 1' ? (document.getElementById('metaTeam1').value.trim() || 'Team 1')
                                                 : (document.getElementById('metaTeam2').value.trim() || 'Team 2');
     const teamStr = a.type !== 'Game Event' ? ` <span class="recent-team">· ${team}</span>` : '';
@@ -2397,20 +2314,30 @@ async function pushToSheet(override = false) {
 // Positions are attack-normalised: x runs 0..100 across the pitch from the
 // attacking team's left, and y runs 0 (their own try line) to 100 (the try line
 // they're attacking). The team in possession therefore always attacks *up* the
-// screen, so "forward" never moves and one tap means the same thing all game —
-// which is the whole reason the pitch can be tapped without looking at it.
+// screen, so "forward" never moves and one tap means the same thing all game.
+// Because that flip is invisible in the geometry, it's made loud in the colour:
+// the try band and the whole current set carry the attacking team's colour.
 //
-// The pitch adds no state of its own: touch numbers, which pins to draw and
-// which one is live are all derived from `annotations`, so undo, edit, reload
-// and possession replay stay correct for free.
+// The pitch adds no state of its own. Touch numbers, which pins to draw, which
+// one is live and where the ball is are all derived from `annotations`, so undo,
+// edit, delete, possession replay and a mid-game reload stay correct for free.
 // ══════════════════════════════════════════════════════════════════
 
-const PITCH_BAND = 15;                       // in-goal depth, in y units
-const PITCH_SPAN = 100 + PITCH_BAND * 2;     // full viewBox height
+// Drawing units. The playing area is 70m long × 50m wide, so 100 units across
+// maps to 140 down — draw it any other way and the 5m and 10m lines lie.
+const PITCH_LEN  = 140;                       // try line to try line
+const PITCH_BAND = 10;                        // ~5m dead-ball area at each end
+const M          = PITCH_LEN / 70;            // drawing units per metre
+const PIN_R      = 5.2;
 const PEN_KINDS  = ['Penalty Attack', 'Penalty Defence', '6 Again'];
+const TEAM_COLOR = { 'Team 1': '#3b82f6', 'Team 2': '#f59e0b' };
 
-let armedPen   = null;    // a penalty waiting to be placed by the next pitch tap
-let subtypeIdx = null;    // the event the sub-type strip is currently offering
+// Pitch coordinates → drawing coordinates. y is measured towards the try line
+// being attacked, which is at the top, so it runs the opposite way on screen.
+const toView = (x, y) => ({ vx: x, vy: (100 - y) / 100 * PITCH_LEN });
+
+let armedPen     = null;   // a penalty waiting to be placed by the next pitch tap
+let subtypeIdx   = null;   // the event the sub-type strip is currently offering
 let subtypeTimer = null;
 
 // Whether the touch-by-touch rows go up with the rest. Off by default: the
@@ -2424,28 +2351,42 @@ function setUploadTouches(on) {
 }
 
 function pitchSVG() {
-  const h = (y, cls) => `<line x1="0" y1="${y}" x2="100" y2="${y}" class="${cls}"/>`;
+  const line = (metres, cls) => {
+    const vy = metres * M;
+    return `<line x1="0" y1="${vy.toFixed(2)}" x2="100" y2="${vy.toFixed(2)}" class="ln ${cls}"/>`;
+  };
+  const dist = (metres, text) =>
+    `<text x="4" y="${(metres * M + 1.3).toFixed(2)}" class="dist-label">${text}</text>`;
+  // A margin all round keeps a pin on the touchline from being clipped, and
+  // leaves the turf reading as a pitch on a surface rather than a filled box.
   return `
-<svg class="pitch" viewBox="0 ${-PITCH_BAND} 100 ${PITCH_SPAN}" preserveAspectRatio="none" aria-hidden="true">
+<svg class="pitch" viewBox="-5 ${-PITCH_BAND - 5} 110 ${PITCH_LEN + PITCH_BAND * 2 + 10}"
+     preserveAspectRatio="xMidYMid meet">
   <defs><linearGradient id="turf" x1="0" y1="0" x2="0" y2="1">
-    <stop offset="0%" stop-color="#12301f"/><stop offset="100%" stop-color="#0d2417"/>
+    <stop offset="0%" stop-color="#153a25"/><stop offset="100%" stop-color="#0c2115"/>
   </linearGradient></defs>
-  <rect x="0" y="${-PITCH_BAND}" width="100" height="${PITCH_SPAN}" fill="url(#turf)"/>
-  <rect x="0" y="${-PITCH_BAND}" width="100" height="${PITCH_BAND}" class="ingoal try-band"/>
-  <rect x="0" y="100"            width="100" height="${PITCH_BAND}" class="ingoal"/>
-  ${h(0, 'ln try-ln')}${h(100, 'ln try-ln')}
-  ${h(7.1, 'ln five')}${h(92.9, 'ln five')}
-  ${h(50, 'ln half')}
-  <text x="12" y="${-PITCH_BAND / 2 + 2}" class="band-label">TRY</text>
-  <text x="88" y="${-PITCH_BAND / 2 + 2}" class="band-label">TRY</text>
-  <text x="50" y="104.6" class="band-label dim">own in-goal</text>
+
+  <rect x="0" y="${-PITCH_BAND}" width="100" height="${PITCH_LEN + PITCH_BAND * 2}" rx="1" class="turf"/>
+  <rect id="tryBand" x="0" y="${-PITCH_BAND}" width="100" height="${PITCH_BAND}"/>
+  <rect x="0" y="${PITCH_LEN}" width="100" height="${PITCH_BAND}" class="own-band"/>
+
+  ${line(0,  'try-ln')}${line(70, 'try-ln')}
+  ${line(5,  'five')}${line(65, 'five')}
+  ${line(10, 'ten')}${line(60, 'ten')}
+  ${line(35, 'half')}
+  ${dist(5, '5')}${dist(10, '10')}${dist(60, '10')}${dist(65, '5')}
+
+  <text id="tryBandLabel" x="50" y="${-PITCH_BAND / 2 + 2}" class="band-label">TRY</text>
+
+  <g id="touchDots"></g>
+  <g id="pinLayer"></g>
 </svg>`;
 }
 
 // ── Reading the current set out of the event list ──────────────
 // A "set" is one possession. Everything that doesn't end a possession — the
-// touches themselves, Ball Live, Drive ratings, To Review — belongs to the set
-// in progress; anything else closes it.
+// touches themselves, Ball Live, To Review — belongs to the set in progress;
+// anything else closes it.
 function isSetFiller(a) {
   if (a.type === 'Touch' || a.type === 'To Review') return true;
   return a.type === 'Game Event' && a.name !== 'Game Start' && a.name !== 'Game End';
@@ -2458,8 +2399,14 @@ function currentSet() {
   return out;
 }
 
-// The set before it, including the event that ended it — kept on the pitch as
-// faded pins so a turnover doesn't blank the screen you were just reading.
+// The event that closed the previous set, or null at the very start of a half.
+function lastEnder() {
+  for (let i = annotations.length - 1; i >= 0; i--) if (!isSetFiller(annotations[i])) return annotations[i];
+  return null;
+}
+
+// That set in full, including its ending event — kept on the pitch as faded
+// pins so a turnover doesn't blank the screen you were just reading.
 function previousSet() {
   let i = annotations.length - 1;
   while (i >= 0 && isSetFiller(annotations[i])) i--;
@@ -2470,6 +2417,28 @@ function previousSet() {
 }
 
 function touchCount() { return currentSet().filter(a => a.type === 'Touch').length; }
+
+// After a try — and at each kick-off — play restarts with a tap from halfway,
+// so that's where the ball is and where the count starts from. It's drawn, not
+// tagged: nothing is recorded until you actually tap a touch.
+function restartPoint() {
+  if (touchCount()) return null;
+  const end = lastEnder();
+  if (!end) return null;
+  const isTry   = end.type === 'Try';
+  const isKick  = end.type === 'Game Event' && end.name === 'Game Start';
+  return (isTry || isKick) ? { x: 50, y: 50 } : null;
+}
+
+// Where the ball is, for a penalty placed without aiming at a spot.
+function lastKnownPoint() {
+  const restart = restartPoint();
+  if (restart) return restart;
+  for (let i = annotations.length - 1; i >= 0; i--) {
+    if (annotations[i].x != null) return { x: annotations[i].x, y: annotations[i].y };
+  }
+  return { x: 50, y: 50 };
+}
 
 // Touch numbers are positional, so any edit that removes or retypes one has to
 // renumber the rest of its set. Called from updateUI so every path that mutates
@@ -2486,6 +2455,11 @@ function isGameRunning() {
   const ge   = annotations.filter(a => a.name === 'Game Start' || a.name === 'Game End');
   const last = ge[ge.length - 1];
   return !!(last && last.name === 'Game Start');
+}
+
+function teamName(key) {
+  return (document.getElementById(key === 'Team 1' ? 'metaTeam1' : 'metaTeam2').value.trim())
+    || (key === 'Team 1' ? 'Team 1' : 'Team 2');
 }
 
 // ── Pins ───────────────────────────────────────────────────────
@@ -2511,63 +2485,107 @@ function pinLabel(a) {
     default:                 return '·';
   }
 }
+// A touch takes its team's colour, so the whole set reads as one team's and a
+// possession change is unmissable. Everything else keeps a semantic colour.
+function pinFill(a) {
+  switch (pinKind(a)) {
+    case 'touch':    return TEAM_COLOR[a.possessionOwner] || 'var(--accent)';
+    case 'try':      return 'var(--green)';
+    case 'penatk':   return 'var(--red)';
+    case 'pendef':   return 'var(--red-dark)';
+    case 'review':   return 'var(--purple)';
+    case 'again':    return 'var(--yellow)';
+    default:         return 'var(--orange)';
+  }
+}
 
-function pinHTML(a, active, live) {
+function pinSVG(a, active, live) {
   if (a.x == null || a.y == null) return '';
-  const top = (100 - a.y + PITCH_BAND) / PITCH_SPAN * 100;
-  return `<button class="pin pin-${pinKind(a)}${active ? '' : ' stale'}${live ? ' live' : ''}"` +
-    ` data-idx="${annotations.indexOf(a)}"${live ? '' : ' tabindex="-1"'}` +
-    ` style="left:${a.x.toFixed(2)}%;top:${top.toFixed(2)}%">${pinLabel(a)}</button>`;
+  const { vx, vy } = toView(a.x, a.y);
+  const label = pinLabel(a);
+  return `<g class="pin pin-${pinKind(a)}${active ? '' : ' stale'}${live ? ' live' : ''}" data-idx="${annotations.indexOf(a)}">` +
+    (live ? `<circle class="pin-ring" cx="${vx}" cy="${vy}" r="${PIN_R + 2.2}"/>` : '') +
+    `<circle class="pin-dot" cx="${vx}" cy="${vy}" r="${PIN_R}" fill="${pinFill(a)}"/>` +
+    `<text class="pin-txt${label.length > 1 ? ' sm' : ''}" x="${vx}" y="${vy + (label.length > 1 ? 1.2 : 1.7)}">${label}</text></g>`;
 }
 
 function renderPitch() {
   const layer = document.getElementById('pinLayer');
   if (!layer) return;
+
+  const attacking = TEAM_COLOR[possession] || '#3b82f6';
+  const band  = document.getElementById('tryBand');
+  const label = document.getElementById('tryBandLabel');
+  band.setAttribute('fill', attacking);
+  band.setAttribute('fill-opacity', '0.42');
+  label.textContent = teamName(possession).toUpperCase() + ' TRY';
+
   const cur  = currentSet();
   const last = cur[cur.length - 1];
-  // Only the newest pin is tappable, and only while it's still a touch: that tap
+  // Only the newest pin is live, and only while it's still a touch: that tap
   // means "the ball was lost right here", so letting older pins take it would
   // make the gesture ambiguous.
   const live = last && last.type === 'Touch' && !isFinished() ? last : null;
-
   const prev = previousSet();
-  layer.innerHTML = prev.map(a => pinHTML(a, !cur.length, false)).join('') +
-                    cur.map(a => pinHTML(a, true, a === live)).join('');
 
-  const n = touchCount();
-  document.getElementById('touchRail').innerHTML = [1, 2, 3, 4, 5, 6]
-    .map(i => `<span class="tdot ${i <= n ? 'on' : i === n + 1 ? 'next' : ''}"></span>`).join('');
+  // The tap-off marker, when the ball is sitting on halfway waiting to restart.
+  const restart = restartPoint();
+  const restartSVG = restart
+    ? (() => { const { vx, vy } = toView(restart.x, restart.y);
+        return `<g class="pin pin-restart"><circle class="pin-dot" cx="${vx}" cy="${vy}" r="${PIN_R}" stroke="${attacking}"/>` +
+               `<text class="pin-txt" x="${vx}" y="${vy + 1.7}">0</text></g>`; })()
+    : '';
 
-  document.getElementById('attackTeam').textContent = possession === 'Team 1'
-    ? (document.getElementById('metaTeam1').value.trim() || 'Team 1')
-    : (document.getElementById('metaTeam2').value.trim() || 'Team 2');
+  layer.innerHTML = prev.map(a => pinSVG(a, !cur.length && !restart, false)).join('') +
+                    restartSVG +
+                    cur.map(a => pinSVG(a, true, a === live)).join('');
+
+  // Touch counter, laid across the own in-goal band where there's nothing else.
+  const n  = touchCount();
+  const y0 = PITCH_LEN + PITCH_BAND / 2;
+  document.getElementById('touchDots').innerHTML = [1, 2, 3, 4, 5, 6].map((i, k) => {
+    const cx = 50 + (k - 2.5) * 7;
+    const style = i <= n     ? `fill:${attacking};stroke:${attacking}`
+                : i === n + 1 ? 'fill:none;stroke:var(--orange);stroke-width:0.7'
+                :               '';
+    return `<circle cx="${cx}" cy="${y0}" r="2.1" class="tdot-bg" style="${style}"/>`;
+  }).join('');
 
   PEN_KINDS.forEach(k => {
     const el = document.getElementById(k === 'Penalty Attack' ? 'penAtkBtn' : k === 'Penalty Defence' ? 'penDefBtn' : 'sixAgainBtn');
     if (el) el.classList.toggle('armed', armedPen === k);
   });
 
-  document.getElementById('pitchHint').textContent =
-      armedPen ? `Tap where the ${penLabel(armedPen)} was — or tap it again for the last spot`
-    : n >= 5   ? 'Next tap is the 6th touch — ball hands over'
-    : live     ? 'Tap the numbered pin if the ball was lost there'
-    :            'Tap where the touch was made';
+  // The status line is shared with the sub-type strip, so the hint element is
+  // absent while chips are showing.
+  const hint = document.getElementById('pitchHint');
+  if (hint && subtypeIdx === null) {
+    hint.textContent =
+        armedPen ? `Tap where the ${penLabel(armedPen)} was — or tap it again for the last spot`
+      : restart  ? `Tap-off from halfway — ${teamName(possession)}'s ball`
+      : n >= 5   ? 'Next tap is the 6th touch — ball hands over'
+      : live     ? 'Tap the numbered pin if the ball was lost there'
+      :            'Tap where the touch was made';
+  }
 }
 
 function penLabel(kind) {
-  return kind === 'Penalty Attack' ? 'Pen Attack' : kind === 'Penalty Defence' ? 'Pen Defence' : '6 Again';
+  return kind === 'Penalty Attack' ? 'Pen Atk' : kind === 'Penalty Defence' ? 'Pen Def' : '6 Again';
 }
 
 // ── Tapping ────────────────────────────────────────────────────
+// The pitch is letterboxed inside its box to keep a true shape, so screen
+// coordinates come back through the SVG's own transform rather than being
+// worked out from the wrapper's rectangle.
 function pitchPoint(ev) {
-  const r  = document.getElementById('pitchWrap').getBoundingClientRect();
-  const px = Math.min(1, Math.max(0, (ev.clientX - r.left) / r.width));
-  const py = Math.min(1, Math.max(0, (ev.clientY - r.top)  / r.height));
-  const vy = -PITCH_BAND + py * PITCH_SPAN;   // viewBox y; below zero is the try band
+  const svg = document.querySelector('#pitchWrap svg.pitch');
+  const pt  = svg.createSVGPoint();
+  pt.x = ev.clientX; pt.y = ev.clientY;
+  const p = pt.matrixTransform(svg.getScreenCTM().inverse());
   return {
-    x:     +(px * 100).toFixed(1),
-    y:     +Math.min(100, Math.max(0, 100 - vy)).toFixed(1),
-    inTry: vy < 0,
+    x:     +Math.min(100, Math.max(0, p.x)).toFixed(1),
+    y:     +Math.min(100, Math.max(0, 100 - p.y / PITCH_LEN * 100)).toFixed(1),
+    inTry: p.y < 0,
   };
 }
 
@@ -2618,27 +2636,19 @@ function placePen(pt) {
   offerSubtype();
 }
 
-function lastKnownPoint() {
-  for (let i = annotations.length - 1; i >= 0; i--) {
-    if (annotations[i].x != null) return { x: annotations[i].x, y: annotations[i].y };
-  }
-  return { x: 50, y: 50 };
-}
-
 // ── Sub-type strip ─────────────────────────────────────────────
 // Offered for a few seconds after an event that has detail worth capturing, and
 // entirely optional: ignoring it leaves the event as "Other", exactly as v1's
-// buttons do.
+// buttons do. It shares the status line with the hint, so nothing moves.
 function offerSubtype(idx) {
   const i   = idx == null ? annotations.length - 1 : idx;
   const a   = annotations[i];
-  const bar = document.getElementById('subtypeBar');
+  const bar = document.getElementById('pitchStatus');
   if (!a || !SUBTYPE_TYPES.includes(a.type)) { closeSubtype(); return; }
   subtypeIdx = i;
   bar.innerHTML = `<span class="sub-chip head">${EVENT_LABELS[a.type] || a.type} —</span>` +
     (TR.MENU[a.type] || []).filter(n => n !== 'Other')
       .map(n => `<button class="sub-chip" data-sub="${n}">${n}</button>`).join('');
-  bar.classList.add('open');
   clearTimeout(subtypeTimer);
   subtypeTimer = setTimeout(closeSubtype, 10000);
 }
@@ -2646,8 +2656,9 @@ function offerSubtype(idx) {
 function closeSubtype() {
   clearTimeout(subtypeTimer);
   subtypeIdx = null;
-  const bar = document.getElementById('subtypeBar');
-  if (bar) { bar.classList.remove('open'); bar.innerHTML = ''; }
+  const bar = document.getElementById('pitchStatus');
+  if (bar) bar.innerHTML = '<span id="pitchHint"></span>';
+  renderPitch();
 }
 
 function pickSubtype(name) {
@@ -2686,18 +2697,18 @@ function deleteEvent() {
 // ── Wiring ─────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
   const wrap = document.getElementById('pitchWrap');
-  wrap.insertAdjacentHTML('afterbegin', pitchSVG());
+  wrap.innerHTML = pitchSVG();
   document.getElementById('uploadTouchesInput').checked = uploadTouches;
 
-  // One listener on the wrapper: the overlays are pointer-events:none and the
-  // stale pins are inert, so anything that isn't the live pin is a pitch tap.
+  // One listener on the wrapper: only the live pin takes taps of its own, so
+  // anything else that lands here is a tap on the pitch.
   wrap.addEventListener('click', ev => {
     const pin = ev.target.closest('.pin.live');
     if (pin) { onPinTap(+pin.dataset.idx); return; }
     onPitchTap(ev);
   });
 
-  document.getElementById('subtypeBar').addEventListener('click', ev => {
+  document.getElementById('pitchStatus').addEventListener('click', ev => {
     const chip = ev.target.closest('[data-sub]');
     if (chip) pickSubtype(chip.dataset.sub);
   });

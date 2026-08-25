@@ -15,17 +15,24 @@ Both read and write the same on-device game store, so a game can be opened in ei
 
 ## The idea
 
-Tagging live is a speed-and-accuracy problem, so the pitch gets the whole screen:
+Tagging live is a speed-and-accuracy problem, so the pitch gets the screen and
+everything pressable sits in a rail beside it:
 
-- **Every touch is a tap** where it happened. The touch counter fills 1…6.
+- **Every touch is a tap** where it happened. The counter fills 1…6.
 - **Tap the pin again** and that touch becomes a **turnover** — the ball was lost
   right there.
 - **The sixth tap is the handover.** It's tagged `Turnover / 6th Touch`
   automatically and the ball changes hands.
-- **Tap the green try band** at the attacking end to score.
-- **Penalties stay as buttons** along the top, where they can be hit without
-  looking down.
-- The **last four events** sit along the bottom; tap one to correct it.
+- **Tap the try band** at the attacking end to score. It carries the attacking
+  team's name and colour, so it always says whose try it would be.
+- **After a try, and at each kick-off**, a hollow **0** appears on halfway: the
+  tap-off. Nothing is recorded until you tap the first touch, but that's where
+  the ball is, so a penalty placed without aiming lands there.
+- **Penalties, Ball Live, Review and Undo** are in the rail, under one thumb.
+- The **last four events** sit below the pitch; tap one to correct it.
+
+The pitch is drawn to its real 50 m × 70 m proportions, with the 5 m and 10 m
+lines at each end and halfway — so a position on it means what it looks like.
 
 ### Attack-normalised: the pitch never turns round
 
@@ -42,6 +49,11 @@ way:
 That's the form you want for analysis anyway — a heat map of where sets die reads
 the same whichever end a team happened to be kicking towards.
 
+Because that flip is invisible in the geometry, it's made loud in the colour.
+Each team owns one — **Team 1 blue, Team 2 amber** — and it tints the try band,
+the possession button, the touch counter and every pin in the current set at
+once. When the ball turns over, the whole screen changes colour.
+
 > **⇆ Swap** still only flips the scoreboard for the sideline you're standing on.
 > It never touches the pitch or the recorded data.
 
@@ -57,7 +69,8 @@ the same whichever end a team happened to be kicking towards.
    - the ball went down → **tap the last pin**;
    - they scored → **tap the try band**;
    - a penalty → **tap the penalty button, then tap the spot**.
-5. Possession, score and the touch counter all reset themselves.
+5. Possession, score and the touch counter all reset themselves. After a try the
+   ball goes back to halfway for the tap-off.
 6. **End** at half time, **Start** again for the second half, **End** at full time,
    then **⏹ Stop Game** → **⬆ Finish & Upload**.
 
@@ -81,6 +94,9 @@ penalty never costs two taps unless the placement is worth one.
 > The behaviour above is what `TR.inferPossessionAfter` has always done, and is
 > what both annotators produce; the discrepancy is in that document, not the code.
 
+> **No Drive +/−.** v2 doesn't tag drive ratings and doesn't offer them as an
+> edit target. A game tagged in v1 that has them still shows and counts them.
+
 ### Sub-types
 
 After a try, turnover or penalty a strip of sub-types slides in for ten seconds —
@@ -93,7 +109,7 @@ corrected name, so a late correction doesn't leave the ball on the wrong team.
 
 ### Fixing a mistake
 
-- **↩ Undo** drops the newest event.
+- **↩ Undo**, in the rail, drops the newest event.
 - **Tap any row** in the strip along the bottom for the full edit card: change the
   type, pick a sub-type, add a comment — or **Delete**, which is new in v2 and is
   the only way to remove a mis-tap that isn't the most recent event. Possession is
@@ -150,11 +166,11 @@ tagged offline are attributed to whoever finally uploads them.
 
 ## Layout notes
 
-- The pitch is stretched to fill the space rather than letterboxed, so a phone in
-  portrait gets a tall pitch. Positions stay a faithful linear mapping — only the
-  drawing is stretched — so the recorded data is unaffected.
 - The previous set stays on the pitch as faded pins until the next one starts, so
   a turnover doesn't blank the screen you were reading.
+- The pitch keeps a true aspect rather than stretching to fill a portrait phone,
+  so it can't use the full height. The possession toggle and the last-four list
+  sit below it and take that slack, rather than leaving a hole.
 - Only the newest pin is tappable. That tap means "the ball was lost here", and
   letting older pins take it would make the gesture ambiguous.
 - While a game is running the header drops its labels to icons and the scoreboard
