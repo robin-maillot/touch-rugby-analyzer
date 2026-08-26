@@ -735,6 +735,9 @@
     body.game-finished #pitchSection { display: none; }
 
     .pitch-stage { flex: 1 1 auto; min-height: 0; display: flex; gap: 7px; }
+    body.lay-stack .pitch-stage { flex-direction: column; }
+    body.lay-rail  .pitch-stage,
+    body.lay-wide  .pitch-stage { flex-direction: row; }
     /* No explicit height: the row's default stretch gives it the stage's height,
        and height:100% against an indefinite flex height collapses to zero. */
     .pitch-wrap  { position: relative; flex: 1 1 auto; min-width: 0; }
@@ -786,28 +789,36 @@
     }
     .tdot.next { background: none; border-color: var(--orange); border-width: 2px; }
 
-    /* ── Action rail ── */
-    .act-rail {
-      flex: 0 0 82px; display: flex; flex-direction: column; gap: 5px;
-      overflow-y: auto; scrollbar-width: none;
+    /* ── Action rail ─────────────────────────────────────────────
+       Six buttons: a single column beside the pitch, or two rows of three
+       beneath it. Nothing here goes below 46px in its short dimension — these
+       get hit at speed, sometimes without looking down. ── */
+    .act-rail { display: grid; gap: 6px; }
+    body.lay-rail .act-rail,
+    body.lay-wide .act-rail {
+      flex: 0 0 96px; grid-template-columns: 1fr; grid-auto-rows: minmax(46px, 1fr);
+      overflow-y: auto; scrollbar-width: none;      /* belt and braces: never unreachable */
     }
     .act-rail::-webkit-scrollbar { display: none; }
+    body.rail-2col.lay-rail .act-rail,
+    body.rail-2col.lay-wide .act-rail { flex: 0 0 182px; grid-template-columns: repeat(2, 1fr); }
+    body.lay-stack .act-rail {
+      flex: 0 0 auto; grid-template-columns: repeat(3, 1fr); grid-auto-rows: minmax(50px, auto);
+    }
+    #touchDots { grid-column: 1 / -1; }
     .rail-btn {
-      flex: 0 1 62px; min-height: 34px;
-      border-radius: 10px; border: 1px solid var(--border);
+      min-height: 46px; padding: 4px 3px;
+      border-radius: 11px; border: 1px solid var(--border);
       background: var(--surface-2); color: var(--text);
-      font-family: inherit; font-size: 0.76rem; font-weight: 700; line-height: 1.15;
+      font-family: inherit; font-size: 0.82rem; font-weight: 700; line-height: 1.15;
       cursor: pointer; -webkit-tap-highlight-color: transparent;
       transition: background .1s, border-color .1s, transform .06s;
     }
-    .rail-btn:active { transform: scale(0.96); background: var(--surface-3); }
-    .rail-btn small  { display: block; font-size: 0.55rem; font-weight: 600; color: var(--text-dim); margin-top: 1px; }
+    .rail-btn:active { transform: scale(0.97); background: var(--surface-3); }
+    .rail-btn small  { display: block; font-size: 0.58rem; font-weight: 600; color: var(--text-dim); margin-top: 1px; }
     .rail-btn.armed  { background: var(--yellow); border-color: var(--yellow); color: #17130a; }
     .rail-btn.armed small { color: rgba(0,0,0,0.6); }
-    .rail-btn.minor  { flex: 0 1 34px; min-height: 26px; padding: 4px 2px; font-size: 0.66rem; color: var(--text-muted); }
-    /* Pushes the minor buttons to the bottom of the rail, where the thumb sits. */
-    .rail-sep { flex: 1 1 4px; min-height: 0; }
-    .rail-btn.minor:first-of-type { margin-top: 4px; border-top-color: var(--text-dim); }
+    .rail-btn.minor  { font-size: 0.72rem; color: var(--text-muted); }
 
     /* ── One status line under the pitch: the sub-type prompt when there's
          something worth refining, otherwise what the next tap will do. ── */
@@ -830,11 +841,11 @@
          controls and the last four take the slack rather than leaving a hole. ── */
     body.game-running:not(.game-finished) #pitchSection { flex: 1 1 auto; min-height: 0; }
     body.game-running:not(.game-finished) #possWrap     { flex: 0 0 auto; }
-    /* The last four gives way to the pitch: capped and scrollable, so a long
-       history can never push the field off the bottom of the screen. */
-    body.game-running:not(.game-finished) #recentWrap   { flex: 0 1 auto; min-height: 0; max-height: 34vh; overflow-y: auto; }
+    /* Fixed, not capped: sized from the first event so the pitch keeps exactly
+       the same space at full time as it had at kick-off. */
+    body.game-running:not(.game-finished) #recentWrap   { flex: 0 0 126px; min-height: 0; overflow-y: auto; }
+    body.game-running:not(.game-finished) .recent-item  { padding: 5px 11px; font-size: 0.78rem; }
     body.game-running:not(.game-finished) #recentLabel  { display: none; }
-    body.game-running:not(.game-finished) .recent-item  { padding: 7px 11px; }
 
     .recent-pos {
       font-size: 0.62rem; color: var(--text-dim); font-variant-numeric: tabular-nums;
@@ -878,22 +889,22 @@
        then, so the narrow layout is untouched. ── */
     #sidePanel { display: contents; }
 
-    @media (min-aspect-ratio: 1/1), (min-width: 760px) {
-      body.game-running:not(.game-finished) main { flex-direction: row; align-items: stretch; justify-content: center; }
-      /* The pitch keeps a flex width and letterboxes inside it. Sizing it from
-         its own aspect ratio would be tighter, but an aspect-ratio box with an
-         indefinite height contributes nothing to intrinsic width, so the rail
-         ends up overflowing the section and the panel lands on top of it. */
-      body.game-running:not(.game-finished) #pitchSection { flex: 1 1 auto; min-width: 0; }
-      body.game-running:not(.game-finished) #sidePanel {
-        display: flex; flex-direction: column; gap: 8px;
-        flex: 0 0 clamp(190px, 32%, 360px); min-height: 0;
-      }
-      body.game-running:not(.game-finished) #possWrap   { flex: 0 0 auto; }
-      body.game-running:not(.game-finished) #recentWrap { flex: 1 1 auto; max-height: none; min-height: 0; overflow-y: auto; }
-      /* Vertical again: with the height back, the toggle reads better stacked. */
-      body.game-running:not(.game-finished) .poss-toggle { flex-direction: column; }
+    /* Wide is now chosen by measurement rather than by a media query — see
+       resolveLayout() — so it hangs off a body class. */
+    body.game-running.lay-wide:not(.game-finished) main { flex-direction: row; align-items: stretch; justify-content: center; }
+    /* The pitch keeps a flex width and letterboxes inside it. Sizing it from its
+       own aspect ratio would be tighter, but an aspect-ratio box with an
+       indefinite height contributes nothing to intrinsic width, so the rail ends
+       up overflowing the section and the panel lands on top of it. */
+    body.game-running.lay-wide:not(.game-finished) #pitchSection { flex: 1 1 auto; min-width: 0; }
+    body.game-running.lay-wide:not(.game-finished) #sidePanel {
+      display: flex; flex-direction: column; gap: 8px;
+      flex: 0 0 clamp(168px, 24%, 230px); min-height: 0;
     }
+    body.game-running.lay-wide:not(.game-finished) #possWrap   { flex: 0 0 auto; }
+    body.game-running.lay-wide:not(.game-finished) #recentWrap { flex: 1 1 auto; max-height: none; min-height: 0; overflow-y: auto; }
+    /* Vertical again: with the height back, the toggle reads better stacked. */
+    body.game-running.lay-wide:not(.game-finished) .poss-toggle { flex-direction: column; }
 
     /* ── Field maps in the stats sheet ──────────────────────────
        Both teams are drawn attacking upwards here, whichever ends they were
@@ -981,6 +992,7 @@
     <button class="btn-icon" onclick="showPicker()">←<span class="lbl"> Games</span></button>
     <button class="btn-icon btn-hdr-push" id="pushBtn"     onclick="pushToSheet()">⬆<span class="lbl"> Push</span></button>
     <button class="btn-icon btn-hdr-swap" id="swapBtn"     onclick="toggleSwap()">⇆<span class="lbl"> Swap</span></button>
+    <button class="btn-icon btn-hdr-swap" id="rotateBtn"   onclick="rotatePitch()">⟳<span class="lbl"> Turn</span></button>
     <button class="btn-icon btn-hdr-override" id="overrideBtn" style="display:none" onclick="pushToSheet(true)">⚠ Override</button>
     <button class="btn-icon btn-hdr-stats" onclick="openStats()" title="View live stats">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="6" y1="20" x2="6" y2="13"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="18" y1="20" x2="18" y2="9"/></svg>
@@ -1072,7 +1084,6 @@
         <button class="rail-btn" id="penAtkBtn"   onclick="armPen('Penalty Attack')">Pen Atk<small>ball over</small></button>
         <button class="rail-btn" id="penDefBtn"   onclick="armPen('Penalty Defence')">Pen Def<small>keep ball</small></button>
         <button class="rail-btn" id="sixAgainBtn" onclick="armPen('6 Again')">6 Again<small>count resets</small></button>
-        <div class="rail-sep"></div>
         <button class="rail-btn minor" onclick="tagGameEvent('Ball Live')">&#9654; Ball Live</button>
         <button class="rail-btn minor" onclick="tagToReview()">&#9873; Review</button>
         <button class="rail-btn minor" onclick="undoLast()">&#8617; Undo</button>
@@ -1858,6 +1869,7 @@ function toggleSettings() {
 function setSetupOpen(on) {
   document.getElementById('settingsPanel').classList.toggle('open', !!on);
   document.body.classList.toggle('setup-open', !!on);
+  resolveLayout();
 }
 
 // Tab name for an arbitrary game's metadata — used both for the active game and
@@ -2522,11 +2534,20 @@ const PIN_R      = 5.2;
 const PEN_KINDS  = ['Penalty Attack', 'Penalty Defence', '6 Again'];
 const TEAM_COLOR = { 'Team 1': '#3b82f6', 'Team 2': '#f59e0b' };
 
-// Stored position → drawing position. `down` is true for the team running down
-// the screen, for whom the whole frame is turned end over end.
-const toView = (x, y, down) => down
-  ? { vx: 100 - x, vy: y / 100 * PITCH_LEN }
-  : { vx: x,       vy: (100 - y) / 100 * PITCH_LEN };
+// Two mappings sit between a stored position and a drawn one.
+//
+// First, `down` turns the frame end over end for the team running the other way,
+// giving a canonical pair: `a` is distance along the pitch from the end the "up"
+// team attacks, `c` is distance across. Then `place` puts that pair on screen
+// according to the pitch's orientation — the same pitch, quarter-turned.
+const toAC = (x, y, down) => down
+  ? { a: y / 100 * PITCH_LEN,       c: 100 - x }
+  : { a: (100 - y) / 100 * PITCH_LEN, c: x };
+
+const place   = (a, c) => pitchOrient === 'h' ? { vx: PITCH_LEN - a, vy: c } : { vx: c, vy: a };
+const unplace = (X, Y) => pitchOrient === 'h' ? { a: PITCH_LEN - X, c: Y }   : { a: Y,  c: X };
+
+const toView = (x, y, down) => { const { a, c } = toAC(x, y, down); return place(a, c); };
 
 // Which team is attacking up the screen. Ends change at every Game Start after
 // the first — teams swap at half time — and ⇆ Swap points the screen the way
@@ -2539,6 +2560,12 @@ function upTeam() {
 // A pin is drawn for the team that owned it, not for whoever has the ball now —
 // otherwise the previous set would leap to the other end on every turnover.
 const runsDown = owner => owner !== upTeam();
+
+// 'v' draws the pitch with attack running up and down the screen, 'h' with it
+// running left to right. Resolved by resolveLayout() unless pinned with ⟳.
+let pitchOrient    = 'v';
+let orientPin      = localStorage.getItem('fieldPitchOrient') || '';
+let layoutWide     = false;   // buttons and the last four beside the pitch
 
 let armedPen     = null;   // a penalty waiting to be placed by the next pitch tap
 let subtypeIdx   = null;   // the event the sub-type strip is currently offering
@@ -2554,34 +2581,56 @@ function setUploadTouches(on) {
   updateSyncUI();
 }
 
+// Drawn in whichever orientation is current. Every coordinate goes through
+// place(), so the markings, the labels and the pins can never disagree about
+// which way round the pitch is.
 function pitchSVG() {
-  const line = (metres, cls) => {
-    const vy = metres * M;
-    return `<line x1="0" y1="${vy.toFixed(2)}" x2="100" y2="${vy.toFixed(2)}" class="ln ${cls}"/>`;
+  const h = pitchOrient === 'h';
+  const seg = (metres, cls) => {                 // a line right across the pitch
+    const p1 = place(metres * M, 0), p2 = place(metres * M, 100);
+    return `<line x1="${p1.vx.toFixed(2)}" y1="${p1.vy.toFixed(2)}" x2="${p2.vx.toFixed(2)}" y2="${p2.vy.toFixed(2)}" class="ln ${cls}"/>`;
   };
-  const dist = (metres, text) =>
-    `<text x="4" y="${(metres * M + 1.3).toFixed(2)}" class="dist-label">${text}</text>`;
-  // A margin all round keeps a pin on the touchline from being clipped, and
-  // leaves the turf reading as a pitch on a surface rather than a filled box.
+  const dist = (metres, text) => {               // distance marker near one edge
+    const p = place(metres * M, 4);
+    return `<text x="${p.vx.toFixed(2)}" y="${(p.vy + 1.3).toFixed(2)}" class="dist-label">${text}</text>`;
+  };
+  // An in-goal. `from` is where it starts along the pitch, so in landscape the
+  // end the "up" team attacks (a below zero) lands on the right-hand side.
+  const band = (id, from) => h
+    ? `<rect id="${id}" x="${from < 0 ? PITCH_LEN : -PITCH_BAND}" y="0" width="${PITCH_BAND}" height="100"/>`
+    : `<rect id="${id}" x="0" y="${from}" width="100" height="${PITCH_BAND}"/>`;
+  // The label reads along the band, so in landscape it turns with the pitch.
+  const label = (id, atA) => {
+    const p = place(atA, 50);
+    const rot = h ? ` transform="rotate(${atA < 0 ? 90 : -90} ${p.vx.toFixed(2)} ${p.vy.toFixed(2)})"` : '';
+    return `<text id="${id}" x="${p.vx.toFixed(2)}" y="${(p.vy + 2).toFixed(2)}" class="band-label"${rot}>TRY</text>`;
+  };
+
+  const turf = h
+    ? `<rect x="${-PITCH_BAND}" y="0" width="${PITCH_LEN + PITCH_BAND * 2}" height="100" rx="1" class="turf"/>`
+    : `<rect x="0" y="${-PITCH_BAND}" width="100" height="${PITCH_LEN + PITCH_BAND * 2}" rx="1" class="turf"/>`;
+  const viewBox = h
+    ? `${-PITCH_BAND - 5} -5 ${PITCH_LEN + PITCH_BAND * 2 + 10} 110`
+    : `-5 ${-PITCH_BAND - 5} 110 ${PITCH_LEN + PITCH_BAND * 2 + 10}`;
+
   return `
-<svg class="pitch" viewBox="-5 ${-PITCH_BAND - 5} 110 ${PITCH_LEN + PITCH_BAND * 2 + 10}"
-     preserveAspectRatio="xMidYMid meet">
-  <defs><linearGradient id="turf" x1="0" y1="0" x2="0" y2="1">
+<svg class="pitch" viewBox="${viewBox}" preserveAspectRatio="xMidYMid meet">
+  <defs><linearGradient id="turf" x1="0" y1="0" x2="${h ? 1 : 0}" y2="${h ? 0 : 1}">
     <stop offset="0%" stop-color="#153a25"/><stop offset="100%" stop-color="#0c2115"/>
   </linearGradient></defs>
 
-  <rect x="0" y="${-PITCH_BAND}" width="100" height="${PITCH_LEN + PITCH_BAND * 2}" rx="1" class="turf"/>
-  <rect id="bandTop" x="0" y="${-PITCH_BAND}" width="100" height="${PITCH_BAND}"/>
-  <rect id="bandBot" x="0" y="${PITCH_LEN}"   width="100" height="${PITCH_BAND}"/>
+  ${turf}
+  ${band('bandTop', -PITCH_BAND)}
+  ${band('bandBot', PITCH_LEN)}
 
-  ${line(0,  'try-ln')}${line(70, 'try-ln')}
-  ${line(7,  'seven')}${line(63, 'seven')}
-  ${line(25, 'ten')}${line(45, 'ten')}
-  ${line(35, 'half')}
+  ${seg(0, 'try-ln')}${seg(70, 'try-ln')}
+  ${seg(7, 'seven')}${seg(63, 'seven')}
+  ${seg(25, 'ten')}${seg(45, 'ten')}
+  ${seg(35, 'half')}
   ${dist(7, '7')}${dist(63, '7')}${dist(25, '10')}${dist(45, '10')}
 
-  <text id="labelTop" x="50" y="${-PITCH_BAND / 2 + 2}"          class="band-label">TRY</text>
-  <text id="labelBot" x="50" y="${PITCH_LEN + PITCH_BAND / 2 + 2}" class="band-label">TRY</text>
+  ${label('labelTop', -PITCH_BAND / 2)}
+  ${label('labelBot', PITCH_LEN + PITCH_BAND / 2)}
 
   <g id="pinLayer"></g>
 </svg>`;
@@ -2776,6 +2825,85 @@ function renderPitch() {
   }
 }
 
+// ── Orientation and layout ─────────────────────────────────────
+// The pitch is a fixed shape, so only one of its dimensions can ever fill the
+// space; the other has slack. Rather than guess where that slack falls, work out
+// how big the pitch would come out in each of the four combinations —  pitch
+// upright or turned, controls beneath it or beside it — and take the biggest.
+// The controls therefore never eat the dimension that is limiting the pitch.
+const PITCH_AR = { v: 110 / (PITCH_LEN + PITCH_BAND * 2), h: (PITCH_LEN + PITCH_BAND * 2) / 110 };
+
+function resolveLayout() {
+  const header = document.querySelector('header');
+  const score  = document.getElementById('scoreboard');
+  if (!header || !score) return;
+  // Measured from the viewport and the fixed chrome, not from <main>: main's
+  // height moves with Setup and with the layout being chosen, so measuring it
+  // would mean deciding the layout from a box the decision itself created.
+  const W = window.innerWidth  - 16;
+  const H = window.innerHeight - header.offsetHeight - score.offsetHeight - 16;
+  if (W <= 0 || H <= 0) return;
+
+  // Rough allowances for the pieces that aren't the pitch. Deliberately fixed:
+  // measuring them would mean measuring a layout that isn't on screen yet.
+  // BTN_ROWS covers two rows of buttons plus the touch-counter row, which spans
+  // the full width when the buttons are stacked underneath rather than beside.
+  const STATUS = 30, BTN_ROWS = 140, POSS = 52, RECENT = 126, PANEL = 230, GAP = 8;
+  // Six buttons at a usable size need ~350px of column. Where there isn't that
+  // much — a phone held sideways — the rail goes to two columns rather than
+  // pushing Undo off the bottom of the screen.
+  const twoCol = H < 350;
+  const RAIL   = twoCol ? 190 : 104;
+  document.body.classList.toggle('rail-2col', twoCol);
+  const area = (bw, bh, ar) => { const w = Math.min(bw, bh * ar); return w <= 0 || bh <= 0 ? 0 : w * (w / ar); };
+
+  // Three places the controls can go, from least to most horizontal room needed.
+  const places = ar => [
+    // stack: buttons in two rows under the pitch, everything else below that
+    ['stack', area(W, H - STATUS - BTN_ROWS - POSS - RECENT - GAP * 4, ar)],
+    // rail: buttons in a column beside the pitch, possession and last four below
+    ['rail',  area(W - RAIL - GAP, H - STATUS - POSS - RECENT - GAP * 3, ar)],
+    // wide: buttons beside the pitch and the rest in a panel beside that
+    ['wide',  area(W - RAIL - PANEL - GAP * 2, H - STATUS - GAP, ar)],
+  ];
+
+  let best = null;
+  for (const o of (orientPin ? [orientPin] : ['v', 'h'])) {
+    for (const [place, a] of places(PITCH_AR[o])) {
+      if (!best || a > best.area) best = { area: a, orient: o, place };
+    }
+  }
+  if (!best || !best.area) return;
+
+  const changed = best.orient !== pitchOrient;
+  pitchOrient = best.orient;
+  layoutWide  = best.place === 'wide';
+  document.body.classList.toggle('lay-wide',  best.place === 'wide');
+  document.body.classList.toggle('lay-rail',  best.place === 'rail');
+  document.body.classList.toggle('lay-stack', best.place === 'stack');
+  document.body.classList.toggle('pitch-h',   pitchOrient === 'h');
+  const btn = document.getElementById('rotateBtn');
+  if (btn) {
+    btn.classList.toggle('active', !!orientPin);
+    btn.title = orientPin
+      ? `Pitch locked ${pitchOrient === 'h' ? 'sideways' : 'upright'} — tap to turn it`
+      : 'Turn the pitch (currently chosen to fit)';
+  }
+  // The markings live in the SVG, so a turn means redrawing it.
+  if (changed) {
+    const wrap = document.getElementById('pitchWrap');
+    if (wrap) wrap.innerHTML = pitchSVG();
+  }
+  renderPitch();
+}
+
+// ⟳ pins the other orientation. Once pinned it stays pinned, per device.
+function rotatePitch() {
+  orientPin = (orientPin || pitchOrient) === 'v' ? 'h' : 'v';
+  try { localStorage.setItem('fieldPitchOrient', orientPin); } catch (e) {}
+  resolveLayout();
+}
+
 function penLabel(kind) {
   return kind === 'Penalty Attack' ? 'Pen Atk' : kind === 'Penalty Defence' ? 'Pen Def' : '6 Again';
 }
@@ -2788,14 +2916,15 @@ function pitchPoint(ev) {
   const svg = document.querySelector('#pitchWrap svg.pitch');
   const pt  = svg.createSVGPoint();
   pt.x = ev.clientX; pt.y = ev.clientY;
-  const p    = pt.matrixTransform(svg.getScreenCTM().inverse());
-  const down = runsDown(possession);
-  const x    = down ? 100 - p.x : p.x;
-  const y    = (down ? p.y : PITCH_LEN - p.y) / PITCH_LEN * 100;
+  const p       = pt.matrixTransform(svg.getScreenCTM().inverse());
+  const { a, c } = unplace(p.x, p.y);
+  const down    = runsDown(possession);
+  const x       = down ? 100 - c : c;
+  const y       = (down ? a : PITCH_LEN - a) / PITCH_LEN * 100;
   return {
     x:     +Math.min(100, Math.max(0, x)).toFixed(1),
     y:     +Math.min(100, Math.max(0, y)).toFixed(1),
-    inTry: down ? p.y > PITCH_LEN : p.y < 0,
+    inTry: down ? a > PITCH_LEN : a < 0,
   };
 }
 
@@ -3148,6 +3277,13 @@ window.addEventListener('DOMContentLoaded', () => {
   const wrap = document.getElementById('pitchWrap');
   wrap.innerHTML = pitchSVG();
   document.getElementById('uploadTouchesInput').checked = uploadTouches;
+  resolveLayout();
+  // The best layout depends on the space available, so it is re-decided whenever
+  // that changes — a rotation, a keyboard opening, Setup being opened.
+  let t = null;
+  const relayout = () => { clearTimeout(t); t = setTimeout(resolveLayout, 60); };
+  window.addEventListener('resize', relayout);
+  window.addEventListener('orientationchange', relayout);
 
   // One listener on the wrapper: only the live pin takes taps of its own, so
   // anything else that lands here is a tap on the pitch.

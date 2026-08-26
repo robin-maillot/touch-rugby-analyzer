@@ -28,7 +28,7 @@ everything pressable sits in a rail beside it:
 - **After a try, and at each kick-off**, a hollow **0** appears on halfway: the
   tap-off. Nothing is recorded until you tap the first touch, but that's where
   the ball is, so a penalty placed without aiming lands there.
-- **Penalties, Ball Live, Review and Undo** are in the rail, under one thumb.
+- **Penalties, Ball Live, Review and Undo** sit in a rail, under one thumb.
 - The **last four events** sit below the pitch; tap one to correct it.
 
 The pitch is drawn to its real 50 m × 70 m proportions, with the full Touch
@@ -36,6 +36,34 @@ markings — a **7 m line** at each end, **10 m lines either side of halfway**, 
 halfway itself solid — so a position on it means what it looks like. The whole
 field is always on screen: it's fitted to whatever space is left rather than
 sized from the width, and the page never scrolls while a game is running.
+
+### The pitch turns, and the controls follow it
+
+A fixed-shape pitch can only ever fill one dimension of a screen; the other has
+slack. So rather than guess, the page works out how big the pitch would come out
+in each combination — **upright or turned**, with the buttons **beneath it,
+beside it, or beside it with the last four beside that** — and picks the biggest.
+The controls therefore never eat the dimension that is limiting the pitch, and
+the answer differs by device:
+
+| Screen | Pitch | Controls | Pitch drawn |
+|---|---|---|---|
+| Phone portrait | upright | rail beside | 233 × 372 |
+| Phone landscape | **turned** | rail + panel beside | 333 × 208 |
+| Tablet portrait | upright | rail beside | 495 × 793 |
+| Tablet landscape | **turned** | rail + panel beside | 775 × 484 |
+
+**⟳ Turn** overrides the choice and pins it for that device — the controls still
+rearrange around whichever way you pinned it. On a tablet held landscape, turning
+the pitch is worth about 50% more field than leaving it upright (375k px² against
+251k), which is the whole reason it's there.
+
+No button is smaller than **46 px** on its short side, and where six of them
+won't fit in a column — a phone held sideways — the rail goes to two columns
+rather than pushing Undo off the bottom.
+
+The last four has a **fixed** height rather than a growing one, so the pitch is
+exactly as big at full time as it was at kick-off.
 
 ### Attack-normalised: the pitch never turns round
 
