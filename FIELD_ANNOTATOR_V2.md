@@ -128,9 +128,14 @@ mid-game reload all leave the counter and the pins agreeing with each other.
 The 📊 Stats sheet keeps everything v1 reported and opens with the thing you
 actually read first: **two pitch maps**, one per team, both drawn attacking
 upwards whichever ends they were really playing — because the point of the map
-is to compare them. Each shows every touch as a dot, a ring wherever that team
-lost the ball, tries on the line, and a dashed line at the **average end of
-set**: how far they usually get.
+is to compare them.
+
+Each map plots the two touches that decide a set — **touch 3 hollow, touch 4
+filled** — with a **line at the average position of each**, dashed for T3 and
+solid for T4. An ✕ marks where that team lost the ball and a green dot marks a
+try. Plotting every touch was just a cloud; two touches and two lines is a read.
+T3 and T4 are told apart by fill and by dash rather than by colour, so the team
+colour stays free to mean the team.
 
 Then three figures, all inline SVG and flexbox — no chart library, because the
 page has to work at a pitch with no signal.

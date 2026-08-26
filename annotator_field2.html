@@ -722,7 +722,13 @@
        ══════════════════════════════════════════════════════════════ */
     body.game-running:not(.game-finished)      { height: 100dvh; overflow: hidden; }
     body.game-running:not(.game-finished) main { gap: 8px; padding: 8px; overflow: hidden; }
-    body.game-running:not(.game-finished) #settingsPanel { display: none; }
+    /* Setup stays openable mid-game — hiding it outright here outranked the
+       .open class, so ⚙ Setup had nothing to show. It is a setup task rather
+       than a tagging one, though, so while it's open the page goes back to
+       scrolling: pinning the height would squeeze the pitch to nothing and put
+       everything below the panel out of reach. */
+    body.game-running.setup-open      { height: auto; overflow: visible; }
+    body.game-running.setup-open main { overflow: visible; }
 
     #pitchSection { flex: 1; min-height: 0; display: none; flex-direction: column; gap: 7px; }
     body.game-running #pitchSection { display: flex; }
@@ -907,8 +913,11 @@
     }
     .fmap-key span { display: inline-flex; align-items: center; gap: 4px; }
     .fmap-key i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
-    .k-dot  { background: var(--accent); opacity: 0.6; }
-    .k-ring { border: 1.5px solid var(--orange); }
+    .k-t3   { border: 1.5px solid var(--text-muted); }
+    .k-t4   { background: var(--text-muted); }
+    .k-x    { border-radius: 0 !important; background:
+              linear-gradient(45deg, transparent 42%, var(--orange) 42%, var(--orange) 58%, transparent 58%),
+              linear-gradient(-45deg, transparent 42%, var(--orange) 42%, var(--orange) 58%, transparent 58%); }
     .k-try  { background: var(--green); }
     .k-avg  { border-radius: 0 !important; height: 0 !important; width: 12px !important;
               border-top: 2px dashed var(--text-muted); }
@@ -1446,7 +1455,7 @@ function loadGame(rec, isNew) {
   loading = false;
   // Open Setup for a brand-new game (teams still need filling in); leave it shut
   // when resuming so the tagging buttons are immediately to hand.
-  $('settingsPanel').classList.toggle('open', !!isNew);
+  setSetupOpen(!!isNew);
   updateSheetPreview();
   updateUI();
   updateSyncUI();
@@ -1841,7 +1850,14 @@ function normalizeYoutubeInput() {
 
 // ── Settings panel ─────────────────────────────────────────────
 function toggleSettings() {
-  document.getElementById('settingsPanel').classList.toggle('open');
+  setSetupOpen(!document.getElementById('settingsPanel').classList.contains('open'));
+}
+
+// The body class is what lets the page scroll while Setup is open, so it has to
+// move with the panel — never toggle .open on its own.
+function setSetupOpen(on) {
+  document.getElementById('settingsPanel').classList.toggle('open', !!on);
+  document.body.classList.toggle('setup-open', !!on);
 }
 
 // Tab name for an arbitrary game's metadata — used both for the active game and
@@ -2145,6 +2161,7 @@ function refreshStats() {
         { label: 'Avg start',           n1: fL.startM.toFixed(0) + 'm',  pct1: null, n2: fR.startM.toFixed(0) + 'm',  pct2: null, r1: fL.startM,   r2: fR.startM,   hib: true },
         { label: 'Avg gain per set',    n1: (fL.gainM >= 0 ? '+' : '') + fL.gainM.toFixed(0) + 'm', pct1: null,
                                         n2: (fR.gainM >= 0 ? '+' : '') + fR.gainM.toFixed(0) + 'm', pct2: null, r1: fL.gainM, r2: fR.gainM, hib: true },
+        { label: 'Avg end of set',      n1: fL.endM.toFixed(0) + 'm',    pct1: null, n2: fR.endM.toFixed(0) + 'm',    pct2: null, r1: fL.endM,     r2: fR.endM,     hib: true },
         { label: 'Territory',           n1: fL.territory.toFixed(0) + '%', pct1: null, n2: fR.territory.toFixed(0) + '%', pct2: null, r1: fL.territory, r2: fR.territory, hib: true },
         { label: 'Touches per set',     n1: fL.touchesPer.toFixed(1),    pct1: null, n2: fR.touchesPer.toFixed(1),    pct2: null, r1: fL.touchesPer, r2: fR.touchesPer, hib: null },
       ],
@@ -2249,10 +2266,11 @@ function refreshStats() {
          ${fieldMapSVG(fR, teamsSwapped ? 'Team 1' : 'Team 2', tR.name)}
        </div>
        <div class="fmap-key">
-         <span><i class="k-dot"></i>touch</span>
-         <span><i class="k-ring"></i>ball lost</span>
+         <span><i class="k-t3"></i>touch 3</span>
+         <span><i class="k-t4"></i>touch 4</span>
+         <span><i class="k-x"></i>ball lost</span>
          <span><i class="k-try"></i>try</span>
-         <span><i class="k-avg"></i>avg end of set</span>
+         <span><i class="k-avg"></i>avg T3 / T4</span>
        </div>`
     : '';
   document.getElementById('statsBody').innerHTML = mapHtml + chartHtml + html;
@@ -2962,6 +2980,13 @@ function computeFieldStats() {
       redConvPct:  red.length ? redTries.length / red.length * 100 : null,
       channels:    chan.map(c => Math.round(c / chanTotal * 100)),
       touchPts:    myTouches.map(a => ({ x: a.x, y: a.y })),
+      // The third and fourth touch are where a set is decided — the shape is
+      // set by then and the break comes off one of them — so those are the two
+      // the map plots, rather than every touch at once.
+      t3Pts:       myTouches.filter(a => a.name === 'Touch 3').map(a => ({ x: a.x, y: a.y })),
+      t4Pts:       myTouches.filter(a => a.name === 'Touch 4').map(a => ({ x: a.x, y: a.y })),
+      t3M:         mean(myTouches.filter(a => a.name === 'Touch 3').map(a => a.y)) * Y_TO_M,
+      t4M:         mean(myTouches.filter(a => a.name === 'Touch 4').map(a => a.y)) * Y_TO_M,
       tryPts:      annotations.filter(a => a.type === 'Try' && a.actionOwner === key && a.x != null).map(a => ({ x: a.x, y: a.y })),
       lostPts:     annotations.filter(a => a.x != null && a.possessionOwner === key &&
                      (a.type === 'Turnover' || a.type === 'Penalty Attack')).map(a => ({ x: a.x, y: a.y })),
@@ -2970,21 +2995,38 @@ function computeFieldStats() {
   return { t1: forTeam('Team 1'), t2: forTeam('Team 2'), any: sets.length > 0 };
 }
 
-// A small attack-normalised pitch per team: every touch as a dot, tries on the
-// line, lost ball marked, and a dashed line at the average end-of-set position —
-// "how far they usually get" in one glance. Both teams attack upwards here even
-// though the live pitch shows them attacking real ends, because the whole point
-// of the map is to compare them.
+// A small attack-normalised pitch per team, plotting the two touches that decide
+// a set — the third and the fourth — plus where the ball was lost and where they
+// scored, and a line at the average position of each of those two touches. Every
+// touch at once was just a cloud; two touches and two lines is a read.
+//
+// Both teams attack upwards here even though the live pitch shows them attacking
+// real ends, because the whole point of the map is to compare them. Touch 3 and
+// touch 4 are told apart by fill and by dash, never by hue, so the team colour
+// stays free to mean the team.
 function fieldMapSVG(stat, key, name) {
   const color = TEAM_COLOR[key];
   const vy    = y => (100 - y) / 100 * PITCH_LEN;
-  const dots  = stat.touchPts.map(p => `<circle cx="${p.x}" cy="${vy(p.y)}" r="2.6" fill="${color}" fill-opacity="0.5"/>`).join('');
-  const lost  = stat.lostPts.map(p => `<circle cx="${p.x}" cy="${vy(p.y)}" r="2.4" fill="none" stroke="var(--orange)" stroke-width="1"/>`).join('');
+  const t3 = stat.t3Pts.map(p =>
+    `<circle cx="${p.x}" cy="${vy(p.y)}" r="2.6" fill="none" stroke="${color}" stroke-width="1.1"/>`).join('');
+  const t4 = stat.t4Pts.map(p =>
+    `<circle cx="${p.x}" cy="${vy(p.y)}" r="2.6" fill="${color}"/>`).join('');
+  const lost = stat.lostPts.map(p => {
+    const d = 2.4;
+    return `<path d="M${p.x - d} ${vy(p.y) - d}L${p.x + d} ${vy(p.y) + d}M${p.x + d} ${vy(p.y) - d}L${p.x - d} ${vy(p.y) + d}"
+             stroke="var(--orange)" stroke-width="1.1" fill="none"/>`;
+  }).join('');
   const tries = stat.tryPts.map(p => `<circle cx="${p.x}" cy="${vy(p.y)}" r="3.4" fill="var(--green)"/>`).join('');
-  const avg   = stat.sets
-    ? `<line x1="2" y1="${vy(stat.endM / Y_TO_M)}" x2="98" y2="${vy(stat.endM / Y_TO_M)}"
-             stroke="${color}" stroke-width="1.2" stroke-dasharray="4 3"/>`
-    : '';
+
+  const avgLine = (m, n, dash) => !m ? '' :
+    `<line x1="2" y1="${vy(m / Y_TO_M)}" x2="90" y2="${vy(m / Y_TO_M)}" stroke="${color}"
+           stroke-width="1.2"${dash ? ' stroke-dasharray="4 3"' : ''}/>` +
+    `<text x="93" y="${vy(m / Y_TO_M) + 2.6}" fill="${color}" font-size="6" font-weight="800">${n}</text>`;
+
+  const foot = stat.t3M || stat.t4M
+    ? `T3 ${stat.t3M.toFixed(0)}m · T4 ${stat.t4M.toFixed(0)}m`
+    : `${stat.sets} set${stat.sets === 1 ? '' : 's'}`;
+
   return `<div class="fmap">
     <div class="fmap-name"><i style="background:${color}"></i>${name}</div>
     <svg viewBox="-3 -3 106 ${PITCH_LEN + 6}" preserveAspectRatio="xMidYMid meet">
@@ -2992,9 +3034,10 @@ function fieldMapSVG(stat, key, name) {
       <line x1="0" y1="${vy(100)}" x2="100" y2="${vy(100)}" stroke="rgba(255,255,255,0.6)" stroke-width="1.4"/>
       <line x1="0" y1="${vy(50)}"  x2="100" y2="${vy(50)}"  stroke="rgba(255,255,255,0.22)" stroke-dasharray="3 3"/>
       <line x1="0" y1="${vy(RED_ZONE)}" x2="100" y2="${vy(RED_ZONE)}" stroke="rgba(255,255,255,0.14)" stroke-dasharray="2 3"/>
-      ${dots}${lost}${tries}${avg}
+      ${avgLine(stat.t3M, '3', true)}${avgLine(stat.t4M, '4', false)}
+      ${t3}${t4}${lost}${tries}
     </svg>
-    <div class="fmap-foot">${stat.sets} set${stat.sets === 1 ? '' : 's'} · avg end ${stat.endM.toFixed(0)}m</div>
+    <div class="fmap-foot">${stat.sets} set${stat.sets === 1 ? '' : 's'} · ${foot}</div>
   </div>`;
 }
 
