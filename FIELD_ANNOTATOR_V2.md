@@ -211,6 +211,28 @@ In the **Recent** strip each event carries its position as a channel letter and
 a distance — `R 58m`, `M 22m` — rather than raw coordinates, which read as
 nothing at a glance.
 
+### Ball Live after every touch
+
+v1 had few enough events that a **Ball Live** could only ever follow the end of a
+possession. Here you can tag one after each individual touch — the roll-ball — and
+the arithmetic holds: each gap is charged to the team that was in possession, and
+**ball-in-play time comes out the same either way**, because the extra elapsed
+time you record is exactly the extra dead time subtracted from it. Checked on a
+two-half game: tagging roll-balls took Dead Ball from 35s to 107s for one team
+while its average possession stayed at 28.8s, and Avg Turnover was untouched at
+7s in both.
+
+What does change is what **Dead Ball** means. Tagged only at the end of sets it's
+stoppage time; tagged per touch it's stoppage time *plus every roll-ball*, which
+is several times larger. Either is defensible, but they aren't comparable — so
+pick one habit and keep to it, or the number moves between games for reasons that
+have nothing to do with the games.
+
+> One known gap, inherited from v1: a Ball Live tagged after the **last** play of
+> a game belongs to no possession, since nobody receives the ball afterwards, so
+> those few seconds appear in neither team's Dead Ball. It's one interval per
+> game and it is left out rather than assigned to a team that never got the ball.
+
 ---
 
 ## What reaches the Google Sheet
