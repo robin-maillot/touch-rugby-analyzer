@@ -117,7 +117,7 @@ Open before kickoff and fill in:
 |---|---|
 | **Team 1 / Team 2** | Free text. As soon as you type, the possession buttons and scoreboard relabel themselves. |
 | **Year** | Defaults to the current year. |
-| **Division** | Dropdown (MXO, MO, WO, M30, W27, M40, W35, or NONE). |
+| **Division** | Dropdown (MXO, MO, WO, M30, X30, W27, M35, M40, W35, M45, or NONE). |
 | **Competition** | Free text, e.g. "Seniors Cup". |
 | **ID** | *Optional.* A disambiguator for repeat fixtures — when the same two teams in the same comp/year/division play more than once, set a different ID on each so they get distinct sheet tabs. |
 | **Click delay (s)** | Subtracted from every tag **after the first**, to compensate for your reaction time. `0`–`9`. Set it to ~1–2 if you find yourself always tapping a beat late. Persists across sessions. |
