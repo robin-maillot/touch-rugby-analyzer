@@ -895,6 +895,9 @@
         <span class="edit-subtype-wrap" id="editSubtypeWrap">
           <select id="editSubtype" class="edit-subtype" aria-label="Sub-type" onchange="applySubtype()"></select>
         </span>
+        <span class="edit-subtype-wrap" id="editMoveWrap" style="display:none">
+          <select id="editMove" class="edit-subtype" aria-label="Strike move" onchange="applyStrikeMove()"></select>
+        </span>
       </div>
     </div>
     <div style="padding:16px 16px 4px">
@@ -1314,7 +1317,7 @@ function tag(type, name, possessionOwner) {
   let t = nowSeconds();
   if (annotations.length > 0) t = Math.max(0, t - clickDelay);
   const actionOwner = TR.inferActionOwner(possessionOwner, type, name);
-  annotations.push({ id: Date.now() + Math.random(), type, name, possessionOwner, actionOwner, comment: '', time: t, timeStr: TR.fmt(t) });
+  annotations.push({ id: Date.now() + Math.random(), type, name, possessionOwner, actionOwner, comment: '', strikeMove: '', time: t, timeStr: TR.fmt(t) });
 
   const next = TR.inferPossessionAfter(possessionOwner, type, name);
   if (next !== possessionOwner) setPossession(next);
@@ -1400,6 +1403,7 @@ function openEdit(index) {
   const a = annotations[index];
   document.getElementById('editCurrentLabel').textContent = eventBaseLabel(a) + ' · ' + fmtClock(a.time);
   renderSubtypeMenu(a);
+  renderMoveSelect(a);
   // '?' is the placeholder marker To Review events carry — show a blank box so
   // the annotator can type a real note over it.
   document.getElementById('editComment').value = (a.comment && a.comment !== '?') ? a.comment : '';
@@ -1433,6 +1437,7 @@ function applyEdit(type, name) {
   a.name = name;
   commitCommentField(a);
   a.actionOwner = TR.inferActionOwner(a.possessionOwner, type, name);
+  renderMoveSelect(a);
   replayPossessionFrom(editingIndex + 1);
   closeEdit();
   updateUI();
@@ -1468,7 +1473,36 @@ function applySubtype() {
   a.name = document.getElementById('editSubtype').value;
   a.actionOwner = TR.inferActionOwner(a.possessionOwner, a.type, a.name);
   replayPossessionFrom(editingIndex + 1);
+  renderMoveSelect(a);
   markSubtypeState();
+  updateUI();
+  saveSession();
+}
+
+// Only a failed attempt carries a move — a Try's move is its own sub-type, and
+// 6 Again / Penalty Defence keep the ball so the move is still running.
+// '' is a real option: leaving it untagged is always allowed.
+// Named renderMoveSelect, not renderMoveMenu: annotator.html already has a
+// renderMoveMenu(type, name) with a different signature, and the two pages are
+// read side by side often enough that the collision would mislead.
+function renderMoveSelect(a) {
+  const wrap = document.getElementById('editMoveWrap');
+  const sel  = document.getElementById('editMove');
+  const show = a.type !== 'Try' && TR.isAttackEnd(a.type, a.name);
+  wrap.style.display = show ? '' : 'none';
+  if (!show) return;
+  const opts = ['', ...TR.STRIKE_MOVES];
+  const cur  = a.strikeMove || '';
+  if (cur && !opts.includes(cur)) opts.splice(1, 0, cur);
+  sel.innerHTML = opts.map(o =>
+    `<option value="${o}"${o === cur ? ' selected' : ''}>${o || '— none —'}</option>`).join('');
+}
+
+// Applies straight away rather than waiting on Save, matching applySubtype.
+// The move has no bearing on possession, so nothing is replayed.
+function applyStrikeMove() {
+  if (editingIndex === null) return;
+  annotations[editingIndex].strikeMove = document.getElementById('editMove').value;
   updateUI();
   saveSession();
 }
@@ -2084,7 +2118,9 @@ async function pushToSheet(override = false) {
     saveSession({ touch: false });
   }
 
-  const rows = annotations.map(a => [a.timeStr, a.possessionOwner, a.type, a.name, '', a.comment, a.actionOwner]);
+  // Column order must match HEADERS in Code.gs, Strike Move last.
+  const rows = annotations.map(a => [a.timeStr, a.possessionOwner, a.type, a.name, '', a.comment,
+                                     a.actionOwner, TR.strikeMoveOf(a.type, a.name, a.strikeMove)]);
 
   try {
     const analyzable = isAnalysable() ? 'TRUE' : 'FALSE';
