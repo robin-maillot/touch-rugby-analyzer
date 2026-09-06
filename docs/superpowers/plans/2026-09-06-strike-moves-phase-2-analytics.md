@@ -18,7 +18,9 @@
 - The formula lives in `TR.strikeMoveStats` and nowhere else. A surface that needs a variant passes a filtered event list; it does not compute rates itself.
 - Untagged attempts are excluded from rates. Every surface that shows a rate must also show `coverage`.
 - `coverage.total` counts attack-ending events only — never all events.
-- `'Other'` and `'Interception'` are real moves with their own rows. They are not "untagged".
+- `'Other'` and `'Interception'` are **excluded from every rate**: no row in `moves`, never `topByRate` or `topByTries`, counted as untagged in `coverage`. They remain selectable in the annotators. See the spec's amended decision for why — the two sides are asymmetric and both would otherwise sit at a 100% artefact rate and top both leaderboards.
+- **Never read the stored `Strike Move` column directly.** Always re-derive through `TR.strikeMoveOf(type, name, storedMove)` at the input boundary. `Code.gs`'s `updateRow` (the viewer's inline edit) writes only Name and Comment, so the stored column goes stale on edited rows.
+- `coverage` is reported **per side** — Try-side and failure-side separately. A Try always has a Name, so its coverage is 100% by construction and would inflate a combined figure.
 - `topByRate` requires `attempts >= TR.MIN_MOVE_ATTEMPTS` (2). `topByTries` has no threshold.
 - `rate` is a 0–1 number. Formatting to a percentage is each surface's job.
 
@@ -27,6 +29,7 @@
 ### Task 1: The `TR.strikeMoveStats` module
 
 **Files:**
+- Modify: `js/events.js` (add `TR.EXCLUDED_MOVES` beside `TR.STRIKE_MOVES`)
 - Create: `js/strike_moves.js`
 - Modify: `test.js:26` (module load list)
 - Modify: `tests.html:15` (script tags)
@@ -41,10 +44,15 @@
 ```js
 TR.strikeMoveStats(events: {type, name, strikeMove, actionOwner}[]) => {
   moves:      { move: string, tries: number, fails: number, attempts: number, rate: number }[],
-  coverage:   { tagged: number, total: number, pct: number },
+  coverage:   { tagged: number, total: number, pct: number,
+                tries:  { tagged: number, total: number, pct: number },
+                fails:  { tagged: number, total: number, pct: number } },
   topByTries: { move, tries, fails, attempts, rate } | null,
   topByRate:  { move, tries, fails, attempts, rate } | null,
 }
+
+`TR.EXCLUDED_MOVES = ['Other', 'Interception']` — add it to `js/events.js` beside
+`TR.STRIKE_MOVES` in Task 1, so the annotators and the analytics agree on one list.
 ```
 
 - [ ] **Step 1: Write the failing tests**
@@ -101,13 +109,51 @@ test('untagged attempts are excluded from every move row', () => {
   assert.equal(s.moves[0].attempts, 1);
 });
 
-test('Other and Interception are real moves', () => {
+test('Other and Interception never get a row', () => {
   const s = TR.strikeMoveStats([
     ev('Try', 'Other', ''),
     ev('Turnover', 'Ball Down', 'Interception'),
   ]);
-  assert.deepEqual(s.moves.map(m => m.move).sort(), ['Interception', 'Other']);
-  assert.equal(s.coverage.tagged, 2);
+  assert.deepEqual(s.moves, []);
+  assert.equal(s.coverage.tagged, 0);
+  assert.equal(s.coverage.total, 2);
+  assert.equal(s.topByTries, null);
+  assert.equal(s.topByRate, null);
+});
+
+test('a Simple Mode game cannot top the board on Other', () => {
+  const s = TR.strikeMoveStats([
+    ev('Try', 'Other', ''), ev('Try', 'Other', ''), ev('Try', 'Other', ''),
+    ev('Try', '32', ''), ev('Turnover', 'Ball Down', '32'),
+  ]);
+  assert.equal(s.topByTries.move, '32');
+  assert.equal(s.topByRate.move, '32');
+});
+
+test('a stale stored move loses to the Name on a Try', () => {
+  // What a viewer Name edit leaves behind: Name corrected, column not.
+  const s = TR.strikeMoveStats([ev('Try', '32 - Cut', 'Other')]);
+  assert.deepEqual(s.moves.map(m => m.move), ['32 - Cut']);
+  assert.equal(s.moves[0].tries, 1);
+});
+
+test('a stale stored move is dropped when the name stops ending an attack', () => {
+  const s = TR.strikeMoveStats([ev('Turnover', '6 Again', '32')]);
+  assert.deepEqual(s.moves, []);
+  assert.equal(s.coverage.total, 0);
+});
+
+test('coverage is reported per side', () => {
+  const s = TR.strikeMoveStats([
+    ev('Try', '32', ''),                 // try side, tagged
+    ev('Try', 'Other', ''),              // try side, excluded -> untagged
+    ev('Turnover', 'Ball Down', '32'),   // fail side, tagged
+    ev('Turnover', 'Ball Down', ''),     // fail side, untagged
+    ev('Penalty Attack', 'Forward Pass', ''),
+  ]);
+  assert.deepEqual(s.coverage.tries, { tagged: 1, total: 2, pct: 0.5 });
+  assert.deepEqual(s.coverage.fails, { tagged: 1, total: 3, pct: 1 / 3 });
+  assert.equal(s.coverage.total, 5);
 });
 
 test('moves are sorted by rate descending', () => {
@@ -196,19 +242,29 @@ Create `js/strike_moves.js`:
 // owner is always the attacking team that ran the move.
 TR.strikeMoveStats = (events) => {
   const byMove = new Map();
-  let tagged = 0, total = 0;
+  const cov = { tries: { tagged: 0, total: 0 }, fails: { tagged: 0, total: 0 } };
 
   (events || []).forEach(e => {
     if (!e || !TR.isAttackEnd(e.type, e.name)) return;
-    total++;
+    const isTry = e.type === 'Try';
+    const side  = isTry ? cov.tries : cov.fails;
+    side.total++;
+    // Re-derived, never read from the stored column: the viewer's inline edit
+    // writes Name without touching Strike Move, so the column goes stale.
     const move = TR.strikeMoveOf(e.type, e.name, e.strikeMove);
-    if (!move) return;
-    tagged++;
+    // 'Other' and 'Interception' count as untagged. On a Try they are what
+    // "the annotator skipped the picker" looks like, while on a failure that
+    // same skip yields ''. Left in, they would sit at a 100% artefact rate.
+    if (!move || TR.EXCLUDED_MOVES.includes(move)) return;
+    side.tagged++;
     if (!byMove.has(move)) byMove.set(move, { move, tries: 0, fails: 0, attempts: 0, rate: 0 });
     const m = byMove.get(move);
     m.attempts++;
-    if (e.type === 'Try') m.tries++; else m.fails++;
+    if (isTry) m.tries++; else m.fails++;
   });
+
+  const tagged = cov.tries.tagged + cov.fails.tagged;
+  const total  = cov.tries.total  + cov.fails.total;
 
   const moves = [...byMove.values()];
   moves.forEach(m => { m.rate = m.attempts ? m.tries / m.attempts : 0; });
@@ -223,9 +279,16 @@ TR.strikeMoveStats = (events) => {
     b.tries - a.tries || b.rate - a.rate || a.move.localeCompare(b.move));
   const topByTries = byTries.length && byTries[0].tries > 0 ? byTries[0] : null;
 
+  const pct = c => (c.total ? c.tagged / c.total : 0);
   return {
     moves,
-    coverage: { tagged, total, pct: total ? tagged / total : 0 },
+    // Per side as well as combined: a Try always has a Name, so its coverage is
+    // 100% by construction and hides a sparse failure side when averaged in.
+    coverage: {
+      tagged, total, pct: total ? tagged / total : 0,
+      tries: { tagged: cov.tries.tagged, total: cov.tries.total, pct: pct(cov.tries) },
+      fails: { tagged: cov.fails.tagged, total: cov.fails.total, pct: pct(cov.fails) },
+    },
     topByTries,
     topByRate,
   };

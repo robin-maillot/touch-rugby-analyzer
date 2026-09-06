@@ -88,6 +88,17 @@ The in-memory event gains one optional field, `strikeMove`. Push writes
 move without the annotator storing it twice. Every read coalesces with
 `|| ''`, so **no localStorage migration** is needed for games already on a phone.
 
+**The stored column is never trusted on read.** `Code.gs`'s `updateRow` — the
+viewer's inline edit path — writes only `Name` and `Comment`, so correcting a
+Try's name there leaves the stored `Strike Move` behind. Every consumer
+therefore re-derives through `TR.strikeMoveOf(type, name, storedMove)` at its
+input boundary rather than reading the column directly. That keeps the
+"derived, never stored twice" invariant true everywhere instead of only at
+push time, and repairs already-edited rows without an Apps Script redeploy.
+The one place the raw column still shows through is `viewer.html`'s own
+`Strike Move` cell and filter, which display what is stored; that is a display
+inconsistency on edited rows, not a rate error.
+
 ### Stats module — `js/strike_moves.js` (new)
 
 Pure, so it is unit-testable under `node test.js` like the rest of `TR.*`.
@@ -116,9 +127,26 @@ Precise definitions, so no surface has to guess:
 - `coverage.tagged` counts those with a non-empty move.
 - `moves` contains only moves with at least one attempt; a move that was never
   run does not appear as a zero row.
-- `'Other'` and `'Interception'` are **real move values**, since the list is
-  exactly `TR.MENU['Try']`. A Try named `Other` counts as tagged with the move
-  `Other`, and gets its own row. They are not treated as untagged.
+- `'Other'` and `'Interception'` stay **selectable** — the list is exactly
+  `TR.MENU['Try']`, so a Try named either one still parses. But they are
+  **excluded from every rate**: no row in `moves`, never `topByRate` or
+  `topByTries`, and counted as untagged in `coverage`.
+
+  **Why (amended 2026-09-06 after the Phase 1 whole-branch review).** The two
+  sides are asymmetric. On a Try, "the annotator skipped the picker" *is*
+  `Other` — `annotator_field2.html` filters `Other` out of its sub-type strip,
+  so ignoring the strip yields it, and the video annotator's Simple Mode names
+  every Try `Other` by default. On a failure, skipping yields `''` and is
+  excluded. Nobody ever deliberately tags `Other` as the move that *failed*.
+  So `Other` accrues tries with almost no fails, reaches a 100% rate, clears
+  `MIN_MOVE_ATTEMPTS`, and tops both leaderboards on an artefact. `Interception`
+  is worse: on a Try it means the score came from a defensive interception
+  rather than a called move off the tap, and it has no coherent failure
+  counterpart at all.
+
+- **Coverage is reported per side.** A Try always has a `Name`, so Try-side
+  coverage is 100% by construction; averaging it with the variable failure-side
+  figure produces a reassuring number that hides sparse failure tagging.
 - `rate` is `tries / attempts` as a 0–1 number; formatting is each surface's job.
 
 ## Capture
