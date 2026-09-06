@@ -106,7 +106,7 @@
   .list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; flex-shrink: 0; }
   .list-header h2 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #666; }
   .annotations-list { overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 3px; padding-right: 2px; }
-  .annotation-row { display: grid; grid-template-columns: 55px 90px 90px 110px 1fr 1fr auto auto auto; align-items: center; gap: 8px; background: #141925; border-radius: 6px; padding: 5px 10px; border-left: 3px solid; font-size: 0.77rem; cursor: pointer; transition: background 0.1s; }
+  .annotation-row { display: grid; grid-template-columns: 55px 90px 90px 90px 110px 1fr 1fr auto auto auto; align-items: center; gap: 8px; background: #141925; border-radius: 6px; padding: 5px 10px; border-left: 3px solid; font-size: 0.77rem; cursor: pointer; transition: background 0.1s; }
   .annotation-row:hover { background: #1e2433; }
   .ann-time { font-family: monospace; color: #aaa; font-size: 0.73rem; }
   .ann-type { font-weight: 700; }
@@ -122,6 +122,7 @@
   .ann-name-editable { cursor: pointer; border-bottom: 1px dashed #444; }
   .ann-name-editable:hover { color: #e9ecf3; border-bottom-color: #9ba6b9; }
   .ann-name-select { background: #141925; color: #e9ecf3; border: 1px solid #3b82f6; border-radius: 4px; font-size: 0.76rem; padding: 1px 4px; cursor: pointer; max-width: 100%; }
+  .ann-move { color: #7dd3fc; font-size: 0.72rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   /* Possession inconsistency highlighting */
   .annotation-row.inconsistent { background: rgba(249,115,22,0.08); }
@@ -204,6 +205,7 @@
     /* Simplify annotation rows on narrow screens */
     .annotation-row { grid-template-columns: 50px 80px 1fr auto auto; }
     .ann-possession, .ann-yt { display: none; }
+    .ann-move { display: none; }
     /* Let the content panel scroll naturally instead of nested overflow */
     .content-panel { overflow-y: auto; -webkit-overflow-scrolling: touch; }
     .list-section  { flex: 0 0 auto; overflow: visible; }
@@ -499,6 +501,10 @@ let selectedType = null;
 let pendingType = null;
 let pendingName = null;
 let pendingComment = null;
+let pendingStrikeMove = null;
+// The optional second stage: which failed attempt is currently awaiting a move.
+// Deliberately NOT pendingType — that variable arms the 1/2 team-select hotkeys.
+let moveType = null, moveName = null, moveComment = null;
 let wasPlaying = false;
 let videoMode = 'none'; // 'local' | 'youtube'
 let player = null;       // TR.player handle (current backend)
@@ -710,7 +716,7 @@ function isFullGame() { return document.getElementById('fullGameToggle').checked
 function needsTeamSelection(type) { return isFullGame() ? (type === 'Game Event' || type === 'To Review') : true; }
 function showTeamMenu() { document.getElementById('teamMenu').style.display = 'flex'; }
 function hideTeamMenu() { document.getElementById('teamMenu').style.display = 'none'; }
-function selectTeam(team) { if (pendingType !== null) tag(pendingType, pendingName, team, pendingComment || ''); }
+function selectTeam(team) { if (pendingType !== null) tag(pendingType, pendingName, team, pendingComment || '', pendingStrikeMove || ''); }
 
 function inferPossessionOwner() {
   // Walk back through annotations strictly before the current game time
@@ -741,6 +747,8 @@ updateSimpleModeUI();
 function quickTag(type, name) {
   selectedType = type;
   pendingType = null; pendingName = null; pendingComment = null;
+  pendingStrikeMove = null;
+  moveType = null; moveName = null; moveComment = null;
   hideTeamMenu();
   wasPlaying = !isPaused();
   if (wasPlaying) doPause();
@@ -761,6 +769,8 @@ function selectType(type) {
   pendingType = null;
   pendingName = null;
   pendingComment = null;
+  pendingStrikeMove = null;
+  moveType = null; moveName = null; moveComment = null;
   hideTeamMenu();
   wasPlaying = !isPaused();
   if (wasPlaying) doPause();
@@ -801,9 +811,47 @@ function renderSubmenu(type) {
     </button>`).join('');
 }
 
+// ── Strike move (optional second stage) ────────────────────────
+// Turnovers and attack penalties can record the move that was being run when
+// the attack failed. Offered after the sub-type is picked and always skippable.
+// Simple Mode is excluded: being one click is the entire point of it.
+function offersStrikeMove(type, name) {
+  return !isDefaultOther() && type !== 'Try' && TR.isAttackEnd(type, name);
+}
+
+function renderMoveMenu(type, name) {
+  document.getElementById('submenu').innerHTML =
+    `<span class="submenu-label" style="color:${COLORS[type]}">${name} — move:</span>` +
+    TR.STRIKE_MOVES.map((m, i) =>
+      `<button class="sub-btn" onclick="selectStrikeMove('${m.replace(/'/g, "\\'")}')">` +
+      (i < 9 ? `<span class="hotkey">${i + 1}</span>` : '') + m + `</button>`).join('') +
+    `<button class="sub-btn" onclick="selectStrikeMove('')">✕ Skip</button>`;
+}
+
+function selectStrikeMove(move) {
+  const type = moveType, name = moveName, comment = moveComment || '';
+  moveType = null; moveName = null; moveComment = null;
+  if (type === null) return;
+  finishSubType(type, name, comment, move);
+}
+
 function selectSubType(type, name, comment = '') {
-  if (needsTeamSelection(type)) { pendingType = type; pendingName = name; pendingComment = comment; showTeamMenu(); }
-  else {
+  // Interpose the optional move stage before anything else, so pendingType is
+  // still null and the 1-9 keys belong to the move menu rather than to team
+  // selection.
+  if (offersStrikeMove(type, name)) {
+    moveType = type; moveName = name; moveComment = comment;
+    renderMoveMenu(type, name);
+    return;
+  }
+  finishSubType(type, name, comment, '');
+}
+
+function finishSubType(type, name, comment, strikeMove) {
+  if (needsTeamSelection(type)) {
+    pendingType = type; pendingName = name; pendingComment = comment; pendingStrikeMove = strikeMove;
+    showTeamMenu();
+  } else {
     if (isFullGame()) {
       const inferred = inferPossessionOwner();
       if (!inferred) {
@@ -815,9 +863,9 @@ function selectSubType(type, name, comment = '') {
         if (wasPlaying) { wasPlaying = false; doPlay(); }
         return;
       }
-      tag(type, name, inferred, comment);
+      tag(type, name, inferred, comment, strikeMove);
     } else {
-      tag(type, name, '', comment);
+      tag(type, name, '', comment, strikeMove);
     }
   }
 }
@@ -840,6 +888,8 @@ function tag(type, name, possessionOwner, comment = '', strikeMove = '') {
   flashType(type);
   document.getElementById('lastAnnBtn').removeAttribute('disabled');
   selectedType = null; pendingType = null; pendingName = null;
+  pendingStrikeMove = null;
+  moveType = null; moveName = null; moveComment = null;
   hideTeamMenu();
   document.querySelectorAll('.tag-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('submenu').innerHTML = '<span class="submenu-empty">Select an action above — then choose a sub-type (or press 1–9)</span>';
@@ -908,6 +958,7 @@ function renderList() {
       <span class="ann-time">${a.timeStr}</span>
       <span class="ann-type" style="color:${COLORS[a.type]}">${a.type}</span>
       <span class="ann-name${TR.MENU[a.type] && TR.MENU[a.type].length ? ' ann-name-editable' : ''}" id="ann-name-${a.id}" onclick="event.stopPropagation();editAnnotationName(${a.id})" title="${TR.MENU[a.type] && TR.MENU[a.type].length ? 'Click to change' : ''}">${a.name || '—'}</span>
+      <span class="ann-move${TR.isAttackEnd(a.type, a.name) && a.type !== 'Try' ? ' ann-name-editable' : ''}" id="ann-move-${a.id}" onclick="event.stopPropagation();editAnnotationMove(${a.id})" title="${TR.isAttackEnd(a.type, a.name) && a.type !== 'Try' ? 'Click to set the strike move' : ''}">${TR.isAttackEnd(a.type, a.name) && a.type !== 'Try' ? (a.strikeMove || '—') : ''}</span>
       <span class="ann-possession">${warnHtml}${displayTeam(a.possessionOwner)}</span>
       <span class="ann-comment" title="${commentTitle}">${commentDisplay || ''}</span>
       <span class="ann-yt">${ytCell}</span>
@@ -958,6 +1009,37 @@ function editAnnotationName(id) {
     renderList();
     renderMarkers();
   };
+  sel.onchange = commit;
+  sel.onblur = () => renderList();
+  sel.onkeydown = e => { if (e.key === 'Escape') { e.stopPropagation(); renderList(); } if (e.key === 'Enter') { e.stopPropagation(); commit(); } };
+  sel.onclick = e => e.stopPropagation();
+
+  span.replaceWith(sel);
+  sel.focus();
+}
+
+// Mirrors editAnnotationName, but for the strike move, and with a blank option
+// because leaving an attempt untagged is always allowed.
+function editAnnotationMove(id) {
+  const ann = annotations.find(a => a.id === id);
+  if (!ann || ann.type === 'Try' || !TR.isAttackEnd(ann.type, ann.name)) return;
+
+  const span = document.getElementById(`ann-move-${id}`);
+  if (!span) return;
+
+  const sel = document.createElement('select');
+  sel.className = 'ann-name-select';
+  ['', ...TR.STRIKE_MOVES].forEach(o => {
+    const opt = document.createElement('option');
+    opt.value = o;
+    opt.textContent = o || '— none —';
+    if (o === (ann.strikeMove || '')) opt.selected = true;
+    sel.appendChild(opt);
+  });
+
+  // The move has no bearing on possession or action owner, so nothing is
+  // recomputed here — unlike editAnnotationName.
+  const commit = () => { ann.strikeMove = sel.value; renderList(); };
   sel.onchange = commit;
   sel.onblur = () => renderList();
   sel.onkeydown = e => { if (e.key === 'Escape') { e.stopPropagation(); renderList(); } if (e.key === 'Enter') { e.stopPropagation(); commit(); } };
@@ -1417,7 +1499,8 @@ document.addEventListener('keydown', e => {
   if (e.key === 'ArrowLeft') { skip(-5); return; }
   if (e.key === 'ArrowRight') { skip(5); return; }
   if (e.key === 'Escape') {
-    selectedType = null; pendingType = null; pendingName = null;
+    selectedType = null; pendingType = null; pendingName = null; pendingStrikeMove = null;
+    moveType = null; moveName = null; moveComment = null;
     hideTeamMenu();
     document.querySelectorAll('.tag-btn').forEach(b => b.classList.remove('active'));
     document.getElementById('submenu').innerHTML = '<span class="submenu-empty">Select an action above — then choose a sub-type (or press 1–9)</span>';
@@ -1431,6 +1514,15 @@ document.addEventListener('keydown', e => {
     const [t, n] = QUICK_TAG_ACTIONS[action];
     quickTag(t, n); return;
   }
+  // Strike move by number — must precede both the team-select and sub-type
+  // branches, since selectedType is still set while the move menu is up.
+  if (moveType !== null && /^[1-9]$/.test(e.key)) {
+    const idx = parseInt(e.key) - 1;
+    if (idx < TR.STRIKE_MOVES.length) { e.preventDefault(); selectStrikeMove(TR.STRIKE_MOVES[idx]); }
+    return;
+  }
+  // Enter skips the move stage, leaving the event untagged for move.
+  if (moveType !== null && e.key === 'Enter') { e.preventDefault(); selectStrikeMove(''); return; }
   // Team selection when team menu is showing
   if (pendingType !== null && (e.key === '1' || e.key === '2')) {
     e.preventDefault(); selectTeam(e.key === '1' ? 'Team 1' : 'Team 2'); return;
