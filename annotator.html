@@ -68,6 +68,7 @@
   .sub-btn { border: none; border-radius: 6px; padding: 4px 10px; font-size: 0.76rem; font-weight: 600; cursor: pointer; background: #2b3242; color: #ddd; transition: background 0.1s; display: flex; align-items: center; gap: 4px; }
   .sub-btn:hover { background: #3a3d4a; }
   .sub-btn .hotkey { font-size: 0.65rem; opacity: 0.55; background: rgba(255,255,255,0.1); padding: 1px 4px; border-radius: 3px; }
+  .sub-btn.active { outline: 2px solid #fff; outline-offset: 1px; }
   .submenu-empty { font-size: 0.75rem; color: #444; font-style: italic; }
 
   /* Timeline */
@@ -819,19 +820,29 @@ function offersStrikeMove(type, name) {
   return !isDefaultOther() && type !== 'Try' && TR.isAttackEnd(type, name);
 }
 
-function renderMoveMenu(type, name) {
+function renderMoveMenu(type, name, selectedMove = null) {
   document.getElementById('submenu').innerHTML =
     `<span class="submenu-label" style="color:${COLORS[type]}">${name} — move:</span>` +
     TR.STRIKE_MOVES.map((m, i) =>
-      `<button class="sub-btn" onclick="selectStrikeMove('${m.replace(/'/g, "\\'")}')">` +
+      `<button class="sub-btn${m === selectedMove ? ' active' : ''}" onclick="selectStrikeMove('${m.replace(/'/g, "\\'")}')">` +
       (i < 9 ? `<span class="hotkey">${i + 1}</span>` : '') + m + `</button>`).join('') +
-    `<button class="sub-btn" onclick="selectStrikeMove('')">✕ Skip</button>`;
+    `<button class="sub-btn${selectedMove === '' ? ' active' : ''}" onclick="selectStrikeMove('')">✕ Skip</button>`;
 }
 
 function selectStrikeMove(move) {
+  if (moveType === null) {
+    // The move stage already finished and the team menu is up, but the move
+    // buttons are still visible — treat this as a correction: update the
+    // pending value and re-render the marked selection, without re-tagging
+    // or touching pendingType (team selection is still required).
+    if (pendingType !== null) {
+      pendingStrikeMove = move;
+      renderMoveMenu(pendingType, pendingName, move);
+    }
+    return;
+  }
   const type = moveType, name = moveName, comment = moveComment || '';
   moveType = null; moveName = null; moveComment = null;
-  if (type === null) return;
   finishSubType(type, name, comment, move);
 }
 
@@ -850,6 +861,7 @@ function selectSubType(type, name, comment = '') {
 function finishSubType(type, name, comment, strikeMove) {
   if (needsTeamSelection(type)) {
     pendingType = type; pendingName = name; pendingComment = comment; pendingStrikeMove = strikeMove;
+    if (offersStrikeMove(type, name)) renderMoveMenu(type, name, strikeMove);
     showTeamMenu();
   } else {
     if (isFullGame()) {
@@ -954,11 +966,12 @@ function renderList() {
     const warnHtml = bad
       ? `<span class="ann-warn" title="Expected ${exp} based on the chain from prior events">⚠</span><button class="ann-fix-btn" onclick="event.stopPropagation();fixOneInconsistency(${a.id})" title="Set possession to ${exp} and recompute downstream">Fix</button>`
       : '';
+    const canMove = TR.isAttackEnd(a.type, a.name) && a.type !== 'Try';
     return `<div class="annotation-row${bad ? ' inconsistent' : ''}" style="border-color:${COLORS[a.type]}" onclick="seekTo(${a.time})">
       <span class="ann-time">${a.timeStr}</span>
       <span class="ann-type" style="color:${COLORS[a.type]}">${a.type}</span>
       <span class="ann-name${TR.MENU[a.type] && TR.MENU[a.type].length ? ' ann-name-editable' : ''}" id="ann-name-${a.id}" onclick="event.stopPropagation();editAnnotationName(${a.id})" title="${TR.MENU[a.type] && TR.MENU[a.type].length ? 'Click to change' : ''}">${a.name || '—'}</span>
-      <span class="ann-move${TR.isAttackEnd(a.type, a.name) && a.type !== 'Try' ? ' ann-name-editable' : ''}" id="ann-move-${a.id}" onclick="event.stopPropagation();editAnnotationMove(${a.id})" title="${TR.isAttackEnd(a.type, a.name) && a.type !== 'Try' ? 'Click to set the strike move' : ''}">${TR.isAttackEnd(a.type, a.name) && a.type !== 'Try' ? (a.strikeMove || '—') : ''}</span>
+      <span class="ann-move${canMove ? ' ann-name-editable' : ''}" id="ann-move-${a.id}" onclick="event.stopPropagation();editAnnotationMove(${a.id})" title="${canMove ? 'Click to set the strike move' : ''}">${canMove ? (a.strikeMove || '—') : ''}</span>
       <span class="ann-possession">${warnHtml}${displayTeam(a.possessionOwner)}</span>
       <span class="ann-comment" title="${commentTitle}">${commentDisplay || ''}</span>
       <span class="ann-yt">${ytCell}</span>
