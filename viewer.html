@@ -1137,7 +1137,12 @@ function renderRows(rows) {
         // column. Only a Turnover or Penalty Attack can carry one — a Try's move
         // IS its name, and 6 Again / Penalty Defence keep the ball.
         const canMove = colStrike >= 0 && type !== 'Try' && TR.isAttackEnd(type, row[colName]);
-        const moveVal = colStrike >= 0 ? (row[colStrike] || '') : '';
+        // Derived, not read raw: a Try's move IS its name, so a row whose name was
+        // corrected must show the corrected move even before the sheet catches up,
+        // and a name that no longer ends an attack shows none at all.
+        const moveVal = colStrike >= 0
+          ? TR.strikeMoveOf(type, row[colName], row[colStrike])
+          : '';
         if (canMove && isAdmin && editMode) {
           const msel = document.createElement('select');
           msel.className = 'edit-select edit-move' + (pendingEdits.has(row) ? ' dirty' : '');
