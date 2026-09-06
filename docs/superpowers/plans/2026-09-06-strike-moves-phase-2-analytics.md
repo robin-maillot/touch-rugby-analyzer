@@ -74,6 +74,11 @@ test('empty input', () => {
 
 test('null input is tolerated', () => assert.equal(TR.strikeMoveStats(null).moves.length, 0));
 
+test('excluded moves are Other and Interception',
+  () => assert.deepEqual(TR.EXCLUDED_MOVES, ['Other', 'Interception']));
+test('excluded moves are real entries of the picker list',
+  () => TR.EXCLUDED_MOVES.forEach(m => assert.ok(TR.STRIKE_MOVES.includes(m), m)));
+
 test('a try and a turnover on the same move', () => {
   const s = TR.strikeMoveStats([
     ev('Try', '32 - Cut', ''),
@@ -220,9 +225,22 @@ node test.js
 
 Expected: the run aborts with `ENOENT: no such file or directory, open 'js/strike_moves.js'`.
 
-- [ ] **Step 4: Write the implementation**
+- [ ] **Step 4: Add `TR.EXCLUDED_MOVES`, then write the module**
 
-Create `js/strike_moves.js`:
+First, in `js/events.js`, immediately after `TR.MIN_MOVE_ATTEMPTS`:
+
+```js
+// Selectable in the annotators, but never rate-bearing. On a Try these are what
+// "the annotator skipped the picker" looks like — annotator_field2 filters
+// 'Other' out of its sub-type strip, and Simple Mode names every Try 'Other' —
+// while on a failure that same skip yields ''. Counted as untagged so they
+// cannot sit at a 100% artefact rate and top both leaderboards. 'Interception'
+// on a try means a defensive intercept, not a called move off the tap, and has
+// no failure counterpart at all.
+TR.EXCLUDED_MOVES = ['Other', 'Interception'];
+```
+
+Then create `js/strike_moves.js`:
 
 ```js
 // Depends on js/events.js (TR.isAttackEnd, TR.strikeMoveOf, TR.MIN_MOVE_ATTEMPTS)
@@ -506,10 +524,14 @@ function renderStrikeMoves() {
     tile('🏆 Most tries', stats.topByTries, m => `${m.tries} ${m.tries === 1 ? 'try' : 'tries'} from ${m.attempts} · ${pct(m.rate)}`) +
     tile('⚡ Best try rate', stats.topByRate, m => `${pct(m.rate)} · ${m.tries} from ${m.attempts}`);
 
+  // Failure-side coverage is the number that matters: the Try side is 100% by
+  // construction, so quoting only the combined figure flatters thin tagging.
+  const f = stats.coverage.fails;
   cover.textContent =
-    `Coverage: ${stats.coverage.tagged} of ${stats.coverage.total} attempts tagged ` +
-    `(${Math.round(stats.coverage.pct * 100)}%) · ` +
-    `ranked by rate over at least ${TR.MIN_MOVE_ATTEMPTS} attempts`;
+    `Coverage: ${f.tagged} of ${f.total} failed attempts tagged ` +
+    `(${Math.round(f.pct * 100)}%) · ` +
+    `ranked by rate over at least ${TR.MIN_MOVE_ATTEMPTS} attempts · ` +
+    `Other and Interception are not ranked`;
 
   const maxAttempts = Math.max(...stats.moves.map(m => m.attempts), 1);
   body.innerHTML = stats.moves.map(m => `<tr>
@@ -743,9 +765,10 @@ function renderGameStrikeMoves(events, team1, team2) {
     return;
   }
 
+  const f = all.coverage.fails;
   cover.textContent =
-    `Coverage: ${all.coverage.tagged} of ${all.coverage.total} attempts tagged ` +
-    `(${Math.round(all.coverage.pct * 100)}%). Single-game rates are noisy — read the counts first.`;
+    `Coverage: ${f.tagged} of ${f.total} failed attempts tagged ` +
+    `(${Math.round(f.pct * 100)}%). Single-game rates are noisy — read the counts first.`;
 
   grid.innerHTML = [team1, team2].map(team => {
     const s = TR.strikeMoveStats(events.filter(e => e['Action Owner'] === team));
