@@ -1166,6 +1166,9 @@
         <span class="edit-subtype-wrap" id="editSubtypeWrap">
           <select id="editSubtype" class="edit-subtype" aria-label="Sub-type" onchange="applySubtype()"></select>
         </span>
+        <span class="edit-subtype-wrap" id="editMoveWrap" style="display:none">
+          <select id="editMove" class="edit-subtype" aria-label="Strike move" onchange="applyStrikeMove()"></select>
+        </span>
       </div>
     </div>
     <div style="padding:16px 16px 4px">
@@ -1463,6 +1466,7 @@ function loadGame(rec, isNew) {
   if (teamsSwapped !== !!rec.teamsSwapped) toggleSwap();
   armedPen = null;
   closeSubtype();
+  closeMoveStrip();
   $('overrideBtn').style.display = 'none';
 
   loading = false;
@@ -1590,7 +1594,7 @@ function tag(type, name, possessionOwner, pos) {
   let t = nowSeconds();
   if (annotations.length > 0) t = Math.max(0, t - clickDelay);
   const actionOwner = TR.inferActionOwner(possessionOwner, type, name);
-  annotations.push({ id: Date.now() + Math.random(), type, name, possessionOwner, actionOwner, comment: '', time: t, timeStr: TR.fmt(t),
+  annotations.push({ id: Date.now() + Math.random(), type, name, possessionOwner, actionOwner, comment: '', strikeMove: '', time: t, timeStr: TR.fmt(t),
                      x: pos ? pos.x : null, y: pos ? pos.y : null });
 
   const next = TR.inferPossessionAfter(possessionOwner, type, name);
@@ -1634,6 +1638,7 @@ function undoLast() {
   if (isFinished() || !annotations.length) return;
   const removed = annotations.pop();
   setPossession(removed.possessionOwner);
+  closeMoveStrip();
   updateUI();
   saveSession();
 }
@@ -1660,6 +1665,7 @@ function openEdit(index) {
   const a = annotations[index];
   document.getElementById('editCurrentLabel').textContent = eventBaseLabel(a) + ' · ' + fmtClock(a.time);
   renderSubtypeMenu(a);
+  renderMoveSelect(a);
   // '?' is the placeholder marker To Review events carry — show a blank box so
   // the annotator can type a real note over it.
   document.getElementById('editComment').value = (a.comment && a.comment !== '?') ? a.comment : '';
@@ -1693,6 +1699,7 @@ function applyEdit(type, name) {
   a.name = name;
   commitCommentField(a);
   a.actionOwner = TR.inferActionOwner(a.possessionOwner, type, name);
+  renderMoveSelect(a);
   replayPossessionFrom(editingIndex + 1);
   closeEdit();
   updateUI();
@@ -1728,7 +1735,43 @@ function applySubtype() {
   a.name = document.getElementById('editSubtype').value;
   a.actionOwner = TR.inferActionOwner(a.possessionOwner, a.type, a.name);
   replayPossessionFrom(editingIndex + 1);
+  renderMoveSelect(a);
   markSubtypeState();
+  updateUI();
+  saveSession();
+}
+
+// Only a failed attempt carries a move — a Try's move is its own sub-type, and
+// 6 Again / Penalty Defence keep the ball so the move is still running.
+// '' is a real option: leaving it untagged is always allowed.
+// Named renderMoveSelect, not renderMoveMenu: annotator.html already has a
+// renderMoveMenu(type, name) with a different signature, and the two pages are
+// read side by side often enough that the collision would mislead.
+function renderMoveSelect(a) {
+  const wrap = document.getElementById('editMoveWrap');
+  const sel  = document.getElementById('editMove');
+  const show = a.type !== 'Try' && TR.isAttackEnd(a.type, a.name);
+  wrap.style.display = show ? '' : 'none';
+  if (!show) return;
+  const opts = ['', ...TR.STRIKE_MOVES];
+  const cur  = a.strikeMove || '';
+  if (cur && !opts.includes(cur)) opts.splice(1, 0, cur);
+  sel.innerHTML = opts.map(o =>
+    `<option value="${o}"${o === cur ? ' selected' : ''}>${o || '— none —'}</option>`).join('');
+  markMoveState();
+}
+
+function markMoveState() {
+  const sel = document.getElementById('editMove');
+  sel.classList.toggle('set', !!sel.value);
+}
+
+// Applies straight away rather than waiting on Save, matching applySubtype.
+// The move has no bearing on possession, so nothing is replayed.
+function applyStrikeMove() {
+  if (editingIndex === null) return;
+  annotations[editingIndex].strikeMove = document.getElementById('editMove').value;
+  markMoveState();
   updateUI();
   saveSession();
 }
@@ -2436,9 +2479,12 @@ async function pushToSheet(override = false) {
     saveSession({ touch: false });
   }
 
+  // Column order must match HEADERS in Code.gs, Strike Move last. The pitch
+  // position still rides in Comment; the move gets its own column.
   const rows = annotations
     .filter(a => uploadTouches || a.type !== 'Touch')
-    .map(a => [a.timeStr, a.possessionOwner, a.type, a.name, '', commentWithPos(a), a.actionOwner]);
+    .map(a => [a.timeStr, a.possessionOwner, a.type, a.name, '', commentWithPos(a),
+               a.actionOwner, TR.strikeMoveOf(a.type, a.name, a.strikeMove)]);
 
   try {
     const analyzable = isAnalysable() ? 'TRUE' : 'FALSE';
@@ -2985,7 +3031,7 @@ function offerSubtype(idx) {
   const i   = idx == null ? annotations.length - 1 : idx;
   const a   = annotations[i];
   const bar = document.getElementById('pitchStatus');
-  if (!a || !SUBTYPE_TYPES.includes(a.type)) { closeSubtype(); return; }
+  if (!a || !SUBTYPE_TYPES.includes(a.type)) { closeSubtype(); closeMoveStrip(); return; }
   subtypeIdx = i;
   bar.innerHTML = `<span class="sub-chip head">${EVENT_LABELS[a.type] || a.type} —</span>` +
     (TR.MENU[a.type] || []).filter(n => n !== 'Other')
@@ -3017,6 +3063,41 @@ function pickSubtype(name) {
   else replayPossessionFrom(i + 1);
   updateUI();
   saveSession();
+  // A failed attempt can also record which move was being run. Same strip, same
+  // timeout — ignoring it simply leaves the move blank.
+  if (a.type !== 'Try' && TR.isAttackEnd(a.type, a.name)) offerMoveStrip(i);
+}
+
+// ── Strike move strip ──────────────────────────────────────────
+let moveIdx = null, moveTimer = null;
+
+function offerMoveStrip(idx) {
+  const a = annotations[idx];
+  if (!a) return;
+  moveIdx = idx;
+  document.getElementById('pitchStatus').innerHTML =
+    `<span class="sub-chip head">Move —</span>` +
+    TR.STRIKE_MOVES.map(m => `<button class="sub-chip" data-move="${m}">${m}</button>`).join('');
+  clearTimeout(moveTimer);
+  moveTimer = setTimeout(closeMoveStrip, 10000);
+}
+
+function closeMoveStrip() {
+  clearTimeout(moveTimer);
+  moveIdx = null;
+  const bar = document.getElementById('pitchStatus');
+  if (bar) bar.innerHTML = '<span id="pitchHint"></span>';
+  renderPitch();
+}
+
+function pickStrikeMove(move) {
+  if (moveIdx === null) return;
+  const a = annotations[moveIdx];
+  closeMoveStrip();
+  if (!a) return;
+  a.strikeMove = move;   // no possession impact, so nothing is replayed
+  updateUI();
+  saveSession();
 }
 
 // ── Deleting a single event ────────────────────────────────────
@@ -3028,6 +3109,7 @@ function deleteEvent() {
   const at = editingIndex;
   annotations.splice(at, 1);
   closeEdit();
+  closeMoveStrip();
   if (!annotations.length)      setPossession('Team 1');
   else if (at === 0)            replayPossessionFrom(1);
   else                          replayPossessionFrom(at);
@@ -3297,7 +3379,9 @@ window.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('pitchStatus').addEventListener('click', ev => {
     const chip = ev.target.closest('[data-sub]');
-    if (chip) pickSubtype(chip.dataset.sub);
+    if (chip) { pickSubtype(chip.dataset.sub); return; }
+    const mv = ev.target.closest('[data-move]');
+    if (mv) pickStrikeMove(mv.dataset.move);
   });
 });
 
