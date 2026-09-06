@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Game — Touch Rugby Analyzer</title>
+<link rel="icon" href="favicon-32x32.png">
+<style>
+  :root{
+    --bg:#0b0e14; --surface:#141925; --surface2:#1b2230; --border:#242c3d;
+    --text:#e9ecf3; --dim:#8a93a6; --accent:#3b82f6;
+    --try:#22c55e; --turn:#f97316; --patk:#ef4444; --pdef:#b91c1c; --game:#3b82f6; --review:#a855f7;
+    --safe-b: env(safe-area-inset-bottom, 0px);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;overflow:hidden}
+  body{background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    display:flex;flex-direction:column;height:100dvh}
+
+  /* ── Top bar: one row, 48px, never wraps ───────────────────── */
+  .topbar{display:flex;align-items:center;gap:8px;padding:0 10px;height:48px;
+    flex-shrink:0;background:var(--surface);border-bottom:1px solid var(--border)}
+  .topbar img{width:24px;height:24px;border-radius:5px;flex-shrink:0}
+  .game-btn{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;
+    background:none;border:none;color:var(--text);font:inherit;padding:0;cursor:pointer;text-align:left}
+  .game-btn .g-name{font-size:.85rem;font-weight:600;white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis;max-width:100%}
+  .game-btn .g-sub{font-size:.65rem;color:var(--dim);white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis;max-width:100%}
+  .icon-btn{flex-shrink:0;background:var(--surface2);border:1px solid var(--border);color:var(--text);
+    border-radius:8px;min-width:40px;height:36px;font-size:.8rem;cursor:pointer;
+    display:inline-flex;align-items:center;justify-content:center;gap:4px;padding:0 8px}
+  .icon-btn:active{background:var(--accent)}
+  .badge{background:var(--accent);color:#fff;border-radius:9px;font-size:.62rem;
+    padding:1px 5px;font-weight:700;line-height:1.4}
+
+  /* Layout skeleton. Declared for ALL widths, not just landscape, so that
+     cinema mode has a flex axis to grow the stage along on a phone. */
+  .frame{flex:1 1 auto;display:flex;flex-direction:column;min-height:0}
+  .left{display:flex;flex-direction:column;flex-shrink:0;min-height:0}
+  .right{flex:1 1 auto;display:flex;flex-direction:column;min-height:0}
+
+  /* ── Video: sized by ASPECT RATIO, not a vh fraction ───────── */
+  .stage{flex-shrink:0;background:#000;position:relative;width:100%;
+    aspect-ratio:16/9;overflow:hidden;touch-action:none}
+  .stage.zoomed{cursor:grab}
+  #ytZoom{position:absolute;inset:0;transform-origin:center center;transition:transform .18s ease}
+  #ytZoom iframe{width:100%;height:100%;display:block;border:0}
+  .stage-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    color:var(--dim);font-size:.8rem;text-align:center;padding:20px}
+  .now-pill{position:absolute;left:8px;bottom:8px;right:8px;display:flex;align-items:center;gap:6px;
+    background:rgba(11,14,20,.82);backdrop-filter:blur(6px);border-radius:8px;padding:5px 8px;
+    font-size:.7rem;pointer-events:none;opacity:0;transition:opacity .2s}
+  .now-pill.show{opacity:1}
+  .zoom-tag{position:absolute;top:8px;right:8px;background:rgba(11,14,20,.82);border-radius:6px;
+    padding:2px 7px;font-size:.66rem;color:var(--dim);opacity:0;transition:opacity .2s}
+  .zoom-tag.show{opacity:1}
+  .cine-btn{position:absolute;top:8px;left:8px;background:rgba(11,14,20,.82);border:1px solid var(--border);
+    color:var(--text);border-radius:6px;width:34px;height:30px;font-size:.8rem;cursor:pointer;
+    display:flex;align-items:center;justify-content:center}
+  body.cinema .cine-btn{top:auto;bottom:12px;left:12px}
+
+  /* fullscreen-ish: video eats the whole screen */
+  body.cinema .topbar,body.cinema .filterbar,body.cinema .list,body.cinema .scrub{display:none}
+  /* the whole right column goes, not just its children — an empty flex column
+     would still claim its share of the frame and starve the stage */
+  body.cinema .right{display:none}
+  body.cinema .left{flex:1 1 auto;min-height:0}
+  body.cinema .stage{flex:1 1 auto;aspect-ratio:auto;height:auto;min-height:0}
+
+  /* ── Transport: ONE row ────────────────────────────────────── */
+  .transport{display:flex;align-items:center;gap:6px;padding:6px 8px;flex-shrink:0;
+    background:var(--surface);border-bottom:1px solid var(--border)}
+  .t-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:8px;
+    height:38px;min-width:42px;padding:0 6px;font-size:.75rem;cursor:pointer;display:inline-flex;
+    align-items:center;justify-content:center;flex-shrink:0}
+  .t-btn:disabled{opacity:.4}
+  .t-btn.play{background:var(--accent);border-color:var(--accent);min-width:52px;font-size:.9rem}
+  .t-time{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.68rem;color:var(--dim);
+    flex:1 1 auto;min-width:0;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .t-time b{color:var(--text);font-weight:600}
+  .seek{height:100%;flex-shrink:0}
+  .scrub{width:100%;height:16px;position:relative;background:var(--surface);flex-shrink:0;
+    border-bottom:1px solid var(--border);cursor:pointer;touch-action:none}
+  .scrub-fill{position:absolute;left:0;top:6px;height:4px;background:var(--accent);border-radius:2px}
+  .scrub-track{position:absolute;left:0;right:0;top:6px;height:4px;background:var(--surface2);border-radius:2px}
+  .scrub-thumb{position:absolute;top:2px;width:12px;height:12px;border-radius:50%;background:#fff;
+    margin-left:-6px;pointer-events:none}
+  .scrub-mark{position:absolute;top:5px;width:2px;height:6px;border-radius:1px;opacity:.85}
+
+  /* ── Filter bar ────────────────────────────────────────────── */
+  .filterbar{display:flex;align-items:center;gap:6px;padding:7px 8px;flex-shrink:0;
+    overflow-x:auto;background:var(--bg);border-bottom:1px solid var(--border);
+    scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .filterbar::-webkit-scrollbar{display:none}
+  .chip{flex-shrink:0;background:var(--surface2);border:1px solid var(--border);color:var(--text);
+    border-radius:16px;padding:5px 11px;font-size:.72rem;cursor:pointer;white-space:nowrap;
+    display:inline-flex;align-items:center;gap:5px;min-height:32px}
+  .chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .chip .x{opacity:.75;font-size:.8rem}
+  .count{color:var(--dim);font-size:.7rem;flex-shrink:0;padding-left:2px;white-space:nowrap}
+
+  /* ── Event list: cards, never a sideways table ─────────────── */
+  .list{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;
+    padding:6px 8px calc(12px + var(--safe-b))}
+  .ev{display:grid;grid-template-columns:52px 1fr;gap:10px;align-items:center;
+    background:var(--surface);border-left:3px solid var(--border);border-radius:8px;
+    padding:9px 10px;margin-bottom:6px;cursor:pointer;min-height:52px}
+  .ev:active{background:var(--surface2)}
+  .ev.active{outline:2px solid var(--accent);background:var(--surface2)}
+  .ev-t{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.72rem;color:var(--dim)}
+  .ev-main{min-width:0}
+  .ev-name{font-size:.82rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ev-meta{font-size:.66rem;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    margin-top:1px;display:flex;gap:5px;align-items:center}
+  .tag{font-size:.6rem;font-weight:700;letter-spacing:.03em;text-transform:uppercase;
+    padding:2px 6px;border-radius:4px;flex-shrink:0}
+  .team{font-size:.66rem;color:var(--text);flex-shrink:0;font-weight:600;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:11ch}
+  .move{background:var(--surface2);border:1px solid var(--border);border-radius:4px;
+    padding:1px 5px;font-size:.62rem;color:#7dd3fc;flex-shrink:0}
+  .empty{color:var(--dim);text-align:center;padding:36px 20px;font-size:.82rem}
+
+  /* ── Bottom sheet ──────────────────────────────────────────── */
+  .scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:40;display:none}
+  .scrim.open{display:block}
+  .sheet{position:fixed;left:0;right:0;bottom:0;z-index:50;background:var(--surface);
+    border-radius:16px 16px 0 0;max-height:82dvh;display:none;flex-direction:column;
+    padding-bottom:var(--safe-b)}
+  .sheet.open{display:flex}
+  .sheet-grab{width:36px;height:4px;background:var(--border);border-radius:2px;margin:8px auto 4px}
+  .sheet-head{display:flex;align-items:center;justify-content:space-between;padding:6px 14px 10px;
+    border-bottom:1px solid var(--border)}
+  .sheet-head h2{margin:0;font-size:.92rem}
+  .sheet-body{overflow-y:auto;overflow-x:hidden;padding:10px 14px calc(14px + var(--safe-b))}
+  .opts{min-width:0}
+  .grp{margin-bottom:14px}
+  .grp h3{margin:0 0 7px;font-size:.68rem;color:var(--dim);text-transform:uppercase;letter-spacing:.05em}
+  .opts{display:flex;flex-wrap:wrap;gap:6px}
+  .srch{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);
+    border-radius:8px;padding:10px 12px;font-size:.85rem;margin-bottom:12px}
+  .glist button{display:block;width:100%;text-align:left;background:var(--surface2);
+    border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px 12px;
+    margin-bottom:6px;font-size:.8rem;cursor:pointer}
+  .glist button.on{border-color:var(--accent);background:#16233c}
+  .glist .gs{display:block;font-size:.66rem;color:var(--dim);margin-top:2px}
+
+  /* ── Tablet / landscape: video beside the list ─────────────── */
+  @media (min-width:760px) and (orientation:landscape){
+    .frame{flex-direction:row}
+    .left{width:58%;min-width:0;border-right:1px solid var(--border)}
+    .right{min-width:0}
+  }
+  @media (min-width:760px){
+    .ev{grid-template-columns:64px 1fr}
+    .ev-name{font-size:.88rem}
+    /* Wide enough to give the team its own edge again, so a column of teams
+       reads down the right the way it does on desktop. */
+    .ev-meta .team{margin-left:auto;padding-left:10px}
+  }
+</style>
+<script src="js/config.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/events.js"></script>
+<script src="js/player.js"></script>
+</head>
+<body>
+
+<div class="topbar">
+  <img src="apple-touch-icon.png" alt="">
+  <button class="game-btn" id="gameBtn" onclick="openSheet('game')">
+    <span class="g-name" id="gName">Choose a game</span>
+    <span class="g-sub"  id="gSub">tap to pick</span>
+  </button>
+  <button class="icon-btn" id="filterBtn" onclick="openSheet('filter')">Filter <span class="badge" id="fCount" hidden>0</span></button>
+</div>
+
+<div class="frame" id="frame">
+ <div class="left">
+  <div class="stage" id="stage">
+    <div id="ytZoom"></div>
+    <div class="stage-empty" id="stageEmpty">Pick a game, then tap any event to watch it</div>
+    <div class="now-pill" id="nowPill"></div>
+    <div class="zoom-tag" id="zoomTag">1.0×</div>
+    <button class="cine-btn" id="bCine" onclick="event.stopPropagation();toggleCinema()">⤢</button>
+  </div>
+
+  <div class="scrub" id="scrub">
+    <div class="scrub-track"></div>
+    <div class="scrub-fill" id="scrubFill" style="width:0"></div>
+    <div class="scrub-thumb" id="scrubThumb" style="left:0"></div>
+  </div>
+
+  <div class="transport">
+    <button class="t-btn" id="bBack"  onclick="skip(-5)"  disabled>−5s</button>
+    <button class="t-btn play" id="bPlay" onclick="togglePlay()" disabled>▶</button>
+    <button class="t-btn" id="bFwd"   onclick="skip(5)"   disabled>+5s</button>
+    <span class="t-time" id="tTime"><b>0:00</b> / 0:00</span>
+    <button class="t-btn" id="bRate"  onclick="cycleRate()" disabled>1×</button>
+    <button class="t-btn" id="bZoom"  onclick="cycleZoom()" disabled>⛶</button>
+  </div>
+ </div>
+
+ <div class="right">
+  <div class="filterbar" id="filterbar">
+    <span class="count" id="count">—</span>
+  </div>
+  <div class="list" id="list">
+    <div class="empty" id="empty">Loading…</div>
+  </div>
+ </div>
+</div>
+
+<div class="scrim" id="scrim" onclick="closeSheet()"></div>
+<div class="sheet" id="sheet">
+  <div class="sheet-grab"></div>
+  <div class="sheet-head"><h2 id="sheetTitle">Filter</h2>
+    <button class="icon-btn" onclick="closeSheet()">Done</button></div>
+  <div class="sheet-body" id="sheetBody"></div>
+</div>
+
+<script>
+TR.auth('viewer');
+
+const TAGCOL = {'Try':'--try','Turnover':'--turn','Penalty Attack':'--patk',
+  'Penalty Defence':'--pdef','Game Event':'--game','To Review':'--review'};
+function col(t){return `var(${TAGCOL[t]||'--dim'})`}
+
+let rows=[], headers=[], meta={}, labels={}, order={};
+let game='', events=[], shown=[];
+let player=null, ready=false, dur=0, tick=null, pendingSeek=null;
+let activeId=null, rate=1, zoom=1;
+const RATES=[1,1.5,2], ZOOMS=[1,1.5,2];
+let F={type:new Set(),team:new Set(),name:new Set(),q:''};
+
+const LS={get(k){try{return JSON.parse(localStorage.getItem('trl2_'+k))}catch(e){return null}},
+          set(k,v){try{localStorage.setItem('trl2_'+k,JSON.stringify(v))}catch(e){}}};
+function $(id){return document.getElementById(id)}
+function fmtS(s){s=Math.max(0,Math.floor(s||0));const m=Math.floor(s/60);
+  return (m>=60?Math.floor(m/60)+':'+String(m%60).padStart(2,'0'):String(m))+':'+String(s%60).padStart(2,'0')}
+function toSecs(t){const p=String(t||'').trim().split(':').map(Number);
+  return p.length===3?p[0]*3600+p[1]*60+p[2]:p.length===2?p[0]*60+p[1]:0}
+
+// ── Load ──────────────────────────────────────────────────────
+(async function(){
+  const ca=LS.get('all'), cl=LS.get('list');
+  if(cl) buildMeta(cl.sheets);
+  if(ca){ ingest(ca.rows); restore(); }
+  try{
+    const [a,l]=await Promise.all([
+      fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&action=all`),
+      fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&action=list`)]);
+    const [ar,lr]=await Promise.all([a.json(),l.json()]);
+    if(ar.ok){LS.set('all',ar); ingest(ar.rows);}
+    if(lr.ok){LS.set('list',lr); buildMeta(lr.sheets); if(game) paintGame();}
+  }catch(e){ if(!ca) $('empty').textContent='Could not load events: '+e.message; }
+  restore();
+  if(!game) openSheet('game');
+})();
+
+// ?game= wins, else the last game this device looked at. On a phone you come
+// back to the same match rather than re-picking it every time.
+function restore(){
+  if(game) return;
+  const want = new URLSearchParams(location.search).get('game') || LS.get('lastgame');
+  if(want && rows.some(r=>r.game===want)) pickGame(want);
+  applyHash();
+}
+
+// #cinema / #filter make the two full-screen states linkable and restorable.
+function applyHash(){
+  const h=(location.hash||'').replace('#','');
+  if(h==='cinema' && !document.body.classList.contains('cinema')) toggleCinema();
+  if(h==='filter' && game) openSheet('filter');
+}
+window.addEventListener('hashchange',applyHash);
+
+function buildMeta(sheets){ meta={};labels={};order={};
+  (sheets||[]).forEach((s,i)=>{meta[s.name]=s;labels[s.name]=TR.sheetNameToLabel(s);order[s.name]=i;}); }
+
+function ingest(r){
+  if(!r||r.length<2)return;
+  headers=r[0].map(h=>h.trim());
+  const hi=n=>headers.findIndex(h=>h.toLowerCase()===n);
+  const I={t:hi('time'),ty:hi('type'),nm:hi('name'),ao:hi('action owner'),
+    cm:hi('comment'),sm:hi('strike move'),g:hi('game'),t1:hi('team 1'),t2:hi('team 2')};
+  const sub=(v,a,b)=>{const s=(v||'').trim();return s==='Team 1'?a:s==='Team 2'?b:s};
+  rows=r.slice(1).filter(x=>x.some(c=>c!=='')).map(x=>({
+    time:toSecs(x[I.t]), timeStr:x[I.t]||'', type:(x[I.ty]||'').trim(), name:(x[I.nm]||'').trim(),
+    team:sub(x[I.ao],x[I.t1],x[I.t2]), comment:I.cm>=0?(x[I.cm]||''):'',
+    move:I.sm>=0?(x[I.sm]||'').trim():'', game:x[I.g]}))
+    .filter(e=>e.type);
+  if(game) paintGame(); 
+}
+
+// ── Game selection ────────────────────────────────────────────
+function pickGame(k){ game=k; F={type:new Set(),team:new Set(),name:new Set(),q:''};
+  activeId=null; closeSheet(); LS.set('lastgame',k); paintGame(); loadVideo(); }
+
+function paintGame(){
+  events=rows.filter(e=>e.game===game).sort((a,b)=>a.time-b.time);
+  const m=meta[game]||{};
+  $('gName').textContent=labels[game]||game||'Choose a game';
+  const tries=events.filter(e=>e.type==='Try');
+  const t1=m.team1||'Team 1', t2=m.team2||'Team 2';
+  const s1=tries.filter(e=>e.team===t1).length, s2=tries.filter(e=>e.team===t2).length;
+  $('gSub').textContent = events.length? `${s1}–${s2} · ${events.length} events` : 'no events';
+  render();
+}
+
+// ── Filtering ─────────────────────────────────────────────────
+function render(){
+  const q=F.q.toLowerCase();
+  shown=events.filter(e=>
+    (!F.type.size||F.type.has(e.type)) &&
+    (!F.team.size||F.team.has(e.team)) &&
+    (!F.name.size||F.name.has(e.name)) &&
+    (!q||(e.name+' '+e.type+' '+e.team+' '+e.comment+' '+e.move).toLowerCase().includes(q)));
+
+  const n=F.type.size+F.team.size+F.name.size+(F.q?1:0);
+  $('fCount').hidden=!n; $('fCount').textContent=n;
+  $('count').textContent=`${shown.length}${shown.length!==events.length?' of '+events.length:''} events`;
+
+  const bar=$('filterbar');
+  bar.innerHTML='<span class="count" id="count">'+
+    `${shown.length}${shown.length!==events.length?' of '+events.length:''} events</span>`;
+  const add=(label,fn)=>{const b=document.createElement('button');b.className='chip on';
+    b.innerHTML=label+' <span class="x">✕</span>';b.onclick=fn;bar.appendChild(b)};
+  F.type.forEach(v=>add(v,()=>{F.type.delete(v);render()}));
+  F.team.forEach(v=>add(v,()=>{F.team.delete(v);render()}));
+  F.name.forEach(v=>add(v,()=>{F.name.delete(v);render()}));
+  if(F.q) add('“'+F.q+'”',()=>{F.q='';render()});
+  if(!n){ // quick-access type chips when nothing is filtered
+    ['Try','Turnover','Penalty Attack','Penalty Defence'].forEach(t=>{
+      if(!events.some(e=>e.type===t))return;
+      const b=document.createElement('button');b.className='chip';b.textContent=t;
+      b.onclick=()=>{F.type.add(t);render()};bar.appendChild(b)});
+  }
+
+  const L=$('list');
+  if(!shown.length){L.innerHTML='<div class="empty">'+
+    (events.length?'No events match these filters.':'Pick a game to see its events.')+'</div>';return}
+  L.innerHTML=shown.map((e,i)=>{
+    const id=e.game+'#'+e.time+'#'+i;
+    return `<div class="ev${activeId===id?' active':''}" style="border-left-color:${col(e.type)}"
+      onclick="playEvent(${e.time},'${id.replace(/'/g,"\\'")}')">
+      <span class="ev-t">${shortT(e.timeStr)}</span>
+      <span class="ev-main">
+        <span class="ev-name">${esc(e.name||e.type)}</span>
+        <span class="ev-meta"><span class="tag" style="background:${col(e.type)}22;color:${col(e.type)}">${esc(e.type)}</span>
+        ${e.team?`<span class="team">${esc(e.team)}</span>`:''}
+        ${e.move?`<span class="move">${esc(e.move)}</span>`:''}
+        ${e.comment?esc(e.comment.slice(0,32)):''}</span>
+      </span>
+    </div>`}).join('');
+  paintMarks();
+}
+// Function declarations, not const arrows: restoring a cached game calls
+// render() from the top-level IIFE before a const at this point in the file has
+// been evaluated, and a TDZ ReferenceError there silently leaves the list on
+// "Loading…". Only reproduces when localStorage already holds a cached game.
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;')}
+// Game clocks run well under an hour, so the leading 0: / 00: is noise on a phone.
+function shortT(t){return String(t||'').replace(/^0?0:/,'')}
+
+// ── Video ─────────────────────────────────────────────────────
+function loadVideo(){
+  const m=meta[game]||{};
+  if(player){player.destroy();player=null}
+  ready=false; if(tick){clearInterval(tick);tick=null}
+  if(!TR.player.providerFor(m)){
+    $('stageEmpty').style.display='flex';
+    $('stageEmpty').textContent='This game has no video linked yet.';
+    ['bPlay','bBack','bFwd','bRate','bZoom'].forEach(i=>$(i).disabled=true);
+    return;
+  }
+  $('stageEmpty').style.display='none';
+  $('ytZoom').innerHTML='';
+  player=TR.player.create({provider:'youtube',container:$('ytZoom'),
+    videoId:TR.extractVideoId(m.youtubelink),
+    onReady(){ready=true;dur=player.getDuration()||0;
+      ['bPlay','bBack','bFwd','bRate','bZoom'].forEach(i=>$(i).disabled=false);
+      if(pendingSeek!=null){player.seek(pendingSeek);player.play();pendingSeek=null}
+      tick=setInterval(progress,250); paintMarks();},
+    onStateChange(s){$('bPlay').textContent=s==='playing'?'⏸':'▶'}});
+}
+
+function playEvent(gameSecs,id){
+  const m=meta[game]||{};
+  if(!TR.player.providerFor(m)){alert('This game has no video linked yet.');return}
+  activeId=id;
+  const t=Math.max(0,TR.player.videoTimeAt(m,gameSecs)-5);   // 5s lookback
+  if(!player){pendingSeek=t;loadVideo()}
+  else if(!ready){pendingSeek=t}
+  else{player.seek(t);player.play()}
+  const ev=events.find(x=>x.time===gameSecs);
+  if(ev){$('nowPill').innerHTML=
+    `<span class="tag" style="background:${col(ev.type)}22;color:${col(ev.type)}">${esc(ev.type)}</span>`+
+    `<b>${esc(ev.name||'')}</b> <span style="color:var(--dim)">${esc(ev.team||'')}</span>`;
+    $('nowPill').classList.add('show');}
+  document.querySelectorAll('.ev').forEach(n=>n.classList.remove('active'));
+  render();
+}
+
+function progress(){
+  if(!ready||!player)return;
+  const t=player.getTime()||0; dur=player.getDuration()||dur;
+  $('tTime').innerHTML=`<b>${fmtS(t)}</b> / ${fmtS(dur)}`;
+  const p=dur?Math.min(100,t/dur*100):0;
+  $('scrubFill').style.width=p+'%'; $('scrubThumb').style.left=p+'%';
+}
+function togglePlay(){if(!ready)return;player.isPaused()?player.play():player.pause()}
+function skip(d){if(!ready)return;player.seek(Math.max(0,(player.getTime()||0)+d))}
+function cycleRate(){rate=RATES[(RATES.indexOf(rate)+1)%RATES.length];
+  if(ready)player.setRate(rate);$('bRate').textContent=rate+'×'}
+function cycleZoom(){zoom=ZOOMS[(ZOOMS.indexOf(zoom)+1)%ZOOMS.length];applyZoom()}
+function applyZoom(){$('ytZoom').style.transform=`scale(${zoom})`;
+  $('stage').classList.toggle('zoomed',zoom>1);
+  const z=$('zoomTag');z.textContent=zoom.toFixed(1)+'×';z.classList.toggle('show',zoom>1);
+  $('bZoom').textContent=zoom>1?zoom+'×':'⛶'}
+function toggleCinema(){const on=document.body.classList.toggle('cinema');
+  $('bCine').textContent=on?'⤡':'⤢';
+  history.replaceState(null,'',on?'#cinema':location.pathname+location.search)}
+
+// double-tap to zoom
+let lastTap=0;
+$('stage').addEventListener('click',()=>{const n=Date.now();
+  if(n-lastTap<300){cycleZoom()}lastTap=n});
+
+// scrub
+function scrubTo(clientX){
+  if(!ready||!dur)return;
+  const r=$('scrub').getBoundingClientRect();
+  player.seek(Math.max(0,Math.min(1,(clientX-r.left)/r.width))*dur);
+}
+$('scrub').addEventListener('pointerdown',e=>{scrubTo(e.clientX);
+  const mv=m=>scrubTo(m.clientX);
+  const up=()=>{window.removeEventListener('pointermove',mv);window.removeEventListener('pointerup',up)};
+  window.addEventListener('pointermove',mv);window.addEventListener('pointerup',up)});
+
+function paintMarks(){
+  const s=$('scrub'); s.querySelectorAll('.scrub-mark').forEach(n=>n.remove());
+  const m=meta[game]||{}; if(!dur)return;
+  shown.filter(e=>e.type==='Try'||e.type==='Turnover').slice(0,180).forEach(e=>{
+    const t=TR.player.videoTimeAt(m,e.time); if(t<0||t>dur)return;
+    const d=document.createElement('div'); d.className='scrub-mark';
+    d.style.left=(t/dur*100)+'%'; d.style.background=col(e.type); s.appendChild(d)});
+}
+
+// ── Sheets ────────────────────────────────────────────────────
+function openSheet(kind){
+  $('scrim').classList.add('open'); $('sheet').classList.add('open');
+  $('sheetTitle').textContent = kind==='game'?'Choose a game':'Filter events';
+  $('sheetBody').innerHTML = kind==='game'?gameSheet():filterSheet();
+}
+function closeSheet(){$('scrim').classList.remove('open');$('sheet').classList.remove('open')}
+
+function gameSheet(){
+  const keys=[...new Set(rows.map(r=>r.game))].filter(Boolean)
+    .sort((a,b)=>(order[a]??999)-(order[b]??999));
+  if(!keys.length)return '<div class="empty">No games loaded yet.</div>';
+  return '<div class="glist">'+keys.map(k=>{
+    const m=meta[k]||{}, has=!!TR.player.providerFor(m);
+    return `<button class="${k===game?'on':''}" onclick="pickGame('${k.replace(/'/g,"\\'")}')">
+      ${esc(labels[k]||k)}
+      <span class="gs">${has?'▶ video':'no video'} · ${rows.filter(r=>r.game===k).length} events</span>
+    </button>`}).join('')+'</div>';
+}
+
+function filterSheet(){
+  if(!game)return '<div class="empty">Pick a game first.</div>';
+  const uniq=f=>[...new Set(events.map(f).filter(Boolean))];
+  const grp=(title,key,vals)=>`<div class="grp"><h3>${title}</h3><div class="opts">`+
+    vals.map(v=>`<button class="chip ${F[key].has(v)?'on':''}"
+      onclick="tog('${key}','${String(v).replace(/'/g,"\\'")}',this)">${esc(v)}</button>`).join('')+
+    '</div></div>';
+  return `<input class="srch" id="q" placeholder="Search name, comment, move…" value="${esc(F.q)}"
+      oninput="F.q=this.value;render()">`+
+    grp('Type','type',uniq(e=>e.type))+
+    grp('Team','team',uniq(e=>e.team))+
+    grp('Name','name',uniq(e=>e.name).slice(0,30))+
+    `<button class="icon-btn" style="width:100%;height:40px" onclick="clearF()">Clear all filters</button>`;
+}
+function tog(k,v,el){F[k].has(v)?F[k].delete(v):F[k].add(v);el.classList.toggle('on');render()}
+function clearF(){F={type:new Set(),team:new Set(),name:new Set(),q:''};
+  $('sheetBody').innerHTML=filterSheet();render()}
+</script>
+</body>
+</html>
