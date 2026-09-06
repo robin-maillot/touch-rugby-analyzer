@@ -11,7 +11,10 @@ const LIVE_SHEET      = '_live';       // reserved tab name for live game state
 const ADMIN_SHEETS    = [GROUPS_SHEET, METADATA_SHEET, LIVE_SHEET];
 
 // Expected column order (must match what the Python pipeline reads)
-const HEADERS = ['Time', 'Possession Owner', 'Type', 'Name', 'To Review', 'Comment', 'Action Owner'];
+// Strike Move is appended LAST so the Python pipeline's positional reads of
+// columns 0-6 are unaffected. Every read path maps by header name, so tabs
+// written before this column existed simply report '' for it.
+const HEADERS = ['Time', 'Possession Owner', 'Type', 'Name', 'To Review', 'Comment', 'Action Owner', 'Strike Move'];
 
 // Metadata columns appended to action=all rows
 const META_COLS = ['Team 1', 'Team 2', 'Competition', 'Year', 'Division', 'Video Name', 'Analyzable', 'ID'];
