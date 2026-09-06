@@ -112,6 +112,38 @@ test('Game Event Game End → false',   () => assert.equal(TR.isTurnover('Game E
 test('Game Event Ball Live → false',  () => assert.equal(TR.isTurnover('Game Event', 'Ball Live'),  false));
 test('To Review → false',             () => assert.equal(TR.isTurnover('To Review', ''), false));
 
+// ── TR.STRIKE_MOVES ───────────────────────────────────────────
+console.log('TR.STRIKE_MOVES');
+test('matches the Try menu',   () => assert.deepEqual(TR.STRIKE_MOVES, TR.MENU['Try']));
+test('is a copy, not the same array', () => assert.notEqual(TR.STRIKE_MOVES, TR.MENU['Try']));
+test('keeps Other and Interception', () => {
+  assert.ok(TR.STRIKE_MOVES.includes('Other'));
+  assert.ok(TR.STRIKE_MOVES.includes('Interception'));
+});
+test('min attempts is 2',      () => assert.equal(TR.MIN_MOVE_ATTEMPTS, 2));
+
+// ── TR.isAttackEnd ────────────────────────────────────────────
+console.log('TR.isAttackEnd');
+test('Try ends an attempt',        () => assert.equal(TR.isAttackEnd('Try', '32 - Cut'), true));
+test('Penalty Attack ends it',     () => assert.equal(TR.isAttackEnd('Penalty Attack', 'Forward Pass'), true));
+test('Turnover ends it',           () => assert.equal(TR.isAttackEnd('Turnover', 'Ball Down'), true));
+test('6 Again does not',           () => assert.equal(TR.isAttackEnd('Turnover', '6 Again'), false));
+test('Penalty Defence does not',   () => assert.equal(TR.isAttackEnd('Penalty Defence', 'Offside'), false));
+test('Game Event does not',        () => assert.equal(TR.isAttackEnd('Game Event', 'Game Start'), false));
+test('To Review does not',         () => assert.equal(TR.isAttackEnd('To Review', ''), false));
+
+// ── TR.strikeMoveOf ───────────────────────────────────────────
+console.log('TR.strikeMoveOf');
+test('Try returns its own name',    () => assert.equal(TR.strikeMoveOf('Try', '33 - Quicky', ''), '33 - Quicky'));
+test('Try ignores a stored move',   () => assert.equal(TR.strikeMoveOf('Try', '33 - Quicky', 'Scoop'), '33 - Quicky'));
+test('Turnover returns its move',   () => assert.equal(TR.strikeMoveOf('Turnover', 'Ball Down', '32 - Cut'), '32 - Cut'));
+test('Pen Attack returns its move', () => assert.equal(TR.strikeMoveOf('Penalty Attack', 'Forward Pass', '23'), '23'));
+test('untagged returns empty',      () => assert.equal(TR.strikeMoveOf('Turnover', 'Ball Down', ''), ''));
+test('undefined move returns empty',() => assert.equal(TR.strikeMoveOf('Turnover', 'Ball Down', undefined), ''));
+test('6 Again drops its move',      () => assert.equal(TR.strikeMoveOf('Turnover', '6 Again', '32'), ''));
+test('Pen Defence drops its move',  () => assert.equal(TR.strikeMoveOf('Penalty Defence', 'Offside', '32'), ''));
+test('Game Event drops its move',   () => assert.equal(TR.strikeMoveOf('Game Event', 'Game Start', '32'), ''));
+
 // ── TR.otherTeam ──────────────────────────────────────────────
 console.log('TR.otherTeam');
 test('Team 1 → Team 2',  () => assert.equal(TR.otherTeam('Team 1'), 'Team 2'));

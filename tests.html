@@ -156,6 +156,37 @@
     });
   });
 
+  QUnit.module('TR.strikeMoveOf', () => {
+    QUnit.test('a Try uses its own name', t => {
+      t.equal(TR.strikeMoveOf('Try', '33 - Quicky', ''), '33 - Quicky');
+      t.equal(TR.strikeMoveOf('Try', '33 - Quicky', 'Scoop'), '33 - Quicky');
+    });
+    QUnit.test('a failed attempt uses its stored move', t => {
+      t.equal(TR.strikeMoveOf('Turnover', 'Ball Down', '32 - Cut'), '32 - Cut');
+      t.equal(TR.strikeMoveOf('Penalty Attack', 'Forward Pass', '23'), '23');
+    });
+    QUnit.test('events that keep possession carry no move', t => {
+      t.equal(TR.strikeMoveOf('Turnover', '6 Again', '32'), '');
+      t.equal(TR.strikeMoveOf('Penalty Defence', 'Offside', '32'), '');
+      t.equal(TR.strikeMoveOf('Game Event', 'Game Start', '32'), '');
+    });
+    QUnit.test('untagged is empty', t => {
+      t.equal(TR.strikeMoveOf('Turnover', 'Ball Down', ''), '');
+      t.equal(TR.strikeMoveOf('Turnover', 'Ball Down', undefined), '');
+    });
+  });
+
+  QUnit.module('TR.isAttackEnd', () => {
+    QUnit.test('true only when the ball changes hands', t => {
+      t.equal(TR.isAttackEnd('Try', '32 - Cut'), true);
+      t.equal(TR.isAttackEnd('Penalty Attack', 'Forward Pass'), true);
+      t.equal(TR.isAttackEnd('Turnover', 'Ball Down'), true);
+      t.equal(TR.isAttackEnd('Turnover', '6 Again'), false);
+      t.equal(TR.isAttackEnd('Penalty Defence', 'Offside'), false);
+      t.equal(TR.isAttackEnd('Game Event', 'Game Start'), false);
+    });
+  });
+
   // ── TR.inferPossessionAfter ────────────────────────────────────
   QUnit.module('TR.inferPossessionAfter', () => {
     QUnit.test('Try → other team gets possession', t => {
