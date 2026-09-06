@@ -1545,11 +1545,15 @@ document.addEventListener('keydown', e => {
   if (pendingType !== null && (e.key === '1' || e.key === '2')) {
     e.preventDefault(); selectTeam(e.key === '1' ? 'Team 1' : 'Team 2'); return;
   }
-  // Sub-type by number — never while the team menu is up. Once pendingType
-  // is set, the on-screen menu is no longer the sub-type menu (it's either
-  // the team menu, or the move menu re-rendered for correction), so digits
-  // must not silently rewrite selectedType's sub-type out from under it.
-  if (pendingType === null && selectedType && /^[1-9]$/.test(e.key)) {
+  // Sub-type by number — suppressed only while the *move* menu is the thing
+  // actually on screen (pendingType set AND that pending type/name offers a
+  // strike move). For types with no move stage (e.g. Penalty Defence, Try),
+  // #submenu still shows the full sub-type list with live hotkey hints even
+  // once the team menu is up — those digits must keep working, matching
+  // pre-existing behaviour (correcting a sub-type choice while the team menu
+  // is displayed). Only when the move menu has taken over #submenu do digits
+  // stop meaning "pick a sub-type".
+  if ((pendingType === null || !offersStrikeMove(pendingType, pendingName)) && selectedType && /^[1-9]$/.test(e.key)) {
     const opts = TR.MENU[selectedType];
     const idx = parseInt(e.key) - 1;
     if (idx < opts.length) { e.preventDefault(); selectSubType(selectedType, opts[idx]); }
