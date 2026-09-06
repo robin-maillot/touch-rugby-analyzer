@@ -80,7 +80,7 @@ Aggregate view across all analysable games. Shows team rankings, cumulative try 
 
 Searchable, filterable table of every event across all games. Clicking a row with a YouTube link plays the video at that timestamp. Supports filtering by Type, Name, Possession Owner, Action Owner, and Game. Events without a YouTube link are hidden.
 
-**Admin extras:** Name and Comment cells become editable inline. Name shows a dropdown with the same options as the annotator (depends on Type). A **💾 Save N changes** button appears in the toolbar when edits are pending and sends all changes to the sheet in one request.
+**Admin extras:** Name and Comment cells become editable inline. Name shows a dropdown with the same options as the annotator (depends on Type). On `Turnover` and `Penalty Attack` rows, the Strike Move is also editable as a dropdown nested under the Name (Try rows have none — a Try's move is its Name; `6 Again` and Penalty Defence never carry one). The sheet re-derives the Strike Move on save, so correcting a Name can't leave a stale move behind. A **💾 Save N changes** button appears in the toolbar when edits are pending and sends all changes to the sheet in one request.
 
 ---
 
