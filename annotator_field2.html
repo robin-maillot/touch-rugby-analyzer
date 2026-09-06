@@ -827,6 +827,17 @@
       overflow-x: auto; scrollbar-width: none;
     }
     #pitchStatus::-webkit-scrollbar { display: none; }
+    /* The move strip has 19 chips — 4+ screens wide as a single scrolling row on
+       a phone, with 14 of them (the named variants a per-move try rate exists to
+       tell apart) never reached. Wrapping keeps every chip reachable by a plain
+       vertical scroll instead of a hidden horizontal one; the height cap keeps
+       that scroll bounded so the strip can never grow enough to push the pitch
+       off screen — it just gives up some of the pitch's height, never all of it. */
+    #pitchStatus.move-strip {
+      flex-wrap: wrap; align-content: flex-start;
+      overflow-x: hidden; overflow-y: auto;
+      max-height: 128px;
+    }
     #pitchHint { font-size: 0.7rem; color: var(--text-dim); font-weight: 600; padding-left: 2px; }
     .sub-chip {
       flex: 0 0 auto; padding: 6px 11px; border-radius: 99px;
@@ -3039,6 +3050,7 @@ function offerSubtype(idx) {
   // clears subtypeTimer, before it ever calls offerMoveStrip().)
   clearTimeout(moveTimer);
   moveIdx = null;
+  bar.classList.remove('move-strip');
   subtypeIdx = i;
   bar.innerHTML = `<span class="sub-chip head">${EVENT_LABELS[a.type] || a.type} —</span>` +
     (TR.MENU[a.type] || []).filter(n => n !== 'Other')
@@ -3078,22 +3090,42 @@ function pickSubtype(name) {
 // ── Strike move strip ──────────────────────────────────────────
 let moveIdx = null, moveTimer = null;
 
+// 19 moves take longer to scan than the sub-type strip's 7, so the timeout
+// scales with option count at roughly the sub-type strip's rate
+// (10s / 7 opts ≈ 1.4s/opt → 19 opts ≈ 27s), rounded down to a clean 25s. The
+// strip also wraps onto several rows here, so a glance can take a moment
+// longer even before any tapping starts. Real interaction pushes the deadline
+// out further still — restartMoveTimer() is called on every tap or scroll
+// inside the strip, so the fixed budget only matters for a screen nobody is
+// touching.
+const MOVE_STRIP_TIMEOUT_MS = 25000;
+
 function offerMoveStrip(idx) {
   const a = annotations[idx];
   if (!a) return;
   moveIdx = idx;
-  document.getElementById('pitchStatus').innerHTML =
+  const bar = document.getElementById('pitchStatus');
+  bar.classList.add('move-strip');
+  bar.innerHTML =
     `<span class="sub-chip head">Move —</span>` +
     TR.STRIKE_MOVES.map(m => `<button class="sub-chip" data-move="${m}">${m}</button>`).join('');
+  restartMoveTimer();
+}
+
+// Re-armed on every tap or scroll inside the move strip (see the pitchStatus
+// listeners below) so a still-scanning annotator never has the strip close
+// under them mid-read.
+function restartMoveTimer() {
+  if (moveIdx === null) return;
   clearTimeout(moveTimer);
-  moveTimer = setTimeout(closeMoveStrip, 10000);
+  moveTimer = setTimeout(closeMoveStrip, MOVE_STRIP_TIMEOUT_MS);
 }
 
 function closeMoveStrip() {
   clearTimeout(moveTimer);
   moveIdx = null;
   const bar = document.getElementById('pitchStatus');
-  if (bar) bar.innerHTML = '<span id="pitchHint"></span>';
+  if (bar) { bar.classList.remove('move-strip'); bar.innerHTML = '<span id="pitchHint"></span>'; }
   renderPitch();
 }
 
@@ -3384,12 +3416,19 @@ window.addEventListener('DOMContentLoaded', () => {
     onPitchTap(ev);
   });
 
-  document.getElementById('pitchStatus').addEventListener('click', ev => {
+  const statusBar = document.getElementById('pitchStatus');
+  statusBar.addEventListener('click', ev => {
     const chip = ev.target.closest('[data-sub]');
     if (chip) { pickSubtype(chip.dataset.sub); return; }
     const mv = ev.target.closest('[data-move]');
-    if (mv) pickStrikeMove(mv.dataset.move);
+    if (mv) { pickStrikeMove(mv.dataset.move); return; }
+    // A tap anywhere else in the strip (the head label, the gaps between
+    // chips) still counts as active interaction with it.
+    restartMoveTimer();
   });
+  // Scrolling to reach a chip further down the wrapped strip is interaction
+  // too, and rarely fires a click of its own — so it gets its own listener.
+  statusBar.addEventListener('scroll', restartMoveTimer, { passive: true });
 });
 
 </script>
