@@ -821,11 +821,16 @@ function offersStrikeMove(type, name) {
 }
 
 function renderMoveMenu(type, name, selectedMove = null) {
+  // Once pendingType is set, the team menu is up and digits 1/2 are claimed
+  // by team selection (3-9 do nothing — see the keydown handler), so this
+  // render must not advertise 1-9 hotkeys that no longer do anything. The
+  // pre-team-selection render (pendingType still null here) keeps its hints.
+  const showHints = pendingType === null;
   document.getElementById('submenu').innerHTML =
     `<span class="submenu-label" style="color:${COLORS[type]}">${name} — move:</span>` +
     TR.STRIKE_MOVES.map((m, i) =>
       `<button class="sub-btn${m === selectedMove ? ' active' : ''}" onclick="selectStrikeMove('${m.replace(/'/g, "\\'")}')">` +
-      (i < 9 ? `<span class="hotkey">${i + 1}</span>` : '') + m + `</button>`).join('') +
+      (showHints && i < 9 ? `<span class="hotkey">${i + 1}</span>` : '') + m + `</button>`).join('') +
     `<button class="sub-btn${selectedMove === '' ? ' active' : ''}" onclick="selectStrikeMove('')">✕ Skip</button>`;
 }
 
@@ -1540,8 +1545,11 @@ document.addEventListener('keydown', e => {
   if (pendingType !== null && (e.key === '1' || e.key === '2')) {
     e.preventDefault(); selectTeam(e.key === '1' ? 'Team 1' : 'Team 2'); return;
   }
-  // Sub-type by number
-  if (selectedType && /^[1-9]$/.test(e.key)) {
+  // Sub-type by number — never while the team menu is up. Once pendingType
+  // is set, the on-screen menu is no longer the sub-type menu (it's either
+  // the team menu, or the move menu re-rendered for correction), so digits
+  // must not silently rewrite selectedType's sub-type out from under it.
+  if (pendingType === null && selectedType && /^[1-9]$/.test(e.key)) {
     const opts = TR.MENU[selectedType];
     const idx = parseInt(e.key) - 1;
     if (idx < opts.length) { e.preventDefault(); selectSubType(selectedType, opts[idx]); }
