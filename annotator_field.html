@@ -1464,6 +1464,11 @@ function markSubtypeState() {
   sel.classList.toggle('set', !!sel.value && sel.value !== 'Other');
 }
 
+function markMoveState() {
+  const sel = document.getElementById('editMove');
+  sel.classList.toggle('set', !!sel.value);
+}
+
 // Applies straight away rather than waiting on Save, so the pick can't be lost
 // by dismissing the sheet — same as the type buttons. The sheet stays open so a
 // comment can still be added on top.
@@ -1496,6 +1501,7 @@ function renderMoveSelect(a) {
   if (cur && !opts.includes(cur)) opts.splice(1, 0, cur);
   sel.innerHTML = opts.map(o =>
     `<option value="${o}"${o === cur ? ' selected' : ''}>${o || '— none —'}</option>`).join('');
+  markMoveState();
 }
 
 // Applies straight away rather than waiting on Save, matching applySubtype.
@@ -1503,6 +1509,7 @@ function renderMoveSelect(a) {
 function applyStrikeMove() {
   if (editingIndex === null) return;
   annotations[editingIndex].strikeMove = document.getElementById('editMove').value;
+  markMoveState();
   updateUI();
   saveSession();
 }
