@@ -3032,6 +3032,13 @@ function offerSubtype(idx) {
   const a   = annotations[i];
   const bar = document.getElementById('pitchStatus');
   if (!a || !SUBTYPE_TYPES.includes(a.type)) { closeSubtype(); closeMoveStrip(); return; }
+  // The two strips share this one status line, so whichever one is about to take
+  // it over must disarm the other's timer too — otherwise a stale timer from the
+  // strip that just lost the line fires later and wipes out whatever replaced it.
+  // (The reverse direction is safe: pickSubtype always calls closeSubtype(), which
+  // clears subtypeTimer, before it ever calls offerMoveStrip().)
+  clearTimeout(moveTimer);
+  moveIdx = null;
   subtypeIdx = i;
   bar.innerHTML = `<span class="sub-chip head">${EVENT_LABELS[a.type] || a.type} —</span>` +
     (TR.MENU[a.type] || []).filter(n => n !== 'Other')
