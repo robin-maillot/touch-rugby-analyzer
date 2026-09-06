@@ -138,6 +138,10 @@ event as `Other`, exactly as v1's buttons do.
 Picking `6 Again` or `6th Touch` after the fact re-derives possession from the
 corrected name, so a late correction doesn't leave the ball on the wrong team.
 
+Picking a sub-type on a turnover or attack penalty chains straight into a **Move**
+strip on the same line, with the same ten-second timeout, and ignoring it leaves
+the move blank.
+
 ### Fixing a mistake
 
 - **↩ Undo**, in the rail, drops the newest event.

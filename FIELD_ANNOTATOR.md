@@ -207,6 +207,8 @@ automatically — e.g. a Pen Defence or a 6 Again is attributed to the *other* t
   (no need to hit **Save**) and shows it as a pill beside the event name in **Recent**.
   Only Try / Turnover / Pen Attack / Pen Defence offer it; Game Event and To Review
   already spell their detail out in the name.
+- The sheet also carries a **Strike move** picker below **Sub-type**, shown only on
+  turnovers and attack penalties, defaulting to `— none —`.
 
 ### 6. Finishing the game (⏹ Stop Game)
 

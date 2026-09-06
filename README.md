@@ -106,6 +106,7 @@ The main tool for tagging events against a match video (local file or YouTube).
 |---|---|---|
 | Try | `T` | Try scored by the possession team. Sub-types: Scoop, 32, 23, 33, 32 - Cut, 32 - Long, 32 - Quicky, 32 - Scoop, 23 - Backdoor, 23 - Quicky, 23 - Scoop, 33 - Backdoor, 33 - Cut, 33 - Quicky, 33 - Scoop, French Flair, Other |
 | Turnover | `U` | Ball changes hands. Sub-types: Ball Down, 6th Touch, Dummy Touch, Bad Roll, 6 Again, Interception, Other |
+| Strike move | `1`–`9` | Optional second stage after a Turnover or Pen Attack sub-type — which move was being run. Skippable with `Escape`, `Enter`, or **✕ Skip**. Not offered in Simple Mode. |
 | Pen Attack | `P` | Penalty against the defence (attacking team benefits) |
 | Pen Defence | `Q` | Penalty against the attack (defending team benefits, possession switches) |
 | Game Event | `G` | Game Start or Game End — tag first so possession can be inferred |
@@ -204,7 +205,9 @@ Transient live game state. One row per active live session. Columns: `Sheet Name
 
 ### Game tabs
 
-Each game is a separate sheet tab named `YEAR_DIVISION_COMPETITION_TEAM1_TEAM2`. Columns: `Time`, `Possession Owner`, `Type`, `Name`, `To Review`, `Comment`, `Youtube Link`, `Action Owner`.
+Each game is a separate sheet tab named `YEAR_DIVISION_COMPETITION_TEAM1_TEAM2`. Columns: `Time`, `Possession Owner`, `Type`, `Name`, `To Review`, `Comment`, `Youtube Link`, `Action Owner`, `Strike Move`.
+
+**Strike Move** — which attacking move the attempt was running. A Try's move is its own `Name`; a Turnover or Pen Attack can record the move that failed, which is what makes a try rate per move possible. Always optional, and never set on `6 Again` or Penalty Defence, since the attack keeps the ball there.
 
 ### Deploying updates
 
