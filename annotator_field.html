@@ -228,6 +228,22 @@
       color: var(--text-muted);
       white-space: nowrap;
     }
+    /* The strike move is a different kind of fact from the sub-type (what was
+       being run, not what happened), so it gets its own accent rather than
+       reading as a second sub-type pill — same shape, tinted purple. */
+    .recent-move {
+      display: inline-block;
+      vertical-align: middle;
+      background: rgba(124,58,237,0.13);
+      border: 1px solid var(--purple);
+      border-radius: 999px;
+      padding: 1px 7px;
+      margin: 0 2px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--purple);
+      white-space: nowrap;
+    }
     /* Keeps "· Team" together when a long sub-type wraps the row onto two lines. */
     .recent-team { white-space: nowrap; }
 
@@ -1603,12 +1619,16 @@ function updateUI() {
                                                 : (document.getElementById('metaTeam2').value.trim() || 'Team 2');
     const teamStr = a.type !== 'Game Event' ? ` <span class="recent-team">· ${team}</span>` : '';
     const sub = eventSubtype(a);
+    // Only a failed attempt carries a stored move (a Try's move is already its
+    // sub-type, shown above) — the pill is the only read-back on the sideline
+    // that a tap on the move picker actually landed, without reopening the card.
+    const move = a.strikeMove || '';
     const hasComment = a.comment && a.comment.trim() && a.comment !== '?';
     const commentMark = hasComment ? '<span class="recent-comment" title="Has a comment">💬</span>' : '';
     return `<div class="recent-item" onclick="openEdit(${idx})">
       <div class="recent-dot" style="background:${color}"></div>
       <span class="recent-time">${fmtClock(a.time)}</span>
-      <span class="recent-text">${eventBaseLabel(a)}${sub ? ` <span class="recent-sub">${sub}</span>` : ''}${teamStr}</span>
+      <span class="recent-text">${eventBaseLabel(a)}${sub ? ` <span class="recent-sub">${sub}</span>` : ''}${move ? ` <span class="recent-move">${move}</span>` : ''}${teamStr}</span>
       ${commentMark}
       <span style="color:var(--border);font-size:0.9rem;flex-shrink:0">›</span>
     </div>`;

@@ -1047,11 +1047,14 @@ function editAnnotationMove(id) {
 
   const sel = document.createElement('select');
   sel.className = 'ann-name-select';
-  ['', ...TR.STRIKE_MOVES].forEach(o => {
+  const opts = ['', ...TR.STRIKE_MOVES];
+  const cur  = ann.strikeMove || '';
+  if (cur && !opts.includes(cur)) opts.splice(1, 0, cur);
+  opts.forEach(o => {
     const opt = document.createElement('option');
     opt.value = o;
     opt.textContent = o || '— none —';
-    if (o === (ann.strikeMove || '')) opt.selected = true;
+    if (o === cur) opt.selected = true;
     sel.appendChild(opt);
   });
 
