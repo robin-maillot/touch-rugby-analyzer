@@ -148,6 +148,11 @@
     padding:2px 6px;border-radius:4px;flex-shrink:0}
   .team{font-size:.66rem;color:var(--text);flex-shrink:0;font-weight:600;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:11ch}
+  /* All-games mode only: names which match a card belongs to. Its own class,
+     not a reuse of .team (which is bold/light and sized for a team name) —
+     this wants the dimmer, wider treatment a match label needs. */
+  .gmatch{font-size:.66rem;color:var(--dim);flex-shrink:0;white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis;max-width:18ch}
   .move{background:var(--surface2);border:1px solid var(--border);border-radius:4px;
     padding:1px 5px;font-size:.62rem;color:#7dd3fc;flex-shrink:0}
   .empty{color:var(--dim);text-align:center;padding:36px 20px;font-size:.82rem}
@@ -293,11 +298,12 @@ const TAGCOL = {'Try':'--try','Turnover':'--turn','Penalty Attack':'--patk',
 function col(t){return `var(${TAGCOL[t]||'--dim'})`}
 
 let rows=[], headers=[], meta={}, labels={}, order={};
-let game='', events=[], shown=[];
-let player=null, ready=false, dur=0, tick=null, pendingSeek=null;
-let activeId=null, rate=1, zoom=1;
-const RATES=[1,1.5,2], ZOOMS=[1,1.5,2];
-let F={type:new Set(),team:new Set(),name:new Set(),move:new Set(),q:''};
+let game='', events=[], shown=[], picked=false;
+let player=null, ready=false, dur=0, tick=null, pendingSeek=null, videoGame='';
+let activeId=null, rate=1, zoom=1, renderLimit=200;
+const RATES=[1,0.5,2], ZOOMS=[1,1.5,2];
+let F={type:new Set(),team:new Set(),name:new Set(),move:new Set(),
+       comp:new Set(),div:new Set(),year:new Set(),q:''};
 
 const LS={get(k){try{return JSON.parse(localStorage.getItem('trl2_'+k))}catch(e){return null}},
           set(k,v){try{localStorage.setItem('trl2_'+k,JSON.stringify(v))}catch(e){}}};
@@ -318,19 +324,23 @@ function toSecs(t){const p=String(t||'').trim().split(':').map(Number);
       fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&action=list`)]);
     const [ar,lr]=await Promise.all([a.json(),l.json()]);
     if(ar.ok){LS.set('all',ar); ingest(ar.rows);}
-    if(lr.ok){LS.set('list',lr); buildMeta(lr.sheets); if(game) paintGame();}
+    if(lr.ok){LS.set('list',lr); buildMeta(lr.sheets); if(picked) paintGame();}
   }catch(e){ if(!ca) $('empty').textContent='Could not load events: '+e.message; }
   restore();
-  if(!game) openSheet('game');
+  if(!picked) openSheet('game');
 })();
 
 // ?game= wins, else the last game this device looked at. On a phone you come
-// back to the same match rather than re-picking it every time.
+// back to the same match rather than re-picking it every time. '' means "all
+// games" (both from ?game= and from a stored lastgame) and must round-trip
+// just like a real game name — so this checks presence, not truthiness.
 function restore(){
   if(LS.get('listCollapsed') && !document.body.classList.contains('list-collapsed')) toggleList();
-  if(game) return;
-  const want = new URLSearchParams(location.search).get('game') || LS.get('lastgame');
-  if(want && rows.some(r=>r.game===want)) pickGame(want);
+  if(picked) return;
+  const params=new URLSearchParams(location.search);
+  const want = params.has('game') ? params.get('game') : LS.get('lastgame');
+  if(want==='' ){ if(rows.length) pickGame(''); }
+  else if(want && rows.some(r=>r.game===want)) pickGame(want);
   applyHash();
 }
 
@@ -339,8 +349,8 @@ function restore(){
 function applyHash(){
   const h=(location.hash||'').replace('#','');
   if(h==='cinema' && !document.body.classList.contains('cinema')) toggleCinema();
-  if(h==='filter' && game) openSheet('filter');
-  if(h==='moves'  && game) openSheet('moves');
+  if(h==='filter' && picked) openSheet('filter');
+  if(h==='moves'  && picked) openSheet('moves');
 }
 window.addEventListener('hashchange',applyHash);
 
@@ -352,7 +362,8 @@ function ingest(r){
   headers=r[0].map(h=>h.trim());
   const hi=n=>headers.findIndex(h=>h.toLowerCase()===n);
   const I={t:hi('time'),ty:hi('type'),nm:hi('name'),ao:hi('action owner'),
-    cm:hi('comment'),sm:hi('strike move'),g:hi('game'),t1:hi('team 1'),t2:hi('team 2')};
+    cm:hi('comment'),sm:hi('strike move'),g:hi('game'),t1:hi('team 1'),t2:hi('team 2'),
+    cp:hi('competition'),yr:hi('year'),dv:hi('division')};
   const sub=(v,a,b)=>{const s=(v||'').trim();return s==='Team 1'?a:s==='Team 2'?b:s};
   rows=r.slice(1).filter(x=>x.some(c=>c!=='')).map(x=>{
     const type=(x[I.ty]||'').trim(), name=(x[I.nm]||'').trim();
@@ -363,37 +374,67 @@ function ingest(r){
       // Derived, not read raw: a Try's move IS its name, and the viewer's inline
       // edit can leave the stored Strike Move column stale after a rename.
       // Same fix as viewer.html f14dbee.
-      move:TR.strikeMoveOf(type,name,rawMove), game:x[I.g]};
+      move:TR.strikeMoveOf(type,name,rawMove), game:x[I.g],
+      comp:I.cp>=0?(x[I.cp]||'').trim():'', year:I.yr>=0?(x[I.yr]||'').trim():'',
+      div:I.dv>=0?(x[I.dv]||'').trim():''};
   }).filter(e=>e.type);
-  if(game) paintGame(); 
+  if(picked) paintGame();
 }
 
 // ── Game selection ────────────────────────────────────────────
-function pickGame(k){ game=k; F={type:new Set(),team:new Set(),name:new Set(),move:new Set(),q:''};
-  activeId=null; closeSheet(); LS.set('lastgame',k); paintGame(); loadVideo(); }
+// game==='' means "all games", a real pick like any other — distinguished from
+// "nothing chosen yet" by the `picked` flag, not by truthiness.
+function pickGame(k){ game=k; picked=true; renderLimit=200;
+  F={type:new Set(),team:new Set(),name:new Set(),move:new Set(),
+     comp:new Set(),div:new Set(),year:new Set(),q:''};
+  activeId=null; closeSheet(); LS.set('lastgame',k); paintGame();
+  if(k) loadVideo(k); else clearVideo(); }
 
 function paintGame(){
-  events=rows.filter(e=>e.game===game).sort((a,b)=>a.time-b.time);
-  const m=meta[game]||{};
-  $('gName').textContent=labels[game]||game||'Choose a game';
-  const tries=events.filter(e=>e.type==='Try');
-  const t1=m.team1||'Team 1', t2=m.team2||'Team 2';
-  const s1=tries.filter(e=>e.team===t1).length, s2=tries.filter(e=>e.team===t2).length;
-  $('gSub').textContent = events.length? `${s1}–${s2} · ${events.length} events` : 'no events';
+  if(game===''){
+    // Every row, grouped by match (API order) rather than interleaved by time.
+    events=rows.slice().sort((a,b)=>(order[a.game]??999)-(order[b.game]??999)||a.time-b.time);
+    $('gName').textContent='All games';
+    $('gSub').textContent=`${events.length} events`;
+  }else{
+    events=rows.filter(e=>e.game===game).sort((a,b)=>a.time-b.time);
+    const m=meta[game]||{};
+    $('gName').textContent=labels[game]||game||'Choose a game';
+    const tries=events.filter(e=>e.type==='Try');
+    const t1=m.team1||'Team 1', t2=m.team2||'Team 2';
+    const s1=tries.filter(e=>e.team===t1).length, s2=tries.filter(e=>e.team===t2).length;
+    $('gSub').textContent = events.length? `${s1}–${s2} · ${events.length} events` : 'no events';
+  }
   render();
 }
 
+// Compact match label for all-games cards — team names only, never the full
+// sheetNameToLabel (which can carry competition/year/division/#id too).
+function shortLabel(g){
+  const m=meta[g]||{};
+  if(m.team1&&m.team2) return `${m.team1} v ${m.team2}`;
+  const parts=(g||'').split('_');
+  return parts.length>=2 ? `${parts[parts.length-2]} v ${parts[parts.length-1]}` : (g||'');
+}
+
 // ── Filtering ─────────────────────────────────────────────────
-function render(){
+// keepWindow: pass true only when re-rendering without a game/filter change
+// (e.g. after playEvent's active-highlight update) — every other caller wants
+// a fresh filter to start back at the top of the rendered window.
+function render(keepWindow){
+  if(!keepWindow) renderLimit=200;
   const q=F.q.toLowerCase();
   shown=events.filter(e=>
+    (!F.comp.size||F.comp.has(e.comp)) &&
+    (!F.div.size||F.div.has(e.div)) &&
+    (!F.year.size||F.year.has(e.year)) &&
     (!F.type.size||F.type.has(e.type)) &&
     (!F.team.size||F.team.has(e.team)) &&
     (!F.name.size||F.name.has(e.name)) &&
     (!F.move.size||F.move.has(e.move)) &&
     (!q||(e.name+' '+e.type+' '+e.team+' '+e.comment+' '+e.move).toLowerCase().includes(q)));
 
-  const n=F.type.size+F.team.size+F.name.size+F.move.size+(F.q?1:0);
+  const n=F.comp.size+F.div.size+F.year.size+F.type.size+F.team.size+F.name.size+F.move.size+(F.q?1:0);
   $('fCount').hidden=!n; $('fCount').textContent=n;
   $('count').textContent=`${shown.length}${shown.length!==events.length?' of '+events.length:''} events`;
 
@@ -405,6 +446,9 @@ function render(){
     `${shown.length}${shown.length!==events.length?' of '+events.length:''} events</span>`;
   const add=(label,fn)=>{const b=document.createElement('button');b.className='chip on';
     b.innerHTML=label+' <span class="x">✕</span>';b.onclick=fn;bar.appendChild(b)};
+  F.comp.forEach(v=>add(v,()=>{F.comp.delete(v);render()}));
+  F.div.forEach(v=>add(v,()=>{F.div.delete(v);render()}));
+  F.year.forEach(v=>add(v,()=>{F.year.delete(v);render()}));
   F.type.forEach(v=>add(v,()=>{F.type.delete(v);render()}));
   F.team.forEach(v=>add(v,()=>{F.team.delete(v);render()}));
   F.name.forEach(v=>add(v,()=>{F.name.delete(v);render()}));
@@ -420,21 +464,28 @@ function render(){
   const L=$('list');
   if(!shown.length){L.innerHTML='<div class="empty">'+
     (events.length?'No events match these filters.':'Pick a game to see its events.')+'</div>';return}
-  L.innerHTML=shown.map((e,i)=>{
+  const windowed=shown.slice(0,renderLimit);
+  L.innerHTML=windowed.map((e,i)=>{
     const id=e.game+'#'+e.time+'#'+i;
     return `<div class="ev${activeId===id?' active':''}" style="border-left-color:${col(e.type)}"
-      onclick="playEvent(${e.time},'${id.replace(/'/g,"\\'")}')">
+      onclick="playEvent(${e.time},'${id.replace(/'/g,"\\'")}','${String(e.game).replace(/'/g,"\\'")}')">
       <span class="ev-t">${shortT(e.timeStr)}</span>
       <span class="ev-main">
         <span class="ev-name">${esc(e.name||e.type)}</span>
         <span class="ev-meta"><span class="tag" style="background:${col(e.type)}22;color:${col(e.type)}">${esc(e.type)}</span>
+        ${game===''?`<span class="gmatch">${esc(shortLabel(e.game))}</span>`:''}
         ${e.team?`<span class="team">${esc(e.team)}</span>`:''}
         ${e.move?`<span class="move">${esc(e.move)}</span>`:''}
         ${e.comment?esc(e.comment.slice(0,32)):''}</span>
       </span>
     </div>`}).join('');
+  if(shown.length>renderLimit){
+    L.innerHTML+=`<button class="icon-btn" style="width:100%;height:40px;margin:4px 0 0"
+      onclick="loadMore()">Load more (${shown.length-renderLimit} more)</button>`;
+  }
   paintMarks();
 }
+function loadMore(){renderLimit+=200;render(true)}
 // Function declarations, not const arrows: restoring a cached game calls
 // render() from the top-level IIFE before a const at this point in the file has
 // been evaluated, and a TDZ ReferenceError there silently leaves the list on
@@ -444,8 +495,12 @@ function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').
 function shortT(t){return String(t||'').replace(/^0?0:/,'')}
 
 // ── Video ─────────────────────────────────────────────────────
-function loadVideo(){
-  const m=meta[game]||{};
+// loadVideo takes the game explicitly rather than reading the global `game` —
+// in all-games mode there is no single game, so the loaded video's game is
+// tracked separately in `videoGame` and driven by whichever event was tapped.
+function loadVideo(g){
+  videoGame=g;
+  const m=meta[g]||{};
   if(player){player.destroy();player=null}
   ready=false; if(tick){clearInterval(tick);tick=null}
   if(!TR.player.providerFor(m)){
@@ -465,21 +520,35 @@ function loadVideo(){
     onStateChange(s){$('bPlay').textContent=s==='playing'?'⏸':'▶'}});
 }
 
-function playEvent(gameSecs,id){
-  const m=meta[game]||{};
+// No game picked / all-games mode with nothing tapped yet: no video to show,
+// as opposed to loadVideo's "this specific game has none".
+function clearVideo(){
+  videoGame=''; if(player){player.destroy();player=null}
+  ready=false; dur=0; if(tick){clearInterval(tick);tick=null}
+  $('stageEmpty').style.display='flex';
+  $('stageEmpty').textContent='Pick a game, then tap any event to watch it';
+  ['bPlay','bBack','bFwd','bRate','bZoom'].forEach(i=>$(i).disabled=true);
+  paintMarks();
+}
+
+function playEvent(gameSecs,id,evGame){
+  const m=meta[evGame]||{};
   if(!TR.player.providerFor(m)){alert('This game has no video linked yet.');return}
   activeId=id;
   const t=Math.max(0,TR.player.videoTimeAt(m,gameSecs)-5);   // 5s lookback
-  if(!player){pendingSeek=t;loadVideo()}
+  // The video follows the event, not the picker: load evGame's video whenever
+  // it differs from what's currently loaded, regardless of what `game` is.
+  if(evGame!==videoGame){pendingSeek=t;loadVideo(evGame)}
+  else if(!player){pendingSeek=t;loadVideo(evGame)}
   else if(!ready){pendingSeek=t}
   else{player.seek(t);player.play()}
-  const ev=events.find(x=>x.time===gameSecs);
+  const ev=events.find(x=>x.game===evGame&&x.time===gameSecs);
   if(ev){$('nowPill').innerHTML=
     `<span class="tag" style="background:${col(ev.type)}22;color:${col(ev.type)}">${esc(ev.type)}</span>`+
     `<b>${esc(ev.name||'')}</b> <span style="color:var(--dim)">${esc(ev.team||'')}</span>`;
     $('nowPill').classList.add('show');}
   document.querySelectorAll('.ev').forEach(n=>n.classList.remove('active'));
-  render();
+  render(true);
 }
 
 function progress(){
@@ -531,8 +600,8 @@ $('scrub').addEventListener('pointerdown',e=>{scrubTo(e.clientX);
 
 function paintMarks(){
   const s=$('scrub'); s.querySelectorAll('.scrub-mark').forEach(n=>n.remove());
-  const m=meta[game]||{}; if(!dur)return;
-  shown.filter(e=>e.type==='Try'||e.type==='Turnover').slice(0,180).forEach(e=>{
+  const m=meta[videoGame]||{}; if(!dur||!videoGame)return;
+  shown.filter(e=>e.game===videoGame&&(e.type==='Try'||e.type==='Turnover')).slice(0,180).forEach(e=>{
     const t=TR.player.videoTimeAt(m,e.time); if(t<0||t>dur)return;
     const d=document.createElement('div'); d.className='scrub-mark';
     d.style.left=(t/dur*100)+'%'; d.style.background=col(e.type); s.appendChild(d)});
@@ -637,7 +706,11 @@ function gameSheet(){
   const keys=[...new Set(rows.map(r=>r.game))].filter(Boolean)
     .sort((a,b)=>(order[a]??999)-(order[b]??999));
   if(!keys.length)return '<div class="empty">No games loaded yet.</div>';
-  return '<div class="glist">'+keys.map(k=>{
+  const allBtn=`<button class="${picked&&game===''?'on':''}" onclick="pickGame('')">
+      All games
+      <span class="gs">${rows.length} events</span>
+    </button>`;
+  return '<div class="glist">'+allBtn+keys.map(k=>{
     const m=meta[k]||{}, has=!!TR.player.providerFor(m);
     return `<button class="${k===game?'on':''}" onclick="pickGame('${k.replace(/'/g,"\\'")}')">
       ${esc(labels[k]||k)}
@@ -645,8 +718,11 @@ function gameSheet(){
     </button>`}).join('')+'</div>';
 }
 
+// Groups ordered by how much they narrow: Competition/Division/Year first
+// (the ones that matter most once you're browsing across every game), then
+// the original per-event groups.
 function filterSheet(){
-  if(!game)return '<div class="empty">Pick a game first.</div>';
+  if(!picked)return '<div class="empty">Pick a game first.</div>';
   const uniq=f=>[...new Set(events.map(f).filter(Boolean))];
   const grp=(title,key,vals)=>`<div class="grp"><h3>${title}</h3><div class="opts">`+
     vals.map(v=>`<button class="chip ${F[key].has(v)?'on':''}"
@@ -654,6 +730,9 @@ function filterSheet(){
     '</div></div>';
   return `<input class="srch" id="q" placeholder="Search name, comment, move…" value="${esc(F.q)}"
       oninput="F.q=this.value;render()">`+
+    grp('Competition','comp',uniq(e=>e.comp))+
+    grp('Division','div',uniq(e=>e.div))+
+    grp('Year','year',uniq(e=>e.year))+
     grp('Type','type',uniq(e=>e.type))+
     grp('Team','team',uniq(e=>e.team))+
     grp('Name','name',uniq(e=>e.name).slice(0,30))+
@@ -661,7 +740,8 @@ function filterSheet(){
     `<button class="icon-btn" style="width:100%;height:40px" onclick="clearF()">Clear all filters</button>`;
 }
 function tog(k,v,el){F[k].has(v)?F[k].delete(v):F[k].add(v);el.classList.toggle('on');render()}
-function clearF(){F={type:new Set(),team:new Set(),name:new Set(),move:new Set(),q:''};
+function clearF(){F={type:new Set(),team:new Set(),name:new Set(),move:new Set(),
+    comp:new Set(),div:new Set(),year:new Set(),q:''};
   $('sheetBody').innerHTML=filterSheet();render()}
 </script>
 </body>
