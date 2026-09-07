@@ -19,6 +19,7 @@
   <script src="js/possession.js"></script>
   <script src="js/consistency.js"></script>
   <script src="js/player.js"></script>
+  <script src="js/strike_moves.js"></script>
 
   <script src="https://code.jquery.com/qunit/qunit-2.21.0.js"></script>
   <script>
@@ -231,6 +232,33 @@
     });
     QUnit.test('Ball Live → possession owner', t => {
       t.equal(TR.inferActionOwner('Team 1', 'Game Event', 'Ball Live'), 'Team 1');
+    });
+  });
+
+  // ── TR.strikeMoveStats ───────────────────────────────────────
+  QUnit.module('TR.strikeMoveStats', () => {
+    const ev = (type, name, strikeMove) => ({ type, name, strikeMove, actionOwner: 'Team 1' });
+    QUnit.test('rate over tries and fails', t => {
+      const s = TR.strikeMoveStats([ev('Try', '32 - Cut', ''), ev('Turnover', 'Ball Down', '32 - Cut')]);
+      t.equal(s.moves.length, 1);
+      t.equal(s.moves[0].rate, 0.5);
+      t.equal(s.moves[0].attempts, 2);
+    });
+    QUnit.test('coverage counts attack-ends only', t => {
+      const s = TR.strikeMoveStats([
+        ev('Try', 'Scoop', ''), ev('Turnover', 'Ball Down', '32'), ev('Turnover', 'Ball Down', ''),
+        ev('Turnover', '6 Again', '32'), ev('Penalty Defence', 'Offside', '32'),
+      ]);
+      t.equal(s.coverage.total, 3);
+      t.equal(s.coverage.tagged, 2);
+    });
+    QUnit.test('topByRate needs two attempts, topByTries does not', t => {
+      const s = TR.strikeMoveStats([
+        ev('Try', 'Scoop', ''),
+        ev('Try', '32', ''), ev('Try', '32', ''), ev('Turnover', 'Ball Down', '32'),
+      ]);
+      t.equal(s.topByRate.move, '32');
+      t.equal(s.topByTries.move, '32');
     });
   });
   </script>

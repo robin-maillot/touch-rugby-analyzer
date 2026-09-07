@@ -30,6 +30,15 @@ TR.STRIKE_MOVES      = TR.MENU['Try'].slice();
 TR.STRIKE_MOVE_TYPES = ['Try', 'Turnover', 'Penalty Attack'];
 TR.MIN_MOVE_ATTEMPTS = 2;
 
+// Selectable in the annotators, but never rate-bearing. On a Try these are what
+// "the annotator skipped the picker" looks like — annotator_field2 filters
+// 'Other' out of its sub-type strip, and Simple Mode names every Try 'Other' —
+// while on a failure that same skip yields ''. Counted as untagged so they
+// cannot sit at a 100% artefact rate and top both leaderboards. 'Interception'
+// on a try means a defensive intercept, not a called move off the tap, and has
+// no failure counterpart at all.
+TR.EXCLUDED_MOVES = ['Other', 'Interception'];
+
 // An attempt ends precisely when the ball changes hands, which TR.isTurnover
 // already encodes: Try, Penalty Attack and Turnover all end it — except
 // '6 Again' (and Penalty Defence), where the attack keeps the ball and the
