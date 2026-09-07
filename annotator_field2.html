@@ -2450,6 +2450,8 @@ function refreshStats() {
 // descending straight from the module — that is the "order of success".
 // In-game samples are tiny, so a rate below MIN_MOVE_ATTEMPTS is shown but
 // de-emphasised, and the raw tries/attempts count always sits beside it.
+// Same treatment for a move that has never itself failed (rateKnown false) -
+// its rate reads 100% by construction, not performance.
 function renderMoves() {
   const s = TR.strikeMoveStats(annotations);
 
@@ -2462,7 +2464,12 @@ function renderMoves() {
       // attempts that nobody tagged; and a game that hasn't had one yet.
       const best = s.topByRate || s.topByTries;
       meta.textContent = best
-        ? `${best.move} · ${Math.round(best.rate * 100)}%`
+        ? (best.rateKnown
+            ? `${best.move} · ${Math.round(best.rate * 100)}%`
+            // topByRate excludes an untested move, so falling back to
+            // topByTries here means this leader has never itself failed -
+            // quote tries, not a rate that only reads 100% by construction.
+            : `${best.move} · ${best.tries} ${best.tries === 1 ? 'try' : 'tries'}`)
         : s.moves.length
           ? `${s.moves.length} tagged · no rate yet`
           : (s.coverage.fails.total ? 'none tagged yet' : '—');
@@ -2510,7 +2517,7 @@ function renderMoves() {
     + ` · best first · ${TR.MIN_MOVE_ATTEMPTS}+ attempts to rank`;
 
   body.innerHTML = s.moves.map((m, i) => {
-    const thin = m.attempts < TR.MIN_MOVE_ATTEMPTS;
+    const thin = m.attempts < TR.MIN_MOVE_ATTEMPTS || !m.rateKnown;
     return `<div class="moves-row">
         <span class="moves-rank">${i + 1}</span>
         <span>${m.move}</span>

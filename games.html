@@ -203,6 +203,9 @@
     .game-move-grid th { text-align: left; color: #8a93a6; font-weight: 500; padding: 3px 5px; }
     .game-move-grid td { padding: 3px 5px; border-top: 1px solid #1e2433; }
     .game-move-rate { color: #8a93a6; }
+    /* Same idiom as #commentText:empty and .pop-empty above: italic marks a
+       value that isn't a solid fact yet - here, a rate no failure has tested. */
+    .game-move-rate.unknown { font-style: italic; }
     @media (max-width: 700px) { .game-move-grid { grid-template-columns: 1fr; } }
   </style>
 <script src="js/config.js"></script>
@@ -1301,10 +1304,17 @@ function renderGameStrikeMoves(events, team1, team2) {
     } else {
       // Already sorted rate-descending with a deterministic tie-break; do not
       // re-sort.
-      rows = s.moves.map(m => `<tr>
+      rows = s.moves.map(m => {
+        // This move itself has never been seen to fail, so its rate reads
+        // 100% by construction rather than performance - mark it the same
+        // way an empty comment or an empty popover is marked: italic.
+        const rateCls = 'game-move-rate' + (m.rateKnown ? '' : ' unknown');
+        const title   = m.rateKnown ? '' : ' title="No failed attempt tagged for this move yet"';
+        return `<tr>
           <td>${m.move}</td><td>${m.tries}</td><td>${m.fails}</td>
-          <td class="game-move-rate">${(m.rate * 100).toFixed(0)}%</td>
-        </tr>`).join('');
+          <td class="${rateCls}"${title}>${(m.rate * 100).toFixed(0)}%</td>
+        </tr>`;
+      }).join('');
     }
 
     return `<div>

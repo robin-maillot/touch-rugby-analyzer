@@ -599,8 +599,11 @@ function renderTeamDetail(filter) {
           const m       = rateOf.get(name);
           // Only shown once this team has enough attempts on the move for the
           // rate to mean anything; the share-of-tries figure is always there.
+          // Even then, a move this team has never seen fail reads 100% by
+          // construction rather than performance - dimmed the same way the
+          // Strike Moves table dims a sub-threshold rate.
           const rateTxt = moveStats.ratesMeaningful && m && m.attempts >= TR.MIN_MOVE_ATTEMPTS
-            ? `<span class="td-rate" title="${m.tries} from ${m.attempts} attempts">${Math.round(m.rate * 100)}% scored</span>`
+            ? `<span class="td-rate"${m.rateKnown ? '' : ' style="color:var(--dim)"'} title="${m.tries} from ${m.attempts} attempts">${Math.round(m.rate * 100)}% scored</span>`
             : '';
           return `<div class="td-row">
             <span class="td-rank">${i + 1}</span>
@@ -694,7 +697,7 @@ function renderStrikeMoves() {
       <td>${m.tries}</td>
       <td>${m.fails}</td>
       <td>${m.attempts}</td>
-      <td>${m.attempts >= TR.MIN_MOVE_ATTEMPTS ? pct(m.rate) : `<span style="color:var(--dim)">${pct(m.rate)}</span>`}</td>
+      <td>${m.attempts >= TR.MIN_MOVE_ATTEMPTS && m.rateKnown ? pct(m.rate) : `<span style="color:var(--dim)">${pct(m.rate)}</span>`}</td>
       <td style="width:35%"><div class="strike-move-bar" style="width:${Math.round(m.attempts / maxAttempts * 100)}%;opacity:${0.35 + m.rate * 0.65}"></div></td>
     </tr>`).join('');
 }
