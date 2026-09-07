@@ -32,6 +32,17 @@
   and fall back to a tries/attempts-only presentation (still genuinely useful) plus
   a short explanation, exactly as `dashboard.html` and both field annotators do.
   This applies to Task 4 and Task 5 below, not yet built.
+- `ratesMeaningful` is a **dataset-level** gate only: the moment any one move
+  anywhere gets a tagged failure, it flips true for the whole call, and every
+  *other* move that has never itself failed still computes to `rate: 1` by
+  construction - the same artefact `ratesMeaningful` exists to catch, now hiding
+  behind a single tag. `moves[].rateKnown` (`fails > 0`) is the per-move version
+  of the same check, and `topByRate` already excludes a move with `rateKnown:
+  false` regardless of how high its rate reads. **A surface must not treat
+  `ratesMeaningful === true` as license to render every move's rate at full
+  strength: it still has to mark or exclude a move whose own `rateKnown` is
+  false**, the same way `dashboard.html`, `games.html`, and both field annotators
+  now do. This applies to Task 5 below, not yet built.
 
 ---
 
@@ -52,12 +63,21 @@
 
 ```js
 TR.strikeMoveStats(events: {type, name, strikeMove, actionOwner}[]) => {
-  moves:           { move: string, tries: number, fails: number, attempts: number, rate: number }[],
+  moves:           { move: string, tries: number, fails: number, attempts: number,
+                     rate: number, rateKnown: boolean }[],
+                             // rateKnown = fails > 0. ratesMeaningful (below) is
+                             // dataset-level and flips true the instant ANY move
+                             // is seen to fail; rateKnown asks it per move, so a
+                             // move that has never itself failed can still be
+                             // marked/excluded even once ratesMeaningful is true.
   coverage:        { tagged: number, total: number, pct: number,
                      tries:  { tagged: number, total: number, pct: number },
                      fails:  { tagged: number, total: number, pct: number } },
-  topByTries:      { move, tries, fails, attempts, rate } | null,
-  topByRate:       { move, tries, fails, attempts, rate } | null,
+  topByTries:      { move, tries, fails, attempts, rate, rateKnown } | null,
+  topByRate:       { move, tries, fails, attempts, rate, rateKnown } | null,
+                             // topByRate also requires rateKnown: true - an
+                             // untested move's construction-guaranteed 100%
+                             // must never win the crown.
   ratesMeaningful: boolean,  // cov.fails.tagged > 0 - false means every `rate`
                              // above is 1 by construction, not "perfect". Gate
                              // any rate/top-move display on this (see Global
