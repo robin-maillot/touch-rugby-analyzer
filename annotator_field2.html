@@ -2455,16 +2455,27 @@ function renderMoves() {
 
   const meta = document.getElementById('movesDrillMeta');
   if (meta) {
-    // Four distinct states, and they must not be collapsed: a rankable leader;
-    // moves tagged but nothing rankable yet (one turnover with a move is 1 attempt
-    // and 0 tries, so both tops are null while data plainly exists); failed
-    // attempts that nobody tagged; and a game that hasn't had one yet.
-    const best = s.topByRate || s.topByTries;
-    meta.textContent = best
-      ? `${best.move} · ${Math.round(best.rate * 100)}%`
-      : s.moves.length
-        ? `${s.moves.length} tagged · no rate yet`
-        : (s.coverage.fails.total ? 'none tagged yet' : '—');
+    if (s.ratesMeaningful) {
+      // Four distinct states, and they must not be collapsed: a rankable leader;
+      // moves tagged but nothing rankable yet (one turnover with a move is 1 attempt
+      // and 0 tries, so both tops are null while data plainly exists); failed
+      // attempts that nobody tagged; and a game that hasn't had one yet.
+      const best = s.topByRate || s.topByTries;
+      meta.textContent = best
+        ? `${best.move} · ${Math.round(best.rate * 100)}%`
+        : s.moves.length
+          ? `${s.moves.length} tagged · no rate yet`
+          : (s.coverage.fails.total ? 'none tagged yet' : '—');
+    } else {
+      // No failure has ever been tagged, so a rate would only ever read 100% -
+      // quote the most-scored move by tries instead of a meaningless percentage.
+      const best = s.topByTries;
+      meta.textContent = best
+        ? `${best.move} · ${best.tries} ${best.tries === 1 ? 'try' : 'tries'}`
+        : s.moves.length
+          ? `${s.moves.length} tagged · no tries yet`
+          : (s.coverage.fails.total ? 'none tagged yet' : '—');
+    }
   }
 
   const cov  = document.getElementById('movesCov');
@@ -2475,6 +2486,20 @@ function renderMoves() {
     cov.textContent = '';
     body.innerHTML = '<div class="moves-empty">No moves tagged yet. Pick a move '
       + 'after a turnover or attack penalty and they show up here.</div>';
+    return;
+  }
+
+  if (!s.ratesMeaningful) {
+    // Rate cannot order or describe anything here - no failure has ever been
+    // tagged, so every move would read 100% by construction. Sort a COPY by
+    // tries; s.moves is shared by six surfaces and must not be mutated.
+    const byTries = s.moves.slice().sort((a, b) => b.tries - a.tries || a.move.localeCompare(b.move));
+    cov.textContent = 'No failed attempts tagged yet · sorted by tries, not rate';
+    body.innerHTML = byTries.map((m, i) => `<div class="moves-row">
+        <span class="moves-rank">${i + 1}</span>
+        <span>${m.move}</span>
+        <span class="moves-count">${m.tries}/${m.attempts}</span>
+      </div>`).join('');
     return;
   }
 

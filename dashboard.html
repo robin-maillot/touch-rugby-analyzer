@@ -67,6 +67,8 @@
     .strike-move-table td { padding: 4px 6px; border-top: 1px solid #1e2433; }
     .strike-move-bar { height: 6px; border-radius: 3px; background: #22c55e; }
     .strike-move-empty { font-size: 0.78rem; color: var(--dim); padding: 8px 0; }
+    .strike-move-notice { font-size: 0.75rem; color: var(--orange); background: rgba(255,152,0,.08);
+      border: 1px solid rgba(255,152,0,.25); border-radius: 6px; padding: 8px 12px; margin-bottom: 10px; }
 
     /* ── Loading ────────────────────────────────────────────── */
     #loadingArea { text-align: center; padding: 80px; color: var(--muted); font-size: 0.9rem; }
@@ -312,14 +314,15 @@
     <!-- Strike Moves -->
     <div class="section">
       <div class="section-header" onclick="toggleSection('strike-moves-body')">
-        <h2>Strike Moves</h2>
+        <div class="section-label">Strike Moves</div>
+        <span class="section-toggle">▾</span>
       </div>
       <div id="strike-moves-body" class="section-body">
         <div id="strike-move-tops" class="strike-move-tops"></div>
         <div id="strike-move-coverage" class="strike-move-coverage"></div>
         <table class="strike-move-table">
           <thead><tr>
-            <th>Move</th><th>Tries</th><th>Fails</th><th>Attempts</th><th>Try rate</th><th></th>
+            <th>Move</th><th>Tries</th><th>Fails</th><th>Attempts</th><th id="strike-move-rate-th">Try rate</th><th></th>
           </tr></thead>
           <tbody id="strike-move-rows"></tbody>
         </table>
@@ -609,14 +612,48 @@ function renderStrikeMoves() {
   const cover  = document.getElementById('strike-move-coverage');
   const body   = document.getElementById('strike-move-rows');
   const empty  = document.getElementById('strike-move-empty');
+  const rateTh = document.getElementById('strike-move-rate-th');
   const pct    = r => (r * 100).toFixed(1) + '%';
 
   if (!stats.moves.length) {
     tops.innerHTML = ''; cover.innerHTML = ''; body.innerHTML = '';
+    rateTh.style.display = '';
     empty.style.display = '';
     return;
   }
   empty.style.display = 'none';
+
+  // A rate needs failures in its denominator. With none tagged, every move
+  // here would compute to 1 by construction - not "perfect", unknown - so
+  // there is nothing to crown and no column worth showing.
+  if (!stats.ratesMeaningful) {
+    rateTh.style.display = 'none';
+
+    tops.innerHTML = `<div class="strike-move-notice">
+        Try rates need failures tagged to mean anything. Every move below would
+        otherwise show 100%, because no turnover or attack penalty has been
+        tagged with a move yet — tag the move on turnovers and attack
+        penalties, not just tries, to unlock real rates.
+      </div>`;
+
+    const f = stats.coverage.fails;
+    cover.textContent = `No failed attempts are tagged yet` +
+      (f.total ? ` (0 of ${f.total})` : '') +
+      ` · this is a try-count breakdown only, not a rate ranking.`;
+
+    const byTries  = stats.moves.slice().sort((a, b) => b.tries - a.tries || a.move.localeCompare(b.move));
+    const maxTries = Math.max(...byTries.map(m => m.tries), 1);
+    body.innerHTML = byTries.map(m => `<tr>
+        <td>${m.move}</td>
+        <td>${m.tries}</td>
+        <td>${m.fails}</td>
+        <td>${m.attempts}</td>
+        <td style="width:35%"><div class="strike-move-bar" style="width:${Math.round(m.tries / maxTries * 100)}%;opacity:0.7"></div></td>
+      </tr>`).join('');
+    return;
+  }
+
+  rateTh.style.display = '';
 
   const tile = (label, m, detail) => !m ? '' : `<div class="strike-move-top">
       <div class="label">${label}</div>
