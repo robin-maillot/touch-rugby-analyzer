@@ -40,11 +40,25 @@ TR.strikeMoveStats = (events) => {
   const total  = cov.tries.total  + cov.fails.total;
 
   const moves = [...byMove.values()];
-  moves.forEach(m => { m.rate = m.attempts ? m.tries / m.attempts : 0; });
+  moves.forEach(m => {
+    m.rate = m.attempts ? m.tries / m.attempts : 0;
+    // ratesMeaningful (above) is a dataset-level gate: the moment ANY move
+    // anywhere gets a tagged failure, it flips true. That leaves every OTHER
+    // move that has never itself failed sitting on a rate of 1 by pure
+    // arithmetic - not because it performs well, but because nothing has ever
+    // been subtracted from its denominator. rateKnown asks the question per
+    // move rather than per dataset: has this move specifically ever been seen
+    // to fail? Surfaces use it to mark or exclude a rate that hasn't earned
+    // its 100% yet, the same way ratesMeaningful protects the dataset as a
+    // whole.
+    m.rateKnown = m.fails > 0;
+  });
   moves.sort((a, b) => b.rate - a.rate || b.attempts - a.attempts || a.move.localeCompare(b.move));
 
-  // Efficiency needs a floor or a lone 1-for-1 tops the board on 100%.
-  const eligible   = moves.filter(m => m.attempts >= TR.MIN_MOVE_ATTEMPTS);
+  // Efficiency needs a floor or a lone 1-for-1 tops the board on 100% - and it
+  // needs rateKnown, or an untested move's construction-guaranteed 100% would
+  // win the crown on arithmetic rather than performance.
+  const eligible   = moves.filter(m => m.attempts >= TR.MIN_MOVE_ATTEMPTS && m.rateKnown);
   const topByRate  = eligible.length ? eligible[0] : null;
 
   // Volume has no floor, but a move that never scored isn't a "top scorer".

@@ -284,6 +284,43 @@
       const s = TR.strikeMoveStats([ev('Try', '32 - Cut', ''), ev('Turnover', 'Ball Down', '')]);
       t.equal(s.ratesMeaningful, false);
     });
+    QUnit.test('a move with fails > 0 has rateKnown true', t => {
+      const s = TR.strikeMoveStats([ev('Try', '32 - Cut', ''), ev('Turnover', 'Ball Down', '32 - Cut')]);
+      t.equal(s.moves[0].rateKnown, true);
+    });
+    QUnit.test('a move with 0 fails has rateKnown false even when ratesMeaningful is true', t => {
+      const s = TR.strikeMoveStats([
+        ev('Try', '32 - Cut', ''), ev('Try', '32 - Cut', ''),
+        ev('Turnover', 'Ball Down', '23 - Scoop'),
+      ]);
+      t.equal(s.ratesMeaningful, true);
+      const cut = s.moves.find(m => m.move === '32 - Cut');
+      t.equal(cut.rate, 1);
+      t.equal(cut.rateKnown, false);
+    });
+    QUnit.test('topByRate skips a 0-fail 100% move for a lower-rated move that has actually failed', t => {
+      const s = TR.strikeMoveStats([
+        ev('Try', '32 - Cut', ''), ev('Try', '32 - Cut', ''),
+        ev('Try', '23 - Scoop', ''), ev('Try', '23 - Scoop', ''),
+        ev('Turnover', 'Ball Down', '23 - Scoop'),
+      ]);
+      t.equal(s.topByRate.move, '23 - Scoop');
+    });
+    QUnit.test('topByRate is null when every qualifying move has 0 fails', t => {
+      const s = TR.strikeMoveStats([
+        ev('Try', '32 - Cut', ''), ev('Try', '32 - Cut', ''),
+        ev('Try', '23 - Scoop', ''), ev('Try', '23 - Scoop', ''),
+      ]);
+      t.equal(s.topByRate, null);
+    });
+    QUnit.test('topByTries still returns the 0-fail move when it leads on volume', t => {
+      const s = TR.strikeMoveStats([
+        ev('Try', '32 - Cut', ''), ev('Try', '32 - Cut', ''), ev('Try', '32 - Cut', ''),
+        ev('Try', '23 - Scoop', ''), ev('Turnover', 'Ball Down', '23 - Scoop'),
+      ]);
+      t.equal(s.topByTries.move, '32 - Cut');
+      t.equal(s.topByTries.tries, 3);
+    });
   });
   </script>
 </body>

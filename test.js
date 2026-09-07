@@ -957,12 +957,12 @@ test('a try and a turnover on the same move', () => {
     ev('Turnover', 'Ball Down', '32 - Cut'),
   ]);
   assert.equal(s.moves.length, 1);
-  assert.deepEqual(s.moves[0], { move: '32 - Cut', tries: 1, fails: 1, attempts: 2, rate: 0.5 });
+  assert.deepEqual(s.moves[0], { move: '32 - Cut', tries: 1, fails: 1, attempts: 2, rate: 0.5, rateKnown: true });
 });
 
 test('a pen attack counts as a failure', () => {
   const s = stats([ev('Penalty Attack', 'Forward Pass', '23')]);
-  assert.deepEqual(s.moves[0], { move: '23', tries: 0, fails: 1, attempts: 1, rate: 0 });
+  assert.deepEqual(s.moves[0], { move: '23', tries: 0, fails: 1, attempts: 1, rate: 0, rateKnown: true });
 });
 
 test('coverage counts attack-ends only', () => {
@@ -1075,6 +1075,59 @@ test('topByRate is null when nothing clears the threshold', () => {
 test('topByTries is null when no move ever scored', () => {
   const s = stats([ev('Turnover', 'Ball Down', '32')]);
   assert.equal(s.topByTries, null);
+});
+
+// ── rateKnown: a per-move gate, not the dataset-level ratesMeaningful ──
+// The moment ANY move anywhere gets a tagged failure, ratesMeaningful flips
+// true - but every OTHER move that has never itself failed still computes to
+// rate 1 by construction. rateKnown asks the question per move.
+test('a move with fails > 0 has rateKnown true', () => {
+  const s = stats([
+    ev('Try', '32 - Cut', ''),
+    ev('Turnover', 'Ball Down', '32 - Cut'),
+  ]);
+  assert.equal(s.moves[0].rateKnown, true);
+});
+
+test('a move with 0 fails has rateKnown false even when ratesMeaningful is true', () => {
+  const s = stats([
+    ev('Try', '32 - Cut', ''), ev('Try', '32 - Cut', ''),   // 2/2 = 100%, never failed
+    ev('Turnover', 'Ball Down', '23 - Scoop'),               // flips the dataset-level gate
+  ]);
+  assert.equal(s.ratesMeaningful, true, 'sanity: the dataset-level gate is on');
+  const cut = s.moves.find(m => m.move === '32 - Cut');
+  assert.equal(cut.rate, 1);
+  assert.equal(cut.rateKnown, false, 'this move itself has never been seen to fail');
+});
+
+test('topByRate skips a 0-fail 100% move for a lower-rated move that has actually failed', () => {
+  const s = stats([
+    ev('Try', '32 - Cut', ''), ev('Try', '32 - Cut', ''),        // 2/2 = 100%, never failed
+    ev('Try', '23 - Scoop', ''), ev('Try', '23 - Scoop', ''),    // 2/3 = 67%, has failed once
+    ev('Turnover', 'Ball Down', '23 - Scoop'),
+  ]);
+  assert.equal(s.topByRate.move, '23 - Scoop', 'the untested 100% must not crown');
+  assert.equal(s.topByRate.rate, 2 / 3);
+});
+
+test('topByRate is null when every qualifying move has 0 fails', () => {
+  const s = stats([
+    ev('Try', '32 - Cut', ''), ev('Try', '32 - Cut', ''),
+    ev('Try', '23 - Scoop', ''), ev('Try', '23 - Scoop', ''),
+  ]);
+  assert.equal(s.topByRate, null);
+});
+
+test('topByTries still returns the 0-fail move when it leads on volume', () => {
+  const s = stats([
+    ev('Try', '32 - Cut', ''), ev('Try', '32 - Cut', ''), ev('Try', '32 - Cut', ''), // 3 tries, never failed
+    ev('Try', '23 - Scoop', ''),
+    ev('Turnover', 'Ball Down', '23 - Scoop'),
+  ]);
+  assert.equal(s.topByTries.move, '32 - Cut');
+  assert.equal(s.topByTries.tries, 3);
+  const cut = s.moves.find(m => m.move === '32 - Cut');
+  assert.equal(cut.rateKnown, false, 'volume leader can still be untested');
 });
 
 test('ties break on attempts then alphabetically', () => {
