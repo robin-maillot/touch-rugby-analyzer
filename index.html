@@ -142,6 +142,10 @@
     .nav-card .card-icon  { font-size: 2rem; margin-bottom: 10px; }
     .nav-card .card-title { font-size: 1rem; font-weight: 700; color: #fff; }
     .nav-card .card-desc  { font-size: 0.78rem; color: #9ba6b9; margin-top: 4px; }
+    .nav-card .card-tag   { font-size: 0.6rem; font-weight: 700; text-transform: uppercase;
+                            letter-spacing: 0.06em; color: #7dd3fc; border: 1px solid #7dd3fc;
+                            border-radius: 4px; padding: 1px 5px; margin-left: 6px;
+                            vertical-align: 2px; }
   </style>
 </head>
 <body>
@@ -190,6 +194,11 @@
         <div class="card-icon">▶️</div>
         <div class="card-title">Event Viewer</div>
         <div class="card-desc">Browse events with video</div>
+      </a>
+      <a class="nav-card" href="game.html" id="gameViewCard" style="display:none">
+        <div class="card-icon">📐</div>
+        <div class="card-title">Game View <span class="card-tag">beta</span></div>
+        <div class="card-desc">Phone-first viewer — video, filters, events</div>
       </a>
       <a class="nav-card" href="live.html">
         <div class="card-icon">🔴</div>
@@ -379,6 +388,9 @@
       document.getElementById('backfillCard').style.display  = staffOrAdmin ? '' : 'none';
       document.getElementById('adminCard').style.display     = admin ? '' : 'none';
       document.getElementById('dashboardCard').style.display = admin ? '' : 'none';
+      // A proposal sitting beside the Event Viewer rather than replacing it, so
+      // it's admin-only until it's been used on a real phone at a real game.
+      document.getElementById('gameViewCard').style.display  = admin ? '' : 'none';
     }
     document.getElementById('offline-banner').style.display = offline ? 'flex' : 'none';
     const logout = document.getElementById('logout-btn');

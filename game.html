@@ -35,6 +35,23 @@
   .badge{background:var(--accent);color:#fff;border-radius:9px;font-size:.62rem;
     padding:1px 5px;font-weight:700;line-height:1.4}
 
+  /* Collapsed events: unlike cinema (which hides everything), the list header
+     stays visible — it carries the counts, the filters and the way back. The
+     video absorbs the height the rows gave up. In landscape the frame drops
+     back to a column so the video gets the full width too, rather than leaving
+     a stranded one-row column beside it. */
+  body.list-collapsed .list{display:none}
+  body.list-collapsed .left{flex:1 1 auto;min-height:0}
+  body.list-collapsed .stage{flex:1 1 auto;aspect-ratio:auto;height:auto;min-height:0}
+  /* The collapsed .right is one header row tall, so it must stop claiming a
+     share of the frame — otherwise it splits the space with the video and the
+     collapse buys almost nothing. */
+  body.list-collapsed .right{flex:0 0 auto}
+  @media (orientation:landscape){
+    body.list-collapsed .frame{flex-direction:column}
+    body.list-collapsed .left{width:100%;border-right:none}
+  }
+
   /* Layout skeleton. Declared for ALL widths, not just landscape, so that
      cinema mode has a flex axis to grow the stage along on a phone. */
   .frame{flex:1 1 auto;display:flex;flex-direction:column;min-height:0}
@@ -62,7 +79,7 @@
   body.cinema .cine-btn{top:auto;bottom:12px;left:12px}
 
   /* fullscreen-ish: video eats the whole screen */
-  body.cinema .topbar,body.cinema .filterbar,body.cinema .list,body.cinema .scrub{display:none}
+  body.cinema .topbar,body.cinema .listhead,body.cinema .list,body.cinema .scrub{display:none}
   /* the whole right column goes, not just its children — an empty flex column
      would still claim its share of the frame and starve the stage */
   body.cinema .right{display:none}
@@ -90,9 +107,13 @@
   .scrub-mark{position:absolute;top:5px;width:2px;height:6px;border-radius:1px;opacity:.85}
 
   /* ── Filter bar ────────────────────────────────────────────── */
-  .filterbar{display:flex;align-items:center;gap:6px;padding:7px 8px;flex-shrink:0;
-    overflow-x:auto;background:var(--bg);border-bottom:1px solid var(--border);
-    scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  /* The chips scroll sideways; the collapse control must not scroll away with
+     them, so it sits outside the scroller in a shared header row. */
+  .listhead{display:flex;align-items:center;flex-shrink:0;background:var(--bg);
+    border-bottom:1px solid var(--border)}
+  .filterbar{display:flex;align-items:center;gap:6px;padding:7px 8px;
+    flex:1 1 auto;min-width:0;
+    overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
   .filterbar::-webkit-scrollbar{display:none}
   .chip{flex-shrink:0;background:var(--surface2);border:1px solid var(--border);color:var(--text);
     border-radius:16px;padding:5px 11px;font-size:.72rem;cursor:pointer;white-space:nowrap;
@@ -105,6 +126,10 @@
   .chip.drill{border-color:#7dd3fc}
   .chip.drill b{color:#7dd3fc;font-weight:700;margin-left:3px}
   .count{color:var(--dim);font-size:.7rem;flex-shrink:0;padding-left:2px;white-space:nowrap}
+  .collapse-btn{flex-shrink:0;background:none;border:none;border-left:1px solid var(--border);
+    color:var(--dim);font-size:.9rem;line-height:1;cursor:pointer;
+    width:40px;height:38px;display:flex;align-items:center;justify-content:center}
+  .collapse-btn:active{color:var(--text)}
 
   /* ── Event list: cards, never a sideways table ─────────────── */
   .list{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;
@@ -239,8 +264,12 @@
  </div>
 
  <div class="right">
-  <div class="filterbar" id="filterbar">
-    <span class="count" id="count">—</span>
+  <div class="listhead">
+    <div class="filterbar" id="filterbar">
+      <span class="count" id="count">—</span>
+    </div>
+    <button class="collapse-btn" id="collapseBtn" onclick="toggleList()"
+            aria-expanded="true" title="Collapse the event list">⌄</button>
   </div>
   <div class="list" id="list">
     <div class="empty" id="empty">Loading…</div>
@@ -298,6 +327,7 @@ function toSecs(t){const p=String(t||'').trim().split(':').map(Number);
 // ?game= wins, else the last game this device looked at. On a phone you come
 // back to the same match rather than re-picking it every time.
 function restore(){
+  if(LS.get('listCollapsed') && !document.body.classList.contains('list-collapsed')) toggleList();
   if(game) return;
   const want = new URLSearchParams(location.search).get('game') || LS.get('lastgame');
   if(want && rows.some(r=>r.game===want)) pickGame(want);
@@ -468,6 +498,17 @@ function applyZoom(){$('ytZoom').style.transform=`scale(${zoom})`;
   $('stage').classList.toggle('zoomed',zoom>1);
   const z=$('zoomTag');z.textContent=zoom.toFixed(1)+'×';z.classList.toggle('show',zoom>1);
   $('bZoom').textContent=zoom>1?zoom+'×':'⛶'}
+// Persisted, not linkable: this is a per-device preference like the last game,
+// not a shareable view of a moment.
+function toggleList(){
+  const on = document.body.classList.toggle('list-collapsed');
+  const b  = $('collapseBtn');
+  b.textContent = on ? '⌃' : '⌄';
+  b.title = on ? 'Show the event list' : 'Collapse the event list';
+  b.setAttribute('aria-expanded', String(!on));
+  LS.set('listCollapsed', on);
+}
+
 function toggleCinema(){const on=document.body.classList.toggle('cinema');
   $('bCine').textContent=on?'⤡':'⤢';
   history.replaceState(null,'',on?'#cinema':location.pathname+location.search)}
