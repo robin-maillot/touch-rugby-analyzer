@@ -62,8 +62,16 @@
   .stage{flex-shrink:0;background:#000;position:relative;width:100%;
     aspect-ratio:16/9;overflow:hidden;touch-action:none}
   .stage.zoomed{cursor:grab}
+  .stage.zoomed.panning{cursor:grabbing}
   #ytZoom{position:absolute;inset:0;transform-origin:center center;transition:transform .18s ease}
+  /* While panning, the transform must track the finger with no easing or the
+     frame lags behind it. */
+  .stage.panning #ytZoom{transition:none}
   #ytZoom iframe{width:100%;height:100%;display:block;border:0}
+  /* Zoomed, the drag belongs to us, not to YouTube's own controls — otherwise
+     the iframe swallows every pointermove and the frame can't be moved. Our own
+     transport drives playback, so nothing is lost. */
+  .stage.zoomed #ytZoom iframe{pointer-events:none}
   .stage-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
     color:var(--dim);font-size:.8rem;text-align:center;padding:20px}
   .now-pill{position:absolute;left:8px;bottom:8px;right:8px;display:flex;align-items:center;gap:6px;
@@ -77,6 +85,15 @@
     color:var(--text);border-radius:6px;width:34px;height:30px;font-size:.8rem;cursor:pointer;
     display:flex;align-items:center;justify-content:center}
   body.cinema .cine-btn{top:auto;bottom:12px;left:12px}
+  /* Zoom is an action on the picture, so it lives on the picture — and moving it
+     off the transport made room there for prev/next/loop. */
+  .zoom-btn{position:absolute;top:8px;left:48px;background:rgba(11,14,20,.82);
+    border:1px solid var(--border);color:var(--text);border-radius:6px;
+    width:34px;height:30px;font-size:.8rem;cursor:pointer;
+    display:flex;align-items:center;justify-content:center}
+  .zoom-btn:disabled{opacity:.4}
+  body.cinema .zoom-btn{top:auto;bottom:12px;left:52px}
+  .t-btn.on{background:var(--accent);border-color:var(--accent);color:#fff}
 
   /* fullscreen-ish: video eats the whole screen */
   body.cinema .topbar,body.cinema .listhead,body.cinema .list,body.cinema .scrub{display:none}
@@ -94,17 +111,31 @@
     align-items:center;justify-content:center;flex-shrink:0}
   .t-btn:disabled{opacity:.4}
   .t-btn.play{background:var(--accent);border-color:var(--accent);min-width:52px;font-size:.9rem}
+  /* On the seek bar, not in the transport — and pointer-events:none so it can
+     never swallow a drag on the bar underneath it. */
+  /* Above the event marks (which are appended after it) and on an opaque
+     ground, or the two print over each other and neither reads. It masks the
+     marks it covers, so on a phone it shows elapsed only — half the width, and
+     the position matters more than the duration. */
+  .scrub-time{position:absolute;right:0;top:0;height:100%;display:flex;align-items:center;
+    z-index:2;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.64rem;
+    color:var(--dim);font-variant-numeric:tabular-nums;pointer-events:none;
+    padding:0 6px 0 12px;
+    background:linear-gradient(90deg,transparent,var(--surface) 12px)}
+  .scrub-time b{color:var(--text);font-weight:600}
+  .scrub-time .dur{display:none}
+  @media (min-width:600px){ .scrub-time .dur{display:inline} }
   .t-time{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.68rem;color:var(--dim);
     flex:1 1 auto;min-width:0;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .t-time b{color:var(--text);font-weight:600}
   .seek{height:100%;flex-shrink:0}
-  .scrub{width:100%;height:16px;position:relative;background:var(--surface);flex-shrink:0;
+  .scrub{width:100%;height:22px;position:relative;background:var(--surface);flex-shrink:0;
     border-bottom:1px solid var(--border);cursor:pointer;touch-action:none}
-  .scrub-fill{position:absolute;left:0;top:6px;height:4px;background:var(--accent);border-radius:2px}
-  .scrub-track{position:absolute;left:0;right:0;top:6px;height:4px;background:var(--surface2);border-radius:2px}
-  .scrub-thumb{position:absolute;top:2px;width:12px;height:12px;border-radius:50%;background:#fff;
+  .scrub-fill{position:absolute;left:0;top:9px;height:4px;background:var(--accent);border-radius:2px}
+  .scrub-track{position:absolute;left:0;right:0;top:9px;height:4px;background:var(--surface2);border-radius:2px}
+  .scrub-thumb{position:absolute;top:5px;width:12px;height:12px;border-radius:50%;background:#fff;
     margin-left:-6px;pointer-events:none}
-  .scrub-mark{position:absolute;top:5px;width:2px;height:6px;border-radius:1px;opacity:.85}
+  .scrub-mark{position:absolute;top:8px;width:2px;height:6px;border-radius:1px;opacity:.85}
 
   /* ── Filter bar ────────────────────────────────────────────── */
   /* The chips scroll sideways; the collapse control must not scroll away with
@@ -250,21 +281,24 @@
     <div class="now-pill" id="nowPill"></div>
     <div class="zoom-tag" id="zoomTag">1.0×</div>
     <button class="cine-btn" id="bCine" onclick="event.stopPropagation();toggleCinema()">⤢</button>
+    <button class="zoom-btn" id="bZoom" onclick="event.stopPropagation();cycleZoom()" disabled>⛶</button>
   </div>
 
   <div class="scrub" id="scrub">
     <div class="scrub-track"></div>
+    <span class="scrub-time" id="tTime"><b>0:00</b><span class="dur"> / 0:00</span></span>
     <div class="scrub-fill" id="scrubFill" style="width:0"></div>
     <div class="scrub-thumb" id="scrubThumb" style="left:0"></div>
   </div>
 
   <div class="transport">
-    <button class="t-btn" id="bBack"  onclick="skip(-5)"  disabled>−5s</button>
+    <button class="t-btn" id="bPrev"  onclick="stepEvent(-1)" title="Previous event" disabled>⏮</button>
+    <button class="t-btn" id="bBack"  onclick="skip(-5)" title="Back 5 seconds" disabled>−5</button>
     <button class="t-btn play" id="bPlay" onclick="togglePlay()" disabled>▶</button>
-    <button class="t-btn" id="bFwd"   onclick="skip(5)"   disabled>+5s</button>
-    <span class="t-time" id="tTime"><b>0:00</b> / 0:00</span>
-    <button class="t-btn" id="bRate"  onclick="cycleRate()" disabled>1×</button>
-    <button class="t-btn" id="bZoom"  onclick="cycleZoom()" disabled>⛶</button>
+    <button class="t-btn" id="bFwd"   onclick="skip(5)" title="Forward 5 seconds" disabled>+5</button>
+    <button class="t-btn" id="bNext"  onclick="stepEvent(1)" title="Next event" disabled>⏭</button>
+    <button class="t-btn" id="bLoop"  onclick="toggleLoop()" title="Loop this event" disabled>⟲</button>
+    <button class="t-btn" id="bRate"  onclick="cycleRate()" title="Playback speed" disabled>1×</button>
   </div>
  </div>
 
@@ -301,7 +335,12 @@ let rows=[], headers=[], meta={}, labels={}, order={};
 let game='', events=[], shown=[], picked=false;
 let player=null, ready=false, dur=0, tick=null, pendingSeek=null, videoGame='';
 let activeId=null, rate=1, zoom=1, renderLimit=200;
-const RATES=[1,0.5,2], ZOOMS=[1,1.5,2];
+let panX=0, panY=0;                 // frame offset while zoomed, in px
+let looping=false, loopStart=null, loopEnd=null;
+// Slow-mo for reading a move, normal for watching. Zoom is a plain in/out.
+const RATES=[1,0.5], ZOOMS=[1,2];
+// Matches the Event Viewer's own defaults so a loop feels the same here.
+const LOOP_BEFORE=5, LOOP_AFTER=2;
 let F={type:new Set(),team:new Set(),name:new Set(),move:new Set(),
        comp:new Set(),div:new Set(),year:new Set(),q:''};
 
@@ -335,6 +374,8 @@ function toSecs(t){const p=String(t||'').trim().split(':').map(Number);
 // games" (both from ?game= and from a stored lastgame) and must round-trip
 // just like a real game name — so this checks presence, not truthiness.
 function restore(){
+  if(LS.get('looping')&&!looping){looping=true;
+    $('bLoop').classList.add('on'); $('bLoop').title='Stop looping';}
   if(LS.get('listCollapsed') && !document.body.classList.contains('list-collapsed')) toggleList();
   if(picked) return;
   const params=new URLSearchParams(location.search);
@@ -387,8 +428,11 @@ function ingest(r){
 function pickGame(k){ game=k; picked=true; renderLimit=200;
   F={type:new Set(),team:new Set(),name:new Set(),move:new Set(),
      comp:new Set(),div:new Set(),year:new Set(),q:''};
-  activeId=null; closeSheet(); LS.set('lastgame',k); paintGame();
-  if(k) loadVideo(k); else clearVideo(); }
+  activeId=null; closeSheet(); LS.set('lastgame',k);
+  // Video first: paintGame() renders the list, and a throw in there used to
+  // leave the page with no video and no error to show for it.
+  if(k) loadVideo(k); else clearVideo();
+  paintGame(); }
 
 function paintGame(){
   if(game===''){
@@ -465,8 +509,8 @@ function render(keepWindow){
   if(!shown.length){L.innerHTML='<div class="empty">'+
     (events.length?'No events match these filters.':'Pick a game to see its events.')+'</div>';return}
   const windowed=shown.slice(0,renderLimit);
-  L.innerHTML=windowed.map((e,i)=>{
-    const id=e.game+'#'+e.time+'#'+i;
+  L.innerHTML=windowed.map(e=>{
+    const id=evId(e);
     return `<div class="ev${activeId===id?' active':''}" style="border-left-color:${col(e.type)}"
       onclick="playEvent(${e.time},'${id.replace(/'/g,"\\'")}','${String(e.game).replace(/'/g,"\\'")}')">
       <span class="ev-t">${shortT(e.timeStr)}</span>
@@ -490,6 +534,10 @@ function loadMore(){renderLimit+=200;render(true)}
 // render() from the top-level IIFE before a const at this point in the file has
 // been evaluated, and a TDZ ReferenceError there silently leaves the list on
 // "Loading…". Only reproduces when localStorage already holds a cached game.
+// Index-free on purpose: an id built from the render position went stale the
+// moment a filter changed the list, losing the active row and breaking
+// prev/next. Game + time + type + name is unique in practice.
+function evId(e){return e.game+'#'+e.time+'#'+e.type+'#'+e.name}
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;')}
 // Game clocks run well under an hour, so the leading 0: / 00: is noise on a phone.
 function shortT(t){return String(t||'').replace(/^0?0:/,'')}
@@ -506,7 +554,7 @@ function loadVideo(g){
   if(!TR.player.providerFor(m)){
     $('stageEmpty').style.display='flex';
     $('stageEmpty').textContent='This game has no video linked yet.';
-    ['bPlay','bBack','bFwd','bRate','bZoom'].forEach(i=>$(i).disabled=true);
+    ['bPlay','bBack','bFwd','bRate','bZoom','bPrev','bNext','bLoop'].forEach(i=>$(i).disabled=true);
     return;
   }
   $('stageEmpty').style.display='none';
@@ -514,7 +562,7 @@ function loadVideo(g){
   player=TR.player.create({provider:'youtube',container:$('ytZoom'),
     videoId:TR.extractVideoId(m.youtubelink),
     onReady(){ready=true;dur=player.getDuration()||0;
-      ['bPlay','bBack','bFwd','bRate','bZoom'].forEach(i=>$(i).disabled=false);
+      ['bPlay','bBack','bFwd','bRate','bZoom','bPrev','bNext','bLoop'].forEach(i=>$(i).disabled=false);
       if(pendingSeek!=null){player.seek(pendingSeek);player.play();pendingSeek=null}
       tick=setInterval(progress,250); paintMarks();},
     onStateChange(s){$('bPlay').textContent=s==='playing'?'⏸':'▶'}});
@@ -527,7 +575,7 @@ function clearVideo(){
   ready=false; dur=0; if(tick){clearInterval(tick);tick=null}
   $('stageEmpty').style.display='flex';
   $('stageEmpty').textContent='Pick a game, then tap any event to watch it';
-  ['bPlay','bBack','bFwd','bRate','bZoom'].forEach(i=>$(i).disabled=true);
+  ['bPlay','bBack','bFwd','bRate','bZoom','bPrev','bNext','bLoop'].forEach(i=>$(i).disabled=true);
   paintMarks();
 }
 
@@ -535,7 +583,10 @@ function playEvent(gameSecs,id,evGame){
   const m=meta[evGame]||{};
   if(!TR.player.providerFor(m)){alert('This game has no video linked yet.');return}
   activeId=id;
-  const t=Math.max(0,TR.player.videoTimeAt(m,gameSecs)-5);   // 5s lookback
+  const t=Math.max(0,TR.player.videoTimeAt(m,gameSecs)-LOOP_BEFORE);   // lookback
+  // Whether or not looping is on, remember this event's window so toggling the
+  // loop mid-event doesn't need the event re-tapped.
+  loopStart=t; loopEnd=TR.player.videoTimeAt(m,gameSecs)+LOOP_AFTER;
   // The video follows the event, not the picker: load evGame's video whenever
   // it differs from what's currently loaded, regardless of what `game` is.
   if(evGame!==videoGame){pendingSeek=t;loadVideo(evGame)}
@@ -551,10 +602,33 @@ function playEvent(gameSecs,id,evGame){
   render(true);
 }
 
+// Steps through the FILTERED list, not the whole game — so "next" after
+// filtering to tries is the next try, which is the point of filtering.
+function stepEvent(d){
+  if(!shown.length)return;
+  let i=shown.findIndex(e=>evId(e)===activeId);
+  i = i<0 ? (d>0?0:shown.length-1) : i+d;
+  if(i<0||i>=shown.length)return;                 // stop at the ends, don't wrap
+  const e=shown[i];
+  playEvent(e.time,evId(e),e.game);
+}
+
+function toggleLoop(){
+  looping=!looping;
+  $('bLoop').classList.toggle('on',looping);
+  $('bLoop').title=looping?'Stop looping':'Loop this event';
+  LS.set('looping',looping);
+  // Turning it on mid-event should start the loop now, not at the next tap.
+  if(looping&&ready&&loopStart!=null){player.seek(loopStart);player.play()}
+}
+
 function progress(){
   if(!ready||!player)return;
   const t=player.getTime()||0; dur=player.getDuration()||dur;
-  $('tTime').innerHTML=`<b>${fmtS(t)}</b> / ${fmtS(dur)}`;
+  // Checked here rather than on a timer of its own: this already ticks at 250ms,
+  // which is tight enough that the jump back reads as a loop.
+  if(looping&&loopStart!=null&&loopEnd!=null&&t>=loopEnd){player.seek(loopStart);return}
+  $('tTime').innerHTML=`<b>${fmtS(t)}</b><span class="dur"> / ${fmtS(dur)}</span>`;
   const p=dur?Math.min(100,t/dur*100):0;
   $('scrubFill').style.width=p+'%'; $('scrubThumb').style.left=p+'%';
 }
@@ -563,10 +637,23 @@ function skip(d){if(!ready)return;player.seek(Math.max(0,(player.getTime()||0)+d
 function cycleRate(){rate=RATES[(RATES.indexOf(rate)+1)%RATES.length];
   if(ready)player.setRate(rate);$('bRate').textContent=rate+'×'}
 function cycleZoom(){zoom=ZOOMS[(ZOOMS.indexOf(zoom)+1)%ZOOMS.length];applyZoom()}
-function applyZoom(){$('ytZoom').style.transform=`scale(${zoom})`;
+// Clamp the offset so the frame can never be dragged past its own edges —
+// at 2x there is exactly half a frame of slack in each direction.
+function clampPan(){
+  const r=$('stage').getBoundingClientRect();
+  const mx=Math.max(0,(zoom-1)*r.width/2), my=Math.max(0,(zoom-1)*r.height/2);
+  panX=Math.min(mx,Math.max(-mx,panX)); panY=Math.min(my,Math.max(-my,panY));
+}
+
+function applyZoom(){
+  if(zoom===1){panX=0;panY=0;} else clampPan();
+  $('ytZoom').style.transform=`translate(${panX}px,${panY}px) scale(${zoom})`;
   $('stage').classList.toggle('zoomed',zoom>1);
-  const z=$('zoomTag');z.textContent=zoom.toFixed(1)+'×';z.classList.toggle('show',zoom>1);
-  $('bZoom').textContent=zoom>1?zoom+'×':'⛶'}
+  const z=$('zoomTag');
+  z.textContent=zoom>1?zoom+'× · drag to move':zoom.toFixed(1)+'×';
+  z.classList.toggle('show',zoom>1);
+  $('bZoom').textContent=zoom>1?zoom+'×':'⛶';
+}
 // Persisted, not linkable: this is a per-device preference like the last game,
 // not a shareable view of a moment.
 function toggleList(){
@@ -583,9 +670,42 @@ function toggleCinema(){const on=document.body.classList.toggle('cinema');
   history.replaceState(null,'',on?'#cinema':location.pathname+location.search)}
 
 // double-tap to zoom
-let lastTap=0;
-$('stage').addEventListener('click',()=>{const n=Date.now();
-  if(n-lastTap<300){cycleZoom()}lastTap=n});
+let lastTap=0, dragged=false;
+// Double-tap toggles zoom; a drag while zoomed moves the frame. The two share
+// this surface, so a drag has to suppress the tap that follows it — otherwise
+// every pan ended by zooming back out.
+$('stage').addEventListener('click',()=>{
+  if(dragged){dragged=false;return}
+  const n=Date.now();
+  if(n-lastTap<300){cycleZoom()}
+  lastTap=n;
+});
+
+$('stage').addEventListener('pointerdown',ev=>{
+  if(zoom===1)return;                       // nothing to move at 1x
+  const st=$('stage');
+  const x0=ev.clientX, y0=ev.clientY, px=panX, py=panY;
+  let moved=false;
+  st.setPointerCapture?.(ev.pointerId);
+  st.classList.add('panning');
+  const mv=m=>{
+    const dx=m.clientX-x0, dy=m.clientY-y0;
+    if(!moved && Math.hypot(dx,dy)>4) moved=true;   // ignore a shaky tap
+    if(!moved)return;
+    panX=px+dx; panY=py+dy; clampPan();
+    $('ytZoom').style.transform=`translate(${panX}px,${panY}px) scale(${zoom})`;
+  };
+  const up=()=>{
+    st.classList.remove('panning');
+    dragged=moved;
+    window.removeEventListener('pointermove',mv);
+    window.removeEventListener('pointerup',up);
+    window.removeEventListener('pointercancel',up);
+  };
+  window.addEventListener('pointermove',mv);
+  window.addEventListener('pointerup',up);
+  window.addEventListener('pointercancel',up);
+});
 
 // scrub
 function scrubTo(clientX){
@@ -724,7 +844,11 @@ function gameSheet(){
 function filterSheet(){
   if(!picked)return '<div class="empty">Pick a game first.</div>';
   const uniq=f=>[...new Set(events.map(f).filter(Boolean))];
-  const grp=(title,key,vals)=>`<div class="grp"><h3>${title}</h3><div class="opts">`+
+  // A group with one option can't narrow anything — every event already shares
+  // that value — so it's noise. Kept if it's actively filtered, so a live filter
+  // never becomes invisible and unremovable.
+  const grp=(title,key,vals)=>(vals.length<2&&!F[key].size)?'':
+    `<div class="grp"><h3>${title}</h3><div class="opts">`+
     vals.map(v=>`<button class="chip ${F[key].has(v)?'on':''}"
       onclick="tog('${key}','${String(v).replace(/'/g,"\\'")}',this)">${esc(v)}</button>`).join('')+
     '</div></div>';
