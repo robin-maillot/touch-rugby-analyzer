@@ -204,8 +204,11 @@
     .game-move-grid td { padding: 3px 5px; border-top: 1px solid #1e2433; }
     .game-move-rate { color: #8a93a6; }
     /* Same idiom as #commentText:empty and .pop-empty above: italic marks a
-       value that isn't a solid fact yet - here, a rate no failure has tested. */
-    .game-move-rate.unknown { font-style: italic; }
+       value that isn't a solid fact yet - here, a rate no failure has tested.
+       Italic alone is easy to miss in a column that is already uniformly grey,
+       so it is paired with a dimmer shade and a dotted underline. */
+    .game-move-rate.unknown { font-style: italic; color: #626b7d;
+      text-decoration: underline dotted; text-underline-offset: 2px; }
     @media (max-width: 700px) { .game-move-grid { grid-template-columns: 1fr; } }
   </style>
 <script src="js/config.js"></script>

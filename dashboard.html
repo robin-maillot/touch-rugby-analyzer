@@ -67,6 +67,7 @@
     .strike-move-table th { text-align: left; color: var(--dim); font-weight: 500; padding: 4px 6px; }
     .strike-move-table td { padding: 4px 6px; border-top: 1px solid #1e2433; }
     .strike-move-bar { height: 6px; border-radius: 3px; background: #22c55e; }
+  .rate-untested { color: var(--dim); font-style: italic; }
     .strike-move-empty { font-size: 0.78rem; color: var(--dim); padding: 8px 0; }
     .strike-move-notice { font-size: 0.75rem; color: var(--orange); background: rgba(255,152,0,.08);
       border: 1px solid rgba(255,152,0,.25); border-radius: 6px; padding: 8px 12px; margin-bottom: 10px; }
@@ -679,7 +680,15 @@ function renderStrikeMoves() {
     </div>`;
 
   tops.innerHTML =
-    tile('🏆 Most tries', stats.topByTries, m => `${m.tries} ${m.tries === 1 ? 'try' : 'tries'} from ${m.attempts} · ${pct(m.rate)}`) +
+  // topByTries ranks by volume, so it is deliberately NOT gated on rateKnown —
+  // which means its rate can be a construction-guaranteed 100% and must be
+  // marked here. topByRate already requires rateKnown, so its figure is sound.
+  const rateTxt = m => m.rateKnown
+    ? pct(m.rate)
+    : `<span class="rate-untested" title="No failed attempt tagged for this move yet">${pct(m.rate)}</span>`;
+
+  tops.innerHTML =
+    tile('🏆 Most tries', stats.topByTries, m => `${m.tries} ${m.tries === 1 ? 'try' : 'tries'} from ${m.attempts} · ${rateTxt(m)}`) +
     tile('⚡ Best try rate', stats.topByRate, m => `${pct(m.rate)} · ${m.tries} from ${m.attempts}`);
 
   // Failure-side coverage is the number that matters: the Try side is 100% by
@@ -698,7 +707,7 @@ function renderStrikeMoves() {
       <td>${m.fails}</td>
       <td>${m.attempts}</td>
       <td>${m.attempts >= TR.MIN_MOVE_ATTEMPTS && m.rateKnown ? pct(m.rate) : `<span style="color:var(--dim)">${pct(m.rate)}</span>`}</td>
-      <td style="width:35%"><div class="strike-move-bar" style="width:${Math.round(m.attempts / maxAttempts * 100)}%;opacity:${0.35 + m.rate * 0.65}"></div></td>
+      <td style="width:35%"><div class="strike-move-bar" style="width:${Math.round(m.attempts / maxAttempts * 100)}%;opacity:${m.rateKnown ? 0.35 + m.rate * 0.65 : 0.28}"></div></td>
     </tr>`).join('');
 }
 
