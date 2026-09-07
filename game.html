@@ -286,11 +286,13 @@ function restore(){
   applyHash();
 }
 
-// #cinema / #filter make the two full-screen states linkable and restorable.
+// #cinema / #filter / #moves make the full-screen states linkable and restorable,
+// so a teammate can be sent straight to what you were looking at.
 function applyHash(){
   const h=(location.hash||'').replace('#','');
   if(h==='cinema' && !document.body.classList.contains('cinema')) toggleCinema();
   if(h==='filter' && game) openSheet('filter');
+  if(h==='moves'  && game) openSheet('moves');
 }
 window.addEventListener('hashchange',applyHash);
 
