@@ -64,5 +64,10 @@ TR.strikeMoveStats = (events) => {
     },
     topByTries,
     topByRate,
+    // A try rate needs failures in its denominator. When nothing on the failure
+    // side was tagged, every move computes to 1 by construction — not "perfect",
+    // unknown. Surfaces gate their rate column and both top tiles on this rather
+    // than each re-deriving the rule.
+    ratesMeaningful: cov.fails.tagged > 0,
   };
 };

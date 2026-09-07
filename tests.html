@@ -260,6 +260,30 @@
       t.equal(s.topByRate.move, '32');
       t.equal(s.topByTries.move, '32');
     });
+    QUnit.test('ratesMeaningful is false with no events at all', t => {
+      t.equal(TR.strikeMoveStats([]).ratesMeaningful, false);
+    });
+    QUnit.test('ratesMeaningful is false when tries are tagged but no failure ever is', t => {
+      const s = TR.strikeMoveStats([ev('Try', '32 - Cut', ''), ev('Try', '23 - Scoop', '')]);
+      t.equal(s.moves.length, 2);
+      t.ok(s.moves.every(m => m.rate === 1));
+      t.equal(s.ratesMeaningful, false);
+    });
+    QUnit.test('ratesMeaningful is true once at least one failure is tagged', t => {
+      const s = TR.strikeMoveStats([ev('Try', '32 - Cut', ''), ev('Turnover', 'Ball Down', '32 - Cut')]);
+      t.equal(s.ratesMeaningful, true);
+    });
+    QUnit.test('ratesMeaningful is a dataset-level gate, not per-move', t => {
+      const s = TR.strikeMoveStats([
+        ev('Try', '32 - Cut', ''), ev('Try', '32 - Cut', ''),
+        ev('Turnover', 'Ball Down', '23 - Scoop'),
+      ]);
+      t.equal(s.ratesMeaningful, true);
+    });
+    QUnit.test('ratesMeaningful is false when failures exist but none are tagged', t => {
+      const s = TR.strikeMoveStats([ev('Try', '32 - Cut', ''), ev('Turnover', 'Ball Down', '')]);
+      t.equal(s.ratesMeaningful, false);
+    });
   });
   </script>
 </body>

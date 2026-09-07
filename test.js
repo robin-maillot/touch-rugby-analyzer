@@ -901,9 +901,49 @@ test('empty input', () => {
   });
   assert.equal(s.topByTries, null);
   assert.equal(s.topByRate, null);
+  assert.equal(s.ratesMeaningful, false, 'no events at all - nothing to be meaningful about');
 });
 
 test('null input is tolerated', () => assert.equal(TR.strikeMoveStats(null).moves.length, 0));
+
+test('ratesMeaningful is false when tries are tagged but no failure ever is', () => {
+  // Every existing game: tries carry the move via Name, no failure ever does.
+  const s = stats([
+    ev('Try', '32 - Cut', ''), ev('Try', '32 - Cut', ''),
+    ev('Try', '23 - Scoop', ''),
+  ]);
+  assert.equal(s.moves.length, 2, 'moves is still populated');
+  s.moves.forEach(m => assert.equal(m.rate, 1, 'every rate computes to 1 by construction'));
+  assert.equal(s.ratesMeaningful, false);
+});
+
+test('ratesMeaningful is true once at least one failure is tagged', () => {
+  const s = stats([
+    ev('Try', '32 - Cut', ''),
+    ev('Turnover', 'Ball Down', '32 - Cut'),
+  ]);
+  assert.equal(s.ratesMeaningful, true);
+});
+
+test('ratesMeaningful is a dataset-level gate, not per-move', () => {
+  // The tagged failure sits on a different move from the tries - still true,
+  // because the gate asks "can any rate here be trusted", not "is this move's".
+  const s = stats([
+    ev('Try', '32 - Cut', ''), ev('Try', '32 - Cut', ''),
+    ev('Turnover', 'Ball Down', '23 - Scoop'),
+  ]);
+  assert.equal(s.ratesMeaningful, true);
+});
+
+test('ratesMeaningful is false when failures exist but none are tagged', () => {
+  const s = stats([
+    ev('Try', '32 - Cut', ''),
+    ev('Turnover', 'Ball Down', ''),
+    ev('Penalty Attack', 'Forward Pass', ''),
+  ]);
+  assert.equal(s.moves.length, 1, 'the tagged try still gets a row');
+  assert.equal(s.ratesMeaningful, false);
+});
 
 test('excluded moves are Other and Interception',
   // TR.EXCLUDED_MOVES is a vm-context array literal too — same realm fix.
