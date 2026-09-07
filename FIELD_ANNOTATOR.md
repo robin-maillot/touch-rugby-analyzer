@@ -266,6 +266,14 @@ seconds** while open:
 Green/red highlighting and the proportion bar show who's ahead on each metric. All of this
 is computed locally from your taps — no network needed.
 
+A tappable **Strike moves** row sits below the breakdown, showing the best move at a
+glance. Tap it to open a second sheet listing every move tried, best first, tries-over-
+attempts beside a rate — de-emphasised below 2 attempts, or for a move that has never
+itself been tagged on a failed attempt (its rate would otherwise read 100% by
+construction, not performance). It's a separate sheet rather than another row to scroll
+past: the Stats sheet answers who is winning, this answers what is working. **‹ Stats**
+returns to the Stats sheet, not the game.
+
 ---
 
 ## Broadcasting live (⚫ Live)

@@ -215,6 +215,14 @@ In the **Recent** strip each event carries its position as a channel letter and
 a distance — `R 58m`, `M 22m` — rather than raw coordinates, which read as
 nothing at a glance.
 
+A tappable **Strike moves** row sits below the breakdown, showing the best move at a
+glance. Tap it to open a second sheet listing every move tried, best first, tries-over-
+attempts beside a rate — de-emphasised below 2 attempts, or for a move that has never
+itself been tagged on a failed attempt (its rate would otherwise read 100% by
+construction, not performance). It's a separate sheet rather than another row to scroll
+past: the Stats sheet answers who is winning, this answers what is working. **‹ Stats**
+returns to the Stats sheet, not the game.
+
 ### Ball Live after every touch
 
 v1 had few enough events that a **Ball Live** could only ever follow the end of a
