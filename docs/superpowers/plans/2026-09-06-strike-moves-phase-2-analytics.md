@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Report try rate per strike move and the top scoring move — by volume and by efficiency — across the dashboard, per-game analysis, the analytics explorer, and both field annotators' live Stats sheets.
+**Goal:** Report try rate per strike move and the top scoring move — by volume and by efficiency — across the dashboard, per-game analysis, the analytics explorer, and a Strike Moves sheet reached from both field annotators' Stats sheets.
 
 **Architecture:** One pure module, `js/strike_moves.js`, owns the entire calculation. Each of the four surfaces adapts its own row shape to a common `{type, name, strikeMove, actionOwner}` at the boundary and calls it. None of them re-implements the formula.
 
@@ -908,30 +908,40 @@ git commit -m "feat(analytics): break failed attempts down by strike move"
 
 ---
 
-### Task 6: Field annotators — live Strike Moves in the Stats sheet
+### Task 6: Field annotators — a Strike Moves sheet off the Stats sheet
 
 **Files:**
 - Modify: `annotator_field.html:718` and `annotator_field2.html:982` (script tags)
-- Modify: `annotator_field.html` and `annotator_field2.html` — stats overlay markup
+- Modify: `annotator_field.html:929-947` and the matching `#statsOverlay` markup in `annotator_field2.html`
 - Modify: `annotator_field.html:1828` and the matching `refreshStats` in `annotator_field2.html`
 
 **Interfaces:**
 - Consumes: `TR.strikeMoveStats` (Task 1).
-- Produces: `renderStrikeMoveStats()` local to each page.
+- Produces: `openMoves()`, `closeMoves()`, `renderMoves()` local to each page.
 
-Both files get the same code. Repeat it rather than trying to share it — neither page loads the other, and the existing stats code is already duplicated between them.
+**Owner's decision (2026-09-07), which replaces an earlier inline-block design:**
+the moves do **not** sit inline in the Stats sheet. The Stats sheet gets a
+**tappable row** which opens a **second overlay on top of it**, listing every move
+tried **in order of success**. Rationale: the Stats sheet is already dense, and the
+move table is a different question ("what is working?") from the team comparison
+("who is winning?") — it deserves its own surface rather than another block to
+scroll past.
+
+Both files get the same code. Repeat it rather than sharing — neither page loads
+the other, and the existing stats code is already duplicated between them.
 
 - [ ] **Step 1: Load the module in both pages**
 
-In `annotator_field.html` after line 719 (`js/possession.js`) and in `annotator_field2.html` after line 983, add:
+In `annotator_field.html` after line 719 (`js/possession.js`) and in
+`annotator_field2.html` after line 983, add:
 
 ```html
 <script src="js/strike_moves.js"></script>
 ```
 
-- [ ] **Step 2: Add the markup to both stats overlays**
+- [ ] **Step 2: Add the tappable row to both Stats sheets**
 
-In `annotator_field.html` the stats card ends like this (`annotator_field.html:944-946`):
+`annotator_field.html:944-946` is the tail of the stats card:
 
 ```html
     <div class="stats-status" id="statsStatus"></div>
@@ -939,74 +949,173 @@ In `annotator_field.html` the stats card ends like this (`annotator_field.html:9
     <button class="stats-close-btn" onclick="closeStats()">Close</button>
 ```
 
-Insert the new block between `statsBody` and the Close button, in both files (the v2 markup is structurally identical):
+Insert the row between `statsBody` and the Close button, in both files:
 
 ```html
-      <div class="stats-block">
-        <div class="stats-block-title">Strike moves</div>
-        <div id="statsMoveCoverage" class="stats-move-coverage"></div>
-        <div id="statsMoveRows"></div>
-      </div>
+      <button class="stats-drill" id="movesDrill" onclick="openMoves()">
+        <span class="stats-drill-label">Strike moves</span>
+        <span class="stats-drill-meta" id="movesDrillMeta"></span>
+        <span class="stats-drill-chev">›</span>
+      </button>
 ```
 
-with:
+`#movesDrillMeta` carries the summary so the row is worth tapping — the best move
+and the tagged count — set in Step 4. Style it as a row, not a card, so it reads
+as a way further in rather than as another statistic:
 
 ```css
-  .stats-move-coverage { font-size: 0.68rem; color: #8a93a6; margin-bottom: 6px; }
-  .stats-move-row { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; padding: 3px 0; font-size: 0.78rem; border-top: 1px solid #1e2433; }
-  .stats-move-row .count { color: #8a93a6; }
-  .stats-move-row .rate.thin { color: #55607a; }
+  .stats-drill { display: flex; align-items: center; gap: 10px; width: 100%;
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px;
+    color: var(--text); font: inherit; text-align: left; padding: 12px 14px;
+    margin-top: 10px; cursor: pointer; min-height: 52px; }
+  .stats-drill:active { background: var(--surface); }
+  .stats-drill-label { font-weight: 600; font-size: 0.9rem; }
+  .stats-drill-meta { margin-left: auto; font-size: 0.72rem; color: var(--text-dim);
+    text-align: right; }
+  .stats-drill-chev { color: var(--text-dim); font-size: 1.1rem; }
 ```
 
-- [ ] **Step 3: Render it from `refreshStats` in both files**
+- [ ] **Step 3: Add the second overlay**
 
-Add `renderStrikeMoveStats();` at the end of `refreshStats` in each file, and add this function beside it in each:
+Add a sibling overlay after `#statsOverlay` closes, in both files. It layers above
+the Stats sheet — opening it does not close Stats, so Back returns there.
+
+```html
+<div id="movesOverlay" onclick="if(event.target===this)closeMoves()">
+  <div id="movesCard">
+    <div class="stats-handle"></div>
+    <div class="moves-head">
+      <button class="moves-back" onclick="closeMoves()">‹ Stats</button>
+      <div class="moves-title">Strike moves</div>
+    </div>
+    <div class="moves-cov" id="movesCov"></div>
+    <div id="movesBody"></div>
+    <button class="stats-close-btn" onclick="closeMoves()">Close</button>
+  </div>
+</div>
+```
+
+Match `#statsOverlay`'s own positioning rules (read them first — they differ
+between phone and the wider breakpoint) and give it a higher `z-index` so it sits
+above the Stats sheet rather than beside it:
+
+```css
+  #movesOverlay { position: fixed; inset: 0; z-index: 60; display: none;
+    background: rgba(0,0,0,0.55); align-items: flex-end; justify-content: center; }
+  #movesOverlay.open { display: flex; }
+  #movesCard { background: var(--surface); width: 100%; max-width: 560px;
+    border-radius: 16px 16px 0 0; padding: 0 16px 16px; max-height: 88dvh;
+    overflow-y: auto; }
+  .moves-head { display: flex; align-items: center; gap: 10px; padding: 4px 0 10px; }
+  .moves-back { background: none; border: none; color: var(--accent); font: inherit;
+    font-size: 0.86rem; padding: 6px 0; cursor: pointer; }
+  .moves-title { font-weight: 600; font-size: 1rem; margin-left: auto;
+    margin-right: auto; padding-right: 48px; }
+  .moves-cov { font-size: 0.7rem; color: var(--text-dim); padding-bottom: 8px; }
+  .moves-row { display: grid; grid-template-columns: 22px 1fr auto 46px; gap: 10px;
+    align-items: center; padding: 9px 0; border-top: 1px solid var(--border);
+    font-size: 0.84rem; }
+  .moves-rank { color: var(--text-dim); font-size: 0.72rem;
+    font-variant-numeric: tabular-nums; }
+  .moves-bar { grid-column: 2 / 5; height: 4px; border-radius: 2px;
+    background: var(--border); margin-top: -4px; }
+  .moves-bar span { display: block; height: 100%; border-radius: 2px;
+    background: var(--try, #22c55e); }
+  .moves-count { color: var(--text-dim); font-size: 0.76rem;
+    font-variant-numeric: tabular-nums; }
+  .moves-rate { text-align: right; font-weight: 600;
+    font-variant-numeric: tabular-nums; }
+  .moves-rate.thin { color: var(--text-dim); font-weight: 400; }
+  .moves-empty { color: var(--text-dim); font-size: 0.82rem; padding: 20px 0;
+    text-align: center; }
+```
+
+- [ ] **Step 4: Render both surfaces**
+
+`TR.strikeMoveStats` already returns `moves` sorted by rate descending, which is
+"in order of success" — do not re-sort. Add `renderMoves();` at the end of
+`refreshStats` in each file (it refreshes the drill row's summary, and the overlay
+too when it is open, so the 5-second tick keeps both live), then add:
 
 ```js
-// Live move rates. In-game samples are tiny, so the rate is greyed until the
-// move has enough attempts for it to mean anything — the counts always show.
-function renderStrikeMoveStats() {
-  const s    = TR.strikeMoveStats(annotations);
-  const cov  = document.getElementById('statsMoveCoverage');
-  const rows = document.getElementById('statsMoveRows');
+// The Stats sheet answers "who is winning"; this answers "what is working", so it
+// gets its own surface rather than another block to scroll past. Sorted by rate
+// descending straight from the module — that is the "order of success".
+// In-game samples are tiny, so a rate below MIN_MOVE_ATTEMPTS is shown but
+// de-emphasised, and the raw tries/attempts count always sits beside it.
+function renderMoves() {
+  const s = TR.strikeMoveStats(annotations);
+
+  const meta = document.getElementById('movesDrillMeta');
+  if (meta) {
+    const best = s.topByRate || s.topByTries;
+    meta.textContent = best
+      ? `${best.move} · ${Math.round(best.rate * 100)}%`
+      : (s.coverage.fails.total ? 'none tagged yet' : '—');
+  }
+
+  const cov  = document.getElementById('movesCov');
+  const body = document.getElementById('movesBody');
+  if (!cov || !body) return;
+
   if (!s.moves.length) {
     cov.textContent = '';
-    rows.innerHTML = '<div style="color:#8a93a6;font-size:0.76rem">No moves tagged yet.</div>';
+    body.innerHTML = '<div class="moves-empty">No moves tagged yet. Pick a move '
+      + 'after a turnover or attack penalty and they show up here.</div>';
     return;
   }
-  cov.textContent = `${s.coverage.tagged} of ${s.coverage.total} attempts tagged`;
-  rows.innerHTML = s.moves.map(m => {
+
+  // Failure-side coverage is the honest number: every try has a name, so the
+  // try side reads 100% by construction.
+  const f = s.coverage.fails;
+  cov.textContent = `${f.tagged} of ${f.total} failed attempts tagged`
+    + ` · best first · ${TR.MIN_MOVE_ATTEMPTS}+ attempts to rank`;
+
+  body.innerHTML = s.moves.map((m, i) => {
     const thin = m.attempts < TR.MIN_MOVE_ATTEMPTS;
-    return `<div class="stats-move-row">
-      <span>${m.move}</span>
-      <span class="count">${m.tries}/${m.attempts}</span>
-      <span class="rate${thin ? ' thin' : ''}">${(m.rate * 100).toFixed(0)}%</span>
-    </div>`;
+    return `<div class="moves-row">
+        <span class="moves-rank">${i + 1}</span>
+        <span>${m.move}</span>
+        <span class="moves-count">${m.tries}/${m.attempts}</span>
+        <span class="moves-rate${thin ? ' thin' : ''}">${Math.round(m.rate * 100)}%</span>
+      </div>
+      <div class="moves-bar"><span style="width:${Math.round(m.rate * 100)}%"></span></div>`;
   }).join('');
+}
+
+function openMoves() {
+  renderMoves();
+  document.getElementById('movesOverlay').classList.add('open');
+}
+
+function closeMoves() {
+  document.getElementById('movesOverlay').classList.remove('open');
 }
 ```
 
-`annotations` in both files already carries `type`, `name` and `strikeMove`, which is exactly the shape `TR.strikeMoveStats` expects — no adapter needed.
+- [ ] **Step 5: Verify manually**
 
-- [ ] **Step 4: Verify manually**
+Serve the repo and open `annotator_field.html` at a 375px width, logged in as
+`m30-admin`. Confirm:
 
-```bash
-python3 -m http.server 8000
-```
+1. Open Stats on a game with no moves tagged. Expected: the **Strike moves** row is
+   present showing `—`, and tapping it opens the overlay with the empty-state text.
+2. Tag a turnover, set its move to `32 - Cut`, then score a try with `32 - Cut`.
+   Reopen. Expected: the drill row reads `32 - Cut · 50%`, and the overlay lists
+   `1  32 - Cut  1/2  50%` with a half-width bar.
+3. Tag a second move with a worse rate. Expected: it sorts **below** the better one.
+4. A move with a single attempt. Expected: its rate is de-emphasised, its count
+   still legible.
+5. Tap **‹ Stats** and the scrim. Expected: both return to the Stats sheet, which is
+   still open behind — not to the game.
+6. Leave the overlay open for 5+ seconds after tagging. Expected: it refreshes.
+7. Repeat all of it in `annotator_field2.html`.
 
-Open `http://localhost:8000/annotator_field.html` on a phone-sized viewport, log in with `m30-admin`. Expected:
-
-1. Open Stats on a game with no moves tagged. Expected: "No moves tagged yet.", no errors.
-2. Tag a turnover with a move, reopen Stats. Expected: a row for that move, `0/1`, with the rate greyed.
-3. Score a try on the same move. Expected: the row becomes `1/2` at 50%, no longer greyed.
-4. Leave Stats open for 5 seconds after tagging. Expected: it refreshes on its own.
-5. Repeat all of the above in `annotator_field2.html`.
-
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add annotator_field.html annotator_field2.html
-git commit -m "feat(field-annotators): live strike move rates in the stats sheet"
+git commit -m "feat(field-annotators): a strike moves sheet off the stats sheet"
 ```
 
 ---
@@ -1030,7 +1139,7 @@ In `README.md`:
 - Under **Game Analysis**, add: a per-game **Strike Moves** card, split by team.
 - Under **Event Viewer**, note that `Strike Move` is filterable.
 
-In `FIELD_ANNOTATOR.md` and `FIELD_ANNOTATOR_V2.md`, add to the Stats-sheet sections: a **Strike moves** block listing tries-over-attempts and a rate per move, greyed below 2 attempts.
+In `FIELD_ANNOTATOR.md` and `FIELD_ANNOTATOR_V2.md`, add to the Stats-sheet sections: the sheet carries a tappable **Strike moves** row showing the best move at a glance, which opens a second sheet listing every move tried in order of success — tries-over-attempts beside a rate, de-emphasised below 2 attempts. Say why it is a separate sheet: the Stats sheet answers who is winning, this answers what is working.
 
 Add to the top of the Dashboard entry in `README.md`:
 
@@ -1073,6 +1182,6 @@ git commit -m "docs: document strike move analytics; bump shell cache"
 - [ ] Team Detail cards keep their existing ranking and gain a rate where the sample allows.
 - [ ] Game Analysis shows a per-game, per-team breakdown.
 - [ ] Analytics can break Try / Turnover / Penalty Attack down by strike move.
-- [ ] Both field annotators show live move rates in Stats.
+- [ ] Both field annotators have a tappable Strike moves row in Stats that opens a second sheet listing every move in order of success, and Back returns to Stats rather than to the game.
 - [ ] Every surface degrades cleanly to an empty state on data tagged before Phase 1.
 - [ ] The formula exists only in `js/strike_moves.js` — `grep -rn "tries.*attempts\|/ *m.attempts" *.html` finds no second implementation.
