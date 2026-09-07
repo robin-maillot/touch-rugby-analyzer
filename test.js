@@ -23,7 +23,7 @@ const ctx = vm.createContext({
   window:         { location: { replace() {} } },
 });
 
-for (const f of ['js/config.js', 'js/utils.js', 'js/events.js', 'js/possession.js', 'js/consistency.js', 'js/player.js', 'js/field_games.js']) {
+for (const f of ['js/config.js', 'js/utils.js', 'js/events.js', 'js/possession.js', 'js/consistency.js', 'js/player.js', 'js/field_games.js', 'js/strike_moves.js']) {
   vm.runInContext(fs.readFileSync(f, 'utf8'), ctx);
 }
 
@@ -111,6 +111,38 @@ test('Game Event Game Start → false', () => assert.equal(TR.isTurnover('Game E
 test('Game Event Game End → false',   () => assert.equal(TR.isTurnover('Game Event', 'Game End'),   false));
 test('Game Event Ball Live → false',  () => assert.equal(TR.isTurnover('Game Event', 'Ball Live'),  false));
 test('To Review → false',             () => assert.equal(TR.isTurnover('To Review', ''), false));
+
+// ── TR.STRIKE_MOVES ───────────────────────────────────────────
+console.log('TR.STRIKE_MOVES');
+test('matches the Try menu',   () => assert.deepEqual(TR.STRIKE_MOVES, TR.MENU['Try']));
+test('is a copy, not the same array', () => assert.notEqual(TR.STRIKE_MOVES, TR.MENU['Try']));
+test('keeps Other and Interception', () => {
+  assert.ok(TR.STRIKE_MOVES.includes('Other'));
+  assert.ok(TR.STRIKE_MOVES.includes('Interception'));
+});
+test('min attempts is 2',      () => assert.equal(TR.MIN_MOVE_ATTEMPTS, 2));
+
+// ── TR.isAttackEnd ────────────────────────────────────────────
+console.log('TR.isAttackEnd');
+test('Try ends an attempt',        () => assert.equal(TR.isAttackEnd('Try', '32 - Cut'), true));
+test('Penalty Attack ends it',     () => assert.equal(TR.isAttackEnd('Penalty Attack', 'Forward Pass'), true));
+test('Turnover ends it',           () => assert.equal(TR.isAttackEnd('Turnover', 'Ball Down'), true));
+test('6 Again does not',           () => assert.equal(TR.isAttackEnd('Turnover', '6 Again'), false));
+test('Penalty Defence does not',   () => assert.equal(TR.isAttackEnd('Penalty Defence', 'Offside'), false));
+test('Game Event does not',        () => assert.equal(TR.isAttackEnd('Game Event', 'Game Start'), false));
+test('To Review does not',         () => assert.equal(TR.isAttackEnd('To Review', ''), false));
+
+// ── TR.strikeMoveOf ───────────────────────────────────────────
+console.log('TR.strikeMoveOf');
+test('Try returns its own name',    () => assert.equal(TR.strikeMoveOf('Try', '33 - Quicky', ''), '33 - Quicky'));
+test('Try ignores a stored move',   () => assert.equal(TR.strikeMoveOf('Try', '33 - Quicky', 'Scoop'), '33 - Quicky'));
+test('Turnover returns its move',   () => assert.equal(TR.strikeMoveOf('Turnover', 'Ball Down', '32 - Cut'), '32 - Cut'));
+test('Pen Attack returns its move', () => assert.equal(TR.strikeMoveOf('Penalty Attack', 'Forward Pass', '23'), '23'));
+test('untagged returns empty',      () => assert.equal(TR.strikeMoveOf('Turnover', 'Ball Down', ''), ''));
+test('undefined move returns empty',() => assert.equal(TR.strikeMoveOf('Turnover', 'Ball Down', undefined), ''));
+test('6 Again drops its move',      () => assert.equal(TR.strikeMoveOf('Turnover', '6 Again', '32'), ''));
+test('Pen Defence drops its move',  () => assert.equal(TR.strikeMoveOf('Penalty Defence', 'Offside', '32'), ''));
+test('Game Event drops its move',   () => assert.equal(TR.strikeMoveOf('Game Event', 'Game Start', '32'), ''));
 
 // ── TR.otherTeam ──────────────────────────────────────────────
 console.log('TR.otherTeam');
@@ -844,6 +876,266 @@ test('migrateLegacy discards an empty session', () => {
   assert.equal(FG.migrateLegacy(), null);
   assert.equal(FG.ids().length, 0);
   assert.equal(ctx.localStorage.getItem('fieldAnnotatorSession'), null);
+});
+
+// ── TR.strikeMoveStats ────────────────────────────────────────
+console.log('TR.strikeMoveStats');
+const ev = (type, name, strikeMove, actionOwner) => ({ type, name, strikeMove, actionOwner: actionOwner || 'Team 1' });
+// TR.strikeMoveStats executes inside the vm context loaded above, so the
+// plain objects/arrays it returns carry that context's Object/Array
+// prototypes. assert/strict's deepEqual is a strict deepStrictEqual that
+// checks prototype identity, so it rejects those results against this
+// file's own object/array literals even when every field matches —
+// structuredClone re-realizes the value in this (the main) realm first.
+const stats = (events) => structuredClone(TR.strikeMoveStats(events));
+
+test('empty input', () => {
+  const s = stats([]);
+  assert.deepEqual(s.moves, []);
+  // Per-side breakdown is always present, even at zero (Phase 2 design: coverage
+  // is reported per side as well as combined, never just combined).
+  assert.deepEqual(s.coverage, {
+    tagged: 0, total: 0, pct: 0,
+    tries: { tagged: 0, total: 0, pct: 0 },
+    fails: { tagged: 0, total: 0, pct: 0 },
+  });
+  assert.equal(s.topByTries, null);
+  assert.equal(s.topByRate, null);
+  assert.equal(s.ratesMeaningful, false, 'no events at all - nothing to be meaningful about');
+});
+
+test('null input is tolerated', () => assert.equal(TR.strikeMoveStats(null).moves.length, 0));
+
+test('ratesMeaningful is false when tries are tagged but no failure ever is', () => {
+  // Every existing game: tries carry the move via Name, no failure ever does.
+  const s = stats([
+    ev('Try', '32 - Cut', ''), ev('Try', '32 - Cut', ''),
+    ev('Try', '23 - Scoop', ''),
+  ]);
+  assert.equal(s.moves.length, 2, 'moves is still populated');
+  s.moves.forEach(m => assert.equal(m.rate, 1, 'every rate computes to 1 by construction'));
+  assert.equal(s.ratesMeaningful, false);
+});
+
+test('ratesMeaningful is true once at least one failure is tagged', () => {
+  const s = stats([
+    ev('Try', '32 - Cut', ''),
+    ev('Turnover', 'Ball Down', '32 - Cut'),
+  ]);
+  assert.equal(s.ratesMeaningful, true);
+});
+
+test('ratesMeaningful is a dataset-level gate, not per-move', () => {
+  // The tagged failure sits on a different move from the tries - still true,
+  // because the gate asks "can any rate here be trusted", not "is this move's".
+  const s = stats([
+    ev('Try', '32 - Cut', ''), ev('Try', '32 - Cut', ''),
+    ev('Turnover', 'Ball Down', '23 - Scoop'),
+  ]);
+  assert.equal(s.ratesMeaningful, true);
+});
+
+test('ratesMeaningful is false when failures exist but none are tagged', () => {
+  const s = stats([
+    ev('Try', '32 - Cut', ''),
+    ev('Turnover', 'Ball Down', ''),
+    ev('Penalty Attack', 'Forward Pass', ''),
+  ]);
+  assert.equal(s.moves.length, 1, 'the tagged try still gets a row');
+  assert.equal(s.ratesMeaningful, false);
+});
+
+test('excluded moves are Other and Interception',
+  // TR.EXCLUDED_MOVES is a vm-context array literal too — same realm fix.
+  () => assert.deepEqual(structuredClone(TR.EXCLUDED_MOVES), ['Other', 'Interception']));
+test('excluded moves are real entries of the picker list',
+  () => TR.EXCLUDED_MOVES.forEach(m => assert.ok(TR.STRIKE_MOVES.includes(m), m)));
+
+test('a try and a turnover on the same move', () => {
+  const s = stats([
+    ev('Try', '32 - Cut', ''),
+    ev('Turnover', 'Ball Down', '32 - Cut'),
+  ]);
+  assert.equal(s.moves.length, 1);
+  assert.deepEqual(s.moves[0], { move: '32 - Cut', tries: 1, fails: 1, attempts: 2, rate: 0.5, rateKnown: true });
+});
+
+test('a pen attack counts as a failure', () => {
+  const s = stats([ev('Penalty Attack', 'Forward Pass', '23')]);
+  assert.deepEqual(s.moves[0], { move: '23', tries: 0, fails: 1, attempts: 1, rate: 0, rateKnown: true });
+});
+
+test('coverage counts attack-ends only', () => {
+  const s = stats([
+    ev('Try', 'Scoop', ''),                    // attack end, tagged (name is the move)
+    ev('Turnover', 'Ball Down', '32'),         // attack end, tagged
+    ev('Turnover', 'Ball Down', ''),           // attack end, untagged
+    ev('Turnover', '6 Again', '32'),           // NOT an attack end
+    ev('Penalty Defence', 'Offside', '32'),    // NOT an attack end
+    ev('Game Event', 'Game Start', ''),        // NOT an attack end
+  ]);
+  // 1 Try (tagged) + 2 fail-side attack-ends (1 tagged, 1 untagged).
+  assert.deepEqual(s.coverage, {
+    tagged: 2, total: 3, pct: 2 / 3,
+    tries: { tagged: 1, total: 1, pct: 1 },
+    fails: { tagged: 1, total: 2, pct: 0.5 },
+  });
+});
+
+test('untagged attempts are excluded from every move row', () => {
+  const s = stats([
+    ev('Try', '32', ''),
+    ev('Turnover', 'Ball Down', ''),
+  ]);
+  assert.equal(s.moves.length, 1);
+  assert.equal(s.moves[0].attempts, 1);
+});
+
+test('Other and Interception never get a row', () => {
+  const s = stats([
+    ev('Try', 'Other', ''),
+    ev('Turnover', 'Ball Down', 'Interception'),
+  ]);
+  assert.deepEqual(s.moves, []);
+  assert.equal(s.coverage.tagged, 0);
+  assert.equal(s.coverage.total, 2);
+  assert.equal(s.topByTries, null);
+  assert.equal(s.topByRate, null);
+});
+
+test('a Simple Mode game cannot top the board on Other', () => {
+  const s = stats([
+    ev('Try', 'Other', ''), ev('Try', 'Other', ''), ev('Try', 'Other', ''),
+    ev('Try', '32', ''), ev('Turnover', 'Ball Down', '32'),
+  ]);
+  assert.equal(s.topByTries.move, '32');
+  assert.equal(s.topByRate.move, '32');
+});
+
+test('a stale stored move loses to the Name on a Try', () => {
+  // What a viewer Name edit leaves behind: Name corrected, column not.
+  const s = stats([ev('Try', '32 - Cut', 'Other')]);
+  assert.deepEqual(s.moves.map(m => m.move), ['32 - Cut']);
+  assert.equal(s.moves[0].tries, 1);
+});
+
+test('a stale stored move is dropped when the name stops ending an attack', () => {
+  const s = stats([ev('Turnover', '6 Again', '32')]);
+  assert.deepEqual(s.moves, []);
+  assert.equal(s.coverage.total, 0);
+});
+
+test('coverage is reported per side', () => {
+  const s = stats([
+    ev('Try', '32', ''),                 // try side, tagged
+    ev('Try', 'Other', ''),              // try side, excluded -> untagged
+    ev('Turnover', 'Ball Down', '32'),   // fail side, tagged
+    ev('Turnover', 'Ball Down', ''),     // fail side, untagged
+    ev('Penalty Attack', 'Forward Pass', ''),
+  ]);
+  assert.deepEqual(s.coverage.tries, { tagged: 1, total: 2, pct: 0.5 });
+  assert.deepEqual(s.coverage.fails, { tagged: 1, total: 3, pct: 1 / 3 });
+  assert.equal(s.coverage.total, 5);
+});
+
+test('moves are sorted by rate descending', () => {
+  const s = stats([
+    ev('Turnover', 'Ball Down', 'Scoop'), ev('Turnover', 'Ball Down', 'Scoop'),
+    ev('Try', '32', ''),                  ev('Try', '32', ''),
+  ]);
+  assert.deepEqual(s.moves.map(m => m.move), ['32', 'Scoop']);
+});
+
+test('topByTries ignores the attempts threshold', () => {
+  const s = stats([
+    ev('Try', '32', ''), ev('Try', '32', ''), ev('Try', '32', ''),
+    ev('Turnover', 'Ball Down', '32'), ev('Turnover', 'Ball Down', '32'),
+    ev('Try', 'Scoop', ''),
+  ]);
+  assert.equal(s.topByTries.move, '32');
+  assert.equal(s.topByTries.tries, 3);
+});
+
+test('topByRate needs MIN_MOVE_ATTEMPTS', () => {
+  const s = stats([
+    ev('Try', 'Scoop', ''),                                     // 1/1 = 100%, only 1 attempt
+    ev('Try', '32', ''), ev('Try', '32', ''),                   // 2/3 = 67%, 3 attempts
+    ev('Turnover', 'Ball Down', '32'),
+  ]);
+  assert.equal(s.topByRate.move, '32');
+  assert.equal(s.topByTries.move, '32');
+});
+
+test('topByRate is null when nothing clears the threshold', () => {
+  const s = stats([ev('Try', 'Scoop', '')]);
+  assert.equal(s.topByRate, null);
+  assert.equal(s.topByTries.move, 'Scoop');
+});
+
+test('topByTries is null when no move ever scored', () => {
+  const s = stats([ev('Turnover', 'Ball Down', '32')]);
+  assert.equal(s.topByTries, null);
+});
+
+// ── rateKnown: a per-move gate, not the dataset-level ratesMeaningful ──
+// The moment ANY move anywhere gets a tagged failure, ratesMeaningful flips
+// true - but every OTHER move that has never itself failed still computes to
+// rate 1 by construction. rateKnown asks the question per move.
+test('a move with fails > 0 has rateKnown true', () => {
+  const s = stats([
+    ev('Try', '32 - Cut', ''),
+    ev('Turnover', 'Ball Down', '32 - Cut'),
+  ]);
+  assert.equal(s.moves[0].rateKnown, true);
+});
+
+test('a move with 0 fails has rateKnown false even when ratesMeaningful is true', () => {
+  const s = stats([
+    ev('Try', '32 - Cut', ''), ev('Try', '32 - Cut', ''),   // 2/2 = 100%, never failed
+    ev('Turnover', 'Ball Down', '23 - Scoop'),               // flips the dataset-level gate
+  ]);
+  assert.equal(s.ratesMeaningful, true, 'sanity: the dataset-level gate is on');
+  const cut = s.moves.find(m => m.move === '32 - Cut');
+  assert.equal(cut.rate, 1);
+  assert.equal(cut.rateKnown, false, 'this move itself has never been seen to fail');
+});
+
+test('topByRate skips a 0-fail 100% move for a lower-rated move that has actually failed', () => {
+  const s = stats([
+    ev('Try', '32 - Cut', ''), ev('Try', '32 - Cut', ''),        // 2/2 = 100%, never failed
+    ev('Try', '23 - Scoop', ''), ev('Try', '23 - Scoop', ''),    // 2/3 = 67%, has failed once
+    ev('Turnover', 'Ball Down', '23 - Scoop'),
+  ]);
+  assert.equal(s.topByRate.move, '23 - Scoop', 'the untested 100% must not crown');
+  assert.equal(s.topByRate.rate, 2 / 3);
+});
+
+test('topByRate is null when every qualifying move has 0 fails', () => {
+  const s = stats([
+    ev('Try', '32 - Cut', ''), ev('Try', '32 - Cut', ''),
+    ev('Try', '23 - Scoop', ''), ev('Try', '23 - Scoop', ''),
+  ]);
+  assert.equal(s.topByRate, null);
+});
+
+test('topByTries still returns the 0-fail move when it leads on volume', () => {
+  const s = stats([
+    ev('Try', '32 - Cut', ''), ev('Try', '32 - Cut', ''), ev('Try', '32 - Cut', ''), // 3 tries, never failed
+    ev('Try', '23 - Scoop', ''),
+    ev('Turnover', 'Ball Down', '23 - Scoop'),
+  ]);
+  assert.equal(s.topByTries.move, '32 - Cut');
+  assert.equal(s.topByTries.tries, 3);
+  const cut = s.moves.find(m => m.move === '32 - Cut');
+  assert.equal(cut.rateKnown, false, 'volume leader can still be untested');
+});
+
+test('ties break on attempts then alphabetically', () => {
+  const s = stats([
+    ev('Try', '23', ''), ev('Turnover', 'Ball Down', '23'),
+    ev('Try', '21', ''), ev('Turnover', 'Ball Down', '21'),
+  ]);
+  assert.deepEqual(s.moves.map(m => m.move), ['21', '23']);
 });
 
 // ─────────────────────────────────────────────────────────────

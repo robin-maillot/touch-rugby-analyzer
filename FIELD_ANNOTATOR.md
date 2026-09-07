@@ -207,6 +207,9 @@ automatically — e.g. a Pen Defence or a 6 Again is attributed to the *other* t
   (no need to hit **Save**) and shows it as a pill beside the event name in **Recent**.
   Only Try / Turnover / Pen Attack / Pen Defence offer it; Game Event and To Review
   already spell their detail out in the name.
+- The sheet also carries a **Strike move** picker beside **Sub-type**, on the same header
+  row — both selects sit on the event's identity line so the whole event still reads in
+  one glance. Shown only on turnovers and attack penalties, defaulting to `— none —`.
 
 ### 6. Finishing the game (⏹ Stop Game)
 
@@ -262,6 +265,14 @@ seconds** while open:
 
 Green/red highlighting and the proportion bar show who's ahead on each metric. All of this
 is computed locally from your taps — no network needed.
+
+A tappable **Strike moves** row sits below the breakdown, showing the best move at a
+glance. Tap it to open a second sheet listing every move tried, best first, tries-over-
+attempts beside a rate — de-emphasised below 2 attempts, or for a move that has never
+itself been tagged on a failed attempt (its rate would otherwise read 100% by
+construction, not performance). It's a separate sheet rather than another row to scroll
+past: the Stats sheet answers who is winning, this answers what is working. **‹ Stats**
+returns to the Stats sheet, not the game.
 
 ---
 

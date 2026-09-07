@@ -90,6 +90,8 @@
     .filter-reset:hover { color: var(--text); border-color: var(--accent); }
     .filter-summary { margin-left: auto; font-size: 0.75rem; color: var(--muted); }
     .filter-summary strong { color: var(--text); }
+    .filter-toggle { display: flex; align-items: center; gap: 6px; align-self: end; font-size: 0.75rem; color: var(--muted); cursor: pointer; padding: 7px 0; }
+    .filter-toggle input { accent-color: var(--accent); cursor: pointer; margin: 0; }
 
     /* Vega */
     .chart-wrap { width: 100%; }
@@ -217,6 +219,7 @@
 <script src="js/config.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/events.js"></script>
+<script src="js/strike_moves.js"></script>
 </head>
 <body>
 
@@ -342,6 +345,9 @@
           <label for="fTeam">Team</label>
           <select id="fTeam"><option value="">All</option></select>
         </div>
+        <label class="filter-toggle" title="Only applies to Try, Turnover and Penalty Attack">
+          <input type="checkbox" id="fBreakdownByMove" onchange="renderBottom()"> by strike move
+        </label>
         <button class="filter-reset" onclick="resetFilters()">Reset</button>
         <div class="filter-summary" id="filterSummary"></div>
       </div>
@@ -580,6 +586,7 @@ function parseEvents(rows) {
     type: idx('type'),
     name: idx('name'),
     action: idx('action owner'),
+    strikeMove: idx('strike move'),
     game: idx('game'),
     t1: idx('team 1'),
     t2: idx('team 2'),
@@ -605,6 +612,7 @@ function parseEvents(rows) {
     if (!type) return null;
     return {
       type, name,
+      strikeMove: I.strikeMove >= 0 ? (r[I.strikeMove] || '').trim() : '',
       time:  r[I.time] || '',
       owner:       resolve(r[I.poss],   team1, team2),
       actionOwner: resolve(r[I.action], team1, team2),
@@ -968,13 +976,19 @@ function renderFilteredTypeChart(evs, byType, activeType) {
   // When a specific event type is selected we break down by name instead, so
   // the chart shows the sub-types within the chosen event type.
   if (activeType) {
-    const byName = countBy(evs, e => e.name || '(blank)');
-    const data = Object.entries(byName).map(([name, count]) => ({ name, count }));
+    // For the three types that end an attack, breaking down by strike move
+    // answers a different and more useful question than breaking down by name.
+    const byMove = document.getElementById('fBreakdownByMove')?.checked;
+    const useMove = byMove && TR.STRIKE_MOVE_TYPES.includes(activeType);
+    const counts = countBy(evs, e => useMove
+      ? (TR.strikeMoveOf(e.type, e.name, e.strikeMove) || '(untagged)')
+      : (e.name || '(blank)'));
+    const data = Object.entries(counts).map(([name, count]) => ({ name, count }));
     if (!data.length) { document.getElementById('fTypeChart').innerHTML = emptyMsg(); return; }
     const color = TYPE_COLORS[activeType] || '#888';
     vegaEmbed('#fTypeChart', {
       width: 'container', height: 220,
-      title: { text: `${activeType} — by name`, color: '#aaa', fontSize: 11, fontWeight: 600, anchor: 'start' },
+      title: { text: `${activeType} — by ${useMove ? 'strike move' : 'name'}`, color: '#aaa', fontSize: 11, fontWeight: 600, anchor: 'start' },
       data: { values: data },
       mark: { type: 'bar', cornerRadiusEnd: 3, color },
       encoding: {

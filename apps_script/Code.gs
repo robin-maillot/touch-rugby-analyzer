@@ -11,7 +11,10 @@ const LIVE_SHEET      = '_live';       // reserved tab name for live game state
 const ADMIN_SHEETS    = [GROUPS_SHEET, METADATA_SHEET, LIVE_SHEET];
 
 // Expected column order (must match what the Python pipeline reads)
-const HEADERS = ['Time', 'Possession Owner', 'Type', 'Name', 'To Review', 'Comment', 'Action Owner'];
+// Strike Move is appended LAST so the Python pipeline's positional reads of
+// columns 0-6 are unaffected. Every read path maps by header name, so tabs
+// written before this column existed simply report '' for it.
+const HEADERS = ['Time', 'Possession Owner', 'Type', 'Name', 'To Review', 'Comment', 'Action Owner', 'Strike Move'];
 
 // Metadata columns appended to action=all rows
 const META_COLS = ['Team 1', 'Team 2', 'Competition', 'Year', 'Division', 'Video Name', 'Analyzable', 'ID'];
@@ -433,7 +436,7 @@ function doPost(e) {
       if (!isAdminSecret(data.secret)) return json({ ok: false, error: 'Admin access required.' });
       let updated = 0;
       for (const change of (data.changes || [])) {
-        if (updateRow(change.sheetName, change.time, change.name, change.comment)) updated++;
+        if (updateRow(change.sheetName, change.time, change.name, change.comment, change.strikeMove)) updated++;
       }
       cacheClear();
       return json({ ok: true, updated });
@@ -842,7 +845,18 @@ function clearLiveRow(sheetName) {
 }
 
 // ── Update Name/Comment on a specific row ──────────────────────
-function updateRow(sheetName, time, name, comment) {
+// Strike Move is derived, never taken at face value: a Try's move is its Name,
+// and an event that no longer ends an attack (6 Again, Penalty Defence) must
+// carry no move at all. Mirrors TR.strikeMoveOf in js/events.js — keep the two
+// in step.
+function deriveStrikeMove(type, name, stored) {
+  if (type === 'Try') return name || '';
+  var endsAttack = (type === 'Penalty Attack') ||
+                   (type === 'Turnover' && name !== '6 Again');
+  return endsAttack ? (stored || '') : '';
+}
+
+function updateRow(sheetName, time, name, comment, strikeMove) {
   const ss    = SpreadsheetApp.openById(SHEET_ID);
   const sheet = ss.getSheetByName(sheetName);
   if (!sheet) return false;
@@ -852,12 +866,23 @@ function updateRow(sheetName, time, name, comment) {
   const timeIdx    = headers.indexOf('time');
   const nameIdx    = headers.indexOf('name');
   const commentIdx = headers.indexOf('comment');
+  const typeIdx    = headers.indexOf('type');
+  const strikeIdx  = headers.indexOf('strike move');
   if (timeIdx < 0) return false;
 
   for (let i = 1; i < values.length; i++) {
     if (String(values[i][timeIdx]) === String(time)) {
       if (nameIdx    >= 0 && name    !== undefined) sheet.getRange(i + 1, nameIdx    + 1).setValue(name);
       if (commentIdx >= 0 && comment !== undefined) sheet.getRange(i + 1, commentIdx + 1).setValue(comment);
+      // Re-derive whenever the Name or the Strike Move itself was part of this
+      // edit, so correcting a Try's Name repairs its move and turning a
+      // Turnover into 6 Again clears one.
+      if (typeIdx >= 0 && strikeIdx >= 0 && (name !== undefined || strikeMove !== undefined)) {
+        const type    = values[i][typeIdx];
+        const newName = name       !== undefined ? name       : values[i][nameIdx];
+        const stored  = strikeMove !== undefined ? strikeMove : values[i][strikeIdx];
+        sheet.getRange(i + 1, strikeIdx + 1).setValue(deriveStrikeMove(type, newName, stored));
+      }
       return true;
     }
   }

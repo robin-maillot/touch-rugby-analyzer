@@ -228,6 +228,22 @@
       color: var(--text-muted);
       white-space: nowrap;
     }
+    /* The strike move is a different kind of fact from the sub-type (what was
+       being run, not what happened), so it gets its own accent rather than
+       reading as a second sub-type pill — same shape, tinted purple. */
+    .recent-move {
+      display: inline-block;
+      vertical-align: middle;
+      background: rgba(124,58,237,0.13);
+      border: 1px solid var(--purple);
+      border-radius: 999px;
+      padding: 1px 7px;
+      margin: 0 2px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--purple);
+      white-space: nowrap;
+    }
     /* Keeps "· Team" together when a long sub-type wraps the row onto two lines. */
     .recent-team { white-space: nowrap; }
 
@@ -388,6 +404,66 @@
       flex-shrink: 0;
     }
     .stats-close-btn:active { background: var(--border); }
+
+    /* ── Strike moves drill row (Stats sheet) ───────────────────── */
+    .stats-drill { display: flex; align-items: center; gap: 10px; width: 100%;
+      background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px;
+      color: var(--text); font: inherit; text-align: left; padding: 12px 14px;
+      margin-top: 10px; cursor: pointer; min-height: 52px; }
+    .stats-drill:active { background: var(--surface); }
+    .stats-drill-label { font-weight: 600; font-size: 0.9rem; }
+    .stats-drill-meta { margin-left: auto; font-size: 0.72rem; color: var(--text-dim);
+      text-align: right; }
+    .stats-drill-chev { color: var(--text-dim); font-size: 1.1rem; }
+
+    /* ── Strike moves overlay — layers above #statsOverlay (z-index 100) so
+       Stats stays open behind it; positioning mirrors #statsOverlay/#statsCard. */
+    #movesOverlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      z-index: 110;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    #movesOverlay.open { display: flex; }
+    #movesCard {
+      background: var(--surface);
+      border-radius: 20px 20px 0 0;
+      width: 100%;
+      max-height: 90dvh;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      padding: 0 16px calc(16px + env(safe-area-inset-bottom, 0px));
+    }
+    @media (min-width: 600px) {
+      #movesOverlay { align-items: center; padding: 24px; }
+      #movesCard { border-radius: 16px; max-width: 520px; max-height: 85dvh; }
+    }
+    .moves-head { display: flex; align-items: center; gap: 10px; padding: 4px 0 10px; }
+    .moves-back { background: none; border: none; color: var(--accent); font: inherit;
+      font-size: 0.86rem; padding: 6px 0; cursor: pointer; }
+    .moves-title { font-weight: 600; font-size: 1rem; margin-left: auto;
+      margin-right: auto; padding-right: 48px; }
+    .moves-cov { font-size: 0.7rem; color: var(--text-dim); padding-bottom: 8px; }
+    .moves-row { display: grid; grid-template-columns: 22px 1fr auto 46px; gap: 10px;
+      align-items: center; padding: 9px 0; border-top: 1px solid var(--border);
+      font-size: 0.84rem; }
+    .moves-rank { color: var(--text-dim); font-size: 0.72rem;
+      font-variant-numeric: tabular-nums; }
+    .moves-bar { grid-column: 2 / 5; height: 4px; border-radius: 2px;
+      background: var(--border); margin-top: -4px; }
+    .moves-bar span { display: block; height: 100%; border-radius: 2px;
+      background: var(--try, #22c55e); }
+    .moves-count { color: var(--text-dim); font-size: 0.76rem;
+      font-variant-numeric: tabular-nums; }
+    .moves-rate { text-align: right; font-weight: 600;
+      font-variant-numeric: tabular-nums; }
+    .moves-rate.thin { color: var(--text-dim); font-weight: 400; }
+    .moves-empty { color: var(--text-dim); font-size: 0.82rem; padding: 20px 0;
+      text-align: center; }
 
     /* ── Edit event modal ───────────────────────────────────────── */
     #editOverlay {
@@ -827,6 +903,17 @@
       overflow-x: auto; scrollbar-width: none;
     }
     #pitchStatus::-webkit-scrollbar { display: none; }
+    /* The move strip has 19 chips — 4+ screens wide as a single scrolling row on
+       a phone, with 14 of them (the named variants a per-move try rate exists to
+       tell apart) never reached. Wrapping keeps every chip reachable by a plain
+       vertical scroll instead of a hidden horizontal one; the height cap keeps
+       that scroll bounded so the strip can never grow enough to push the pitch
+       off screen — it just gives up some of the pitch's height, never all of it. */
+    #pitchStatus.move-strip {
+      flex-wrap: wrap; align-content: flex-start;
+      overflow-x: hidden; overflow-y: auto;
+      max-height: 128px;
+    }
     #pitchHint { font-size: 0.7rem; color: var(--text-dim); font-weight: 600; padding-left: 2px; }
     .sub-chip {
       flex: 0 0 auto; padding: 6px 11px; border-radius: 99px;
@@ -981,6 +1068,7 @@
 <script src="js/utils.js"></script>
 <script src="js/events.js"></script>
 <script src="js/possession.js"></script>
+<script src="js/strike_moves.js"></script>
 <script src="js/field_games.js"></script>
 </head>
 <body>
@@ -1166,6 +1254,9 @@
         <span class="edit-subtype-wrap" id="editSubtypeWrap">
           <select id="editSubtype" class="edit-subtype" aria-label="Sub-type" onchange="applySubtype()"></select>
         </span>
+        <span class="edit-subtype-wrap" id="editMoveWrap" style="display:none">
+          <select id="editMove" class="edit-subtype" aria-label="Strike move" onchange="applyStrikeMove()"></select>
+        </span>
       </div>
     </div>
     <div style="padding:16px 16px 4px">
@@ -1212,7 +1303,26 @@
     </div>
     <div class="stats-status" id="statsStatus"></div>
     <div id="statsBody"></div>
+    <button class="stats-drill" id="movesDrill" onclick="openMoves()">
+      <span class="stats-drill-label">Strike moves</span>
+      <span class="stats-drill-meta" id="movesDrillMeta"></span>
+      <span class="stats-drill-chev">›</span>
+    </button>
     <button class="stats-close-btn" onclick="closeStats()">Close</button>
+  </div>
+</div>
+
+<!-- Strike moves modal — layers above the Stats sheet; Back/scrim return to Stats -->
+<div id="movesOverlay" onclick="if(event.target===this)closeMoves()">
+  <div id="movesCard">
+    <div class="stats-handle"></div>
+    <div class="moves-head">
+      <button class="moves-back" onclick="closeMoves()">‹ Stats</button>
+      <div class="moves-title">Strike moves</div>
+    </div>
+    <div class="moves-cov" id="movesCov"></div>
+    <div id="movesBody"></div>
+    <button class="stats-close-btn" onclick="closeMoves()">Close</button>
   </div>
 </div>
 
@@ -1463,6 +1573,7 @@ function loadGame(rec, isNew) {
   if (teamsSwapped !== !!rec.teamsSwapped) toggleSwap();
   armedPen = null;
   closeSubtype();
+  closeMoveStrip();
   $('overrideBtn').style.display = 'none';
 
   loading = false;
@@ -1590,7 +1701,7 @@ function tag(type, name, possessionOwner, pos) {
   let t = nowSeconds();
   if (annotations.length > 0) t = Math.max(0, t - clickDelay);
   const actionOwner = TR.inferActionOwner(possessionOwner, type, name);
-  annotations.push({ id: Date.now() + Math.random(), type, name, possessionOwner, actionOwner, comment: '', time: t, timeStr: TR.fmt(t),
+  annotations.push({ id: Date.now() + Math.random(), type, name, possessionOwner, actionOwner, comment: '', strikeMove: '', time: t, timeStr: TR.fmt(t),
                      x: pos ? pos.x : null, y: pos ? pos.y : null });
 
   const next = TR.inferPossessionAfter(possessionOwner, type, name);
@@ -1634,6 +1745,7 @@ function undoLast() {
   if (isFinished() || !annotations.length) return;
   const removed = annotations.pop();
   setPossession(removed.possessionOwner);
+  closeMoveStrip();
   updateUI();
   saveSession();
 }
@@ -1660,6 +1772,7 @@ function openEdit(index) {
   const a = annotations[index];
   document.getElementById('editCurrentLabel').textContent = eventBaseLabel(a) + ' · ' + fmtClock(a.time);
   renderSubtypeMenu(a);
+  renderMoveSelect(a);
   // '?' is the placeholder marker To Review events carry — show a blank box so
   // the annotator can type a real note over it.
   document.getElementById('editComment').value = (a.comment && a.comment !== '?') ? a.comment : '';
@@ -1693,6 +1806,7 @@ function applyEdit(type, name) {
   a.name = name;
   commitCommentField(a);
   a.actionOwner = TR.inferActionOwner(a.possessionOwner, type, name);
+  renderMoveSelect(a);
   replayPossessionFrom(editingIndex + 1);
   closeEdit();
   updateUI();
@@ -1728,7 +1842,43 @@ function applySubtype() {
   a.name = document.getElementById('editSubtype').value;
   a.actionOwner = TR.inferActionOwner(a.possessionOwner, a.type, a.name);
   replayPossessionFrom(editingIndex + 1);
+  renderMoveSelect(a);
   markSubtypeState();
+  updateUI();
+  saveSession();
+}
+
+// Only a failed attempt carries a move — a Try's move is its own sub-type, and
+// 6 Again / Penalty Defence keep the ball so the move is still running.
+// '' is a real option: leaving it untagged is always allowed.
+// Named renderMoveSelect, not renderMoveMenu: annotator.html already has a
+// renderMoveMenu(type, name) with a different signature, and the two pages are
+// read side by side often enough that the collision would mislead.
+function renderMoveSelect(a) {
+  const wrap = document.getElementById('editMoveWrap');
+  const sel  = document.getElementById('editMove');
+  const show = a.type !== 'Try' && TR.isAttackEnd(a.type, a.name);
+  wrap.style.display = show ? '' : 'none';
+  if (!show) return;
+  const opts = ['', ...TR.STRIKE_MOVES];
+  const cur  = a.strikeMove || '';
+  if (cur && !opts.includes(cur)) opts.splice(1, 0, cur);
+  sel.innerHTML = opts.map(o =>
+    `<option value="${o}"${o === cur ? ' selected' : ''}>${o || '— none —'}</option>`).join('');
+  markMoveState();
+}
+
+function markMoveState() {
+  const sel = document.getElementById('editMove');
+  sel.classList.toggle('set', !!sel.value);
+}
+
+// Applies straight away rather than waiting on Save, matching applySubtype.
+// The move has no bearing on possession, so nothing is replayed.
+function applyStrikeMove() {
+  if (editingIndex === null) return;
+  annotations[editingIndex].strikeMove = document.getElementById('editMove').value;
+  markMoveState();
   updateUI();
   saveSession();
 }
@@ -1824,6 +1974,10 @@ function updateUI() {
                                                 : (document.getElementById('metaTeam2').value.trim() || 'Team 2');
     const teamStr = a.type !== 'Game Event' ? ` <span class="recent-team">· ${team}</span>` : '';
     const sub = eventSubtype(a);
+    // Only a failed attempt carries a stored move (a Try's move is already its
+    // sub-type, shown above) — the pill is the only read-back on the sideline
+    // that a tap on the move strip actually landed, without reopening the card.
+    const move = a.strikeMove || '';
     const hasComment = a.comment && a.comment.trim() && a.comment !== '?';
     const commentMark = hasComment ? '<span class="recent-comment" title="Has a comment">💬</span>' : '';
     // Raw coordinates mean nothing at a glance; metres upfield and a channel
@@ -1835,7 +1989,7 @@ function updateUI() {
     return `<div class="recent-item" onclick="openEdit(${idx})">
       <div class="recent-dot" style="background:${color}"></div>
       <span class="recent-time">${fmtClock(a.time)}</span>
-      <span class="recent-text">${eventBaseLabel(a)}${sub ? ` <span class="recent-sub">${sub}</span>` : ''}${teamStr}</span>
+      <span class="recent-text">${eventBaseLabel(a)}${sub ? ` <span class="recent-sub">${sub}</span>` : ''}${move ? ` <span class="recent-move">${move}</span>` : ''}${teamStr}</span>
       ${posMark}${commentMark}
       <span class="chev" style="color:var(--border);font-size:0.9rem;flex-shrink:0">›</span>
     </div>`;
@@ -2288,6 +2442,99 @@ function refreshStats() {
        </div>`
     : '';
   document.getElementById('statsBody').innerHTML = mapHtml + chartHtml + html;
+  renderMoves();
+}
+
+// The Stats sheet answers "who is winning"; this answers "what is working", so it
+// gets its own surface rather than another block to scroll past. Sorted by rate
+// descending straight from the module — that is the "order of success".
+// In-game samples are tiny, so a rate below MIN_MOVE_ATTEMPTS is shown but
+// de-emphasised, and the raw tries/attempts count always sits beside it.
+// Same treatment for a move that has never itself failed (rateKnown false) -
+// its rate reads 100% by construction, not performance.
+function renderMoves() {
+  const s = TR.strikeMoveStats(annotations);
+
+  const meta = document.getElementById('movesDrillMeta');
+  if (meta) {
+    if (s.ratesMeaningful) {
+      // Four distinct states, and they must not be collapsed: a rankable leader;
+      // moves tagged but nothing rankable yet (one turnover with a move is 1 attempt
+      // and 0 tries, so both tops are null while data plainly exists); failed
+      // attempts that nobody tagged; and a game that hasn't had one yet.
+      const best = s.topByRate || s.topByTries;
+      meta.textContent = best
+        ? (best.rateKnown
+            ? `${best.move} · ${Math.round(best.rate * 100)}%`
+            // topByRate excludes an untested move, so falling back to
+            // topByTries here means this leader has never itself failed -
+            // quote tries, not a rate that only reads 100% by construction.
+            : `${best.move} · ${best.tries} ${best.tries === 1 ? 'try' : 'tries'}`)
+        : s.moves.length
+          ? `${s.moves.length} tagged · no rate yet`
+          : (s.coverage.fails.total ? 'none tagged yet' : '—');
+    } else {
+      // No failure has ever been tagged, so a rate would only ever read 100% -
+      // quote the most-scored move by tries instead of a meaningless percentage.
+      const best = s.topByTries;
+      meta.textContent = best
+        ? `${best.move} · ${best.tries} ${best.tries === 1 ? 'try' : 'tries'}`
+        : s.moves.length
+          ? `${s.moves.length} tagged · no tries yet`
+          : (s.coverage.fails.total ? 'none tagged yet' : '—');
+    }
+  }
+
+  const cov  = document.getElementById('movesCov');
+  const body = document.getElementById('movesBody');
+  if (!cov || !body) return;
+
+  if (!s.moves.length) {
+    cov.textContent = '';
+    body.innerHTML = '<div class="moves-empty">No moves tagged yet. Pick a move '
+      + 'after a turnover or attack penalty and they show up here.</div>';
+    return;
+  }
+
+  if (!s.ratesMeaningful) {
+    // Rate cannot order or describe anything here - no failure has ever been
+    // tagged, so every move would read 100% by construction. Sort a COPY by
+    // tries; s.moves is shared by six surfaces and must not be mutated.
+    const byTries = s.moves.slice().sort((a, b) => b.tries - a.tries || a.move.localeCompare(b.move));
+    cov.textContent = 'No failed attempts tagged yet · sorted by tries, not rate';
+    body.innerHTML = byTries.map((m, i) => `<div class="moves-row">
+        <span class="moves-rank">${i + 1}</span>
+        <span>${m.move}</span>
+        <span class="moves-count">${m.tries}/${m.attempts}</span>
+      </div>`).join('');
+    return;
+  }
+
+  // Failure-side coverage is the honest number: every try has a name, so the
+  // try side reads 100% by construction.
+  const f = s.coverage.fails;
+  cov.textContent = `${f.tagged} of ${f.total} failed attempts tagged`
+    + ` · best first · ${TR.MIN_MOVE_ATTEMPTS}+ attempts to rank`;
+
+  body.innerHTML = s.moves.map((m, i) => {
+    const thin = m.attempts < TR.MIN_MOVE_ATTEMPTS || !m.rateKnown;
+    return `<div class="moves-row">
+        <span class="moves-rank">${i + 1}</span>
+        <span>${m.move}</span>
+        <span class="moves-count">${m.tries}/${m.attempts}</span>
+        <span class="moves-rate${thin ? ' thin' : ''}">${Math.round(m.rate * 100)}%</span>
+      </div>
+      <div class="moves-bar"><span style="width:${Math.round(m.rate * 100)}%"></span></div>`;
+  }).join('');
+}
+
+function openMoves() {
+  renderMoves();
+  document.getElementById('movesOverlay').classList.add('open');
+}
+
+function closeMoves() {
+  document.getElementById('movesOverlay').classList.remove('open');
 }
 
 // ── Stop game ──────────────────────────────────────────────────
@@ -2436,9 +2683,12 @@ async function pushToSheet(override = false) {
     saveSession({ touch: false });
   }
 
+  // Column order must match HEADERS in Code.gs, Strike Move last. The pitch
+  // position still rides in Comment; the move gets its own column.
   const rows = annotations
     .filter(a => uploadTouches || a.type !== 'Touch')
-    .map(a => [a.timeStr, a.possessionOwner, a.type, a.name, '', commentWithPos(a), a.actionOwner]);
+    .map(a => [a.timeStr, a.possessionOwner, a.type, a.name, '', commentWithPos(a),
+               a.actionOwner, TR.strikeMoveOf(a.type, a.name, a.strikeMove)]);
 
   try {
     const analyzable = isAnalysable() ? 'TRUE' : 'FALSE';
@@ -2985,7 +3235,15 @@ function offerSubtype(idx) {
   const i   = idx == null ? annotations.length - 1 : idx;
   const a   = annotations[i];
   const bar = document.getElementById('pitchStatus');
-  if (!a || !SUBTYPE_TYPES.includes(a.type)) { closeSubtype(); return; }
+  if (!a || !SUBTYPE_TYPES.includes(a.type)) { closeSubtype(); closeMoveStrip(); return; }
+  // The two strips share this one status line, so whichever one is about to take
+  // it over must disarm the other's timer too — otherwise a stale timer from the
+  // strip that just lost the line fires later and wipes out whatever replaced it.
+  // (The reverse direction is safe: pickSubtype always calls closeSubtype(), which
+  // clears subtypeTimer, before it ever calls offerMoveStrip().)
+  clearTimeout(moveTimer);
+  moveIdx = null;
+  bar.classList.remove('move-strip');
   subtypeIdx = i;
   bar.innerHTML = `<span class="sub-chip head">${EVENT_LABELS[a.type] || a.type} —</span>` +
     (TR.MENU[a.type] || []).filter(n => n !== 'Other')
@@ -3017,6 +3275,61 @@ function pickSubtype(name) {
   else replayPossessionFrom(i + 1);
   updateUI();
   saveSession();
+  // A failed attempt can also record which move was being run. Same strip, same
+  // timeout — ignoring it simply leaves the move blank.
+  if (a.type !== 'Try' && TR.isAttackEnd(a.type, a.name)) offerMoveStrip(i);
+}
+
+// ── Strike move strip ──────────────────────────────────────────
+let moveIdx = null, moveTimer = null;
+
+// 19 moves take longer to scan than the sub-type strip's 7, so the timeout
+// scales with option count at roughly the sub-type strip's rate
+// (10s / 7 opts ≈ 1.4s/opt → 19 opts ≈ 27s), rounded down to a clean 25s. The
+// strip also wraps onto several rows here, so a glance can take a moment
+// longer even before any tapping starts. Real interaction pushes the deadline
+// out further still — restartMoveTimer() is called on every tap or scroll
+// inside the strip, so the fixed budget only matters for a screen nobody is
+// touching.
+const MOVE_STRIP_TIMEOUT_MS = 25000;
+
+function offerMoveStrip(idx) {
+  const a = annotations[idx];
+  if (!a) return;
+  moveIdx = idx;
+  const bar = document.getElementById('pitchStatus');
+  bar.classList.add('move-strip');
+  bar.innerHTML =
+    `<span class="sub-chip head">Move —</span>` +
+    TR.STRIKE_MOVES.map(m => `<button class="sub-chip" data-move="${m}">${m}</button>`).join('');
+  restartMoveTimer();
+}
+
+// Re-armed on every tap or scroll inside the move strip (see the pitchStatus
+// listeners below) so a still-scanning annotator never has the strip close
+// under them mid-read.
+function restartMoveTimer() {
+  if (moveIdx === null) return;
+  clearTimeout(moveTimer);
+  moveTimer = setTimeout(closeMoveStrip, MOVE_STRIP_TIMEOUT_MS);
+}
+
+function closeMoveStrip() {
+  clearTimeout(moveTimer);
+  moveIdx = null;
+  const bar = document.getElementById('pitchStatus');
+  if (bar) { bar.classList.remove('move-strip'); bar.innerHTML = '<span id="pitchHint"></span>'; }
+  renderPitch();
+}
+
+function pickStrikeMove(move) {
+  if (moveIdx === null) return;
+  const a = annotations[moveIdx];
+  closeMoveStrip();
+  if (!a) return;
+  a.strikeMove = move;   // no possession impact, so nothing is replayed
+  updateUI();
+  saveSession();
 }
 
 // ── Deleting a single event ────────────────────────────────────
@@ -3028,6 +3341,8 @@ function deleteEvent() {
   const at = editingIndex;
   annotations.splice(at, 1);
   closeEdit();
+  closeSubtype();
+  closeMoveStrip();
   if (!annotations.length)      setPossession('Team 1');
   else if (at === 0)            replayPossessionFrom(1);
   else                          replayPossessionFrom(at);
@@ -3295,10 +3610,19 @@ window.addEventListener('DOMContentLoaded', () => {
     onPitchTap(ev);
   });
 
-  document.getElementById('pitchStatus').addEventListener('click', ev => {
+  const statusBar = document.getElementById('pitchStatus');
+  statusBar.addEventListener('click', ev => {
     const chip = ev.target.closest('[data-sub]');
-    if (chip) pickSubtype(chip.dataset.sub);
+    if (chip) { pickSubtype(chip.dataset.sub); return; }
+    const mv = ev.target.closest('[data-move]');
+    if (mv) { pickStrikeMove(mv.dataset.move); return; }
+    // A tap anywhere else in the strip (the head label, the gaps between
+    // chips) still counts as active interaction with it.
+    restartMoveTimer();
   });
+  // Scrolling to reach a chip further down the wrapped strip is interaction
+  // too, and rarely fires a click of its own — so it gets its own listener.
+  statusBar.addEventListener('scroll', restartMoveTimer, { passive: true });
 });
 
 </script>

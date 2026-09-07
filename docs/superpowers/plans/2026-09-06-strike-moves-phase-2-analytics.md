@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Report try rate per strike move and the top scoring move — by volume and by efficiency — across the dashboard, per-game analysis, the analytics explorer, and both field annotators' live Stats sheets.
+**Goal:** Report try rate per strike move and the top scoring move — by volume and by efficiency — across the dashboard, per-game analysis, the analytics explorer, and a Strike Moves sheet reached from both field annotators' Stats sheets.
 
 **Architecture:** One pure module, `js/strike_moves.js`, owns the entire calculation. Each of the four surfaces adapts its own row shape to a common `{type, name, strikeMove, actionOwner}` at the boundary and calls it. None of them re-implements the formula.
 
@@ -18,15 +18,38 @@
 - The formula lives in `TR.strikeMoveStats` and nowhere else. A surface that needs a variant passes a filtered event list; it does not compute rates itself.
 - Untagged attempts are excluded from rates. Every surface that shows a rate must also show `coverage`.
 - `coverage.total` counts attack-ending events only — never all events.
-- `'Other'` and `'Interception'` are real moves with their own rows. They are not "untagged".
+- `'Other'` and `'Interception'` are **excluded from every rate**: no row in `moves`, never `topByRate` or `topByTries`, counted as untagged in `coverage`. They remain selectable in the annotators. See the spec's amended decision for why — the two sides are asymmetric and both would otherwise sit at a 100% artefact rate and top both leaderboards.
+- **Never read the stored `Strike Move` column directly.** Always re-derive through `TR.strikeMoveOf(type, name, storedMove)` at the input boundary. `Code.gs`'s `updateRow` (the viewer's inline edit) writes only Name and Comment, so the stored column goes stale on edited rows.
+- `coverage` is reported **per side** — Try-side and failure-side separately. A Try always has a Name, so its coverage is 100% by construction and would inflate a combined figure.
 - `topByRate` requires `attempts >= TR.MIN_MOVE_ATTEMPTS` (2). `topByTries` has no threshold.
 - `rate` is a 0–1 number. Formatting to a percentage is each surface's job.
+- `ratesMeaningful` (`cov.fails.tagged > 0`) gates every rate and every top-move
+  tile. Every existing game has tries whose Name already encodes the move, but no
+  failure has ever been tagged - so with nothing in the denominator but successes,
+  `rate` computes to 1 for every move by construction, not because the move is
+  perfect. **Any surface that shows a rate, a rate column, a "best try rate" tile,
+  or a "top scoring move" derived from `rate` must check `ratesMeaningful` first**
+  and fall back to a tries/attempts-only presentation (still genuinely useful) plus
+  a short explanation, exactly as `dashboard.html` and both field annotators do.
+  This applies to Task 4 and Task 5 below, not yet built.
+- `ratesMeaningful` is a **dataset-level** gate only: the moment any one move
+  anywhere gets a tagged failure, it flips true for the whole call, and every
+  *other* move that has never itself failed still computes to `rate: 1` by
+  construction - the same artefact `ratesMeaningful` exists to catch, now hiding
+  behind a single tag. `moves[].rateKnown` (`fails > 0`) is the per-move version
+  of the same check, and `topByRate` already excludes a move with `rateKnown:
+  false` regardless of how high its rate reads. **A surface must not treat
+  `ratesMeaningful === true` as license to render every move's rate at full
+  strength: it still has to mark or exclude a move whose own `rateKnown` is
+  false**, the same way `dashboard.html`, `games.html`, and both field annotators
+  now do. This applies to Task 5 below, not yet built.
 
 ---
 
 ### Task 1: The `TR.strikeMoveStats` module
 
 **Files:**
+- Modify: `js/events.js` (add `TR.EXCLUDED_MOVES` beside `TR.STRIKE_MOVES`)
 - Create: `js/strike_moves.js`
 - Modify: `test.js:26` (module load list)
 - Modify: `tests.html:15` (script tags)
@@ -40,11 +63,29 @@
 
 ```js
 TR.strikeMoveStats(events: {type, name, strikeMove, actionOwner}[]) => {
-  moves:      { move: string, tries: number, fails: number, attempts: number, rate: number }[],
-  coverage:   { tagged: number, total: number, pct: number },
-  topByTries: { move, tries, fails, attempts, rate } | null,
-  topByRate:  { move, tries, fails, attempts, rate } | null,
+  moves:           { move: string, tries: number, fails: number, attempts: number,
+                     rate: number, rateKnown: boolean }[],
+                             // rateKnown = fails > 0. ratesMeaningful (below) is
+                             // dataset-level and flips true the instant ANY move
+                             // is seen to fail; rateKnown asks it per move, so a
+                             // move that has never itself failed can still be
+                             // marked/excluded even once ratesMeaningful is true.
+  coverage:        { tagged: number, total: number, pct: number,
+                     tries:  { tagged: number, total: number, pct: number },
+                     fails:  { tagged: number, total: number, pct: number } },
+  topByTries:      { move, tries, fails, attempts, rate, rateKnown } | null,
+  topByRate:       { move, tries, fails, attempts, rate, rateKnown } | null,
+                             // topByRate also requires rateKnown: true - an
+                             // untested move's construction-guaranteed 100%
+                             // must never win the crown.
+  ratesMeaningful: boolean,  // cov.fails.tagged > 0 - false means every `rate`
+                             // above is 1 by construction, not "perfect". Gate
+                             // any rate/top-move display on this (see Global
+                             // Constraints).
 }
+
+`TR.EXCLUDED_MOVES = ['Other', 'Interception']` — add it to `js/events.js` beside
+`TR.STRIKE_MOVES` in Task 1, so the annotators and the analytics agree on one list.
 ```
 
 - [ ] **Step 1: Write the failing tests**
@@ -65,6 +106,11 @@ test('empty input', () => {
 });
 
 test('null input is tolerated', () => assert.equal(TR.strikeMoveStats(null).moves.length, 0));
+
+test('excluded moves are Other and Interception',
+  () => assert.deepEqual(TR.EXCLUDED_MOVES, ['Other', 'Interception']));
+test('excluded moves are real entries of the picker list',
+  () => TR.EXCLUDED_MOVES.forEach(m => assert.ok(TR.STRIKE_MOVES.includes(m), m)));
 
 test('a try and a turnover on the same move', () => {
   const s = TR.strikeMoveStats([
@@ -101,13 +147,51 @@ test('untagged attempts are excluded from every move row', () => {
   assert.equal(s.moves[0].attempts, 1);
 });
 
-test('Other and Interception are real moves', () => {
+test('Other and Interception never get a row', () => {
   const s = TR.strikeMoveStats([
     ev('Try', 'Other', ''),
     ev('Turnover', 'Ball Down', 'Interception'),
   ]);
-  assert.deepEqual(s.moves.map(m => m.move).sort(), ['Interception', 'Other']);
-  assert.equal(s.coverage.tagged, 2);
+  assert.deepEqual(s.moves, []);
+  assert.equal(s.coverage.tagged, 0);
+  assert.equal(s.coverage.total, 2);
+  assert.equal(s.topByTries, null);
+  assert.equal(s.topByRate, null);
+});
+
+test('a Simple Mode game cannot top the board on Other', () => {
+  const s = TR.strikeMoveStats([
+    ev('Try', 'Other', ''), ev('Try', 'Other', ''), ev('Try', 'Other', ''),
+    ev('Try', '32', ''), ev('Turnover', 'Ball Down', '32'),
+  ]);
+  assert.equal(s.topByTries.move, '32');
+  assert.equal(s.topByRate.move, '32');
+});
+
+test('a stale stored move loses to the Name on a Try', () => {
+  // What a viewer Name edit leaves behind: Name corrected, column not.
+  const s = TR.strikeMoveStats([ev('Try', '32 - Cut', 'Other')]);
+  assert.deepEqual(s.moves.map(m => m.move), ['32 - Cut']);
+  assert.equal(s.moves[0].tries, 1);
+});
+
+test('a stale stored move is dropped when the name stops ending an attack', () => {
+  const s = TR.strikeMoveStats([ev('Turnover', '6 Again', '32')]);
+  assert.deepEqual(s.moves, []);
+  assert.equal(s.coverage.total, 0);
+});
+
+test('coverage is reported per side', () => {
+  const s = TR.strikeMoveStats([
+    ev('Try', '32', ''),                 // try side, tagged
+    ev('Try', 'Other', ''),              // try side, excluded -> untagged
+    ev('Turnover', 'Ball Down', '32'),   // fail side, tagged
+    ev('Turnover', 'Ball Down', ''),     // fail side, untagged
+    ev('Penalty Attack', 'Forward Pass', ''),
+  ]);
+  assert.deepEqual(s.coverage.tries, { tagged: 1, total: 2, pct: 0.5 });
+  assert.deepEqual(s.coverage.fails, { tagged: 1, total: 3, pct: 1 / 3 });
+  assert.equal(s.coverage.total, 5);
 });
 
 test('moves are sorted by rate descending', () => {
@@ -174,9 +258,22 @@ node test.js
 
 Expected: the run aborts with `ENOENT: no such file or directory, open 'js/strike_moves.js'`.
 
-- [ ] **Step 4: Write the implementation**
+- [ ] **Step 4: Add `TR.EXCLUDED_MOVES`, then write the module**
 
-Create `js/strike_moves.js`:
+First, in `js/events.js`, immediately after `TR.MIN_MOVE_ATTEMPTS`:
+
+```js
+// Selectable in the annotators, but never rate-bearing. On a Try these are what
+// "the annotator skipped the picker" looks like — annotator_field2 filters
+// 'Other' out of its sub-type strip, and Simple Mode names every Try 'Other' —
+// while on a failure that same skip yields ''. Counted as untagged so they
+// cannot sit at a 100% artefact rate and top both leaderboards. 'Interception'
+// on a try means a defensive intercept, not a called move off the tap, and has
+// no failure counterpart at all.
+TR.EXCLUDED_MOVES = ['Other', 'Interception'];
+```
+
+Then create `js/strike_moves.js`:
 
 ```js
 // Depends on js/events.js (TR.isAttackEnd, TR.strikeMoveOf, TR.MIN_MOVE_ATTEMPTS)
@@ -196,19 +293,29 @@ Create `js/strike_moves.js`:
 // owner is always the attacking team that ran the move.
 TR.strikeMoveStats = (events) => {
   const byMove = new Map();
-  let tagged = 0, total = 0;
+  const cov = { tries: { tagged: 0, total: 0 }, fails: { tagged: 0, total: 0 } };
 
   (events || []).forEach(e => {
     if (!e || !TR.isAttackEnd(e.type, e.name)) return;
-    total++;
+    const isTry = e.type === 'Try';
+    const side  = isTry ? cov.tries : cov.fails;
+    side.total++;
+    // Re-derived, never read from the stored column: the viewer's inline edit
+    // writes Name without touching Strike Move, so the column goes stale.
     const move = TR.strikeMoveOf(e.type, e.name, e.strikeMove);
-    if (!move) return;
-    tagged++;
+    // 'Other' and 'Interception' count as untagged. On a Try they are what
+    // "the annotator skipped the picker" looks like, while on a failure that
+    // same skip yields ''. Left in, they would sit at a 100% artefact rate.
+    if (!move || TR.EXCLUDED_MOVES.includes(move)) return;
+    side.tagged++;
     if (!byMove.has(move)) byMove.set(move, { move, tries: 0, fails: 0, attempts: 0, rate: 0 });
     const m = byMove.get(move);
     m.attempts++;
-    if (e.type === 'Try') m.tries++; else m.fails++;
+    if (isTry) m.tries++; else m.fails++;
   });
+
+  const tagged = cov.tries.tagged + cov.fails.tagged;
+  const total  = cov.tries.total  + cov.fails.total;
 
   const moves = [...byMove.values()];
   moves.forEach(m => { m.rate = m.attempts ? m.tries / m.attempts : 0; });
@@ -223,9 +330,16 @@ TR.strikeMoveStats = (events) => {
     b.tries - a.tries || b.rate - a.rate || a.move.localeCompare(b.move));
   const topByTries = byTries.length && byTries[0].tries > 0 ? byTries[0] : null;
 
+  const pct = c => (c.total ? c.tagged / c.total : 0);
   return {
     moves,
-    coverage: { tagged, total, pct: total ? tagged / total : 0 },
+    // Per side as well as combined: a Try always has a Name, so its coverage is
+    // 100% by construction and hides a sparse failure side when averaged in.
+    coverage: {
+      tagged, total, pct: total ? tagged / total : 0,
+      tries: { tagged: cov.tries.tagged, total: cov.tries.total, pct: pct(cov.tries) },
+      fails: { tagged: cov.fails.tagged, total: cov.fails.total, pct: pct(cov.fails) },
+    },
     topByTries,
     topByRate,
   };
@@ -443,10 +557,14 @@ function renderStrikeMoves() {
     tile('🏆 Most tries', stats.topByTries, m => `${m.tries} ${m.tries === 1 ? 'try' : 'tries'} from ${m.attempts} · ${pct(m.rate)}`) +
     tile('⚡ Best try rate', stats.topByRate, m => `${pct(m.rate)} · ${m.tries} from ${m.attempts}`);
 
+  // Failure-side coverage is the number that matters: the Try side is 100% by
+  // construction, so quoting only the combined figure flatters thin tagging.
+  const f = stats.coverage.fails;
   cover.textContent =
-    `Coverage: ${stats.coverage.tagged} of ${stats.coverage.total} attempts tagged ` +
-    `(${Math.round(stats.coverage.pct * 100)}%) · ` +
-    `ranked by rate over at least ${TR.MIN_MOVE_ATTEMPTS} attempts`;
+    `Coverage: ${f.tagged} of ${f.total} failed attempts tagged ` +
+    `(${Math.round(f.pct * 100)}%) · ` +
+    `ranked by rate over at least ${TR.MIN_MOVE_ATTEMPTS} attempts · ` +
+    `Other and Interception are not ranked`;
 
   const maxAttempts = Math.max(...stats.moves.map(m => m.attempts), 1);
   body.innerHTML = stats.moves.map(m => `<tr>
@@ -680,9 +798,10 @@ function renderGameStrikeMoves(events, team1, team2) {
     return;
   }
 
+  const f = all.coverage.fails;
   cover.textContent =
-    `Coverage: ${all.coverage.tagged} of ${all.coverage.total} attempts tagged ` +
-    `(${Math.round(all.coverage.pct * 100)}%). Single-game rates are noisy — read the counts first.`;
+    `Coverage: ${f.tagged} of ${f.total} failed attempts tagged ` +
+    `(${Math.round(f.pct * 100)}%). Single-game rates are noisy — read the counts first.`;
 
   grid.innerHTML = [team1, team2].map(team => {
     const s = TR.strikeMoveStats(events.filter(e => e['Action Owner'] === team));
@@ -822,30 +941,40 @@ git commit -m "feat(analytics): break failed attempts down by strike move"
 
 ---
 
-### Task 6: Field annotators — live Strike Moves in the Stats sheet
+### Task 6: Field annotators — a Strike Moves sheet off the Stats sheet
 
 **Files:**
 - Modify: `annotator_field.html:718` and `annotator_field2.html:982` (script tags)
-- Modify: `annotator_field.html` and `annotator_field2.html` — stats overlay markup
+- Modify: `annotator_field.html:929-947` and the matching `#statsOverlay` markup in `annotator_field2.html`
 - Modify: `annotator_field.html:1828` and the matching `refreshStats` in `annotator_field2.html`
 
 **Interfaces:**
 - Consumes: `TR.strikeMoveStats` (Task 1).
-- Produces: `renderStrikeMoveStats()` local to each page.
+- Produces: `openMoves()`, `closeMoves()`, `renderMoves()` local to each page.
 
-Both files get the same code. Repeat it rather than trying to share it — neither page loads the other, and the existing stats code is already duplicated between them.
+**Owner's decision (2026-09-07), which replaces an earlier inline-block design:**
+the moves do **not** sit inline in the Stats sheet. The Stats sheet gets a
+**tappable row** which opens a **second overlay on top of it**, listing every move
+tried **in order of success**. Rationale: the Stats sheet is already dense, and the
+move table is a different question ("what is working?") from the team comparison
+("who is winning?") — it deserves its own surface rather than another block to
+scroll past.
+
+Both files get the same code. Repeat it rather than sharing — neither page loads
+the other, and the existing stats code is already duplicated between them.
 
 - [ ] **Step 1: Load the module in both pages**
 
-In `annotator_field.html` after line 719 (`js/possession.js`) and in `annotator_field2.html` after line 983, add:
+In `annotator_field.html` after line 719 (`js/possession.js`) and in
+`annotator_field2.html` after line 983, add:
 
 ```html
 <script src="js/strike_moves.js"></script>
 ```
 
-- [ ] **Step 2: Add the markup to both stats overlays**
+- [ ] **Step 2: Add the tappable row to both Stats sheets**
 
-In `annotator_field.html` the stats card ends like this (`annotator_field.html:944-946`):
+`annotator_field.html:944-946` is the tail of the stats card:
 
 ```html
     <div class="stats-status" id="statsStatus"></div>
@@ -853,74 +982,173 @@ In `annotator_field.html` the stats card ends like this (`annotator_field.html:9
     <button class="stats-close-btn" onclick="closeStats()">Close</button>
 ```
 
-Insert the new block between `statsBody` and the Close button, in both files (the v2 markup is structurally identical):
+Insert the row between `statsBody` and the Close button, in both files:
 
 ```html
-      <div class="stats-block">
-        <div class="stats-block-title">Strike moves</div>
-        <div id="statsMoveCoverage" class="stats-move-coverage"></div>
-        <div id="statsMoveRows"></div>
-      </div>
+      <button class="stats-drill" id="movesDrill" onclick="openMoves()">
+        <span class="stats-drill-label">Strike moves</span>
+        <span class="stats-drill-meta" id="movesDrillMeta"></span>
+        <span class="stats-drill-chev">›</span>
+      </button>
 ```
 
-with:
+`#movesDrillMeta` carries the summary so the row is worth tapping — the best move
+and the tagged count — set in Step 4. Style it as a row, not a card, so it reads
+as a way further in rather than as another statistic:
 
 ```css
-  .stats-move-coverage { font-size: 0.68rem; color: #8a93a6; margin-bottom: 6px; }
-  .stats-move-row { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; padding: 3px 0; font-size: 0.78rem; border-top: 1px solid #1e2433; }
-  .stats-move-row .count { color: #8a93a6; }
-  .stats-move-row .rate.thin { color: #55607a; }
+  .stats-drill { display: flex; align-items: center; gap: 10px; width: 100%;
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px;
+    color: var(--text); font: inherit; text-align: left; padding: 12px 14px;
+    margin-top: 10px; cursor: pointer; min-height: 52px; }
+  .stats-drill:active { background: var(--surface); }
+  .stats-drill-label { font-weight: 600; font-size: 0.9rem; }
+  .stats-drill-meta { margin-left: auto; font-size: 0.72rem; color: var(--text-dim);
+    text-align: right; }
+  .stats-drill-chev { color: var(--text-dim); font-size: 1.1rem; }
 ```
 
-- [ ] **Step 3: Render it from `refreshStats` in both files**
+- [ ] **Step 3: Add the second overlay**
 
-Add `renderStrikeMoveStats();` at the end of `refreshStats` in each file, and add this function beside it in each:
+Add a sibling overlay after `#statsOverlay` closes, in both files. It layers above
+the Stats sheet — opening it does not close Stats, so Back returns there.
+
+```html
+<div id="movesOverlay" onclick="if(event.target===this)closeMoves()">
+  <div id="movesCard">
+    <div class="stats-handle"></div>
+    <div class="moves-head">
+      <button class="moves-back" onclick="closeMoves()">‹ Stats</button>
+      <div class="moves-title">Strike moves</div>
+    </div>
+    <div class="moves-cov" id="movesCov"></div>
+    <div id="movesBody"></div>
+    <button class="stats-close-btn" onclick="closeMoves()">Close</button>
+  </div>
+</div>
+```
+
+Match `#statsOverlay`'s own positioning rules (read them first — they differ
+between phone and the wider breakpoint) and give it a higher `z-index` so it sits
+above the Stats sheet rather than beside it:
+
+```css
+  #movesOverlay { position: fixed; inset: 0; z-index: 60; display: none;
+    background: rgba(0,0,0,0.55); align-items: flex-end; justify-content: center; }
+  #movesOverlay.open { display: flex; }
+  #movesCard { background: var(--surface); width: 100%; max-width: 560px;
+    border-radius: 16px 16px 0 0; padding: 0 16px 16px; max-height: 88dvh;
+    overflow-y: auto; }
+  .moves-head { display: flex; align-items: center; gap: 10px; padding: 4px 0 10px; }
+  .moves-back { background: none; border: none; color: var(--accent); font: inherit;
+    font-size: 0.86rem; padding: 6px 0; cursor: pointer; }
+  .moves-title { font-weight: 600; font-size: 1rem; margin-left: auto;
+    margin-right: auto; padding-right: 48px; }
+  .moves-cov { font-size: 0.7rem; color: var(--text-dim); padding-bottom: 8px; }
+  .moves-row { display: grid; grid-template-columns: 22px 1fr auto 46px; gap: 10px;
+    align-items: center; padding: 9px 0; border-top: 1px solid var(--border);
+    font-size: 0.84rem; }
+  .moves-rank { color: var(--text-dim); font-size: 0.72rem;
+    font-variant-numeric: tabular-nums; }
+  .moves-bar { grid-column: 2 / 5; height: 4px; border-radius: 2px;
+    background: var(--border); margin-top: -4px; }
+  .moves-bar span { display: block; height: 100%; border-radius: 2px;
+    background: var(--try, #22c55e); }
+  .moves-count { color: var(--text-dim); font-size: 0.76rem;
+    font-variant-numeric: tabular-nums; }
+  .moves-rate { text-align: right; font-weight: 600;
+    font-variant-numeric: tabular-nums; }
+  .moves-rate.thin { color: var(--text-dim); font-weight: 400; }
+  .moves-empty { color: var(--text-dim); font-size: 0.82rem; padding: 20px 0;
+    text-align: center; }
+```
+
+- [ ] **Step 4: Render both surfaces**
+
+`TR.strikeMoveStats` already returns `moves` sorted by rate descending, which is
+"in order of success" — do not re-sort. Add `renderMoves();` at the end of
+`refreshStats` in each file (it refreshes the drill row's summary, and the overlay
+too when it is open, so the 5-second tick keeps both live), then add:
 
 ```js
-// Live move rates. In-game samples are tiny, so the rate is greyed until the
-// move has enough attempts for it to mean anything — the counts always show.
-function renderStrikeMoveStats() {
-  const s    = TR.strikeMoveStats(annotations);
-  const cov  = document.getElementById('statsMoveCoverage');
-  const rows = document.getElementById('statsMoveRows');
+// The Stats sheet answers "who is winning"; this answers "what is working", so it
+// gets its own surface rather than another block to scroll past. Sorted by rate
+// descending straight from the module — that is the "order of success".
+// In-game samples are tiny, so a rate below MIN_MOVE_ATTEMPTS is shown but
+// de-emphasised, and the raw tries/attempts count always sits beside it.
+function renderMoves() {
+  const s = TR.strikeMoveStats(annotations);
+
+  const meta = document.getElementById('movesDrillMeta');
+  if (meta) {
+    const best = s.topByRate || s.topByTries;
+    meta.textContent = best
+      ? `${best.move} · ${Math.round(best.rate * 100)}%`
+      : (s.coverage.fails.total ? 'none tagged yet' : '—');
+  }
+
+  const cov  = document.getElementById('movesCov');
+  const body = document.getElementById('movesBody');
+  if (!cov || !body) return;
+
   if (!s.moves.length) {
     cov.textContent = '';
-    rows.innerHTML = '<div style="color:#8a93a6;font-size:0.76rem">No moves tagged yet.</div>';
+    body.innerHTML = '<div class="moves-empty">No moves tagged yet. Pick a move '
+      + 'after a turnover or attack penalty and they show up here.</div>';
     return;
   }
-  cov.textContent = `${s.coverage.tagged} of ${s.coverage.total} attempts tagged`;
-  rows.innerHTML = s.moves.map(m => {
+
+  // Failure-side coverage is the honest number: every try has a name, so the
+  // try side reads 100% by construction.
+  const f = s.coverage.fails;
+  cov.textContent = `${f.tagged} of ${f.total} failed attempts tagged`
+    + ` · best first · ${TR.MIN_MOVE_ATTEMPTS}+ attempts to rank`;
+
+  body.innerHTML = s.moves.map((m, i) => {
     const thin = m.attempts < TR.MIN_MOVE_ATTEMPTS;
-    return `<div class="stats-move-row">
-      <span>${m.move}</span>
-      <span class="count">${m.tries}/${m.attempts}</span>
-      <span class="rate${thin ? ' thin' : ''}">${(m.rate * 100).toFixed(0)}%</span>
-    </div>`;
+    return `<div class="moves-row">
+        <span class="moves-rank">${i + 1}</span>
+        <span>${m.move}</span>
+        <span class="moves-count">${m.tries}/${m.attempts}</span>
+        <span class="moves-rate${thin ? ' thin' : ''}">${Math.round(m.rate * 100)}%</span>
+      </div>
+      <div class="moves-bar"><span style="width:${Math.round(m.rate * 100)}%"></span></div>`;
   }).join('');
+}
+
+function openMoves() {
+  renderMoves();
+  document.getElementById('movesOverlay').classList.add('open');
+}
+
+function closeMoves() {
+  document.getElementById('movesOverlay').classList.remove('open');
 }
 ```
 
-`annotations` in both files already carries `type`, `name` and `strikeMove`, which is exactly the shape `TR.strikeMoveStats` expects — no adapter needed.
+- [ ] **Step 5: Verify manually**
 
-- [ ] **Step 4: Verify manually**
+Serve the repo and open `annotator_field.html` at a 375px width, logged in as
+`m30-admin`. Confirm:
 
-```bash
-python3 -m http.server 8000
-```
+1. Open Stats on a game with no moves tagged. Expected: the **Strike moves** row is
+   present showing `—`, and tapping it opens the overlay with the empty-state text.
+2. Tag a turnover, set its move to `32 - Cut`, then score a try with `32 - Cut`.
+   Reopen. Expected: the drill row reads `32 - Cut · 50%`, and the overlay lists
+   `1  32 - Cut  1/2  50%` with a half-width bar.
+3. Tag a second move with a worse rate. Expected: it sorts **below** the better one.
+4. A move with a single attempt. Expected: its rate is de-emphasised, its count
+   still legible.
+5. Tap **‹ Stats** and the scrim. Expected: both return to the Stats sheet, which is
+   still open behind — not to the game.
+6. Leave the overlay open for 5+ seconds after tagging. Expected: it refreshes.
+7. Repeat all of it in `annotator_field2.html`.
 
-Open `http://localhost:8000/annotator_field.html` on a phone-sized viewport, log in with `m30-admin`. Expected:
-
-1. Open Stats on a game with no moves tagged. Expected: "No moves tagged yet.", no errors.
-2. Tag a turnover with a move, reopen Stats. Expected: a row for that move, `0/1`, with the rate greyed.
-3. Score a try on the same move. Expected: the row becomes `1/2` at 50%, no longer greyed.
-4. Leave Stats open for 5 seconds after tagging. Expected: it refreshes on its own.
-5. Repeat all of the above in `annotator_field2.html`.
-
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add annotator_field.html annotator_field2.html
-git commit -m "feat(field-annotators): live strike move rates in the stats sheet"
+git commit -m "feat(field-annotators): a strike moves sheet off the stats sheet"
 ```
 
 ---
@@ -944,7 +1172,7 @@ In `README.md`:
 - Under **Game Analysis**, add: a per-game **Strike Moves** card, split by team.
 - Under **Event Viewer**, note that `Strike Move` is filterable.
 
-In `FIELD_ANNOTATOR.md` and `FIELD_ANNOTATOR_V2.md`, add to the Stats-sheet sections: a **Strike moves** block listing tries-over-attempts and a rate per move, greyed below 2 attempts.
+In `FIELD_ANNOTATOR.md` and `FIELD_ANNOTATOR_V2.md`, add to the Stats-sheet sections: the sheet carries a tappable **Strike moves** row showing the best move at a glance, which opens a second sheet listing every move tried in order of success — tries-over-attempts beside a rate, de-emphasised below 2 attempts. Say why it is a separate sheet: the Stats sheet answers who is winning, this answers what is working.
 
 Add to the top of the Dashboard entry in `README.md`:
 
@@ -987,6 +1215,6 @@ git commit -m "docs: document strike move analytics; bump shell cache"
 - [ ] Team Detail cards keep their existing ranking and gain a rate where the sample allows.
 - [ ] Game Analysis shows a per-game, per-team breakdown.
 - [ ] Analytics can break Try / Turnover / Penalty Attack down by strike move.
-- [ ] Both field annotators show live move rates in Stats.
+- [ ] Both field annotators have a tappable Strike moves row in Stats that opens a second sheet listing every move in order of success, and Back returns to Stats rather than to the game.
 - [ ] Every surface degrades cleanly to an empty state on data tagged before Phase 1.
 - [ ] The formula exists only in `js/strike_moves.js` — `grep -rn "tries.*attempts\|/ *m.attempts" *.html` finds no second implementation.

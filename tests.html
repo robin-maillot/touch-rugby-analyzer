@@ -19,6 +19,7 @@
   <script src="js/possession.js"></script>
   <script src="js/consistency.js"></script>
   <script src="js/player.js"></script>
+  <script src="js/strike_moves.js"></script>
 
   <script src="https://code.jquery.com/qunit/qunit-2.21.0.js"></script>
   <script>
@@ -156,6 +157,37 @@
     });
   });
 
+  QUnit.module('TR.strikeMoveOf', () => {
+    QUnit.test('a Try uses its own name', t => {
+      t.equal(TR.strikeMoveOf('Try', '33 - Quicky', ''), '33 - Quicky');
+      t.equal(TR.strikeMoveOf('Try', '33 - Quicky', 'Scoop'), '33 - Quicky');
+    });
+    QUnit.test('a failed attempt uses its stored move', t => {
+      t.equal(TR.strikeMoveOf('Turnover', 'Ball Down', '32 - Cut'), '32 - Cut');
+      t.equal(TR.strikeMoveOf('Penalty Attack', 'Forward Pass', '23'), '23');
+    });
+    QUnit.test('events that keep possession carry no move', t => {
+      t.equal(TR.strikeMoveOf('Turnover', '6 Again', '32'), '');
+      t.equal(TR.strikeMoveOf('Penalty Defence', 'Offside', '32'), '');
+      t.equal(TR.strikeMoveOf('Game Event', 'Game Start', '32'), '');
+    });
+    QUnit.test('untagged is empty', t => {
+      t.equal(TR.strikeMoveOf('Turnover', 'Ball Down', ''), '');
+      t.equal(TR.strikeMoveOf('Turnover', 'Ball Down', undefined), '');
+    });
+  });
+
+  QUnit.module('TR.isAttackEnd', () => {
+    QUnit.test('true only when the ball changes hands', t => {
+      t.equal(TR.isAttackEnd('Try', '32 - Cut'), true);
+      t.equal(TR.isAttackEnd('Penalty Attack', 'Forward Pass'), true);
+      t.equal(TR.isAttackEnd('Turnover', 'Ball Down'), true);
+      t.equal(TR.isAttackEnd('Turnover', '6 Again'), false);
+      t.equal(TR.isAttackEnd('Penalty Defence', 'Offside'), false);
+      t.equal(TR.isAttackEnd('Game Event', 'Game Start'), false);
+    });
+  });
+
   // ── TR.inferPossessionAfter ────────────────────────────────────
   QUnit.module('TR.inferPossessionAfter', () => {
     QUnit.test('Try → other team gets possession', t => {
@@ -200,6 +232,94 @@
     });
     QUnit.test('Ball Live → possession owner', t => {
       t.equal(TR.inferActionOwner('Team 1', 'Game Event', 'Ball Live'), 'Team 1');
+    });
+  });
+
+  // ── TR.strikeMoveStats ───────────────────────────────────────
+  QUnit.module('TR.strikeMoveStats', () => {
+    const ev = (type, name, strikeMove) => ({ type, name, strikeMove, actionOwner: 'Team 1' });
+    QUnit.test('rate over tries and fails', t => {
+      const s = TR.strikeMoveStats([ev('Try', '32 - Cut', ''), ev('Turnover', 'Ball Down', '32 - Cut')]);
+      t.equal(s.moves.length, 1);
+      t.equal(s.moves[0].rate, 0.5);
+      t.equal(s.moves[0].attempts, 2);
+    });
+    QUnit.test('coverage counts attack-ends only', t => {
+      const s = TR.strikeMoveStats([
+        ev('Try', 'Scoop', ''), ev('Turnover', 'Ball Down', '32'), ev('Turnover', 'Ball Down', ''),
+        ev('Turnover', '6 Again', '32'), ev('Penalty Defence', 'Offside', '32'),
+      ]);
+      t.equal(s.coverage.total, 3);
+      t.equal(s.coverage.tagged, 2);
+    });
+    QUnit.test('topByRate needs two attempts, topByTries does not', t => {
+      const s = TR.strikeMoveStats([
+        ev('Try', 'Scoop', ''),
+        ev('Try', '32', ''), ev('Try', '32', ''), ev('Turnover', 'Ball Down', '32'),
+      ]);
+      t.equal(s.topByRate.move, '32');
+      t.equal(s.topByTries.move, '32');
+    });
+    QUnit.test('ratesMeaningful is false with no events at all', t => {
+      t.equal(TR.strikeMoveStats([]).ratesMeaningful, false);
+    });
+    QUnit.test('ratesMeaningful is false when tries are tagged but no failure ever is', t => {
+      const s = TR.strikeMoveStats([ev('Try', '32 - Cut', ''), ev('Try', '23 - Scoop', '')]);
+      t.equal(s.moves.length, 2);
+      t.ok(s.moves.every(m => m.rate === 1));
+      t.equal(s.ratesMeaningful, false);
+    });
+    QUnit.test('ratesMeaningful is true once at least one failure is tagged', t => {
+      const s = TR.strikeMoveStats([ev('Try', '32 - Cut', ''), ev('Turnover', 'Ball Down', '32 - Cut')]);
+      t.equal(s.ratesMeaningful, true);
+    });
+    QUnit.test('ratesMeaningful is a dataset-level gate, not per-move', t => {
+      const s = TR.strikeMoveStats([
+        ev('Try', '32 - Cut', ''), ev('Try', '32 - Cut', ''),
+        ev('Turnover', 'Ball Down', '23 - Scoop'),
+      ]);
+      t.equal(s.ratesMeaningful, true);
+    });
+    QUnit.test('ratesMeaningful is false when failures exist but none are tagged', t => {
+      const s = TR.strikeMoveStats([ev('Try', '32 - Cut', ''), ev('Turnover', 'Ball Down', '')]);
+      t.equal(s.ratesMeaningful, false);
+    });
+    QUnit.test('a move with fails > 0 has rateKnown true', t => {
+      const s = TR.strikeMoveStats([ev('Try', '32 - Cut', ''), ev('Turnover', 'Ball Down', '32 - Cut')]);
+      t.equal(s.moves[0].rateKnown, true);
+    });
+    QUnit.test('a move with 0 fails has rateKnown false even when ratesMeaningful is true', t => {
+      const s = TR.strikeMoveStats([
+        ev('Try', '32 - Cut', ''), ev('Try', '32 - Cut', ''),
+        ev('Turnover', 'Ball Down', '23 - Scoop'),
+      ]);
+      t.equal(s.ratesMeaningful, true);
+      const cut = s.moves.find(m => m.move === '32 - Cut');
+      t.equal(cut.rate, 1);
+      t.equal(cut.rateKnown, false);
+    });
+    QUnit.test('topByRate skips a 0-fail 100% move for a lower-rated move that has actually failed', t => {
+      const s = TR.strikeMoveStats([
+        ev('Try', '32 - Cut', ''), ev('Try', '32 - Cut', ''),
+        ev('Try', '23 - Scoop', ''), ev('Try', '23 - Scoop', ''),
+        ev('Turnover', 'Ball Down', '23 - Scoop'),
+      ]);
+      t.equal(s.topByRate.move, '23 - Scoop');
+    });
+    QUnit.test('topByRate is null when every qualifying move has 0 fails', t => {
+      const s = TR.strikeMoveStats([
+        ev('Try', '32 - Cut', ''), ev('Try', '32 - Cut', ''),
+        ev('Try', '23 - Scoop', ''), ev('Try', '23 - Scoop', ''),
+      ]);
+      t.equal(s.topByRate, null);
+    });
+    QUnit.test('topByTries still returns the 0-fail move when it leads on volume', t => {
+      const s = TR.strikeMoveStats([
+        ev('Try', '32 - Cut', ''), ev('Try', '32 - Cut', ''), ev('Try', '32 - Cut', ''),
+        ev('Try', '23 - Scoop', ''), ev('Turnover', 'Ball Down', '23 - Scoop'),
+      ]);
+      t.equal(s.topByTries.move, '32 - Cut');
+      t.equal(s.topByTries.tries, 3);
     });
   });
   </script>

@@ -66,21 +66,36 @@ Tests also run automatically in CI and must pass before each deployment.
 
 Charts and statistics for a single game. Select a game from the dropdown to load it. Only games marked **Analyzable** in `_metadata` are shown. Displays possession charts, try timelines, penalty breakdowns, and half-by-half stats.
 
+Also includes a per-game **Strike Moves** card, split into one table per team. A single game rarely gives a move enough attempts for a percentage to mean anything, so counts (tries / fails) lead and the rate column is secondary — dropped entirely for a team with no failed attempts tagged, same as the Dashboard's gating.
+
 ---
 
 ### Dashboard (`dashboard.html`)
 *Available to all*
 
+> Try rates only count attempts where a move was actually tagged. The coverage
+> figure says how many that is — a 60% rate over 15% coverage is a much weaker
+> claim than the same rate over 80%.
+
 Aggregate view across all analysable games. Shows team rankings, cumulative try charts, and cross-game comparisons.
+
+**Strike Moves** — a cross-game try rate per move, with two top-move tiles: most tries (by volume) and best try rate (needs at least 2 attempts, and only counts once a failure on that specific move has been tagged — a move that has never been seen to fail reads 100% by construction, not performance). `Other` and `Interception` are excluded from the table and from both tiles: on a Try, "the annotator skipped the picker" is `Other`, but on a failure the same skip yields blank, so left in, `Other` would accrue tries with almost no fails and top the board on an artefact. A coverage figure reports how many failed attempts (Turnover / Penalty Attack) carry a tagged move — the failure side is the honest number, since every Try has a Name and reads 100% by construction regardless of tagging effort. **Until a failure is tagged anywhere, the section shows a try-count breakdown instead of rates and says so plainly** — that's the state of the data today (2,022 failed attempts across all games, none tagged). The same gated rate appears per move on each team's **Team Detail** card, alongside its existing try-type ranking.
+
+---
+
+### Analytics (`analytics.html`)
+*Available to all*
+
+Cross-game exploration: event-type and sub-type breakdowns, team-linkage and top-combination tables, filterable by year, competition, division, event type and team. Selecting a single event type (Type filter) reveals a **by strike move** checkbox for Try / Turnover / Penalty Attack — it swaps the sub-type breakdown chart for a strike-move breakdown, with untagged attempts shown as their own `(untagged)` bar rather than dropped.
 
 ---
 
 ### Event Viewer (`viewer.html`)
 *Available to all*
 
-Searchable, filterable table of every event across all games. Clicking a row with a YouTube link plays the video at that timestamp. Supports filtering by Type, Name, Possession Owner, Action Owner, and Game. Events without a YouTube link are hidden.
+Searchable, filterable table of every event across all games. Clicking a row with a YouTube link plays the video at that timestamp. Supports filtering by Type, Name, Strike Move, Possession Owner, Action Owner, and Game. Events without a YouTube link are hidden.
 
-**Admin extras:** Name and Comment cells become editable inline. Name shows a dropdown with the same options as the annotator (depends on Type). A **💾 Save N changes** button appears in the toolbar when edits are pending and sends all changes to the sheet in one request.
+**Admin extras:** Name and Comment cells become editable inline. Name shows a dropdown with the same options as the annotator (depends on Type). On `Turnover` and `Penalty Attack` rows, the Strike Move is also editable as a dropdown nested under the Name (Try rows have none — a Try's move is its Name; `6 Again` and Penalty Defence never carry one). The sheet re-derives the Strike Move on save, so correcting a Name can't leave a stale move behind. A **💾 Save N changes** button appears in the toolbar when edits are pending and sends all changes to the sheet in one request.
 
 ---
 
@@ -106,6 +121,7 @@ The main tool for tagging events against a match video (local file or YouTube).
 |---|---|---|
 | Try | `T` | Try scored by the possession team. Sub-types: Scoop, 32, 23, 33, 32 - Cut, 32 - Long, 32 - Quicky, 32 - Scoop, 23 - Backdoor, 23 - Quicky, 23 - Scoop, 33 - Backdoor, 33 - Cut, 33 - Quicky, 33 - Scoop, French Flair, Other |
 | Turnover | `U` | Ball changes hands. Sub-types: Ball Down, 6th Touch, Dummy Touch, Bad Roll, 6 Again, Interception, Other |
+| Strike move | `1`–`9` | Optional second stage after a Turnover or Pen Attack sub-type — which move was being run. `Enter` or **✕ Skip** skips just the move; `Escape` abandons the whole in-progress tag. Not offered in Simple Mode. |
 | Pen Attack | `P` | Penalty against the defence (attacking team benefits) |
 | Pen Defence | `Q` | Penalty against the attack (defending team benefits, possession switches) |
 | Game Event | `G` | Game Start or Game End — tag first so possession can be inferred |
@@ -204,7 +220,9 @@ Transient live game state. One row per active live session. Columns: `Sheet Name
 
 ### Game tabs
 
-Each game is a separate sheet tab named `YEAR_DIVISION_COMPETITION_TEAM1_TEAM2`. Columns: `Time`, `Possession Owner`, `Type`, `Name`, `To Review`, `Comment`, `Youtube Link`, `Action Owner`.
+Each game is a separate sheet tab named `YEAR_DIVISION_COMPETITION_TEAM1_TEAM2`. Columns: `Time`, `Possession Owner`, `Type`, `Name`, `To Review`, `Comment`, `Youtube Link`, `Action Owner`, `Strike Move`.
+
+**Strike Move** — which attacking move the attempt was running. A Try's move is its own `Name`; a Turnover or Pen Attack can record the move that failed, which is what makes a try rate per move possible. Always optional, and never set on `6 Again` or Penalty Defence, since the attack keeps the ball there.
 
 ### Deploying updates
 

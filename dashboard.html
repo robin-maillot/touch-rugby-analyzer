@@ -54,6 +54,23 @@
     .td-bar { height: 100%; border-radius: 3px; background: var(--green); }
     .td-pct { color: var(--muted); font-size: 0.68rem; width: 34px; text-align: right; flex-shrink: 0; }
     .td-empty { color: var(--dim); font-size: 0.75rem; }
+    .td-rate { font-size: 0.66rem; color: #22c55e; white-space: nowrap; }
+
+    /* ── Strike Moves ───────────────────────────────────────── */
+    .strike-move-tops { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+    .strike-move-top { background: #141925; border-radius: 6px; padding: 8px 12px; flex: 1 1 200px; }
+    .strike-move-top .label { font-size: 0.68rem; color: var(--dim); text-transform: uppercase; letter-spacing: 0.04em; }
+    .strike-move-top .value { font-size: 1.05rem; font-weight: 600; }
+    .strike-move-top .detail { font-size: 0.72rem; color: var(--dim); }
+    .strike-move-coverage { font-size: 0.72rem; color: var(--dim); margin-bottom: 8px; }
+    .strike-move-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+    .strike-move-table th { text-align: left; color: var(--dim); font-weight: 500; padding: 4px 6px; }
+    .strike-move-table td { padding: 4px 6px; border-top: 1px solid #1e2433; }
+    .strike-move-bar { height: 6px; border-radius: 3px; background: #22c55e; }
+  .rate-untested { color: var(--dim); font-style: italic; }
+    .strike-move-empty { font-size: 0.78rem; color: var(--dim); padding: 8px 0; }
+    .strike-move-notice { font-size: 0.75rem; color: var(--orange); background: rgba(255,152,0,.08);
+      border: 1px solid rgba(255,152,0,.25); border-radius: 6px; padding: 8px 12px; margin-bottom: 10px; }
 
     /* ── Loading ────────────────────────────────────────────── */
     #loadingArea { text-align: center; padding: 80px; color: var(--muted); font-size: 0.9rem; }
@@ -168,6 +185,8 @@
     }
   </style>
 <script src="js/config.js"></script>
+<script src="js/events.js"></script>
+<script src="js/strike_moves.js"></script>
 <script src="js/utils.js"></script>
 </head>
 <body>
@@ -294,6 +313,28 @@
       </div>
     </div>
 
+    <!-- Strike Moves -->
+    <div class="section">
+      <div class="section-header" onclick="toggleSection('strike-moves-body')">
+        <div class="section-label">Strike Moves</div>
+        <span class="section-toggle">▾</span>
+      </div>
+      <div id="strike-moves-body" class="section-body">
+        <div id="strike-move-tops" class="strike-move-tops"></div>
+        <div id="strike-move-coverage" class="strike-move-coverage"></div>
+        <table class="strike-move-table">
+          <thead><tr>
+            <th>Move</th><th>Tries</th><th>Fails</th><th>Attempts</th><th id="strike-move-rate-th">Try rate</th><th></th>
+          </tr></thead>
+          <tbody id="strike-move-rows"></tbody>
+        </table>
+        <div id="strike-move-empty" class="strike-move-empty" style="display:none">
+          No strike moves tagged yet. Tag the move on turnovers and attack penalties
+          in any annotator, and these rates fill in.
+        </div>
+      </div>
+    </div>
+
     <!-- Game Results -->
     <div class="section">
       <div class="section-label">Results</div>
@@ -393,6 +434,7 @@ function processData(rows) {
 
   const TYI = col('type'), NAI = col('name'), POI = col('possession owner');
   const AOI = col('action owner'), GI = col('game');
+  const SMI = col('strike move');   // -1 on data pushed before Phase 1
   const T1I = col('team 1'), T2I = col('team 2');
   const COMPI = col('competition'), YEARI = col('year'), DIVI = col('division');
 
@@ -421,6 +463,7 @@ function processData(rows) {
     const turnTypes     = {};
     const tryTypes      = {};
     const teamTryTypes  = { [t1]: {}, [t2]: {} };
+    const moveEvents    = [];
     let prevOwner = null, hasStart = false, hasEnd = false;
 
     gRows.forEach(row => {
@@ -428,6 +471,12 @@ function processData(rows) {
       const name   = (row[NAI] || '').trim();
       const action = res(row[AOI]);
       const owner  = res(row[POI]);
+
+      // Every attack-ending event, normalised for TR.strikeMoveStats. Action
+      // owner is the attacking team on a Try, Turnover and Pen Attack alike.
+      if (TR.isAttackEnd(type, name)) {
+        moveEvents.push({ type, name, strikeMove: SMI >= 0 ? (row[SMI] || '').trim() : '', actionOwner: action });
+      }
 
       if (type === 'Game Event' && name === 'Game Start') { hasStart = true; prevOwner = null; }
       if (type === 'Game Event' && name === 'Game End')   { hasEnd   = true; }
@@ -459,7 +508,7 @@ function processData(rows) {
       year: (f[YEARI] || '').trim(),
       division: (f[DIVI] || '').trim().toUpperCase(),
       tries, pens, turns, poss,
-      penTypes, turnTypes, tryTypes, teamTryTypes,
+      penTypes, turnTypes, tryTypes, teamTryTypes, moveEvents,
       winner: s1 > s2 ? t1 : s2 > s1 ? t2 : null,
       analysed: hasStart && hasEnd,
     };
@@ -476,6 +525,7 @@ function aggregateTeams(games) {
         games: 0, wins: 0, losses: 0, draws: 0,
         triesFor: 0, triesAgt: 0, pens: 0, turns: 0, poss: 0,
         tryTypes: {},
+        moveEvents: [],
       };
       const opp = team === g.t1 ? g.t2 : g.t1;
       const t = map[key];
@@ -488,6 +538,9 @@ function aggregateTeams(games) {
       Object.entries(g.teamTryTypes[team] || {}).forEach(([n, c]) => {
         t.tryTypes[n] = (t.tryTypes[n] || 0) + c;
       });
+      // Only this team's own attempts: on a Try, Turnover and Pen Attack alike
+      // the action owner is the attacking team that ran the move.
+      (g.moveEvents || []).forEach(e => { if (e.actionOwner === team) t.moveEvents.push(e); });
       if      (g.winner === team) t.wins++;
       else if (g.winner === opp)  t.losses++;
       else if (g.analysed)        t.draws++;
@@ -513,6 +566,7 @@ function renderDashboard() {
   populateH2H();
   renderH2H();
   renderTeamDetail();
+  renderStrikeMoves();
   renderResults();
 }
 
@@ -532,6 +586,8 @@ function renderTeamDetail(filter) {
 
   grid.innerHTML = teams.map(t => {
     const total = t.triesFor;
+    const moveStats = TR.strikeMoveStats(t.moveEvents || []);
+    const rateOf    = new Map(moveStats.moves.map(m => [m.move, m]));
     const top3  = Object.entries(t.tryTypes)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3);
@@ -541,11 +597,21 @@ function renderTeamDetail(filter) {
       ? top3.map(([name, count], i) => {
           const pct     = total ? Math.round(count / total * 100) : 0;
           const barPct  = Math.round(count / maxCount * 100);
+          const m       = rateOf.get(name);
+          // Only shown once this team has enough attempts on the move for the
+          // rate to mean anything; the share-of-tries figure is always there.
+          // Even then, a move this team has never seen fail reads 100% by
+          // construction rather than performance - dimmed the same way the
+          // Strike Moves table dims a sub-threshold rate.
+          const rateTxt = moveStats.ratesMeaningful && m && m.attempts >= TR.MIN_MOVE_ATTEMPTS
+            ? `<span class="td-rate"${m.rateKnown ? '' : ' style="color:var(--dim)"'} title="${m.tries} from ${m.attempts} attempts">${Math.round(m.rate * 100)}% scored</span>`
+            : '';
           return `<div class="td-row">
             <span class="td-rank">${i + 1}</span>
             <span class="td-try-name">${name}</span>
             <div class="td-bar-wrap"><div class="td-bar" style="width:${barPct}%"></div></div>
             <span class="td-pct">${pct}%</span>
+            ${rateTxt}
           </div>`;
         }).join('')
       : `<div class="td-empty">No try data</div>`;
@@ -555,6 +621,94 @@ function renderTeamDetail(filter) {
       ${rows}
     </div>`;
   }).join('');
+}
+
+// ── Strike Moves ──────────────────────────────────────────────────
+function renderStrikeMoves() {
+  const stats  = TR.strikeMoveStats(gameStats.flatMap(g => g.moveEvents || []));
+  const tops   = document.getElementById('strike-move-tops');
+  const cover  = document.getElementById('strike-move-coverage');
+  const body   = document.getElementById('strike-move-rows');
+  const empty  = document.getElementById('strike-move-empty');
+  const rateTh = document.getElementById('strike-move-rate-th');
+  const pct    = r => (r * 100).toFixed(1) + '%';
+
+  if (!stats.moves.length) {
+    tops.innerHTML = ''; cover.innerHTML = ''; body.innerHTML = '';
+    rateTh.style.display = '';
+    empty.style.display = '';
+    return;
+  }
+  empty.style.display = 'none';
+
+  // A rate needs failures in its denominator. With none tagged, every move
+  // here would compute to 1 by construction - not "perfect", unknown - so
+  // there is nothing to crown and no column worth showing.
+  if (!stats.ratesMeaningful) {
+    rateTh.style.display = 'none';
+
+    tops.innerHTML = `<div class="strike-move-notice">
+        Try rates need failures tagged to mean anything. Every move below would
+        otherwise show 100%, because no turnover or attack penalty has been
+        tagged with a move yet — tag the move on turnovers and attack
+        penalties, not just tries, to unlock real rates.
+      </div>`;
+
+    const f = stats.coverage.fails;
+    cover.textContent = `No failed attempts are tagged yet` +
+      (f.total ? ` (0 of ${f.total})` : '') +
+      ` · this is a try-count breakdown only, not a rate ranking.`;
+
+    const byTries  = stats.moves.slice().sort((a, b) => b.tries - a.tries || a.move.localeCompare(b.move));
+    const maxTries = Math.max(...byTries.map(m => m.tries), 1);
+    body.innerHTML = byTries.map(m => `<tr>
+        <td>${m.move}</td>
+        <td>${m.tries}</td>
+        <td>${m.fails}</td>
+        <td>${m.attempts}</td>
+        <td style="width:35%"><div class="strike-move-bar" style="width:${Math.round(m.tries / maxTries * 100)}%;opacity:0.7"></div></td>
+      </tr>`).join('');
+    return;
+  }
+
+  rateTh.style.display = '';
+
+  const tile = (label, m, detail) => !m ? '' : `<div class="strike-move-top">
+      <div class="label">${label}</div>
+      <div class="value">${m.move}</div>
+      <div class="detail">${detail(m)}</div>
+    </div>`;
+
+  tops.innerHTML =
+  // topByTries ranks by volume, so it is deliberately NOT gated on rateKnown —
+  // which means its rate can be a construction-guaranteed 100% and must be
+  // marked here. topByRate already requires rateKnown, so its figure is sound.
+  const rateTxt = m => m.rateKnown
+    ? pct(m.rate)
+    : `<span class="rate-untested" title="No failed attempt tagged for this move yet">${pct(m.rate)}</span>`;
+
+  tops.innerHTML =
+    tile('🏆 Most tries', stats.topByTries, m => `${m.tries} ${m.tries === 1 ? 'try' : 'tries'} from ${m.attempts} · ${rateTxt(m)}`) +
+    tile('⚡ Best try rate', stats.topByRate, m => `${pct(m.rate)} · ${m.tries} from ${m.attempts}`);
+
+  // Failure-side coverage is the number that matters: the Try side is 100% by
+  // construction, so quoting only the combined figure flatters thin tagging.
+  const f = stats.coverage.fails;
+  cover.textContent =
+    `Coverage: ${f.tagged} of ${f.total} failed attempts tagged ` +
+    `(${Math.round(f.pct * 100)}%) · ` +
+    `ranked by rate over at least ${TR.MIN_MOVE_ATTEMPTS} attempts · ` +
+    `Other and Interception are not ranked`;
+
+  const maxAttempts = Math.max(...stats.moves.map(m => m.attempts), 1);
+  body.innerHTML = stats.moves.map(m => `<tr>
+      <td>${m.move}</td>
+      <td>${m.tries}</td>
+      <td>${m.fails}</td>
+      <td>${m.attempts}</td>
+      <td>${m.attempts >= TR.MIN_MOVE_ATTEMPTS && m.rateKnown ? pct(m.rate) : `<span style="color:var(--dim)">${pct(m.rate)}</span>`}</td>
+      <td style="width:35%"><div class="strike-move-bar" style="width:${Math.round(m.attempts / maxAttempts * 100)}%;opacity:${m.rateKnown ? 0.35 + m.rate * 0.65 : 0.28}"></div></td>
+    </tr>`).join('');
 }
 
 // ── KPIs ─────────────────────────────────────────────────────────

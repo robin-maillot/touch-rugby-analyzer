@@ -289,6 +289,8 @@
   }
   .edit-select:focus, .edit-input:focus { border-color: var(--accent); }
   .edit-select.dirty, .edit-input.dirty { border-color: #f97316; }
+  .cell-move { display: block; font-size: 0.68rem; color: #7dd3fc; margin-top: 2px; }
+  .edit-move { display: block; margin-top: 3px; font-size: 0.72rem; }
   #saveBtn { background: #f97316; color: #fff; border: none; border-radius: 6px; padding: 5px 12px; font-size: 0.78rem; font-weight: 600; cursor: pointer; display: none; }
   #saveBtn:hover { background: #ea6e00; }
   #saveBtn:disabled { opacity: 0.4; cursor: default; }
@@ -582,7 +584,7 @@ async function getLiveVersion() {
   return _liveVersion;
 }
 
-const FILTERABLE  = ['Type', 'Name', 'Action Owner', 'Division', 'Competition'];
+const FILTERABLE  = ['Type', 'Name', 'Strike Move', 'Action Owner', 'Division', 'Competition'];
 const HIDDEN_COLS = new Set(['Team 1', 'Team 2', 'Video Name', 'To Review', 'Youtube Link', 'Possession Owner', 'Analyzable']);
 const TYPE_BADGE  = { 'try':'badge-try', 'penalty':'badge-penalty', 'penalty attack':'badge-penalty', 'penalty defence':'badge-penalty', 'turnover':'badge-turnover', 'to review':'badge-toreview' };
 
@@ -623,11 +625,13 @@ function markDirty(row, field, value) {
       time:      row[colTime],
       name:      row[colName],
       comment:   row[colComment] || '',
+      strikeMove: row[colStrike] !== undefined ? (row[colStrike] || '') : '',
     });
   }
   pendingEdits.get(row)[field] = value;
-  if (field === 'name')    row[colName]    = value;
-  if (field === 'comment') row[colComment] = value;
+  if (field === 'name')       row[colName]   = value;
+  if (field === 'comment')    row[colComment] = value;
+  if (field === 'strikeMove') row[colStrike]  = value;
   updateSaveBtn();
 }
 
@@ -686,7 +690,7 @@ let rowsPerPage  = 50;
 let activeFilters = {};
 
 // Column indices (resolved after headers load)
-let colTime = -1, colType = -1, colName = -1, colGame = -1, colComment = -1, colAction = -1;
+let colTime = -1, colType = -1, colName = -1, colGame = -1, colComment = -1, colAction = -1, colStrike = -1;
 
 // Full metadata entry per game (provides youtubelink, gcsObject, teams, etc.)
 let gameMetaMap = {};
@@ -838,6 +842,7 @@ function processRows(rows) {
   colGame    = hli('game');
   colComment = hli('comment');
   colAction  = hli('action owner');
+  colStrike  = hli('strike move');
 
   // Hide rows from games that have no video (only once metadata has loaded;
   // skip on a cold cache so we don't hide everything before the list arrives).
@@ -1033,6 +1038,9 @@ function renderHeaders() {
   const tr = document.createElement('tr');
   headers.forEach((h, i) => {
     if (selectedGame && i === colGame) return;
+    // The strike move renders under the Name instead of taking a column of its
+    // own. It stays in headers/allData so the filter and search still see it.
+    if (i === colStrike) return;
     const th = document.createElement('th');
     th.textContent = h || '#';
     const slug = colSlug(h);
@@ -1067,6 +1075,9 @@ function renderRows(rows) {
 
     row.forEach((cell, i) => {
       if (selectedGame && i === colGame) return;
+      // The strike move renders under the Name instead of taking a column of its
+      // own. It stays in headers/allData so the filter and search still see it.
+      if (i === colStrike) return;
       const td  = document.createElement('td');
       const col = (headers[i] || '').toLowerCase();
       const slug = colSlug(headers[i]);
@@ -1098,25 +1109,59 @@ function renderRows(rows) {
         span.className = 'cell-clip';
         span.title = cell;
         td.appendChild(span);
-      } else if (col === 'name' && isAdmin && editMode) {
-        const type    = colType >= 0 ? row[colType] : '';
-        const options = TR.NAMES_BY_TYPE[type] || [];
-        const allOpts = options.includes(cell) || !cell ? options : [cell, ...options];
-        const isDirty = pendingEdits.has(row) && pendingEdits.get(row).name !== (allData.indexOf(row) >= 0 ? row[colName] : cell);
-        if (allOpts.length) {
-          const sel = document.createElement('select');
-          sel.className = 'edit-select' + (pendingEdits.has(row) ? ' dirty' : '');
-          sel.onclick = e => e.stopPropagation();
-          allOpts.forEach(opt => {
-            const o = document.createElement('option');
-            o.value = opt; o.textContent = opt;
-            if (opt === cell) o.selected = true;
-            sel.appendChild(o);
-          });
-          sel.onchange = () => { sel.classList.add('dirty'); markDirty(row, 'name', sel.value); };
-          td.appendChild(sel);
+      } else if (col === 'name') {
+        const type = colType >= 0 ? row[colType] : '';
+        if (isAdmin && editMode) {
+          const options = TR.NAMES_BY_TYPE[type] || [];
+          const allOpts = options.includes(cell) || !cell ? options : [cell, ...options];
+          const isDirty = pendingEdits.has(row) && pendingEdits.get(row).name !== (allData.indexOf(row) >= 0 ? row[colName] : cell);
+          if (allOpts.length) {
+            const sel = document.createElement('select');
+            sel.className = 'edit-select' + (pendingEdits.has(row) ? ' dirty' : '');
+            sel.onclick = e => e.stopPropagation();
+            allOpts.forEach(opt => {
+              const o = document.createElement('option');
+              o.value = opt; o.textContent = opt;
+              if (opt === cell) o.selected = true;
+              sel.appendChild(o);
+            });
+            sel.onchange = () => { sel.classList.add('dirty'); markDirty(row, 'name', sel.value); };
+            td.appendChild(sel);
+          } else {
+            td.textContent = cell;
+          }
         } else {
           td.textContent = cell;
+        }
+        // The move qualifies the name, so it sits under it rather than in its own
+        // column. Only a Turnover or Penalty Attack can carry one — a Try's move
+        // IS its name, and 6 Again / Penalty Defence keep the ball.
+        const canMove = colStrike >= 0 && type !== 'Try' && TR.isAttackEnd(type, row[colName]);
+        // Derived, not read raw: a Try's move IS its name, so a row whose name was
+        // corrected must show the corrected move even before the sheet catches up,
+        // and a name that no longer ends an attack shows none at all.
+        const moveVal = colStrike >= 0
+          ? TR.strikeMoveOf(type, row[colName], row[colStrike])
+          : '';
+        if (canMove && isAdmin && editMode) {
+          const msel = document.createElement('select');
+          msel.className = 'edit-select edit-move' + (pendingEdits.has(row) ? ' dirty' : '');
+          msel.onclick = e => e.stopPropagation();
+          const mopts = ['', ...TR.STRIKE_MOVES];
+          if (moveVal && !mopts.includes(moveVal)) mopts.splice(1, 0, moveVal);
+          mopts.forEach(opt => {
+            const o = document.createElement('option');
+            o.value = opt; o.textContent = opt || '— no move —';
+            if (opt === moveVal) o.selected = true;
+            msel.appendChild(o);
+          });
+          msel.onchange = () => { msel.classList.add('dirty'); markDirty(row, 'strikeMove', msel.value); };
+          td.appendChild(msel);
+        } else if (moveVal) {
+          const m = document.createElement('span');
+          m.className = 'cell-move';
+          m.textContent = moveVal;
+          td.appendChild(m);
         }
       } else if (col === 'comment' && isAdmin && editMode) {
         const input = document.createElement('input');

@@ -197,8 +197,23 @@
     .vega-tooltip td { color: #e9ecf3 !important; border: none !important; padding: 2px 6px 2px 0 !important; }
     .vega-tooltip td.key { color: #9ba6b9 !important; font-weight: 500; padding-right: 10px !important; white-space: nowrap; }
     .vega-tooltip td.value { color: #fff !important; font-weight: 600; }
+    .game-move-coverage { font-size: 0.72rem; color: #8a93a6; margin-bottom: 8px; }
+    .game-move-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .game-move-grid table { width: 100%; border-collapse: collapse; font-size: 0.76rem; }
+    .game-move-grid th { text-align: left; color: #8a93a6; font-weight: 500; padding: 3px 5px; }
+    .game-move-grid td { padding: 3px 5px; border-top: 1px solid #1e2433; }
+    .game-move-rate { color: #8a93a6; }
+    /* Same idiom as #commentText:empty and .pop-empty above: italic marks a
+       value that isn't a solid fact yet - here, a rate no failure has tested.
+       Italic alone is easy to miss in a column that is already uniformly grey,
+       so it is paired with a dimmer shade and a dotted underline. */
+    .game-move-rate.unknown { font-style: italic; color: #626b7d;
+      text-decoration: underline dotted; text-underline-offset: 2px; }
+    @media (max-width: 700px) { .game-move-grid { grid-template-columns: 1fr; } }
   </style>
 <script src="js/config.js"></script>
+<script src="js/events.js"></script>
+<script src="js/strike_moves.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/player.js"></script>
 </head>
@@ -281,6 +296,12 @@
     <div class="card">
       <div class="card-label">Team Statistics</div>
       <div id="metricsTable"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Strike Moves</div>
+      <div id="game-move-coverage" class="game-move-coverage"></div>
+      <div id="game-move-grid" class="game-move-grid"></div>
     </div>
 
     <div class="card">
@@ -531,6 +552,7 @@ function parseSheet(rows) {
 
   const ti = col('time'), ty = col('type'), ni = col('name');
   const pi = col('possession owner'), ai = col('action owner'), ci = col('comment');
+  const si = col('strike move');   // -1 on games pushed before Phase 1
 
   return rows.slice(1).map(r => ({
     Time:               r[ti]  || '',
@@ -539,6 +561,7 @@ function parseSheet(rows) {
     'Possession Owner': pi >= 0 ? (r[pi] || '') : '',
     'Action Owner':     ai >= 0 ? (r[ai] || '') : '',
     Comment:            ci >= 0 ? (r[ci] || '') : '',
+    'Strike Move':      si >= 0 ? (r[si] || '') : '',
   })).filter(e => e.Type);
 }
 
@@ -1223,6 +1246,87 @@ async function renderStats(halfValue) {
        <thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead>
        <tbody>${tbody}</tbody>
      </table>`;
+
+  renderGameStrikeMoves(filtered, team1, team2);
+}
+
+// Per-game move breakdown, split by the team that ran the move. Counts lead;
+// the rate is deliberately secondary, and gated off entirely (per team) until
+// that team's own failed attempts have a tagged move — a single game rarely
+// gives a move enough attempts for a percentage to mean much, and with no
+// failures tagged every move would otherwise compute to a hollow 100%.
+function renderGameStrikeMoves(events, team1, team2) {
+  // This page's events are {Type, Name, 'Action Owner', 'Strike Move', ...};
+  // the module expects {type, name, actionOwner, strikeMove}.
+  const toModuleEvent = e => ({
+    type:        e.Type,
+    name:        e.Name,
+    actionOwner: e['Action Owner'],
+    strikeMove:  e['Strike Move'],
+  });
+
+  const moduleEvents = events.map(toModuleEvent);
+  const all   = TR.strikeMoveStats(moduleEvents);
+  const cover = document.getElementById('game-move-coverage');
+  const grid  = document.getElementById('game-move-grid');
+
+  if (!all.moves.length) {
+    cover.textContent = '';
+    grid.innerHTML = '<div style="color:#8a93a6;font-size:0.78rem">No strike moves tagged in this game.</div>';
+    return;
+  }
+
+  // The coverage line is always present rather than conditional — a per-game
+  // table that hides its own thinness invites over-reading. Quote the failure
+  // side: every Try has a Name, so the try side reads 100% by construction.
+  const f = all.coverage.fails;
+  cover.textContent = all.ratesMeaningful
+    ? `Coverage: ${f.tagged} of ${f.total} failed attempts tagged ` +
+      `(${Math.round(f.pct * 100)}%). Single-game rates are noisy — read the counts first.`
+    : `No failed attempts are tagged yet` + (f.total ? ` (0 of ${f.total})` : '') +
+      ` · this is a try-count breakdown only, not a rate ranking.`;
+
+  grid.innerHTML = [team1, team2].map(team => {
+    const s = TR.strikeMoveStats(moduleEvents.filter(e => e.actionOwner === team));
+
+    let rateHeader = 'Rate';
+    let rows;
+    if (!s.moves.length) {
+      rateHeader = '';
+      rows = `<tr><td colspan="4" style="color:#8a93a6">No moves tagged</td></tr>`;
+    } else if (!s.ratesMeaningful) {
+      // No failures tagged for this team's own moves: rate would be a hollow
+      // 100% for everything, so show a try-count breakdown instead — sort a
+      // copy, never mutate s.moves, which several surfaces share.
+      rateHeader = '';
+      const byTries = s.moves.slice().sort((a, b) =>
+        b.tries - a.tries || a.move.localeCompare(b.move));
+      rows = byTries.map(m => `<tr>
+          <td>${m.move}</td><td>${m.tries}</td><td>${m.fails}</td><td></td>
+        </tr>`).join('');
+    } else {
+      // Already sorted rate-descending with a deterministic tie-break; do not
+      // re-sort.
+      rows = s.moves.map(m => {
+        // This move itself has never been seen to fail, so its rate reads
+        // 100% by construction rather than performance - mark it the same
+        // way an empty comment or an empty popover is marked: italic.
+        const rateCls = 'game-move-rate' + (m.rateKnown ? '' : ' unknown');
+        const title   = m.rateKnown ? '' : ' title="No failed attempt tagged for this move yet"';
+        return `<tr>
+          <td>${m.move}</td><td>${m.tries}</td><td>${m.fails}</td>
+          <td class="${rateCls}"${title}>${(m.rate * 100).toFixed(0)}%</td>
+        </tr>`;
+      }).join('');
+    }
+
+    return `<div>
+      <table>
+        <thead><tr><th>${team}</th><th>Tries</th><th>Fails</th><th>${rateHeader}</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+  }).join('');
 }
 
 // ── Penalty hover popover ────────────────────────────────────
