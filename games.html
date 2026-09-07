@@ -229,7 +229,7 @@
   <nav class="header-nav" id="headerNav">
     <a href="games.html" class="active">Games</a>
     <a href="dashboard.html" id="dashboardLink" style="display:none">Dashboard</a>
-    <a href="viewer.html" id="eventsLink">Events</a>
+    <a href="game.html" id="eventsLink">Events</a>
     <a href="analytics.html">Analytics</a>
     <a href="annotator.html" id="annotatorLink" style="display:none">Annotator</a>
   </nav>
@@ -253,7 +253,7 @@
           <button id="turnoverDistBtn" onclick="openTurnoverModal()" style="display:none">Turnover Distribution</button>
           <button id="compareHalvesBtn" onclick="openCompareModal()" style="display:none">Compare Halves</button>
           <button id="downloadVideoBtn" onclick="downloadCurrentGameVideo()" style="display:none">⬇ Download Video</button>
-          <a id="viewEventsBtn" href="viewer.html">View Events</a>
+          <a id="viewEventsBtn" href="game.html">View Events</a>
         </div>
       </div>
       <div id="gameSubtitle"></div>
@@ -452,11 +452,11 @@ async function fetchGameList() {
 async function loadGame() {
   const sheetName = document.getElementById('gameSelect').value;
   if (!sheetName) {
-    document.getElementById('eventsLink').href = 'viewer.html';
+    document.getElementById('eventsLink').href = 'game.html';
     return;
   }
-  document.getElementById('eventsLink').href    = `viewer.html?game=${TR.enc(sheetName)}`;
-  document.getElementById('viewEventsBtn').href = `viewer.html?game=${TR.enc(sheetName)}`;
+  document.getElementById('eventsLink').href    = `game.html?game=${TR.enc(sheetName)}`;
+  document.getElementById('viewEventsBtn').href = `game.html?game=${TR.enc(sheetName)}`;
   history.replaceState(null, '', `?game=${TR.enc(sheetName)}`);
 
   document.getElementById('gameContent').style.display   = 'none';
