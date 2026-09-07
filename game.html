@@ -99,6 +99,11 @@
     display:inline-flex;align-items:center;gap:5px;min-height:32px}
   .chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
   .chip .x{opacity:.75;font-size:.8rem}
+  /* Drill entry chip: distinct from the on/off filter chips beside it — its
+     own accent (matches the .move tag in event cards) rather than the
+     blue "filter applied" accent. */
+  .chip.drill{border-color:#7dd3fc}
+  .chip.drill b{color:#7dd3fc;font-weight:700;margin-left:3px}
   .count{color:var(--dim);font-size:.7rem;flex-shrink:0;padding-left:2px;white-space:nowrap}
 
   /* ── Event list: cards, never a sideways table ─────────────── */
@@ -146,6 +151,18 @@
   .glist button.on{border-color:var(--accent);background:#16233c}
   .glist .gs{display:block;font-size:.66rem;color:var(--dim);margin-top:2px}
 
+  /* ── Moves sheet: reuses .grp/h3 for the section header, new minimal
+     row styling of its own rather than the field annotators' .moves-* classes ── */
+  .mv-scope{color:var(--dim);font-size:.7rem;margin:0 0 10px;line-height:1.4}
+  .mv-row{display:grid;grid-template-columns:20px 1fr auto auto;gap:8px;align-items:center;
+    padding:7px 0;border-bottom:1px solid var(--border);font-size:.8rem}
+  .mv-row:last-child{border-bottom:none}
+  .mv-rank{color:var(--dim);font-size:.7rem}
+  .mv-count{color:var(--dim);font-size:.72rem;white-space:nowrap}
+  .mv-rate{font-size:.78rem;font-weight:700;min-width:3.2em;text-align:right}
+  .mv-rate.thin{color:var(--dim);font-weight:400}
+  .mv-empty{color:var(--dim);text-align:center;padding:20px 0;font-size:.8rem}
+
   /* ── Tablet / landscape: video beside the list ─────────────── */
   @media (min-width:760px) and (orientation:landscape){
     .frame{flex-direction:row}
@@ -163,6 +180,7 @@
 <script src="js/config.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/events.js"></script>
+<script src="js/strike_moves.js"></script>
 <script src="js/player.js"></script>
 </head>
 <body>
@@ -232,7 +250,7 @@ let game='', events=[], shown=[];
 let player=null, ready=false, dur=0, tick=null, pendingSeek=null;
 let activeId=null, rate=1, zoom=1;
 const RATES=[1,1.5,2], ZOOMS=[1,1.5,2];
-let F={type:new Set(),team:new Set(),name:new Set(),q:''};
+let F={type:new Set(),team:new Set(),name:new Set(),move:new Set(),q:''};
 
 const LS={get(k){try{return JSON.parse(localStorage.getItem('trl2_'+k))}catch(e){return null}},
           set(k,v){try{localStorage.setItem('trl2_'+k,JSON.stringify(v))}catch(e){}}};
@@ -286,16 +304,22 @@ function ingest(r){
   const I={t:hi('time'),ty:hi('type'),nm:hi('name'),ao:hi('action owner'),
     cm:hi('comment'),sm:hi('strike move'),g:hi('game'),t1:hi('team 1'),t2:hi('team 2')};
   const sub=(v,a,b)=>{const s=(v||'').trim();return s==='Team 1'?a:s==='Team 2'?b:s};
-  rows=r.slice(1).filter(x=>x.some(c=>c!=='')).map(x=>({
-    time:toSecs(x[I.t]), timeStr:x[I.t]||'', type:(x[I.ty]||'').trim(), name:(x[I.nm]||'').trim(),
-    team:sub(x[I.ao],x[I.t1],x[I.t2]), comment:I.cm>=0?(x[I.cm]||''):'',
-    move:I.sm>=0?(x[I.sm]||'').trim():'', game:x[I.g]}))
-    .filter(e=>e.type);
+  rows=r.slice(1).filter(x=>x.some(c=>c!=='')).map(x=>{
+    const type=(x[I.ty]||'').trim(), name=(x[I.nm]||'').trim();
+    const rawMove=I.sm>=0?(x[I.sm]||'').trim():'';
+    return {
+      time:toSecs(x[I.t]), timeStr:x[I.t]||'', type, name,
+      team:sub(x[I.ao],x[I.t1],x[I.t2]), comment:I.cm>=0?(x[I.cm]||''):'',
+      // Derived, not read raw: a Try's move IS its name, and the viewer's inline
+      // edit can leave the stored Strike Move column stale after a rename.
+      // Same fix as viewer.html f14dbee.
+      move:TR.strikeMoveOf(type,name,rawMove), game:x[I.g]};
+  }).filter(e=>e.type);
   if(game) paintGame(); 
 }
 
 // ── Game selection ────────────────────────────────────────────
-function pickGame(k){ game=k; F={type:new Set(),team:new Set(),name:new Set(),q:''};
+function pickGame(k){ game=k; F={type:new Set(),team:new Set(),name:new Set(),move:new Set(),q:''};
   activeId=null; closeSheet(); LS.set('lastgame',k); paintGame(); loadVideo(); }
 
 function paintGame(){
@@ -316,20 +340,25 @@ function render(){
     (!F.type.size||F.type.has(e.type)) &&
     (!F.team.size||F.team.has(e.team)) &&
     (!F.name.size||F.name.has(e.name)) &&
+    (!F.move.size||F.move.has(e.move)) &&
     (!q||(e.name+' '+e.type+' '+e.team+' '+e.comment+' '+e.move).toLowerCase().includes(q)));
 
-  const n=F.type.size+F.team.size+F.name.size+(F.q?1:0);
+  const n=F.type.size+F.team.size+F.name.size+F.move.size+(F.q?1:0);
   $('fCount').hidden=!n; $('fCount').textContent=n;
   $('count').textContent=`${shown.length}${shown.length!==events.length?' of '+events.length:''} events`;
 
   const bar=$('filterbar');
-  bar.innerHTML='<span class="count" id="count">'+
+  const ms=TR.strikeMoveStats(moveEventsFor(shown));
+  bar.innerHTML='<button class="chip drill" onclick="openSheet(\'moves\')">Moves '+
+    `<b>${esc(movesSummary(ms))}</b></button>`+
+    '<span class="count" id="count">'+
     `${shown.length}${shown.length!==events.length?' of '+events.length:''} events</span>`;
   const add=(label,fn)=>{const b=document.createElement('button');b.className='chip on';
     b.innerHTML=label+' <span class="x">✕</span>';b.onclick=fn;bar.appendChild(b)};
   F.type.forEach(v=>add(v,()=>{F.type.delete(v);render()}));
   F.team.forEach(v=>add(v,()=>{F.team.delete(v);render()}));
   F.name.forEach(v=>add(v,()=>{F.name.delete(v);render()}));
+  F.move.forEach(v=>add(v,()=>{F.move.delete(v);render()}));
   if(F.q) add('“'+F.q+'”',()=>{F.q='';render()});
   if(!n){ // quick-access type chips when nothing is filtered
     ['Try','Turnover','Penalty Attack','Penalty Defence'].forEach(t=>{
@@ -448,11 +477,98 @@ function paintMarks(){
     d.style.left=(t/dur*100)+'%'; d.style.background=col(e.type); s.appendChild(d)});
 }
 
+// ── Strike moves ──────────────────────────────────────────────
+// Reshapes normalised events back into the {type,name,strikeMove,actionOwner}
+// shape TR.strikeMoveStats expects. e.move is already the derived value (see
+// ingest()), so this just hands it back through — TR.strikeMoveOf is
+// idempotent on an already-derived move, it never re-derives to something else.
+function moveEventsFor(list){
+  return list.map(e=>({type:e.type,name:e.name,strikeMove:e.move,actionOwner:e.team}));
+}
+
+// Mirrors annotator_field.html renderMoves()'s four-state drill meta text —
+// same dialect, just scoped to what's currently filtered rather than a whole
+// game, since the chip answers "what's working in what I'm looking at".
+function movesSummary(s){
+  if(s.ratesMeaningful){
+    const best=s.topByRate||s.topByTries;
+    return best
+      ? (best.rateKnown
+          ? `${best.move} · ${Math.round(best.rate*100)}%`
+          // topByRate excludes an untested move, so falling back to topByTries
+          // means this leader has never itself failed — quote tries, not a
+          // rate that only reads 100% by construction.
+          : `${best.move} · ${best.tries} ${best.tries===1?'try':'tries'}`)
+      : s.moves.length ? `${s.moves.length} tagged · no rate yet`
+      : (s.coverage.fails.total?'none tagged yet':'—');
+  }
+  // No failure has ever been tagged in view, so a rate would only ever read
+  // 100% — quote the most-scored move by tries instead.
+  const best=s.topByTries;
+  return best ? `${best.move} · ${best.tries} ${best.tries===1?'try':'tries'}`
+    : s.moves.length ? `${s.moves.length} tagged · no tries yet`
+    : (s.coverage.fails.total?'none tagged yet':'—');
+}
+
+// The moves sheet: every move tried in the current filter, in order of
+// success. Scoped to `shown`, not `events` — it answers "what worked in what
+// I'm looking at", and says so, so a filtered figure is never mistaken for a
+// whole-game one.
+function movesSheetBody(){
+  const s=TR.strikeMoveStats(moveEventsFor(shown));
+  const scope = shown.length===events.length
+    ? `All ${events.length} events in this game (no filters applied).`
+    : `${shown.length} of ${events.length} events currently in view — not the whole game.`;
+
+  if(!s.moves.length){
+    return `<div class="grp"><h3>Moves — order of success</h3>
+      <div class="mv-scope">${scope}</div>
+      <div class="mv-empty">No strike moves tagged in view yet.</div></div>`;
+  }
+
+  if(!s.ratesMeaningful){
+    // Rate cannot order or describe anything here — no failure has ever been
+    // tagged in view, so every move would read 100% by construction. Sort a
+    // COPY by tries; s.moves is shared and must not be mutated.
+    const byTries=s.moves.slice().sort((a,b)=>b.tries-a.tries||a.move.localeCompare(b.move));
+    const f=s.coverage.fails;
+    return `<div class="grp"><h3>Moves — by tries</h3>
+      <div class="mv-scope">${scope}</div>
+      <div class="mv-scope">Try rates need failures tagged to mean anything — every move
+        below would otherwise show 100%, because no turnover or attack penalty in view has
+        been tagged with a move yet${f.total?` (0 of ${f.total})`:''}. Counts only, not a
+        rate ranking.</div>`+
+      byTries.map((m,i)=>`<div class="mv-row">
+          <span class="mv-rank">${i+1}</span><span>${esc(m.move)}</span>
+          <span class="mv-count">${m.tries}/${m.attempts}</span><span></span>
+        </div>`).join('')+
+      '</div>';
+  }
+
+  const f=s.coverage.fails;
+  return `<div class="grp"><h3>Moves — order of success</h3>
+    <div class="mv-scope">${scope}</div>
+    <div class="mv-scope">${f.tagged} of ${f.total} failed attempts tagged in view
+      (${Math.round(f.pct*100)}%) · ${TR.MIN_MOVE_ATTEMPTS}+ attempts to rank
+      · Other and Interception are not ranked</div>`+
+    s.moves.map((m,i)=>{
+      // Thin: too few attempts to rank, OR this move has never itself failed —
+      // its rate reads 100% by construction, not performance.
+      const thin = m.attempts<TR.MIN_MOVE_ATTEMPTS || !m.rateKnown;
+      return `<div class="mv-row">
+          <span class="mv-rank">${i+1}</span><span>${esc(m.move)}</span>
+          <span class="mv-count">${m.tries}/${m.attempts}</span>
+          <span class="mv-rate${thin?' thin':''}">${Math.round(m.rate*100)}%</span>
+        </div>`;
+    }).join('')+
+    '</div>';
+}
+
 // ── Sheets ────────────────────────────────────────────────────
 function openSheet(kind){
   $('scrim').classList.add('open'); $('sheet').classList.add('open');
-  $('sheetTitle').textContent = kind==='game'?'Choose a game':'Filter events';
-  $('sheetBody').innerHTML = kind==='game'?gameSheet():filterSheet();
+  $('sheetTitle').textContent = kind==='game'?'Choose a game':kind==='moves'?'Strike moves':'Filter events';
+  $('sheetBody').innerHTML = kind==='game'?gameSheet():kind==='moves'?movesSheetBody():filterSheet();
 }
 function closeSheet(){$('scrim').classList.remove('open');$('sheet').classList.remove('open')}
 
@@ -480,10 +596,11 @@ function filterSheet(){
     grp('Type','type',uniq(e=>e.type))+
     grp('Team','team',uniq(e=>e.team))+
     grp('Name','name',uniq(e=>e.name).slice(0,30))+
+    grp('Move','move',uniq(e=>e.move))+
     `<button class="icon-btn" style="width:100%;height:40px" onclick="clearF()">Clear all filters</button>`;
 }
 function tog(k,v,el){F[k].has(v)?F[k].delete(v):F[k].add(v);el.classList.toggle('on');render()}
-function clearF(){F={type:new Set(),team:new Set(),name:new Set(),q:''};
+function clearF(){F={type:new Set(),team:new Set(),name:new Set(),move:new Set(),q:''};
   $('sheetBody').innerHTML=filterSheet();render()}
 </script>
 </body>
