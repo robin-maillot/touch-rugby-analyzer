@@ -28,7 +28,11 @@ TR.strikeMoveStats = (events) => {
     // 'Other' and 'Interception' count as untagged. On a Try they are what
     // "the annotator skipped the picker" looks like, while on a failure that
     // same skip yields ''. Left in, they would sit at a 100% artefact rate.
-    if (!move || TR.EXCLUDED_MOVES.includes(move)) return;
+    // Read defensively: a browser holding a cached js/events.js from before
+    // TR.EXCLUDED_MOVES existed would otherwise throw here and take down the
+    // whole render on every surface that shows moves. Degrading to "exclude
+    // nothing" makes one rate slightly generous; throwing breaks six pages.
+    if (!move || (TR.EXCLUDED_MOVES || []).includes(move)) return;
     side.tagged++;
     if (!byMove.has(move)) byMove.set(move, { move, tries: 0, fails: 0, attempts: 0, rate: 0 });
     const m = byMove.get(move);
