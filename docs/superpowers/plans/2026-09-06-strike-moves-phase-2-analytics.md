@@ -23,6 +23,15 @@
 - `coverage` is reported **per side** — Try-side and failure-side separately. A Try always has a Name, so its coverage is 100% by construction and would inflate a combined figure.
 - `topByRate` requires `attempts >= TR.MIN_MOVE_ATTEMPTS` (2). `topByTries` has no threshold.
 - `rate` is a 0–1 number. Formatting to a percentage is each surface's job.
+- `ratesMeaningful` (`cov.fails.tagged > 0`) gates every rate and every top-move
+  tile. Every existing game has tries whose Name already encodes the move, but no
+  failure has ever been tagged - so with nothing in the denominator but successes,
+  `rate` computes to 1 for every move by construction, not because the move is
+  perfect. **Any surface that shows a rate, a rate column, a "best try rate" tile,
+  or a "top scoring move" derived from `rate` must check `ratesMeaningful` first**
+  and fall back to a tries/attempts-only presentation (still genuinely useful) plus
+  a short explanation, exactly as `dashboard.html` and both field annotators do.
+  This applies to Task 4 and Task 5 below, not yet built.
 
 ---
 
@@ -43,12 +52,16 @@
 
 ```js
 TR.strikeMoveStats(events: {type, name, strikeMove, actionOwner}[]) => {
-  moves:      { move: string, tries: number, fails: number, attempts: number, rate: number }[],
-  coverage:   { tagged: number, total: number, pct: number,
-                tries:  { tagged: number, total: number, pct: number },
-                fails:  { tagged: number, total: number, pct: number } },
-  topByTries: { move, tries, fails, attempts, rate } | null,
-  topByRate:  { move, tries, fails, attempts, rate } | null,
+  moves:           { move: string, tries: number, fails: number, attempts: number, rate: number }[],
+  coverage:        { tagged: number, total: number, pct: number,
+                     tries:  { tagged: number, total: number, pct: number },
+                     fails:  { tagged: number, total: number, pct: number } },
+  topByTries:      { move, tries, fails, attempts, rate } | null,
+  topByRate:       { move, tries, fails, attempts, rate } | null,
+  ratesMeaningful: boolean,  // cov.fails.tagged > 0 - false means every `rate`
+                             // above is 1 by construction, not "perfect". Gate
+                             // any rate/top-move display on this (see Global
+                             // Constraints).
 }
 
 `TR.EXCLUDED_MOVES = ['Other', 'Interception']` — add it to `js/events.js` beside
