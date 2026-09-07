@@ -163,13 +163,31 @@
   .mv-rate.thin{color:var(--dim);font-weight:400}
   .mv-empty{color:var(--dim);text-align:center;padding:20px 0;font-size:.8rem}
 
-  /* ── Tablet / landscape: video beside the list ─────────────── */
-  @media (min-width:760px) and (orientation:landscape){
+  /* ── Landscape: video beside the list ───────────────────────
+     No min-width gate. A 667px-wide phone in landscape used to fall through to
+     the portrait column, where a full-width 16:9 video is 375px tall — the whole
+     viewport — putting the transport 115px below a body that can't scroll. */
+  @media (orientation:landscape){
     .frame{flex-direction:row}
     .left{width:58%;min-width:0;border-right:1px solid var(--border)}
     .right{min-width:0}
+    body.cinema .left{width:100%}
   }
-  @media (min-width:760px){
+
+  /* Short and wide — a phone on its side. Aspect-ratio sizing is what makes the
+     video big in portrait, but here it inverts: 16:9 across 58% of 812px is
+     264px tall, and 48 + 264 + 16 + 51 = 379 in a 375px viewport, which clips
+     the play button off the bottom. So in a short viewport the stage takes
+     whatever height is left after the controls instead of dictating it, and the
+     video letterboxes inside that box rather than pushing anything off screen. */
+  @media (orientation:landscape) and (max-height:560px){
+    .stage{aspect-ratio:auto;height:auto;flex:1 1 auto;min-height:0}
+  }
+
+  /* Roomier rows, but only where the row is actually roomy: a landscape phone
+     matches min-width:760px while giving the list a ~340px column, too narrow
+     to push the team to its own edge. */
+  @media (min-width:760px) and (min-height:600px){
     .ev{grid-template-columns:64px 1fr}
     .ev-name{font-size:.88rem}
     /* Wide enough to give the team its own edge again, so a column of teams
