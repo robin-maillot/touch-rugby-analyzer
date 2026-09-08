@@ -36,7 +36,16 @@
 
     .card { background: #141925; border: 1px solid #2b3242; border-radius: 10px; padding: 16px 20px; margin-bottom: 14px; }
 
-    .game-title-row { display: flex; align-items: center; gap: 10px; }
+    /* flex-wrap: a title plus up to four action buttons (Turnover Distribution,
+       Compare Halves, Download Video, View Events) is comfortably one line on
+       desktop but wider than a phone screen — wrapping keeps every button on
+       screen instead of pushing the row's own width past the viewport. */
+    .game-title-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .game-title-actions { display: flex; gap: 6px; margin-left: auto; flex-wrap: wrap; }
+    /* Below the breakpoint the actions drop to their own line under the title
+       (it already wrapped there) — auto-margin right-alignment only made
+       sense pinned to the title's own line. */
+    @media (max-width: 700px) { .game-title-actions { margin-left: 0; } }
     #gameTitle    { font-size: 1.15rem; font-weight: 700; color: #fff; }
     #gameSubtitle { font-size: 0.78rem; color: #777; margin-top: 3px; }
     #gameTimingRow { display: flex; gap: 16px; margin-top: 8px; font-size: 0.78rem; color: #9ba6b9; flex-wrap: wrap; }
@@ -98,6 +107,11 @@
     @keyframes spin { to { transform: rotate(360deg); } }
 
     .chart-wrap { overflow-x: auto; width: 100%; }
+    /* Safety net above the card breakpoint (e.g. a tablet width, or a future
+       column added to buildMetrics): scroll inside the card rather than widen
+       the page. Never engages on desktop today — the table fits main's
+       960px column — but costs nothing when it doesn't. */
+    #metricsTable { overflow-x: auto; width: 100%; }
     .vega-embed { width: 100% !important; }
     .card-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: #666; margin-bottom: 10px; }
     .momentum-note { font-size: 0.72rem; color: #6b7688; margin-top: 8px; line-height: 1.4; }
@@ -210,6 +224,40 @@
     .game-move-rate.unknown { font-style: italic; color: #626b7d;
       text-decoration: underline dotted; text-underline-offset: 2px; }
     @media (max-width: 700px) { .game-move-grid { grid-template-columns: 1fr; } }
+
+    /* ── Team Statistics: a 10-column-per-team table is a scroll, not a table,
+       on a phone. Below the breakpoint it becomes one card per team — each
+       column stacks as a label/value row, read off the data-label attribute
+       the JS puts on every <td> now that there's no header row left to supply
+       it. Scoped to #metricsTable so the Compare Halves / Strike Moves tables
+       (already their own layouts) are untouched. */
+    @media (max-width: 700px) {
+      #metricsTable table, #metricsTable thead, #metricsTable tbody,
+      #metricsTable tr, #metricsTable th, #metricsTable td { display: block; width: auto; }
+      #metricsTable thead { display: none; }
+      #metricsTable tbody tr {
+        background: #0b0e14; border: 1px solid #2b3242; border-radius: 8px;
+        padding: 2px 0; margin-bottom: 10px;
+      }
+      #metricsTable tbody tr:last-child { margin-bottom: 0; }
+      #metricsTable td {
+        display: flex; justify-content: space-between; align-items: baseline;
+        gap: 12px; padding: 7px 12px; border-bottom: 1px solid #1f2230;
+      }
+      #metricsTable td:last-child { border-bottom: none; }
+      #metricsTable td::before {
+        content: attr(data-label); color: #8a93a6; font-size: 0.68rem;
+        font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+        flex-shrink: 0;
+      }
+      /* The team-name cell reads as the card's own title, not a label/value
+         row — it already says which team this card is, a "Team" label above
+         it would only repeat that. */
+      #metricsTable td:first-child {
+        font-size: 1rem; font-weight: 700; color: #fff; padding: 10px 12px 8px;
+      }
+      #metricsTable td:first-child::before { content: none; }
+    }
   </style>
 <script src="js/config.js"></script>
 <script src="js/events.js"></script>
@@ -249,7 +297,7 @@
     <div class="card">
       <div class="game-title-row">
         <div id="gameTitle"></div>
-        <div style="display:flex;gap:6px;margin-left:auto">
+        <div class="game-title-actions">
           <button id="turnoverDistBtn" onclick="openTurnoverModal()" style="display:none">Turnover Distribution</button>
           <button id="compareHalvesBtn" onclick="openCompareModal()" style="display:none">Compare Halves</button>
           <button id="downloadVideoBtn" onclick="downloadCurrentGameVideo()" style="display:none">⬇ Download Video</button>
@@ -1230,14 +1278,18 @@ async function renderStats(halfValue) {
   // Stash the underlying penalty events for each cell so the hover popover
   // can list them without re-running the filter logic.
   _penEventsByCell = {};
+  // data-label carries each cell's column name onto the <td> itself — on a
+  // phone the table collapses into one card per team (CSS below) and reads
+  // the label back off this attribute, since there's no header row left to
+  // supply it once the row is stacked vertically.
   const tbody = metrics.map((m, mi) => {
     return `<tr>${cols.map(c => {
       if (c === 'Pen Attack' || c === 'Pen Defence') {
         const evtKey = `${mi}:${c}`;
         _penEventsByCell[evtKey] = c === 'Pen Attack' ? m._penAttackEvents : m._penDefenceEvents;
-        return `<td class="stat-hover" data-pen-key="${evtKey}" data-team="${m.Team}" data-kind="${c}" onmouseenter="showPenPopover(event, this)" onmouseleave="schedulePopoverHide()">${m[c]}</td>`;
+        return `<td class="stat-hover" data-label="${c}" data-pen-key="${evtKey}" data-team="${m.Team}" data-kind="${c}" onmouseenter="showPenPopover(event, this)" onmouseleave="schedulePopoverHide()">${m[c]}</td>`;
       }
-      return `<td>${m[c]}</td>`;
+      return `<td data-label="${c}">${m[c]}</td>`;
     }).join('')}</tr>`;
   }).join('');
 
