@@ -126,6 +126,18 @@ TR.player = TR.player || {};
     return !!(meta && meta.gcsObject);
   };
 
+  // Clamp a user-chosen playback-window length (seconds before or after an
+  // event) to something a player can act on: a whole number of seconds, never
+  // negative, never longer than MAX_WINDOW. Anything unparseable — a blank
+  // field, a stored value from an older build, junk from localStorage — falls
+  // back to the caller's default rather than poisoning the window with NaN.
+  const MAX_WINDOW = 120;
+  TR.player.clampWindow = function (val, fallback) {
+    const n = parseInt(val, 10);
+    if (!Number.isFinite(n)) return fallback;
+    return Math.min(MAX_WINDOW, Math.max(0, n));
+  };
+
   // Convert a game-clock time (seconds) to a position within the video, using
   // the game's stored videoOffset. Offset is ADDED to game time: a video that
   // starts at the 15th game-minute has videoOffset = -900, so game 20:00 → 300s

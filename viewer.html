@@ -397,11 +397,11 @@
   <div class="sec-group" id="afterGroup" title="Seconds after event (loop window end)">
     <span class="sec-icon" aria-hidden="true">⏩</span>
     <span class="sec-chips" role="group" aria-label="Seconds after event">
-      <button type="button" class="chip" data-val="2"  onclick="pickLinkOffsetAfter(2)">2</button>
+      <button type="button" class="chip" data-val="3"  onclick="pickLinkOffsetAfter(3)">3</button>
       <button type="button" class="chip" data-val="5"  onclick="pickLinkOffsetAfter(5)">5</button>
       <button type="button" class="chip" data-val="10" onclick="pickLinkOffsetAfter(10)">10</button>
     </span>
-    <input id="linkOffsetAfterInput" type="number" inputmode="numeric" aria-label="Seconds after event (custom)" title="Custom seconds after" min="0" max="120" value="2" oninput="setLinkOffsetAfter(this.value)">
+    <input id="linkOffsetAfterInput" type="number" inputmode="numeric" aria-label="Seconds after event (custom)" title="Custom seconds after" min="0" max="120" value="3" oninput="setLinkOffsetAfter(this.value)">
     <span class="sec-unit">s</span>
   </div>
   <button id="loopBtn" class="hbtn" onclick="toggleLoopMode()" title="Toggle loop playback (R)" aria-label="Toggle loop playback">🔁 Loop</button>
@@ -591,9 +591,8 @@ const TYPE_BADGE  = { 'try':'badge-try', 'penalty':'badge-penalty', 'penalty att
 
 const isAdmin = TR.role() === 'admin';
 let editMode    = false;
-let linkOffset      = parseInt(localStorage.getItem('linkOffset') ?? '5', 10) || 5;
-let linkOffsetAfter = parseInt(localStorage.getItem('linkOffsetAfter') ?? '2', 10);
-if (isNaN(linkOffsetAfter)) linkOffsetAfter = 2;
+let linkOffset      = TR.player.clampWindow(localStorage.getItem('linkOffset'), 5);
+let linkOffsetAfter = TR.player.clampWindow(localStorage.getItem('linkOffsetAfter'), 3);
 let loopMode    = localStorage.getItem('loopMode') === '1';
 let fullPossession = localStorage.getItem('fullPossession') === '1';
 const MAX_POSSESSION_LOOKBACK = 90;
@@ -1851,7 +1850,7 @@ document.addEventListener('keydown', e => {
 });
 
 function setLinkOffset(val) {
-  const n = Math.max(0, parseInt(val, 10) || 0);
+  const n = TR.player.clampWindow(val, 5);
   linkOffset = n;
   localStorage.setItem('linkOffset', n);
   if (activeEventSecs != null) loopStart = toVideoSecs(gameMetaMap[currentSheetName], activeEventSecs - linkOffset);
@@ -1859,7 +1858,7 @@ function setLinkOffset(val) {
 }
 
 function setLinkOffsetAfter(val) {
-  const n = Math.max(0, parseInt(val, 10) || 0);
+  const n = TR.player.clampWindow(val, 3);
   linkOffsetAfter = n;
   localStorage.setItem('linkOffsetAfter', n);
   if (activeEventSecs != null) loopEnd = toVideoSecs(gameMetaMap[currentSheetName], activeEventSecs + linkOffsetAfter);

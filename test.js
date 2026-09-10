@@ -182,6 +182,15 @@ test('no gcsObject',      () => assert.equal(TR.player.hasClip({ youtubelink: 'x
 test('with gcsObject',    () => assert.equal(TR.player.hasClip({ gcsObject: 'a.mp4' }), true));
 test('empty gcsObject',   () => assert.equal(TR.player.hasClip({ gcsObject: '' }), false));
 
+// ── TR.player.clampWindow ────────────────────────────────────
+console.log('TR.player.clampWindow');
+test('missing value → fallback',   () => { assert.equal(TR.player.clampWindow(null, 5), 5); assert.equal(TR.player.clampWindow(undefined, 3), 3); assert.equal(TR.player.clampWindow('', 5), 5); });
+test('non-numeric → fallback',     () => { assert.equal(TR.player.clampWindow('abc', 5), 5); assert.equal(TR.player.clampWindow(NaN, 3), 3); assert.equal(TR.player.clampWindow({}, 5), 5); });
+test('plain values pass through',  () => { assert.equal(TR.player.clampWindow(0, 5), 0); assert.equal(TR.player.clampWindow(7, 5), 7); assert.equal(TR.player.clampWindow('12', 5), 12); });
+test('clamped at both ends',       () => { assert.equal(TR.player.clampWindow(-4, 5), 0); assert.equal(TR.player.clampWindow(500, 5), 120); assert.equal(TR.player.clampWindow(120, 5), 120); });
+test('floats truncate',            () => { assert.equal(TR.player.clampWindow(7.9, 5), 7); assert.equal(TR.player.clampWindow('3.5', 5), 3); });
+test('fallback used as-is',        () => assert.equal(TR.player.clampWindow(undefined, 0), 0));
+
 // ── TR.player.seekLink ───────────────────────────────────────
 console.log('TR.player.seekLink');
 test('youtube URL',         () => assert.equal(TR.player.seekLink({ youtubelink: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' }, 65), 'https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=60s'));

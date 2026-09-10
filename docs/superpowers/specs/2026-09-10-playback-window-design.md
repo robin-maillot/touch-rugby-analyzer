@@ -10,13 +10,13 @@ on every event tap; the post-roll decides where a loop turns around. Neither can
 be changed without editing the page. Different events want different windows — a
 strike move needs a longer run-up than a penalty restart.
 
-The older table view (`viewer.html`) already exposes both values as chips plus a
-custom number input, defaulting to 5 and 2.
+The admin-only Event Editor (`viewer.html`) already exposes both values as chips
+plus a custom number input, defaulting to 5 and 2.
 
 ## Goal
 
 Make the window selectable in the Event Viewer, defaulting to **5 s before** and
-**3 s after**, and move the table view's post-roll default to 3 s so the two
+**3 s after**, and move the Event Editor's post-roll default to 3 s so the two
 pages agree.
 
 ## Design
@@ -32,9 +32,11 @@ page script.
 
 ### 2. Event Viewer — `game.html`
 
-- Replace the two constants with mutable `winBefore` / `winAfter`, seeded from
-  `LS.get('winBefore')` / `LS.get('winAfter')` through `clampWindow`, defaulting
-  to 5 and 3.
+- Replace the two constants with mutable `winBefore` / `winAfter`, defaulting to
+  5 and 3 and then restored from `LS.get(...)` through `clampWindow`. The
+  restore sits below the `LS` declaration, and the label is painted there rather
+  than in `restore()` — that runs only once the data fetch resolves, which would
+  leave a stale label on screen until the network answered.
 - `playEvent` uses them in place of the constants, and records `activeSecs` /
   `activeGame` so the window can be re-derived without re-tapping the event.
 - A new transport button sits after the loop button, labelled with the live
@@ -55,7 +57,7 @@ to 38 px and the transport gap to 4 px, giving 348 px. This is deliberate — th
 CSS comment above the landscape-phone media query documents how little vertical
 and horizontal slack the viewer has on a phone.
 
-### 3. Table view — `viewer.html`
+### 3. Event Editor — `viewer.html`
 
 Defaults only:
 
@@ -94,4 +96,4 @@ from the Node harness and is verified in the browser preview.
 
 - Per-event or per-event-type windows. One window applies to all events.
 - Changing the fixed 5 s lookback baked into `TR.player.seekLink`, which the
-  table view's copy-link path deliberately cancels out.
+  Event Editor's copy-link path deliberately cancels out.

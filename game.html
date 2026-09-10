@@ -216,6 +216,13 @@
   .glist button.on{border-color:var(--accent);background:#16233c}
   .glist .gs{display:block;font-size:.66rem;color:var(--dim);margin-top:2px}
 
+  /* Window sheet: the custom field sits in the same row as the preset chips,
+     sized to the three digits it can ever hold rather than stretching. */
+  .win-num{width:62px;background:var(--surface2);border:1px solid var(--border);color:var(--text);
+    border-radius:8px;padding:0 8px;height:32px;font-size:.78rem}
+  .win-note{color:var(--dim);font-size:.72rem;line-height:1.5;margin:2px 0 0}
+  .win-note b{color:var(--text);font-weight:600}
+
   /* ── Moves sheet: reuses .grp/h3 for the section header, new minimal
      row styling of its own rather than the field annotators' .moves-* classes ── */
   .mv-scope{color:var(--dim);font-size:.7rem;margin:0 0 10px;line-height:1.4}
@@ -237,6 +244,14 @@
     .left{width:58%;min-width:0;border-right:1px solid var(--border)}
     .right{min-width:0}
     body.cinema .left{width:100%}
+  }
+
+  /* Eight transport buttons at 42px with 6px gaps want 394px of row; a 375px
+     phone has 359px inside the padding. Tightening both to 38/4 brings it to
+     348 and keeps every control reachable without a scroll. */
+  @media (max-width:400px){
+    .transport{gap:4px}
+    .t-btn{min-width:38px;padding:0 4px}
   }
 
   /* Short and wide — a phone on its side. Aspect-ratio sizing is what makes the
@@ -303,6 +318,7 @@
     <button class="t-btn" id="bNext"  onclick="stepEvent(1)" title="Next event" disabled>⏭</button>
     <button class="t-btn" id="bLoop"  onclick="toggleLoop()" title="Loop this event" disabled>⟲</button>
     <button class="t-btn" id="bRate"  onclick="cycleRate()" title="Playback speed" disabled>1×</button>
+    <button class="t-btn" id="bWin"   onclick="openSheet('window')" title="Seconds of video before and after each event">5/3</button>
   </div>
  </div>
 
@@ -339,18 +355,30 @@ let rows=[], headers=[], meta={}, labels={}, order={};
 let game='', events=[], shown=[], picked=false;
 let player=null, ready=false, dur=0, tick=null, pendingSeek=null, videoGame='';
 let activeId=null, rate=1, zoom=1, renderLimit=200;
+// The active event's own coordinates, so the window can be re-derived when it
+// changes without making the user re-tap the event.
+let activeSecs=null, activeGame='';
 let panX=0, panY=0;                 // frame offset while zoomed, in px
 let looping=false, loopStart=null, loopEnd=null;
 // Slow-mo for reading a move, normal for watching. Zoom is a plain in/out.
 const RATES=[1,0.5], ZOOMS=[1,2];
-// Matches the Event Viewer's own defaults so a loop feels the same here.
-const LOOP_BEFORE=5, LOOP_AFTER=2;
+// How much video surrounds an event: the lookback decides where playback starts
+// on every tap, the tail decides where a loop turns around. Both are the
+// viewer's own setting, restored from LS below once that helper exists.
+let winBefore=5, winAfter=3;
+const WIN_BEFORE_CHIPS=[3,5,10,15], WIN_AFTER_CHIPS=[2,3,5,10];
 let F={type:new Set(),team:new Set(),name:new Set(),move:new Set(),
        comp:new Set(),div:new Set(),year:new Set(),q:''};
 
 const LS={get(k){try{return JSON.parse(localStorage.getItem('trl2_'+k))}catch(e){return null}},
           set(k,v){try{localStorage.setItem('trl2_'+k,JSON.stringify(v))}catch(e){}}};
 function $(id){return document.getElementById(id)}
+// Restored and painted here rather than in restore(), which waits on the data
+// fetch: the window is a local setting and shouldn't show a stale label until
+// the network answers.
+winBefore=TR.player.clampWindow(LS.get('winBefore'),5);
+winAfter =TR.player.clampWindow(LS.get('winAfter'), 3);
+paintWin();
 function fmtS(s){s=Math.max(0,Math.floor(s||0));const m=Math.floor(s/60);
   return (m>=60?Math.floor(m/60)+':'+String(m%60).padStart(2,'0'):String(m))+':'+String(s%60).padStart(2,'0')}
 function toSecs(t){const p=String(t||'').trim().split(':').map(Number);
@@ -586,11 +614,11 @@ function clearVideo(){
 function playEvent(gameSecs,id,evGame){
   const m=meta[evGame]||{};
   if(!TR.player.providerFor(m)){alert('This game has no video linked yet.');return}
-  activeId=id;
-  const t=Math.max(0,TR.player.videoTimeAt(m,gameSecs)-LOOP_BEFORE);   // lookback
+  activeId=id; activeSecs=gameSecs; activeGame=evGame;
+  const t=Math.max(0,TR.player.videoTimeAt(m,gameSecs)-winBefore);   // lookback
   // Whether or not looping is on, remember this event's window so toggling the
   // loop mid-event doesn't need the event re-tapped.
-  loopStart=t; loopEnd=TR.player.videoTimeAt(m,gameSecs)+LOOP_AFTER;
+  loopStart=t; loopEnd=TR.player.videoTimeAt(m,gameSecs)+winAfter;
   // The video follows the event, not the picker: load evGame's video whenever
   // it differs from what's currently loaded, regardless of what `game` is.
   if(evGame!==videoGame){pendingSeek=t;loadVideo(evGame)}
@@ -626,12 +654,62 @@ function toggleLoop(){
   if(looping&&ready&&loopStart!=null){player.seek(loopStart);player.play()}
 }
 
+// ── Playback window ──────────────────────────────────────────
+// One window for every event rather than a per-event setting: the point is a
+// house style for watching ("give me a run-up, cut it just after"), not a
+// per-clip trim.
+function windowSheet(){
+  const grp=(title,label,key,chips,val)=>
+    `<div class="grp"><h3>${title}</h3><div class="opts">`+
+    chips.map(n=>`<button class="chip win-chip ${n===val?'on':''}" data-key="${key}" data-val="${n}"
+      onclick="setWin('${key}',${n},true)">${n}s</button>`).join('')+
+    `<input class="win-num" id="${key}Num" type="number" inputmode="numeric" min="0" max="120"
+      aria-label="${label}" value="${val}" oninput="setWin('${key}',this.value)"></div></div>`;
+  return grp('Before the event','Custom seconds before','winBefore',WIN_BEFORE_CHIPS,winBefore)+
+         grp('After the event','Custom seconds after','winAfter',WIN_AFTER_CHIPS,winAfter)+
+         `<p class="win-note" id="winNote"></p>`;
+}
+
+// Repaints the label and the sheet in place. Deliberately not a re-render of
+// the sheet body: that would blow away focus and the caret mid-keystroke.
+function paintWin(){
+  $('bWin').textContent=winBefore+'/'+winAfter;
+  $('bWin').title=`${winBefore}s before, ${winAfter}s after each event`;
+  document.querySelectorAll('#sheetBody .win-chip').forEach(c=>
+    c.classList.toggle('on',+c.dataset.val===(c.dataset.key==='winBefore'?winBefore:winAfter)));
+  const note=$('winNote');
+  if(note)note.innerHTML=`Playback starts <b>${winBefore}s</b> before each event`+
+    `, and a loop runs to <b>${winAfter}s</b> after it.`;
+}
+
+function setWin(key,val,fromChip){
+  const n=TR.player.clampWindow(val,key==='winBefore'?5:3);
+  if(key==='winBefore')winBefore=n; else winAfter=n;
+  LS.set(key,n);
+  // A chip press has to be mirrored into the custom field; typing must not be.
+  if(fromChip){const inp=$(key+'Num'); if(inp)inp.value=n;}
+  paintWin(); reWindow();
+}
+
+// Apply a changed window to the event already on screen, so the difference is
+// audible now rather than at the next tap.
+function reWindow(){
+  if(activeSecs==null)return;
+  const at=TR.player.videoTimeAt(meta[activeGame]||{},activeSecs);
+  loopStart=Math.max(0,at-winBefore); loopEnd=at+winAfter;
+  if(!ready||!player||!looping||loopEnd<=loopStart)return;
+  // Only yank the playhead when it has fallen outside the new window; a seek
+  // that lands somewhere already inside it just interrupts watching.
+  const t=player.getTime()||0;
+  if(t<loopStart||t>loopEnd)player.seek(loopStart);
+}
+
 function progress(){
   if(!ready||!player)return;
   const t=player.getTime()||0; dur=player.getDuration()||dur;
   // Checked here rather than on a timer of its own: this already ticks at 250ms,
   // which is tight enough that the jump back reads as a loop.
-  if(looping&&loopStart!=null&&loopEnd!=null&&t>=loopEnd){player.seek(loopStart);return}
+  if(looping&&loopStart!=null&&loopEnd!=null&&loopEnd>loopStart&&t>=loopEnd){player.seek(loopStart);return}
   $('tTime').innerHTML=`<b>${fmtS(t)}</b><span class="dur"> / ${fmtS(dur)}</span>`;
   const p=dur?Math.min(100,t/dur*100):0;
   $('scrubFill').style.width=p+'%'; $('scrubThumb').style.left=p+'%';
@@ -821,8 +899,13 @@ function movesSheetBody(){
 // ── Sheets ────────────────────────────────────────────────────
 function openSheet(kind){
   $('scrim').classList.add('open'); $('sheet').classList.add('open');
-  $('sheetTitle').textContent = kind==='game'?'Choose a game':kind==='moves'?'Strike moves':'Filter events';
-  $('sheetBody').innerHTML = kind==='game'?gameSheet():kind==='moves'?movesSheetBody():filterSheet();
+  $('sheetTitle').textContent = kind==='game'?'Choose a game':kind==='moves'?'Strike moves'
+    :kind==='window'?'Playback window':'Filter events';
+  $('sheetBody').innerHTML = kind==='game'?gameSheet():kind==='moves'?movesSheetBody()
+    :kind==='window'?windowSheet():filterSheet();
+  // The window sheet is painted rather than rendered with its state inlined, so
+  // that a keystroke can update the chips without re-rendering the field.
+  if(kind==='window')paintWin();
 }
 function closeSheet(){$('scrim').classList.remove('open');$('sheet').classList.remove('open')}
 
