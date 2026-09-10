@@ -12,9 +12,9 @@ All pages are behind a password prompt on `index.html`. Three passwords exist:
 
 | Password | Access |
 |---|---|
-| `m30` | Viewer — Game Analysis, Dashboard, Event Viewer, Live |
+| `m30` | Viewer — Game Analysis, Dashboard, Event Viewer, Analytics, Live |
 | `m30-staff` | Staff — everything above + Annotator + Field Annotator |
-| `m30-admin` | Admin — everything above + Video Backfill + Field Annotator v2 + inline event editing in the viewer + sheet override |
+| `m30-admin` | Admin — everything above + Video Backfill + Field Annotator v2 + the Event Editor + sheet override |
 
 The password is stored in `sessionStorage` and used as the API secret for all calls to the Apps Script backend.
 
@@ -90,8 +90,17 @@ Cross-game exploration: event-type and sub-type breakdowns, team-linkage and top
 
 ---
 
-### Event Viewer (`viewer.html`)
+### Event Viewer (`game.html`)
 *Available to all*
+
+The main way to watch events. Pick a game (or all games), filter the event list, and tap any row to play it — the video follows the event, loading a different game's footage when the tap calls for it. Prev/next step through the *filtered* list, so after filtering to tries "next" is the next try.
+
+Transport controls cover play/pause, ±5s, 0.5x slow-mo for reading a move, a 2x zoom you can drag while zoomed, and a loop that repeats the current event. The **playback window** button (labelled with its current values, e.g. `5/3`) opens a sheet for how much video surrounds an event: the lookback decides where playback starts on every tap, the tail decides where a loop turns around. Defaults are 5s before and 3s after, remembered per device.
+
+---
+
+### Event Editor (`viewer.html`)
+*Admin only*
 
 Searchable, filterable table of every event across all games. Clicking a row with a YouTube link plays the video at that timestamp. Supports filtering by Type, Name, Strike Move, Possession Owner, Action Owner, and Game. Events without a YouTube link are hidden.
 
