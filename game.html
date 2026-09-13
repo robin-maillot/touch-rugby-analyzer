@@ -997,17 +997,17 @@ function paintFilterHead(){
   h.innerHTML=c?`‹ ${c.title}`:'Filter events';
   h.className=c?'back':'';
   h.onclick=c?()=>drill(null):null;
-  backCtl(h,!!c);
+  backCtl(h,!!c,c?.title);
 }
 
 // A heading is not a control, so while it doubles as one it has to say so and
 // answer the keyboard too — tapping it is otherwise the only way out of a
 // category. Shared with openSheet, which resets the head for the other kinds.
-function backCtl(h,on){
+function backCtl(h,on,title){
   if(!on){['role','tabindex','aria-label'].forEach(a=>h.removeAttribute(a)); h.onkeydown=null; return}
   h.setAttribute('role','button');
   h.setAttribute('tabindex','0');
-  h.setAttribute('aria-label','Back to all filters');
+  h.setAttribute('aria-label',title?`Back to all filters, ${title}`:'Back to all filters');
   h.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault(); drill(null)}};
 }
 
