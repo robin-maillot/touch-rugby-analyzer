@@ -203,6 +203,7 @@
   .sheet-head{display:flex;align-items:center;justify-content:space-between;padding:6px 14px 10px;
     border-bottom:1px solid var(--border)}
   .sheet-head h2{margin:0;font-size:.92rem}
+  .sheet-head h2.back{cursor:pointer;color:var(--accent)}
   .sheet-body{overflow-y:auto;overflow-x:hidden;padding:10px 14px calc(14px + var(--safe-b))}
   .opts{min-width:0}
   .grp{margin-bottom:14px}
@@ -215,6 +216,17 @@
     margin-bottom:6px;font-size:.8rem;cursor:pointer}
   .glist button.on{border-color:var(--accent);background:#16233c}
   .glist .gs{display:block;font-size:.66rem;color:var(--dim);margin-top:2px}
+
+  /* Filter sheet category rows: a .glist button with the selection summary
+     pulled onto the same line as the title, and a chevron at the end. The
+     selector carries `.glist button` because the block rule above it is a
+     class-plus-element and would otherwise win over a bare `.fcat`. */
+  .glist button.fcat{display:flex;align-items:center;gap:8px}
+  .fcat .fc-t{flex:1;min-width:0}
+  .fcat .fc-v{color:var(--dim);font-size:.72rem;white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis;max-width:52%}
+  .fcat .fc-v.set{color:var(--accent)}
+  .fcat .fc-x{color:var(--dim);font-size:.8rem;flex-shrink:0}
 
   /* Window sheet: the custom field sits in the same row as the preset chips,
      sized to the three digits it can ever hold rather than stretching. */
@@ -899,6 +911,8 @@ function movesSheetBody(){
 // ── Sheets ────────────────────────────────────────────────────
 function openSheet(kind){
   $('scrim').classList.add('open'); $('sheet').classList.add('open');
+  if(kind==='filter')fCat=null;               // always open at the category list
+  $('sheetTitle').className=''; $('sheetTitle').onclick=null;
   $('sheetTitle').textContent = kind==='game'?'Choose a game':kind==='moves'?'Strike moves'
     :kind==='window'?'Playback window':'Filter events';
   $('sheetBody').innerHTML = kind==='game'?gameSheet():kind==='moves'?movesSheetBody()
@@ -925,35 +939,97 @@ function gameSheet(){
     </button>`}).join('')+'</div>';
 }
 
-// Groups ordered by how much they narrow: Competition/Division/Year first
-// (the ones that matter most once you're browsing across every game), then
-// the original per-event groups.
+// Categories ordered by how much they narrow: Competition/Division/Year first
+// (the ones that matter most once you're browsing across every game), then the
+// original per-event groups. One table so the category list and the option
+// screen can't drift apart.
+const FCATS=[
+  {key:'comp', title:'Competition', of:e=>e.comp},
+  {key:'div',  title:'Division',    of:e=>e.div},
+  {key:'year', title:'Year',        of:e=>e.year},
+  {key:'type', title:'Type',        of:e=>e.type},
+  {key:'team', title:'Team',        of:e=>e.team},
+  {key:'name', title:'Name',        of:e=>e.name},
+  {key:'move', title:'Move',        of:e=>e.move},
+];
+// null at the category list, otherwise the FCATS key being browsed. Reset on
+// every open, so the sheet never reopens stranded inside a category.
+let fCat=null, fNarrow='';
+
+function catVals(c){return [...new Set(events.map(c.of).filter(Boolean))]}
+
+// A category with one option can't narrow anything — every event already shares
+// that value — so it's noise. Kept if it's actively filtered, so a live filter
+// never becomes invisible and unremovable.
+function catShown(c){return catVals(c).length>1||F[c.key].size>0}
+
 function filterSheet(){
   if(!picked)return '<div class="empty">Pick a game first.</div>';
-  const uniq=f=>[...new Set(events.map(f).filter(Boolean))];
-  // A group with one option can't narrow anything — every event already shares
-  // that value — so it's noise. Kept if it's actively filtered, so a live filter
-  // never becomes invisible and unremovable.
-  const grp=(title,key,vals)=>(vals.length<2&&!F[key].size)?'':
-    `<div class="grp"><h3>${title}</h3><div class="opts">`+
-    vals.map(v=>`<button class="chip ${F[key].has(v)?'on':''}"
-      onclick="tog('${key}','${String(v).replace(/'/g,"\\'")}',this)">${esc(v)}</button>`).join('')+
-    '</div></div>';
+  return fCat?catOpts(fCat):catList();
+}
+
+function catList(){
   return `<input class="srch" id="q" placeholder="Search name, comment, move…" value="${esc(F.q)}"
       oninput="F.q=this.value;render()">`+
-    grp('Competition','comp',uniq(e=>e.comp))+
-    grp('Division','div',uniq(e=>e.div))+
-    grp('Year','year',uniq(e=>e.year))+
-    grp('Type','type',uniq(e=>e.type))+
-    grp('Team','team',uniq(e=>e.team))+
-    grp('Name','name',uniq(e=>e.name).slice(0,30))+
-    grp('Move','move',uniq(e=>e.move))+
+    '<div class="glist">'+FCATS.filter(catShown).map(c=>{
+      const set=F[c.key].size>0;
+      return `<button class="fcat${set?' on':''}" onclick="drill('${c.key}')">
+        <span class="fc-t">${c.title}</span>
+        <span class="fc-v${set?' set':''}">${esc(TR.filterSummary([...F[c.key]]))}</span>
+        <span class="fc-x">›</span>
+      </button>`}).join('')+'</div>'+
     `<button class="icon-btn" style="width:100%;height:40px" onclick="clearF()">Clear all filters</button>`;
 }
+
+// The title doubles as the back control when drilled in. Painted rather than
+// re-rendered so drilling doesn't have to reopen the sheet.
+function paintFilterHead(){
+  const c=FCATS.find(x=>x.key===fCat), h=$('sheetTitle');
+  h.innerHTML=c?`‹ ${c.title}`:'Filter events';
+  h.className=c?'back':'';
+  h.onclick=c?()=>drill(null):null;
+}
+
+function drill(key){
+  fCat=key; fNarrow='';
+  $('sheetBody').innerHTML=filterSheet();
+  paintFilterHead();
+}
+
+// Twelve chips is about two phone rows — past that, scanning for one costs
+// more than typing three letters of it.
+const NARROW_AT=12;
+
+function catOpts(key){
+  const c=FCATS.find(x=>x.key===key);
+  if(!c)return '<div class="empty">No such filter.</div>';
+  const all=catVals(c);
+  const vals=all.filter(v=>TR.optMatch(v,fNarrow));
+  const box=all.length>NARROW_AT
+    ? `<input class="srch" id="narrow" placeholder="Narrow ${c.title.toLowerCase()}…"
+        value="${esc(fNarrow)}" oninput="narrow(this.value)">` : '';
+  return box+`<div class="grp"><div class="opts" id="optWrap">${optChips(key,vals)}</div></div>`;
+}
+
+// Shared by the first paint and every keystroke, so the two can't drift.
+function optChips(key,vals){
+  if(!vals.length)return `<div class="empty">Nothing matches “${esc(fNarrow)}”.</div>`;
+  return vals.map(v=>`<button class="chip ${F[key].has(v)?'on':''}"
+    onclick="tog('${key}','${String(v).replace(/'/g,"\\'")}',this)">${esc(v)}</button>`).join('');
+}
+
+// Redraws only the chips: re-rendering the body would blow away focus and the
+// caret mid-keystroke, the same reason paintWin exists.
+function narrow(v){
+  fNarrow=v;
+  const c=FCATS.find(x=>x.key===fCat);
+  $('optWrap').innerHTML=optChips(fCat,catVals(c).filter(x=>TR.optMatch(x,fNarrow)));
+}
+
 function tog(k,v,el){F[k].has(v)?F[k].delete(v):F[k].add(v);el.classList.toggle('on');render()}
 function clearF(){F={type:new Set(),team:new Set(),name:new Set(),move:new Set(),
     comp:new Set(),div:new Set(),year:new Set(),q:''};
-  $('sheetBody').innerHTML=filterSheet();render()}
+  drill(null); render()}
 </script>
 </body>
 </html>
