@@ -95,6 +95,8 @@ Cross-game exploration: event-type and sub-type breakdowns, team-linkage and top
 
 The main way to watch events. Pick a game (or all games), filter the event list, and tap any row to play it — the video follows the event, loading a different game's footage when the tap calls for it. Prev/next step through the *filtered* list, so after filtering to tries "next" is the next try.
 
+The **Filter** sheet works in two steps: it opens on a row per category — Competition, Division, Year, Type, Team, Name, Move — each showing what's currently picked, and tapping one drills into that category's options; the sheet's title becomes a `‹ Category` back button while you're inside one. Categories offering more than twelve options get a type-to-narrow box. A category every event already agrees on is hidden unless it's actively filtered. Free-text search sits above the rows and matches name, type, team, comment, and move; picked filters also appear as removable chips above the event list.
+
 Transport controls cover play/pause, ±5s, 0.5x slow-mo for reading a move, a 2x zoom you can drag while zoomed, and a loop that repeats the current event. The **playback window** button (labelled with its current values, e.g. `5/3`) opens a sheet for how much video surrounds an event: the lookback decides where playback starts on every tap, the tail decides where a loop turns around. Defaults are 5s before and 3s after, remembered per device.
 
 ---
