@@ -582,7 +582,7 @@ function render(keepWindow){
   L.innerHTML=windowed.map(e=>{
     const id=evId(e);
     return `<div class="ev${activeId===id?' active':''}" style="border-left-color:${col(e.type)}"
-      onclick="playEvent(${e.time},'${id.replace(/'/g,"\\'")}','${String(e.game).replace(/'/g,"\\'")}')">
+      data-t="${e.time}" data-id="${esc(id)}" data-game="${esc(String(e.game))}">
       <span class="ev-t">${shortT(e.timeStr)}</span>
       <span class="ev-main">
         <span class="ev-name">${esc(e.name||e.type)}</span>
@@ -838,6 +838,23 @@ $('scrub').addEventListener('pointerdown',e=>{scrubTo(e.clientX);
   const up=()=>{window.removeEventListener('pointermove',mv);window.removeEventListener('pointerup',up)};
   window.addEventListener('pointermove',mv);window.addEventListener('pointerup',up)});
 
+// The rows and chips below are rebuilt from sheet data on every render, so their
+// handlers are delegated rather than inlined: an inline onclick has to encode a
+// value as source code, and a value carrying a quote then escapes its own
+// attribute. Data attributes go through esc() and come back off dataset as the
+// exact original string.
+$('list').addEventListener('click',ev=>{
+  const row=ev.target.closest('.ev'); if(!row)return;
+  playEvent(+row.dataset.t,row.dataset.id,row.dataset.game);
+});
+
+$('sheetBody').addEventListener('click',ev=>{
+  const chip=ev.target.closest('.chip[data-k]');
+  if(chip){tog(chip.dataset.k,chip.dataset.v,chip);return}
+  const g=ev.target.closest('[data-game]');
+  if(g)pickGame(g.dataset.game);
+});
+
 function paintMarks(){
   const s=$('scrub'); s.querySelectorAll('.scrub-mark').forEach(n=>n.remove());
   const m=meta[videoGame]||{}; if(!dur||!videoGame)return;
@@ -953,13 +970,13 @@ function gameSheet(){
   const keys=[...new Set(rows.map(r=>r.game))].filter(Boolean)
     .sort((a,b)=>(order[a]??999)-(order[b]??999));
   if(!keys.length)return '<div class="empty">No games loaded yet.</div>';
-  const allBtn=`<button class="${picked&&game===''?'on':''}" onclick="pickGame('')">
+  const allBtn=`<button class="${picked&&game===''?'on':''}" data-game="">
       All games
       <span class="gs">${rows.length} events</span>
     </button>`;
   return '<div class="glist">'+allBtn+keys.map(k=>{
     const m=meta[k]||{}, has=!!TR.player.providerFor(m);
-    return `<button class="${k===game?'on':''}" onclick="pickGame('${k.replace(/'/g,"\\'")}')">
+    return `<button class="${k===game?'on':''}" data-game="${esc(k)}">
       ${esc(labels[k]||k)}
       <span class="gs">${has?'▶ video':'no video'} · ${rows.filter(r=>r.game===k).length} events</span>
     </button>`}).join('')+'</div>';
@@ -1032,7 +1049,7 @@ function catOpts(key){
 function optChips(key,vals){
   if(!vals.length)return `<div class="empty">Nothing matches “${esc(fNarrow)}”.</div>`;
   return vals.map(v=>`<button class="chip ${F[key].has(v)?'on':''}"
-    onclick="tog('${key}','${String(v).replace(/'/g,"\\'")}',this)">${esc(v)}</button>`).join('');
+    data-k="${esc(key)}" data-v="${esc(String(v))}">${esc(v)}</button>`).join('');
 }
 
 // Redraws only the chips: re-rendering the body would blow away focus and the
