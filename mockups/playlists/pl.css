@@ -1,0 +1,104 @@
+/* Shared chrome for the playlist mockups. Lifted from game.html so the three
+   options are judged against the Event Viewer's real look, not a facsimile. */
+:root{
+  --bg:#0b0e14; --surface:#141925; --surface2:#1b2230; --border:#242c3d;
+  --text:#e9ecf3; --dim:#8a93a6; --accent:#3b82f6;
+  --try:#22c55e; --turn:#f97316; --patk:#ef4444; --pdef:#b91c1c; --game:#3b82f6; --review:#a855f7;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  display:flex;flex-direction:column;height:100dvh;
+  -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+
+/* A slim black strip naming the mockup, in normal flow so it can never sit on
+   top of a control the layout is meant to be judged on. */
+.mock-tag{flex-shrink:0;display:flex;align-items:center;gap:8px;padding:3px 10px;
+  background:#000;border-bottom:1px solid var(--border);font-size:.58rem;
+  letter-spacing:.08em;font-weight:800;color:var(--dim);text-transform:uppercase}
+.mock-tag b{color:var(--accent)}
+
+.topbar{display:flex;align-items:center;gap:8px;padding:0 10px;height:48px;flex-shrink:0;
+  background:var(--surface);border-bottom:1px solid var(--border)}
+.topbar .logo{width:24px;height:24px;border-radius:5px;background:var(--accent);flex-shrink:0}
+.game-btn{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;
+  background:none;border:none;color:var(--text);font:inherit;padding:0;cursor:pointer;text-align:left}
+.game-btn .g-name{font-size:.85rem;font-weight:600;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;max-width:100%}
+.game-btn .g-sub{font-size:.65rem;color:var(--dim);white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;max-width:100%}
+.icon-btn{flex-shrink:0;background:var(--surface2);border:1px solid var(--border);color:var(--text);
+  border-radius:8px;min-width:40px;height:36px;font-size:.8rem;cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;gap:4px;padding:0 8px}
+.icon-btn.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.badge{background:var(--accent);color:#fff;border-radius:9px;font-size:.62rem;
+  padding:1px 5px;font-weight:700;line-height:1.4}
+
+/* Stage stands in for the YouTube frame — the mockups are about the list and
+   the sheets, so the video is a flat placeholder that keeps its real height. */
+.stage{flex-shrink:0;aspect-ratio:16/9;background:#000;position:relative;
+  display:flex;align-items:center;justify-content:center;color:#2c3445;font-size:.7rem;
+  letter-spacing:.12em;font-weight:800}
+.transport{display:flex;align-items:center;gap:6px;padding:6px 8px;flex-shrink:0;
+  background:var(--surface);border-bottom:1px solid var(--border)}
+.t-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:8px;
+  height:34px;min-width:38px;padding:0 6px;font-size:.72rem;cursor:pointer;display:inline-flex;
+  align-items:center;justify-content:center;flex-shrink:0}
+.t-btn.play{background:var(--accent);border-color:var(--accent);min-width:48px;font-size:.85rem}
+.t-time{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.66rem;color:var(--dim);
+  flex:1 1 auto;text-align:center;white-space:nowrap;overflow:hidden}
+
+.listhead{display:flex;align-items:center;flex-shrink:0;background:var(--bg);
+  border-bottom:1px solid var(--border)}
+.filterbar{display:flex;align-items:center;gap:6px;padding:7px 8px;flex:1 1 auto;min-width:0;
+  overflow-x:auto;scrollbar-width:none}
+.filterbar::-webkit-scrollbar{display:none}
+.chip{flex-shrink:0;background:var(--surface2);border:1px solid var(--border);color:var(--text);
+  border-radius:16px;padding:5px 11px;font-size:.72rem;cursor:pointer;white-space:nowrap;
+  display:inline-flex;align-items:center;gap:5px;min-height:32px}
+.chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.chip .x{opacity:.75;font-size:.8rem}
+.chip.pl{border-color:var(--review);color:#e9d5ff;background:#231733}
+.chip.pl b{color:var(--review);font-weight:700}
+.count{color:var(--dim);font-size:.7rem;flex-shrink:0;padding-left:2px;white-space:nowrap}
+
+.list{flex:1 1 auto;overflow-y:auto;padding:6px 8px 12px}
+.ev{display:grid;grid-template-columns:52px 1fr;gap:10px;align-items:center;
+  background:var(--surface);border-left:3px solid var(--border);border-radius:8px;
+  padding:9px 10px;margin-bottom:6px;cursor:pointer;min-height:52px}
+.ev.active{outline:2px solid var(--accent);background:var(--surface2)}
+.ev-t{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.72rem;color:var(--dim)}
+.ev-main{min-width:0}
+.ev-name{font-size:.82rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ev-meta{font-size:.66rem;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  margin-top:1px;display:flex;gap:5px;align-items:center}
+.tag{font-size:.6rem;font-weight:700;letter-spacing:.03em;text-transform:uppercase;
+  padding:2px 6px;border-radius:4px;flex-shrink:0}
+.gmatch{font-size:.66rem;color:var(--dim);flex-shrink:0;max-width:16ch;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.move{background:var(--surface2);border:1px solid var(--border);border-radius:4px;
+  padding:1px 5px;font-size:.62rem;color:#7dd3fc;flex-shrink:0}
+.empty{color:var(--dim);text-align:center;padding:36px 20px;font-size:.82rem;line-height:1.6}
+
+/* ── Bottom sheet ─────────────────────────────────────────── */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:40;display:none}
+.scrim.open{display:block}
+.sheet{position:absolute;left:0;right:0;bottom:0;z-index:50;background:var(--surface);
+  border-radius:16px 16px 0 0;max-height:82%;display:none;flex-direction:column}
+.sheet.open{display:flex}
+.sheet-grab{width:36px;height:4px;background:var(--border);border-radius:2px;margin:8px auto 4px}
+.sheet-head{display:flex;align-items:center;justify-content:space-between;padding:6px 14px 10px;
+  border-bottom:1px solid var(--border)}
+.sheet-head h2{margin:0;font-size:.92rem}
+.sheet-body{overflow-y:auto;padding:10px 14px 16px}
+.grp h3{margin:0 0 7px;font-size:.68rem;color:var(--dim);text-transform:uppercase;letter-spacing:.05em}
+.srch{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);
+  border-radius:8px;padding:10px 12px;font-size:.85rem;margin-bottom:12px;font-family:inherit}
+.glist button{display:block;width:100%;text-align:left;background:var(--surface2);
+  border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px 12px;
+  margin-bottom:6px;font-size:.8rem;cursor:pointer;font-family:inherit}
+.glist button.on{border-color:var(--accent);background:#16233c}
+.glist .gs{display:block;font-size:.66rem;color:var(--dim);margin-top:2px}
+.hint{color:var(--dim);font-size:.7rem;line-height:1.55;margin:0 0 10px}
+.hint b{color:var(--text);font-weight:600}

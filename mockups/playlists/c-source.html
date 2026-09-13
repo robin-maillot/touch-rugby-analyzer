@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Mockup C — Playlist as a source</title>
+<link rel="stylesheet" href="pl.css">
+<style>
+  /* A playlist is picked where a game is picked, so the topbar identity changes
+     to match: the name is the playlist's, the sub says what it is. */
+  .topbar.plmode{background:#1a1329;border-bottom-color:var(--review)}
+  .topbar.plmode .g-sub{color:#c4b5fd}
+
+  /* Armed strip: one playlist is the current target, so adding is a single tap
+     on the row itself rather than a menu. This is the trade — the mode lives in
+     a persistent strip instead of in the rows. */
+  .armbar{display:none;align-items:center;gap:8px;padding:7px 10px;flex-shrink:0;
+    background:#231733;border-bottom:1px solid var(--review);font-size:.72rem;color:#e9d5ff}
+  body.armed .armbar{display:flex}
+  .armbar .nm{font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .armbar .sp{flex:1}
+  .armbar button{background:none;border:1px solid var(--review);color:#e9d5ff;
+    border-radius:14px;height:28px;padding:0 10px;font-size:.68rem;cursor:pointer}
+  body.armed .ev{grid-template-columns:52px 1fr 34px}
+  .addmark{justify-self:end;width:28px;height:28px;border-radius:8px;border:1px solid var(--review);
+    color:var(--review);font-size:.85rem;display:flex;align-items:center;justify-content:center;
+    background:none;cursor:pointer}
+  .addmark.done{background:var(--review);color:#fff;border-color:var(--review)}
+
+  /* Reorder rows: the handle replaces the timestamp, ↑↓ buttons stand in for a
+     real drag so the ordering is judgeable with a mouse and a thumb alike. */
+  .ord{grid-template-columns:30px 1fr 62px}
+  .handle{color:var(--dim);font-size:1rem;text-align:center;cursor:grab}
+  .moves{display:flex;gap:3px;justify-self:end}
+  .moves button{width:28px;height:28px;border-radius:7px;background:var(--surface2);
+    border:1px solid var(--border);color:var(--dim);font-size:.75rem;cursor:pointer}
+  .sec{margin:2px 0 8px;font-size:.66rem;color:var(--dim);text-transform:uppercase;letter-spacing:.06em}
+</style>
+</head>
+<body>
+<div class="mock-tag"><b>C</b> Playlist as a source · picked like a game</div>
+
+<div class="topbar" id="topbar">
+  <div class="logo"></div>
+  <button class="game-btn" onclick="openPicker()">
+    <span class="g-name" id="gName">All games</span>
+    <span class="g-sub" id="gSub">12 events · tap to change</span></button>
+  <button class="icon-btn" id="editBtn" onclick="openEdit()" style="display:none">⠿</button>
+</div>
+
+<div class="armbar">
+  <span>Adding to</span><span class="nm" id="armedName">—</span>
+  <span class="sp"></span>
+  <button onclick="disarm()">Done</button>
+</div>
+
+<div class="stage">VIDEO</div>
+<div class="transport">
+  <button class="t-btn play">▶</button><button class="t-btn">−5</button>
+  <button class="t-btn">+5</button><span class="t-time">0:00 / 41:20</span>
+  <button class="t-btn">⤢</button><button class="t-btn">↻</button>
+</div>
+
+<div class="listhead">
+  <div class="filterbar" id="filterbar"></div>
+</div>
+<div class="list" id="list"></div>
+
+<div class="scrim" id="scrim" onclick="closeSheet()"></div>
+<div class="sheet" id="sheet">
+  <div class="sheet-grab"></div>
+  <div class="sheet-head"><h2 id="sheetTitle">Choose</h2>
+    <button class="icon-btn" onclick="closeSheet()">Done</button></div>
+  <div class="sheet-body" id="sheetBody"></div>
+</div>
+
+<script src="pl.js"></script>
+<script>
+const GAMES = ['FRA v ENG', 'WAL v SCO', 'IRE v ITA'];
+let src = {kind:'all', id:null};   // 'all' | 'game' | 'playlist'
+let arm = null;                    // playlist id currently armed for adding
+
+function cur() { return src.kind === 'playlist' ? PLAYLISTS.find(p => p.id === src.id) : null; }
+
+function renderList() {
+  const p = cur();
+  document.body.classList.toggle('armed', !!arm);
+  $('topbar').classList.toggle('plmode', !!p);
+  $('editBtn').style.display = p ? 'inline-flex' : 'none';
+  if (arm) $('armedName').textContent = PLAYLISTS.find(x => x.id === arm).name;
+
+  if (p) {
+    $('gName').textContent = p.name;
+    $('gSub').textContent = `${p.ids.length} events · playlist`;
+    $('filterbar').innerHTML =
+      `<button class="chip pl">Playlist <b>${p.name}</b></button>` +
+      `<span class="count">${p.ids.length} events, your order</span>`;
+    $('list').innerHTML = p.ids.map((ei, n) =>
+      evCard(EVENTS[ei], ei, {onclick:`play(${ei})`})).join('')
+      || `<div class="empty">Nothing in here yet.<br>Pick a game, tap <b>Add to this playlist</b>, then tap events.</div>`;
+    return;
+  }
+
+  const list = src.kind === 'game' ? EVENTS.filter(e => e.g === src.id) : EVENTS;
+  $('gName').textContent = src.kind === 'game' ? src.id : 'All games';
+  $('gSub').textContent = `${list.length} events · tap to change`;
+  $('filterbar').innerHTML = '<button class="chip on">Try <span class="x">✕</span></button>' +
+    `<span class="count">${list.length} events</span>`;
+  $('list').innerHTML = list.map(e => {
+    const i = EVENTS.indexOf(e);
+    const inArm = arm && PLAYLISTS.find(x => x.id === arm).ids.includes(i);
+    return evCard(e, i, {onclick:`play(${i})`,
+      trail: arm ? `<button class="addmark ${inArm ? 'done' : ''}"
+        onclick="event.stopPropagation();quickAdd(${i})">${inArm ? '✓' : '＋'}</button>` : ''});
+  }).join('');
+}
+
+function play(i) { toast('▶ ' + EVENTS[i].name + ' — ' + EVENTS[i].g); }
+
+function openSheet(t) { $('sheetTitle').textContent = t;
+  $('sheet').classList.add('open'); $('scrim').classList.add('open'); }
+function closeSheet() { $('sheet').classList.remove('open'); $('scrim').classList.remove('open'); }
+
+// The picker is the existing game sheet with a playlists section on top. One
+// list of "things you can watch", games and playlists alike.
+function openPicker() {
+  openSheet('Watch');
+  $('sheetBody').innerHTML =
+    '<input class="srch" placeholder="Search games and playlists…" readonly>' +
+    '<div class="sec">Your playlists</div><div class="glist">' +
+    PLAYLISTS.map(p => `<button class="${src.id === p.id ? 'on' : ''}" onclick="pickPl('${p.id}')">
+      ${p.name}<span class="gs">${p.ids.length} events · ${p.note}</span></button>`).join('') +
+    `<button onclick="toast('New playlist…')" style="border-style:dashed;color:var(--accent)">
+      ＋ New playlist</button></div>` +
+    '<div class="sec">Games</div><div class="glist">' +
+    `<button class="${src.kind === 'all' ? 'on' : ''}" onclick="pickGame(null)">All games
+      <span class="gs">${EVENTS.length} events</span></button>` +
+    GAMES.map(g => `<button class="${src.id === g ? 'on' : ''}" onclick="pickGame('${g}')">${g}
+      <span class="gs">${EVENTS.filter(e => e.g === g).length} events</span></button>`).join('') +
+    '</div>';
+}
+
+function pickPl(id) { src = {kind:'playlist', id}; arm = null; closeSheet(); renderList(); }
+function pickGame(g) { src = g ? {kind:'game', id:g} : {kind:'all', id:null}; closeSheet(); renderList(); }
+
+// Editing a playlist: rename, reorder, remove, and arm it so you can go back to
+// the games and keep adding.
+function openEdit() {
+  const p = cur();
+  openSheet('Edit playlist');
+  $('sheetBody').innerHTML =
+    `<input class="srch" value="${p.name}" readonly>` +
+    `<button class="icon-btn" style="width:100%;height:38px;margin-bottom:12px"
+       onclick="armIt('${p.id}')">＋ Add more events to this playlist</button>` +
+    '<div class="sec">Order</div>' +
+    p.ids.map((ei, n) => evCard(EVENTS[ei], ei, {cls:'ord',
+      lead:`<span class="handle">⠿</span>`,
+      trail:`<span class="moves">
+        <button onclick="mv('${p.id}',${n},-1)">↑</button>
+        <button onclick="mv('${p.id}',${n},1)">↓</button></span>`})).join('') +
+    (p.ids.length ? '' : '<p class="hint">Empty. Arm it above, then tap events in any game.</p>');
+}
+
+function mv(pid, n, d) {
+  const p = PLAYLISTS.find(x => x.id === pid), j = n + d;
+  if (j < 0 || j >= p.ids.length) return;
+  [p.ids[n], p.ids[j]] = [p.ids[j], p.ids[n]];
+  openEdit(); renderList();
+}
+
+function armIt(pid) { arm = pid; src = {kind:'all', id:null}; closeSheet(); renderList();
+  toast('Tap events to add them'); }
+function disarm() { const id = arm; arm = null; src = {kind:'playlist', id}; renderList(); }
+
+function quickAdd(i) {
+  const p = PLAYLISTS.find(x => x.id === arm);
+  if (p.ids.includes(i)) p.ids = p.ids.filter(x => x !== i);
+  else { p.ids.push(i); toast('Added · ' + p.ids.length + ' in ' + p.name); }
+  renderList();
+}
+
+renderList();
+</script>
+</body>
+</html>

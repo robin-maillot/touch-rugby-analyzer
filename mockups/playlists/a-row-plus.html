@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Mockup A — Row ＋ and a Playlists sheet</title>
+<link rel="stylesheet" href="pl.css">
+<style>
+  /* The ＋ is a third grid column on every row. It must be big enough to hit
+     and far enough from the card body that it never steals a play tap, which
+     is what costs the row its width. */
+  .ev{grid-template-columns:46px 1fr 40px}
+  .plus{width:36px;height:36px;border-radius:8px;background:var(--surface2);
+    border:1px solid var(--border);color:var(--dim);font-size:1rem;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;justify-self:end}
+  .plus.in{background:#231733;border-color:var(--review);color:var(--review)}
+  /* Playlist rows in the sheet: name, count, and the reorder affordance. */
+  .pl-row{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;
+    background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+    padding:10px 12px;margin-bottom:6px;cursor:pointer}
+  .pl-row.on{border-color:var(--review);background:#231733}
+  .pl-row .nm{font-size:.8rem;font-weight:600}
+  .pl-row .ns{font-size:.66rem;color:var(--dim);margin-top:2px}
+  .pl-row .n{font-size:.7rem;color:var(--dim);white-space:nowrap}
+  .newpl{border-style:dashed;color:var(--accent)}
+  /* Inside a playlist: a drag handle replaces the timestamp column. */
+  .ord{grid-template-columns:34px 1fr 34px}
+  .handle{color:var(--dim);font-size:1rem;cursor:grab;text-align:center}
+  .rm{background:none;border:none;color:var(--dim);font-size:.95rem;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="mock-tag"><b>A</b> Row ＋ · Playlists sheet</div>
+
+<div class="topbar">
+  <div class="logo"></div>
+  <button class="game-btn"><span class="g-name" id="gName">All games</span>
+    <span class="g-sub" id="gSub">12 events</span></button>
+  <button class="icon-btn" onclick="openPl()">📋 <span class="badge">3</span></button>
+</div>
+
+<div class="stage">VIDEO</div>
+<div class="transport">
+  <button class="t-btn play">▶</button><button class="t-btn">−5</button>
+  <button class="t-btn">+5</button><span class="t-time">0:00 / 41:20</span>
+  <button class="t-btn">⤢</button><button class="t-btn">↻</button>
+</div>
+
+<div class="listhead">
+  <div class="filterbar">
+    <button class="chip on">Try <span class="x">✕</span></button>
+    <button class="chip">Turnover</button>
+    <span class="count" id="count">12 events</span>
+  </div>
+</div>
+<div class="list" id="list"></div>
+
+<div class="scrim" id="scrim" onclick="closeSheet()"></div>
+<div class="sheet" id="sheet">
+  <div class="sheet-grab"></div>
+  <div class="sheet-head"><h2 id="sheetTitle">Playlists</h2>
+    <button class="icon-btn" onclick="closeSheet()">Done</button></div>
+  <div class="sheet-body" id="sheetBody"></div>
+</div>
+
+<script src="pl.js"></script>
+<script>
+// Which playlist each event sits in, as a Set of playlist ids per event index —
+// the mockup's stand-in for the sheet-side membership rows.
+const IN = EVENTS.map((_, i) => new Set(PLAYLISTS.filter(p => p.ids.includes(i)).map(p => p.id)));
+let open = null;          // playlist currently being viewed, or null
+let sheetMode = 'list';   // 'list' | 'add' | 'inside'
+let addFor = null;        // event index the add-sheet was opened for
+
+function renderList() {
+  if (open) {   // a playlist is the source: the list IS the playlist, in its own order
+    const p = PLAYLISTS.find(x => x.id === open);
+    $('gName').textContent = p.name;
+    $('gSub').textContent = p.ids.length + ' events · playlist';
+    $('count').textContent = p.ids.length + ' events';
+    $('list').innerHTML = p.ids.map((ei, n) =>
+      evCard(EVENTS[ei], ei, {cls:'ord', lead:`<span class="handle">⠿</span>`,
+        trail:`<button class="rm" onclick="event.stopPropagation();drop('${p.id}',${ei})">✕</button>`,
+        onclick:`play(${ei})`})).join('')
+      || '<div class="empty">Nothing in here yet.<br>Tap ＋ on any event to add it.</div>';
+    return;
+  }
+  $('gName').textContent = 'All games';
+  $('gSub').textContent = EVENTS.length + ' events';
+  $('count').textContent = EVENTS.length + ' events';
+  $('list').innerHTML = EVENTS.map((e, i) =>
+    evCard(e, i, {onclick:`play(${i})`,
+      trail:`<button class="plus ${IN[i].size ? 'in' : ''}"
+        onclick="event.stopPropagation();addSheet(${i})">${IN[i].size ? '★' : '＋'}</button>`})).join('');
+}
+
+function play(i) { toast('▶ ' + EVENTS[i].name + ' — ' + EVENTS[i].g); }
+
+function openSheet(title) { $('sheetTitle').textContent = title;
+  $('sheet').classList.add('open'); $('scrim').classList.add('open'); }
+function closeSheet() { $('sheet').classList.remove('open'); $('scrim').classList.remove('open'); }
+
+// The Playlists sheet — a fourth `kind` alongside game / filter / moves.
+function openPl() {
+  sheetMode = 'list';
+  openSheet('Playlists');
+  $('sheetBody').innerHTML =
+    '<p class="hint">A playlist is a <b>fixed list of events</b> you picked by hand. ' +
+    'Tap one to make it the event list — prev/next, loop and the playback window all follow it.</p>' +
+    PLAYLISTS.map(p => `<div class="pl-row ${open === p.id ? 'on' : ''}" onclick="pick('${p.id}')">
+      <div><div class="nm">${p.name}</div><div class="ns">${p.note}</div></div>
+      <div class="n">${p.ids.length} ›</div></div>`).join('') +
+    `<div class="pl-row newpl" onclick="toast('New playlist…')">
+      <div><div class="nm">＋ New playlist</div></div><div class="n"></div></div>` +
+    (open ? `<button class="icon-btn" style="width:100%;height:38px;margin-top:10px"
+       onclick="pick(null)">Back to all games</button>` : '');
+}
+
+function pick(id) { open = id; closeSheet(); renderList();
+  if (id) toast('Playing ' + PLAYLISTS.find(p => p.id === id).name); }
+
+// The add sheet: one extra tap per event, which is the cost of this option.
+function addSheet(i) {
+  addFor = i; sheetMode = 'add';
+  openSheet('Add to playlist');
+  $('sheetBody').innerHTML =
+    `<p class="hint">${EVENTS[i].name} · ${EVENTS[i].g}</p>` +
+    '<div class="glist">' + PLAYLISTS.map(p => `<button class="${IN[i].has(p.id) ? 'on' : ''}"
+      onclick="toggle('${p.id}')">${IN[i].has(p.id) ? '✓ ' : ''}${p.name}
+      <span class="gs">${p.ids.length} events</span></button>`).join('') +
+    `<button onclick="toast('New playlist…')" style="border-style:dashed;color:var(--accent)">
+      ＋ New playlist</button></div>`;
+}
+
+function toggle(pid) {
+  const p = PLAYLISTS.find(x => x.id === pid), i = addFor;
+  if (IN[i].has(pid)) { IN[i].delete(pid); p.ids = p.ids.filter(x => x !== i); }
+  else { IN[i].add(pid); p.ids.push(i); }
+  addSheet(i); renderList();
+}
+
+function drop(pid, ei) {
+  const p = PLAYLISTS.find(x => x.id === pid);
+  p.ids = p.ids.filter(x => x !== ei); IN[ei].delete(pid);
+  renderList(); toast('Removed');
+}
+
+renderList();
+</script>
+</body>
+</html>

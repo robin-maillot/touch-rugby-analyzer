@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Saved playlists — mockups</title>
+<link rel="stylesheet" href="../../css/theme.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', -apple-system, sans-serif; padding: 28px 20px 60px; }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+  h1 { font-size: 1.3rem; margin-bottom: 6px; }
+  .sub { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 26px; line-height: 1.55; max-width: 66ch; }
+  .sub b { color: var(--text); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; }
+  .card.pick { border-color: var(--green); }
+  .frame { height: 560px; border: 0; width: 100%; background: #000; }
+  .meta { padding: 14px 16px 18px; }
+  .meta h2 { font-size: 0.95rem; }
+  .badge { display: inline-block; font-size: 0.6rem; font-weight: 800; letter-spacing: .07em; padding: 2px 7px; border-radius: 99px; background: var(--green); color: #06210f; margin-left: 6px; vertical-align: 2px; }
+  .meta p { font-size: 0.78rem; color: var(--text-muted); line-height: 1.5; margin-top: 7px; }
+  .meta ul { margin: 9px 0 0 16px; font-size: 0.76rem; color: var(--text-muted); line-height: 1.6; }
+  .meta li.good::marker { color: var(--green); }
+  .meta li.bad::marker { color: var(--red); }
+  .open { display: inline-block; margin-top: 12px; font-size: 0.78rem; font-weight: 700; color: var(--accent); text-decoration: none; }
+  .note { margin-top: 32px; font-size: 0.8rem; color: var(--text-muted); line-height: 1.65; max-width: 78ch; }
+  .note h3 { font-size: 0.85rem; color: var(--text); margin-bottom: 7px; margin-top: 18px; }
+  .note code { background: var(--surface-2); padding: 1px 5px; border-radius: 4px; font-size: 0.9em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Saved playlists — three ways in</h1>
+  <p class="sub">All three assume the same thing underneath: a playlist is a <b>named, ordered list of
+  hand-picked events</b>, stored per account in the sheet, able to span games and filters freely.
+  What differs is <b>how events get into one</b> and <b>where a playlist lives in the Event Viewer</b>.
+  Every frame is live — tap around.</p>
+
+  <div class="grid">
+    <div class="card">
+      <iframe class="frame" src="a-row-plus.html"></iframe>
+      <div class="meta">
+        <h2>A · Row ＋, Playlists sheet</h2>
+        <p>Every event row grows a ＋ at its right edge. Tapping it opens a short
+        “Add to…” sheet. Playlists themselves are a fourth bottom sheet next to
+        Game / Filter / Moves, and picking one swaps the event list for it.</p>
+        <ul>
+          <li class="good">Smallest change — one more <code>openSheet</code> kind, no new mode.</li>
+          <li class="good">Add and play are always available; nothing is modal.</li>
+          <li class="bad">Costs ~40px of row width on a phone, permanently.</li>
+          <li class="bad">Two taps per event. Adding 30 backdoors is 60 taps.</li>
+        </ul>
+        <a class="open" href="a-row-plus.html" target="_blank">Open full screen ↗</a>
+      </div>
+    </div>
+
+    <div class="card pick">
+      <iframe class="frame" src="b-collect.html"></iframe>
+      <div class="meta">
+        <h2>B · Collect mode<span class="badge">recommended</span></h2>
+        <p>A ＋⃞ toggle in the filter bar turns the list into selection mode: rows
+        tick instead of playing, a purple tray keeps the running count, and a
+        pinned bar commits the lot at once. <b>The selection survives a filter
+        change</b> — that is what makes “spans different filters” one save
+        instead of many.</p>
+        <ul>
+          <li class="good">Filter → “All 12” → save. Bulk is one tap, not thirty.</li>
+          <li class="good">Rows keep their full width when you’re not collecting.</li>
+          <li class="bad">A mode: you can’t play an event while collecting.</li>
+          <li class="bad">Needs the tray to explain itself the first time.</li>
+        </ul>
+        <a class="open" href="b-collect.html" target="_blank">Open full screen ↗</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <iframe class="frame" src="c-source.html"></iframe>
+      <div class="meta">
+        <h2>C · Playlist as a source</h2>
+        <p>Playlists sit in the game picker above the games — one list of things
+        you can watch. Picking one recolours the topbar and makes it the event
+        source. A ⠿ button opens rename / reorder, and “add more events” arms
+        the playlist so tapping ＋ on any row in any game drops straight into it.</p>
+        <ul>
+          <li class="good">Reorder gets a real home; prev/next works untouched.</li>
+          <li class="good">Playlists feel equal to games, not a side feature.</li>
+          <li class="bad">Biggest change: picker, topbar, an armed strip, an edit screen.</li>
+          <li class="bad">Armed mode is sticky state that’s easy to forget you’re in.</li>
+        </ul>
+        <a class="open" href="c-source.html" target="_blank">Open full screen ↗</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h3>What is identical in all three</h3>
+    <p>A <code>_playlists</code> tab in the control sheet, one row per playlist
+    (<code>Id | Secret | Name | Note | Event Refs | Updated At</code>), with
+    <code>Event Refs</code> holding the ordered list of
+    <code>game#time#type#name</code> refs the viewer already synthesises in
+    <code>evId()</code>. Reads come back with <code>action=all</code>’s sibling
+    <code>action=playlists</code>; writes are a <code>save_playlist</code> /
+    <code>delete_playlist</code> post, scoped to the caller’s secret the same way
+    <code>canSeeGame</code> scopes games today. Selecting a playlist replaces
+    <code>shown</code>, so prev/next, loop, the scrub marks and the playback
+    window all keep working with no change.</p>
+    <h3>The one real risk</h3>
+    <p>Event refs are synthetic, not stored IDs. An admin renaming an event in
+    the Event Editor changes its ref and silently breaks the playlist entry. The
+    spec needs an answer — either resolve refs loosely (game + time wins, name is
+    advisory) or stamp real IDs onto rows. Loose resolution is cheaper and needs
+    no sheet migration.</p>
+  </div>
+</div>
+</body>
+</html>

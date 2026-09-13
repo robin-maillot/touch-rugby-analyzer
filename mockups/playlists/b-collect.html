@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Mockup B — Collect mode</title>
+<link rel="stylesheet" href="pl.css">
+<style>
+  /* Collect mode swaps the timestamp column for a tick. Nothing is added to the
+     row in normal mode, so the list keeps every pixel it has today. */
+  body.collect .ev{grid-template-columns:34px 1fr}
+  .tick{width:22px;height:22px;border-radius:6px;border:2px solid var(--border);
+    display:flex;align-items:center;justify-content:center;font-size:.75rem;color:transparent}
+  .ev.sel .tick{background:var(--review);border-color:var(--review);color:#fff}
+  .ev.sel{background:var(--surface2);border-left-color:var(--review)}
+  body.collect .list{padding-bottom:70px}
+
+  /* Action bar: only exists in collect mode, pinned so the count and the commit
+     never scroll away from the rows being ticked. */
+  .actionbar{position:absolute;left:0;right:0;bottom:0;z-index:30;display:none;
+    align-items:center;gap:8px;padding:9px 10px;background:var(--surface);
+    border-top:1px solid var(--review)}
+  body.collect .actionbar{display:flex}
+  .actionbar .n{font-size:.75rem;font-weight:700;color:var(--review);white-space:nowrap}
+  .actionbar .sp{flex:1}
+  .btn-primary{background:var(--review);border:1px solid var(--review);color:#fff;
+    border-radius:8px;height:36px;padding:0 13px;font-size:.78rem;font-weight:600;cursor:pointer}
+  .btn-primary:disabled{opacity:.35}
+  .btn-ghost{background:var(--surface2);border:1px solid var(--border);color:var(--text);
+    border-radius:8px;height:36px;padding:0 11px;font-size:.75rem;cursor:pointer}
+  .tray{background:#231733;border:1px solid var(--review);border-radius:8px;
+    padding:8px 11px;margin:0 8px 6px;font-size:.72rem;color:#e9d5ff;display:none}
+  body.collect .tray{display:block}
+  .tray b{color:#fff}
+</style>
+</head>
+<body>
+<div class="mock-tag"><b>B</b> Collect mode · bulk add across filters</div>
+
+<div class="topbar">
+  <div class="logo"></div>
+  <button class="game-btn"><span class="g-name">All games</span>
+    <span class="g-sub" id="gSub">12 events</span></button>
+  <button class="icon-btn" onclick="openPl()">📋 <span class="badge">3</span></button>
+</div>
+
+<div class="stage">VIDEO</div>
+<div class="transport">
+  <button class="t-btn play">▶</button><button class="t-btn">−5</button>
+  <button class="t-btn">+5</button><span class="t-time">0:00 / 41:20</span>
+  <button class="t-btn">⤢</button><button class="t-btn">↻</button>
+</div>
+
+<div class="listhead">
+  <div class="filterbar">
+    <button class="chip on">Try <span class="x">✕</span></button>
+    <button class="chip">23 - Backdoor</button>
+    <span class="count" id="count">12 events</span>
+  </div>
+  <button class="icon-btn" id="collectBtn" style="margin:0 8px 0 0" onclick="toggleCollect()">☑</button>
+</div>
+
+<div class="tray" id="tray"></div>
+<div class="list" id="list"></div>
+
+<div class="actionbar">
+  <span class="n" id="selN">0 selected</span>
+  <button class="btn-ghost" onclick="selectAll()">All 12</button>
+  <span class="sp"></span>
+  <button class="btn-ghost" onclick="toggleCollect()">Cancel</button>
+  <button class="btn-primary" id="saveBtn" onclick="commit()" disabled>Add to…</button>
+</div>
+
+<div class="scrim" id="scrim" onclick="closeSheet()"></div>
+<div class="sheet" id="sheet">
+  <div class="sheet-grab"></div>
+  <div class="sheet-head"><h2 id="sheetTitle">Playlists</h2>
+    <button class="icon-btn" onclick="closeSheet()">Done</button></div>
+  <div class="sheet-body" id="sheetBody"></div>
+</div>
+
+<script src="pl.js"></script>
+<script>
+// The collection survives a filter change — that is the whole point. You tick
+// three tries here, change the filter to turnovers, tick two more, then commit
+// once. The tray keeps the running total visible while the list underneath
+// changes out from under it.
+let collecting = false;
+const sel = new Set();
+
+function renderList() {
+  $('list').innerHTML = EVENTS.map((e, i) =>
+    evCard(e, i, {
+      cls: sel.has(i) ? 'sel' : '',
+      lead: collecting ? `<span class="tick">✓</span>` : `<span class="ev-t">${e.t}</span>`,
+      onclick: collecting ? `tick(${i})` : `play(${i})`
+    })).join('');
+  $('selN').textContent = sel.size + ' selected';
+  $('saveBtn').disabled = !sel.size;
+  $('saveBtn').textContent = sel.size ? `Add ${sel.size} to…` : 'Add to…';
+  $('tray').innerHTML = sel.size
+    ? `<b>${sel.size} collected.</b> Change the filter and keep tapping — the collection is kept until you save it.`
+    : 'Tap events to collect them. Filters can change while you do.';
+}
+
+function play(i) { toast('▶ ' + EVENTS[i].name + ' — ' + EVENTS[i].g); }
+function tick(i) { sel.has(i) ? sel.delete(i) : sel.add(i); renderList(); }
+function selectAll() { EVENTS.forEach((_, i) => sel.add(i)); renderList(); }
+
+function toggleCollect() {
+  collecting = !collecting;
+  document.body.classList.toggle('collect', collecting);
+  $('collectBtn').classList.toggle('on', collecting);
+  if (!collecting) sel.clear();
+  renderList();
+}
+
+function openSheet(t) { $('sheetTitle').textContent = t;
+  $('sheet').classList.add('open'); $('scrim').classList.add('open'); }
+function closeSheet() { $('sheet').classList.remove('open'); $('scrim').classList.remove('open'); }
+
+function commit() {
+  openSheet(`Add ${sel.size} events to…`);
+  $('sheetBody').innerHTML = '<div class="glist">' +
+    PLAYLISTS.map(p => `<button onclick="saveTo('${p.id}')">${p.name}
+      <span class="gs">${p.ids.length} events · ${p.note}</span></button>`).join('') +
+    `<button onclick="saveTo(null)" style="border-style:dashed;color:var(--accent)">
+      ＋ New playlist</button></div>`;
+}
+
+function saveTo(pid) {
+  const p = pid ? PLAYLISTS.find(x => x.id === pid) : null;
+  if (p) sel.forEach(i => { if (!p.ids.includes(i)) p.ids.push(i); });
+  const n = sel.size;
+  closeSheet(); toggleCollect();
+  toast(`Added ${n} to ${p ? p.name : 'new playlist'}`);
+}
+
+function openPl() {
+  openSheet('Playlists');
+  $('sheetBody').innerHTML =
+    '<p class="hint">Tap a playlist to watch it. Tap <b>☑</b> in the filter bar to start collecting new events into one.</p>' +
+    '<div class="glist">' + PLAYLISTS.map(p => `<button onclick="closeSheet();toast('Playing ' + '${p.name}')">
+      ${p.name}<span class="gs">${p.ids.length} events · ${p.note}</span></button>`).join('') + '</div>';
+}
+
+renderList();
+</script>
+</body>
+</html>
