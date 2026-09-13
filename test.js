@@ -1147,6 +1147,24 @@ test('ties break on attempts then alphabetically', () => {
   assert.deepEqual(s.moves.map(m => m.move), ['21', '23']);
 });
 
+// ── TR.filterSummary ──────────────────────────────────────────
+console.log('TR.filterSummary');
+test('none',        () => { assert.equal(TR.filterSummary([]), 'Any'); });
+test('one',         () => { assert.equal(TR.filterSummary(['Try']), 'Try'); });
+test('two',         () => { assert.equal(TR.filterSummary(['Try', 'Turnover']), 'Try, Turnover'); });
+test('three+',      () => { assert.equal(TR.filterSummary(['Try', 'Turnover', 'Penalty Attack']), '3 selected'); });
+test('from a Set',  () => { assert.equal(TR.filterSummary([...new Set(['Try'])]), 'Try'); });
+test('numbers',     () => { assert.equal(TR.filterSummary([2025, 2026]), '2025, 2026'); });
+
+// ── TR.optMatch ───────────────────────────────────────────────
+console.log('TR.optMatch');
+test('empty needle', () => { assert.equal(TR.optMatch('Wiggle', ''), true); assert.equal(TR.optMatch('Wiggle', null), true); assert.equal(TR.optMatch('Wiggle', undefined), true); });
+test('hit',          () => { assert.equal(TR.optMatch('Wiggle', 'wig'), true); });
+test('case',         () => { assert.equal(TR.optMatch('wiggle', 'WIG'), true); });
+test('mid-string',   () => { assert.equal(TR.optMatch('Dummy Switch', 'switch'), true); });
+test('miss',         () => { assert.equal(TR.optMatch('Wiggle', 'zzz'), false); });
+test('non-string',   () => { assert.equal(TR.optMatch(2026, '26'), true); assert.equal(TR.optMatch(null, 'x'), false); });
+
 // ─────────────────────────────────────────────────────────────
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

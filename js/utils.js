@@ -52,3 +52,19 @@ TR.substituteTeams = (rows, team1, team2, cols) => {
     });
   });
 };
+
+// Describes a filter category's current selection for the Filter sheet's
+// category list. Two values still fit a row; beyond that a count reads better
+// than a truncated list.
+TR.filterSummary = (values) => {
+  const v = Array.from(values || []);
+  if (!v.length) return 'Any';
+  return v.length <= 2 ? v.map(String).join(', ') : `${v.length} selected`;
+};
+
+// Case-insensitive substring test for the Filter sheet's type-to-narrow box.
+// An empty needle matches everything, so an untouched box hides nothing.
+TR.optMatch = (value, needle) => {
+  if (!needle) return true;
+  return String(value == null ? '' : value).toLowerCase().includes(String(needle).toLowerCase());
+};
