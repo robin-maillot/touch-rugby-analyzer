@@ -203,7 +203,12 @@
   .sheet-head{display:flex;align-items:center;justify-content:space-between;padding:6px 14px 10px;
     border-bottom:1px solid var(--border)}
   .sheet-head h2{margin:0;font-size:.92rem}
-  .sheet-head h2.back{cursor:pointer;color:var(--accent)}
+  /* Drilled in, the title is the only way back, so it needs a thumb-sized box
+     like the Done button beside it. The negative margin cancels the padding,
+     so the box grows around the text rather than shoving it. */
+  .sheet-head h2.back{cursor:pointer;color:var(--accent);
+    padding:10px 12px;margin:-10px -12px;border-radius:8px}
+  .sheet-head h2.back:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   .sheet-body{overflow-y:auto;overflow-x:hidden;padding:10px 14px calc(14px + var(--safe-b))}
   .opts{min-width:0}
   .grp{margin-bottom:14px}
@@ -381,6 +386,27 @@ let winBefore=5, winAfter=3;
 const WIN_BEFORE_CHIPS=[3,5,10,15], WIN_AFTER_CHIPS=[2,3,5,10];
 let F={type:new Set(),team:new Set(),name:new Set(),move:new Set(),
        comp:new Set(),div:new Set(),year:new Set(),q:''};
+
+// Categories ordered by how much they narrow: Competition/Division/Year first
+// (the ones that matter most once you're browsing across every game), then the
+// original per-event groups. One table so the category list and the option
+// screen can't drift apart.
+const FCATS=[
+  {key:'comp', title:'Competition', of:e=>e.comp},
+  {key:'div',  title:'Division',    of:e=>e.div},
+  {key:'year', title:'Year',        of:e=>e.year},
+  {key:'type', title:'Type',        of:e=>e.type},
+  {key:'team', title:'Team',        of:e=>e.team},
+  {key:'name', title:'Name',        of:e=>e.name},
+  {key:'move', title:'Move',        of:e=>e.move},
+];
+// null at the category list, otherwise the FCATS key being browsed. Reset on
+// every open, so the sheet never reopens stranded inside a category.
+let fCat=null, fNarrow='';
+
+// Twelve chips is about two phone rows — past that, scanning for one costs
+// more than typing three letters of it.
+const NARROW_AT=12;
 
 const LS={get(k){try{return JSON.parse(localStorage.getItem('trl2_'+k))}catch(e){return null}},
           set(k,v){try{localStorage.setItem('trl2_'+k,JSON.stringify(v))}catch(e){}}};
@@ -912,7 +938,7 @@ function movesSheetBody(){
 function openSheet(kind){
   $('scrim').classList.add('open'); $('sheet').classList.add('open');
   if(kind==='filter')fCat=null;               // always open at the category list
-  $('sheetTitle').className=''; $('sheetTitle').onclick=null;
+  $('sheetTitle').className=''; $('sheetTitle').onclick=null; backCtl($('sheetTitle'),false);
   $('sheetTitle').textContent = kind==='game'?'Choose a game':kind==='moves'?'Strike moves'
     :kind==='window'?'Playback window':'Filter events';
   $('sheetBody').innerHTML = kind==='game'?gameSheet():kind==='moves'?movesSheetBody()
@@ -938,23 +964,6 @@ function gameSheet(){
       <span class="gs">${has?'▶ video':'no video'} · ${rows.filter(r=>r.game===k).length} events</span>
     </button>`}).join('')+'</div>';
 }
-
-// Categories ordered by how much they narrow: Competition/Division/Year first
-// (the ones that matter most once you're browsing across every game), then the
-// original per-event groups. One table so the category list and the option
-// screen can't drift apart.
-const FCATS=[
-  {key:'comp', title:'Competition', of:e=>e.comp},
-  {key:'div',  title:'Division',    of:e=>e.div},
-  {key:'year', title:'Year',        of:e=>e.year},
-  {key:'type', title:'Type',        of:e=>e.type},
-  {key:'team', title:'Team',        of:e=>e.team},
-  {key:'name', title:'Name',        of:e=>e.name},
-  {key:'move', title:'Move',        of:e=>e.move},
-];
-// null at the category list, otherwise the FCATS key being browsed. Reset on
-// every open, so the sheet never reopens stranded inside a category.
-let fCat=null, fNarrow='';
 
 function catVals(c){return [...new Set(events.map(c.of).filter(Boolean))]}
 
@@ -988,6 +997,18 @@ function paintFilterHead(){
   h.innerHTML=c?`‹ ${c.title}`:'Filter events';
   h.className=c?'back':'';
   h.onclick=c?()=>drill(null):null;
+  backCtl(h,!!c);
+}
+
+// A heading is not a control, so while it doubles as one it has to say so and
+// answer the keyboard too — tapping it is otherwise the only way out of a
+// category. Shared with openSheet, which resets the head for the other kinds.
+function backCtl(h,on){
+  if(!on){['role','tabindex','aria-label'].forEach(a=>h.removeAttribute(a)); h.onkeydown=null; return}
+  h.setAttribute('role','button');
+  h.setAttribute('tabindex','0');
+  h.setAttribute('aria-label','Back to all filters');
+  h.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault(); drill(null)}};
 }
 
 function drill(key){
@@ -995,10 +1016,6 @@ function drill(key){
   $('sheetBody').innerHTML=filterSheet();
   paintFilterHead();
 }
-
-// Twelve chips is about two phone rows — past that, scanning for one costs
-// more than typing three letters of it.
-const NARROW_AT=12;
 
 function catOpts(key){
   const c=FCATS.find(x=>x.key===key);
