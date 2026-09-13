@@ -558,8 +558,10 @@ function render(keepWindow){
     `<b>${esc(movesSummary(ms))}</b></button>`+
     '<span class="count" id="count">'+
     `${shown.length}${shown.length!==events.length?' of '+events.length:''} events</span>`;
+  // label is raw sheet data, so it goes through esc() like every other value
+  // written as markup — the ✕ is the only markup this chip is allowed to carry.
   const add=(label,fn)=>{const b=document.createElement('button');b.className='chip on';
-    b.innerHTML=label+' <span class="x">✕</span>';b.onclick=fn;bar.appendChild(b)};
+    b.innerHTML=esc(label)+' <span class="x">✕</span>';b.onclick=fn;bar.appendChild(b)};
   F.comp.forEach(v=>add(v,()=>{F.comp.delete(v);render()}));
   F.div.forEach(v=>add(v,()=>{F.div.delete(v);render()}));
   F.year.forEach(v=>add(v,()=>{F.year.delete(v);render()}));
@@ -843,15 +845,21 @@ $('scrub').addEventListener('pointerdown',e=>{scrubTo(e.clientX);
 // value as source code, and a value carrying a quote then escapes its own
 // attribute. Data attributes go through esc() and come back off dataset as the
 // exact original string.
+//
+// closest() would keep walking past the container to document, so each match is
+// bounded to the container it was delegated from: a data-game landing on some
+// ancestor later must not turn every click in here into that hook.
+const within=(ev,el)=>el&&ev.currentTarget.contains(el)?el:null;
+
 $('list').addEventListener('click',ev=>{
-  const row=ev.target.closest('.ev'); if(!row)return;
+  const row=within(ev,ev.target.closest('.ev')); if(!row)return;
   playEvent(+row.dataset.t,row.dataset.id,row.dataset.game);
 });
 
 $('sheetBody').addEventListener('click',ev=>{
-  const chip=ev.target.closest('.chip[data-k]');
+  const chip=within(ev,ev.target.closest('.chip[data-k]'));
   if(chip){tog(chip.dataset.k,chip.dataset.v,chip);return}
-  const g=ev.target.closest('[data-game]');
+  const g=within(ev,ev.target.closest('[data-game]'));
   if(g)pickGame(g.dataset.game);
 });
 
