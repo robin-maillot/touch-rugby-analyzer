@@ -585,7 +585,7 @@ function render(keepWindow){
     const id=evId(e);
     return `<div class="ev${activeId===id?' active':''}" style="border-left-color:${col(e.type)}"
       data-t="${e.time}" data-id="${esc(id)}" data-game="${esc(String(e.game))}">
-      <span class="ev-t">${shortT(e.timeStr)}</span>
+      <span class="ev-t">${esc(shortT(e.timeStr))}</span>
       <span class="ev-main">
         <span class="ev-name">${esc(e.name||e.type)}</span>
         <span class="ev-meta"><span class="tag" style="background:${col(e.type)}22;color:${col(e.type)}">${esc(e.type)}</span>
