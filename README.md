@@ -99,6 +99,10 @@ The **Filter** sheet works in two steps: it opens on a row per category — Comp
 
 Transport controls cover play/pause, ±5s, 0.5x slow-mo for reading a move, a 2x zoom you can drag while zoomed, and a loop that repeats the current event. The **playback window** button (labelled with its current values, e.g. `5/3`) opens a sheet for how much video surrounds an event: the lookback decides where playback starts on every tap, the tail decides where a loop turns around. Defaults are 5s before and 3s after, remembered per device.
 
+**Playlists** are saved, hand-picked sets of events that span games and filters — the eleven backdoors you want to show on Tuesday, in the order you want to show them. Tap **☑** in the filter bar to start collecting: rows tick instead of playing, and the collection survives a filter change, so you can gather tries here and turnovers there and save the lot in one go. **📋** lists what you've saved; tapping one makes it the event list, so prev/next, loop and the playback window all follow it — filters can't narrow a playing playlist, since it's already the hand-picked set. Opening a playlist, collapsing the event list, or entering cinema mode all drop out of collect mode first, since none of them has anywhere to put its tray and tick marks. The ⠿ beside a playlist opens rename, reorder and delete.
+
+Playlists belong to the account that made them, not the device: every save, load and delete is checked against the caller's account secret on the server, the same way editing a game's events is. An event is remembered by its game and timestamp, so correcting a Name in the Event Editor won't break a saved playlist; anything that genuinely can't be found any more is reported rather than silently dropped — as a count next to a playing playlist, and against each playlist in the list and its edit screen.
+
 ---
 
 ### Event Editor (`viewer.html`)
@@ -228,6 +232,15 @@ One row per game. Columns: `Sheet Name`, `Team 1`, `Team 2`, `Competition`, `Yea
 ### `_live` sheet
 
 Transient live game state. One row per active live session. Columns: `Sheet Name`, `Team 1`, `Team 2`, `Score 1`, `Score 2`, `Time Seconds`, `Updated At`. Managed automatically by the annotators.
+
+### `_playlists` sheet
+
+One row per saved playlist. Columns: `Id`, `Owner`, `Name`, `Note`, `Refs`, `Updated At`.
+
+- **Owner** — the account secret that owns it. Every read and write is filtered and checked against this server-side.
+- **Refs** — the playlist's events, one `game#time#type#name` ref per line, in playback order. Only the game and time are matched on; the type and name are stored so the row stays readable, and go stale harmlessly after a rename.
+
+Capped at 500 events per playlist. Not editable from the admin sheet editor — it's user content, not control plane.
 
 ### Game tabs
 
