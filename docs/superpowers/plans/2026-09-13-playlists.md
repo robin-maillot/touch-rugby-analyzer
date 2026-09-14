@@ -16,6 +16,8 @@
 - **Playlist reads and writes bypass `cacheGet`/`cachePut`** and never call `bumpVersion()`.
 - **`_playlists` is never added to `ADMIN_SHEETS`.**
 - **Every playlist write is ownership-checked server-side**, never trusted from the client.
+- **Never build an event handler by interpolating data into markup.** No `onclick="fn('${value}')"`, anywhere, for any value that came from the sheet — including ids you believe are safe. `00b52a3` and `6892607` removed exactly this: an inline handler encodes its value as JavaScript source, so a value carrying a `"` closes the attribute and injects a live handler, and the same encoding decodes entities on the way back so `Fish &amp; Chips` filtered to nothing. Values ride in `data-` attributes through `esc()` and come back off `dataset` as the exact original string, read by **one delegated listener per container**, bounded with the existing `within(ev, el)` helper (`closest()` alone walks past the container to `document`).
+- **Sheets participate in focus management.** `openSheet` records `sheetOpener` and ends with `$('sheet').focus()`; `closeSheet` hands focus back. A new sheet kind goes through `openSheet`, never by setting `.open` directly. A title acting as a back control goes through `backCtl()`, which sets `role`, `tabindex` and `aria-label` and answers Enter and Space.
 - Comment style matches the codebase: explain *why*, not *what*. See `js/utils.js` for the register.
 - Commit messages: imperative mood, a body explaining the reasoning, ending with `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>`.
 
@@ -727,7 +729,7 @@ Still in `render()`, the filter bar is built starting at `const bar=$('filterbar
 ```js
   const bar=$('filterbar');
   if(pl){
-    bar.innerHTML=`<button class="chip pl" onclick="playPlaylist(null)">
+    bar.innerHTML=`<button class="chip pl" data-plleave="1">
         ${esc(pl.name)} <span class="x">✕</span></button>`+
       `<span class="count">${shown.length} events</span>`+
       (plMissing?`<span class="count warn">${plMissing} no longer in the data</span>`:'');
@@ -765,11 +767,28 @@ function playlistSheet(){
   return '<div class="glist">'+PL.map(p=>{
     const r=TR.playlists.resolve(p.refs,rows);
     const gone=r.missing?` · ${r.missing} missing`:'';
-    return `<button class="${p.id===plOpen?'on':''}" onclick="playPlaylist('${p.id}')">
+    return `<button class="${p.id===plOpen?'on':''}" data-pl="${esc(p.id)}">
       ${esc(p.name)}
       <span class="gs">${r.events.length} events${gone}${p.note?' · '+esc(p.note):''}</span>
     </button>`}).join('')+'</div>';
 }
+```
+
+Extend the two existing delegated listeners rather than adding handlers to the markup. In the `$('sheetBody')` listener, before the `data-game` branch:
+
+```js
+  const p=within(ev,ev.target.closest('[data-pl]'));
+  if(p){playPlaylist(p.dataset.pl);return}
+```
+
+And add a `#filterbar` listener beside the others, for the chip that leaves a playlist:
+
+```js
+// The filter bar is rebuilt wholesale by render(), so its controls are
+// delegated too rather than re-bound on every paint.
+$('filterbar').addEventListener('click',ev=>{
+  if(within(ev,ev.target.closest('[data-plleave]'))) playPlaylist(null);
+});
 ```
 
 - [ ] **Step 6: Register the sheet kind**
@@ -861,7 +880,7 @@ EOF
 
 **Interfaces:**
 - Consumes: `PL`, `plOpen`, `plById` from Task 5; `TR.evId`, `TR.playlists.save`, `TR.playlists.MAX_REFS`.
-- Produces: `collecting` (bool), `sel` (`Set` of `TR.evId` refs), `toggleCollect()`, `addToSheet()` — Task 7 touches none of these.
+- Produces: `collecting` (bool), `sel` (`Set` of `TR.evId` refs), `toggleCollect()`, `addToBody()` and the `addto` sheet kind — Task 7 touches none of these.
 
 - [ ] **Step 1: Add the state**
 
@@ -933,35 +952,45 @@ At the end of `<body>`, before the scrim:
   <button class="icon-btn" id="selAll" onclick="selectAll()">All</button>
   <span class="sp"></span>
   <button class="icon-btn" onclick="toggleCollect()">Cancel</button>
-  <button class="ab-go" id="abGo" onclick="addToSheet()" disabled>Add to…</button>
+  <button class="ab-go" id="abGo" onclick="openSheet('addto')" disabled>Add to…</button>
 </div>
 ```
 
 - [ ] **Step 4: Make rows tick instead of play while collecting**
 
-In `render()`, the list rendering currently reads:
+Rows already carry their values as `data-` attributes and are driven by one delegated listener — do **not** add an `onclick`. In `render()`, the list rendering currently reads:
 
 ```js
   L.innerHTML=windowed.map(e=>{
     const id=TR.evId(e);
     return `<div class="ev${activeId===id?' active':''}" style="border-left-color:${col(e.type)}"
-      onclick="playEvent(${e.time},'${id.replace(/'/g,"\\'")}','${String(e.game).replace(/'/g,"\\'")}')">
-      <span class="ev-t">${shortT(e.timeStr)}</span>
+      data-t="${e.time}" data-id="${esc(id)}" data-game="${esc(String(e.game))}">
+      <span class="ev-t">${esc(shortT(e.timeStr))}</span>
 ```
 
 Replace those four lines with:
 
 ```js
   L.innerHTML=windowed.map(e=>{
-    const id=TR.evId(e), esc1=s=>String(s).replace(/'/g,"\\'");
+    const id=TR.evId(e);
     const cls=collecting?(sel.has(id)?' sel':''):(activeId===id?' active':'');
-    const tap=collecting?`tick('${esc1(id)}')`
-      :`playEvent(${e.time},'${esc1(id)}','${esc1(e.game)}')`;
-    return `<div class="ev${cls}" style="border-left-color:${col(e.type)}" onclick="${tap}">
-      ${collecting?'<span class="tick">✓</span>':`<span class="ev-t">${shortT(e.timeStr)}</span>`}
+    return `<div class="ev${cls}" style="border-left-color:${col(e.type)}"
+      data-t="${e.time}" data-id="${esc(id)}" data-game="${esc(String(e.game))}">
+      ${collecting?'<span class="tick">✓</span>':`<span class="ev-t">${esc(shortT(e.timeStr))}</span>`}
 ```
 
-…leaving the rest of the template literal as it is.
+…leaving the rest of the template literal as it is. The attributes are identical in both modes; only what the row *means* on tap changes, and that belongs in the listener, not the markup.
+
+Then change the existing `$('list')` listener to branch on the mode:
+
+```js
+$('list').addEventListener('click',ev=>{
+  const row=within(ev,ev.target.closest('.ev')); if(!row)return;
+  // Same row, same data — collect mode only changes what a tap means.
+  if(collecting) tick(row.dataset.id);
+  else playEvent(+row.dataset.t,row.dataset.id,row.dataset.game);
+});
+```
 
 Then, at the end of `render()` just before `paintMarks();`, add:
 
@@ -1002,21 +1031,32 @@ function selectAll(){ shown.forEach(e=>sel.add(TR.evId(e))); render(true); }
 ```js
 // Committing is one write, however many filters the collection was gathered
 // across.
-function addToSheet(){
-  openSheet('addto');
-  // A naming field rather than prompt(): prompt() appears nowhere in this
-  // codebase, and iOS standalone web apps handle it badly.
-  $('sheetBody').innerHTML=
-    `<p class="win-note">Adding <b>${sel.size}</b> event${sel.size===1?'':'s'}.</p>`+
-    '<div class="glist">'+PL.map(p=>`<button onclick="addTo('${p.id}')">
+// A naming field rather than prompt(): prompt() appears nowhere in this
+// codebase, and iOS standalone web apps handle it badly.
+function addToBody(){
+  return `<p class="win-note">Adding <b>${sel.size}</b> event${sel.size===1?'':'s'}.</p>`+
+    '<div class="glist">'+PL.map(p=>`<button data-addto="${esc(p.id)}">
         ${esc(p.name)}<span class="gs">${p.refs.length} events</span></button>`).join('')+
     '</div>'+
     `<div class="grp"><h3>New playlist</h3>
-      <input class="srch" id="newPlName" placeholder="Name it…"
-             onkeydown="if(event.key==='Enter')addTo(null)">
-      <button class="icon-btn" style="width:100%;height:38px" onclick="addTo(null)">
+      <input class="srch" id="newPlName" placeholder="Name it…">
+      <button class="icon-btn" style="width:100%;height:38px" data-addnew="1">
         ＋ Create and add ${sel.size}</button></div>`;
 }
+```
+
+Add both branches to the `$('sheetBody')` listener, and let Enter in the field create:
+
+```js
+  const a=within(ev,ev.target.closest('[data-addto]'));
+  if(a){addTo(a.dataset.addto);return}
+  if(within(ev,ev.target.closest('[data-addnew]'))){addTo(null);return}
+```
+
+```js
+$('sheetBody').addEventListener('keydown',ev=>{
+  if(ev.key==='Enter'&&ev.target.id==='newPlName'){ev.preventDefault();addTo(null)}
+});
 
 async function addTo(id){
   const pl=id?plById(id):null;
@@ -1039,17 +1079,17 @@ async function addTo(id){
 }
 ```
 
-Add the sheet kind to `openSheet`'s two ternaries:
+Add the sheet kind to `openSheet`'s two ternaries, and open it the normal way (`openSheet('addto')` from the action bar) so it records `sheetOpener` and takes focus like every other sheet:
 
 ```js
     :kind==='playlists'?'Playlists':kind==='addto'?'Add to playlist':'Filter events';
 ```
 
 ```js
-    :kind==='playlists'?playlistSheet():kind==='addto'?$('sheetBody').innerHTML:filterSheet();
+    :kind==='playlists'?playlistSheet():kind==='addto'?addToBody():filterSheet();
 ```
 
-`addToSheet()` writes the body itself after `openSheet` runs, so the `addto` branch must not clobber it — returning the current `innerHTML` keeps `openSheet` generic without a special case.
+The action bar's button calls `openSheet('addto')` directly — there is no separate `addToSheet()` wrapper, because the body is a pure function like every other sheet's.
 
 - [ ] **Step 7: Exit collect when entering cinema**
 
@@ -1134,11 +1174,11 @@ In `plList()`, add a ⠿ to each row. Replace the button template with:
 
 ```js
     return `<div class="pl-row${p.id===plOpen?' on':''}">
-      <button class="pl-go" onclick="playPlaylist('${p.id}')">
+      <button class="pl-go" data-pl="${esc(p.id)}">
         ${esc(p.name)}
         <span class="gs">${r.events.length} events${gone}${p.note?' · '+esc(p.note):''}</span>
       </button>
-      <button class="pl-edit" onclick="plDrill('${p.id}')" title="Edit">⠿</button>
+      <button class="pl-edit" data-pledit="${esc(p.id)}" title="Edit">⠿</button>
     </div>`
 ```
 
@@ -1179,13 +1219,38 @@ function plDrill(id){
 }
 
 // The title doubles as the back control when drilled in, the same shape the
-// filter sheet uses.
+// filter sheet uses — and through the same backCtl(), so it is reachable by
+// keyboard and announced, rather than being a bare h2 nothing can focus.
 function paintPlHead(){
   const h=$('sheetTitle');
   h.innerHTML=plEdit?'‹ Playlists':'Playlists';
   h.className=plEdit?'back':'';
   h.onclick=plEdit?()=>plSaveAndBack():null;
+  backCtl(h,!!plEdit,'Back to playlists, saving changes',()=>plSaveAndBack());
 }
+```
+
+`backCtl` currently hardcodes both the announced label ("Back to all filters…") and the Enter/Space action (`drill(null)`). Two sheets drill now, so it takes both. Change it in `game.html` to:
+
+```js
+// label and onBack are passed because two sheets drill: the filter sheet's
+// categories and the playlists sheet's reorder screen. A screen reader must
+// hear which one it is leaving, and Enter must do the same thing the tap does.
+function backCtl(h,on,label,onBack){
+  if(!on){['role','tabindex','aria-label'].forEach(a=>h.removeAttribute(a)); h.onkeydown=null; return}
+  h.setAttribute('role','button');
+  h.setAttribute('tabindex','0');
+  h.setAttribute('aria-label',label||'Back');
+  h.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault(); onBack()}};
+}
+```
+
+and update the filter sheet's two existing call sites to pass what they already meant:
+
+- in `openSheet`: `backCtl($('sheetTitle'),false)` — unchanged, the `!on` path ignores both new arguments.
+- in `paintFilterHead`: `backCtl(h,!!c,c?\`Back to all filters, ${c.title}\`:'',()=>drill(null))`
+
+Check the exact current spelling of that call before editing, and preserve the label string it produces verbatim — `d8cb029` set it deliberately for WCAG 2.5.3, which requires the accessible name to contain the visible label.
 
 function plEditBody(){
   const r=TR.playlists.resolve(plDraft.refs,rows);
@@ -1205,9 +1270,9 @@ function plEditBody(){
           </span>
         </span>
         <span class="ord-btns">
-          <button onclick="plMove(${n},-1)" ${n===0?'disabled':''}>↑</button>
-          <button onclick="plMove(${n},1)" ${n===r.events.length-1?'disabled':''}>↓</button>
-          <button onclick="plDrop(${n})">✕</button>
+          <button data-plup="${n}" ${n===0?'disabled':''}>↑</button>
+          <button data-pldown="${n}" ${n===r.events.length-1?'disabled':''}>↓</button>
+          <button data-pldrop="${n}">✕</button>
         </span>
       </div>`).join('')
       :'<div class="empty">Nothing in here yet.</div>')+
@@ -1230,6 +1295,21 @@ function plMove(n,d){ plDraft.refs=TR.playlists.reorder(plLive(),n,n+d);
 function plDrop(n){ const r=plLive(); r.splice(n,1); plDraft.refs=r;
   $('sheetBody').innerHTML=playlistSheet(); }
 ```
+
+Add the remaining branches to the `$('sheetBody')` listener, beside the `data-pl` one from Task 5:
+
+```js
+  const pe=within(ev,ev.target.closest('[data-pledit]'));
+  if(pe){plDrill(pe.dataset.pledit);return}
+  const up=within(ev,ev.target.closest('[data-plup]'));
+  if(up){plMove(+up.dataset.plup,-1);return}
+  const dn=within(ev,ev.target.closest('[data-pldown]'));
+  if(dn){plMove(+dn.dataset.pldown,1);return}
+  const dr=within(ev,ev.target.closest('[data-pldrop]'));
+  if(dr){plDrop(+dr.dataset.pldrop);return}
+```
+
+Order matters: the `data-pl` branch must come **after** `data-pledit`, or a tap on the ⠿ inside a `.pl-row` would match the row's play hook first.
 
 - [ ] **Step 5: Save on leaving, and delete**
 
