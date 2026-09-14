@@ -286,6 +286,24 @@
   .mv-rate.thin{color:var(--dim);font-weight:400}
   .mv-empty{color:var(--dim);text-align:center;padding:20px 0;font-size:.8rem}
 
+  /* ── Playlists sheet ───────────────────────────────────────── */
+  .pl-row{display:grid;grid-template-columns:1fr 44px;gap:6px;align-items:stretch;margin-bottom:6px}
+  .pl-row button{background:var(--surface2);border:1px solid var(--border);color:var(--text);
+    border-radius:8px;font-size:.8rem;cursor:pointer;font-family:inherit}
+  .pl-go{text-align:left;padding:10px 12px}
+  .pl-go .gs{display:block;font-size:.66rem;color:var(--dim);margin-top:2px}
+  .pl-row.on .pl-go{border-color:var(--review);background:#231733}
+  .pl-edit{font-size:1rem;color:var(--dim)}
+  /* Reorder rows: the handle takes the timestamp's column, ↑↓ take the right. */
+  .ev.ord{grid-template-columns:26px 1fr 70px;cursor:default}
+  .ev.ord .handle{color:var(--dim);font-size:1rem;text-align:center}
+  .ord-btns{display:flex;gap:3px;justify-self:end}
+  .ord-btns button{width:30px;height:30px;border-radius:7px;background:var(--surface2);
+    border:1px solid var(--border);color:var(--dim);font-size:.75rem;cursor:pointer}
+  .pl-danger{width:100%;height:38px;margin-top:12px;background:var(--surface2);
+    border:1px solid var(--pdef);color:#fca5a5;border-radius:8px;font-size:.78rem;
+    cursor:pointer;font-family:inherit}
+
   /* ── Landscape: video beside the list ───────────────────────
      No min-width gate. A 667px-wide phone in landscape used to fall through to
      the portrait column, where a full-width 16:9 video is 375px tall — the whole
@@ -471,6 +489,10 @@ const FCATS=[
 // null at the category list, otherwise the FCATS key being browsed. Reset on
 // every open, so the sheet never reopens stranded inside a category.
 let fCat=null, fNarrow='';
+// null at the playlist list, otherwise the playlist id being edited. Reset on
+// every open, for the same reason fCat is: reopening the sheet must never
+// strand the user inside a playlist.
+let plEdit=null, plDraft=null;
 // What had focus when the sheet was opened, so closeSheet can hand it back.
 // Declared up here with the rest of the state rather than beside the sheet
 // functions, because the load path closes a sheet before that far down the
@@ -1009,6 +1031,17 @@ $('list').addEventListener('click',ev=>{
 $('sheetBody').addEventListener('click',ev=>{
   const chip=within(ev,ev.target.closest('.chip[data-k]'));
   if(chip){tog(chip.dataset.k,chip.dataset.v,chip);return}
+  // data-pledit before data-pl: the ⠿ button sits inside a .pl-row that also
+  // carries the play hook, so testing play first would start playing the
+  // playlist whenever the edit button was tapped.
+  const pe=within(ev,ev.target.closest('[data-pledit]'));
+  if(pe){plDrill(pe.dataset.pledit);return}
+  const up=within(ev,ev.target.closest('[data-plup]'));
+  if(up){plMove(+up.dataset.plup,-1);return}
+  const dn=within(ev,ev.target.closest('[data-pldown]'));
+  if(dn){plMove(+dn.dataset.pldown,1);return}
+  const dr=within(ev,ev.target.closest('[data-pldrop]'));
+  if(dr){plDrop(+dr.dataset.pldrop);return}
   const p=within(ev,ev.target.closest('[data-pl]'));
   if(p){playPlaylist(p.dataset.pl);return}
   const g=within(ev,ev.target.closest('[data-game]'));
@@ -1172,6 +1205,7 @@ function openSheet(kind){
   if(!$('sheet').contains(o)) sheetOpener = o && o!==document.body && o.focus ? o : null;
   $('scrim').classList.add('open'); $('sheet').classList.add('open');
   if(kind==='filter')fCat=null;               // always open at the category list
+  if(kind==='playlists'){plEdit=null;plDraft=null;}   // never reopen stranded in a playlist
   $('sheetTitle').className=''; $('sheetTitle').onclick=null; backCtl($('sheetTitle'),false);
   $('sheetTitle').textContent = kind==='game'?'Choose a game':kind==='moves'?'Strike moves'
     :kind==='window'?'Playback window':kind==='playlists'?'Playlists':kind==='addto'?'Add to playlist':'Filter events';
@@ -1180,6 +1214,7 @@ function openSheet(kind){
   // The window sheet is painted rather than rendered with its state inlined, so
   // that a keystroke can update the chips without re-rendering the field.
   if(kind==='window')paintWin();
+  if(kind==='playlists')paintPlHead();
   // The container, never the first control: the filter sheet leads with a search
   // box, and focusing that would throw up the on-screen keyboard every time a
   // phone user taps Filter. Last, because a display:none element refuses focus.
@@ -1211,7 +1246,9 @@ function playPlaylist(id){
   plOpen=id; activeId=null; closeSheet(); render();
 }
 
-function playlistSheet(){
+function playlistSheet(){ return plEdit?plEditBody():plList(); }
+
+function plList(){
   // Both a real empty account and a failed fetch leave PL===[], but they need
   // different messages: telling someone with saved playlists to go make one
   // just because the server didn't answer would send them looking for a
@@ -1220,13 +1257,104 @@ function playlistSheet(){
     esc(plLoadError)+'</div>';
   if(!PL.length)return '<div class="empty">No playlists yet.<br>'+
     'Tap ☑ in the filter bar to start collecting events into one.</div>';
-  return '<div class="glist">'+PL.map(p=>{
+  return '<div class="pl-list">'+PL.map(p=>{
     const r=TR.playlists.resolve(p.refs,rows);
     const gone=r.missing?` · ${r.missing} missing`:'';
-    return `<button class="${p.id===plOpen?'on':''}" data-pl="${esc(p.id)}">
-      ${esc(p.name)}
-      <span class="gs">${r.events.length} events${gone}${p.note?' · '+esc(p.note):''}</span>
-    </button>`}).join('')+'</div>';
+    return `<div class="pl-row${p.id===plOpen?' on':''}">
+      <button class="pl-go" data-pl="${esc(p.id)}">
+        ${esc(p.name)}
+        <span class="gs">${r.events.length} events${gone}${p.note?' · '+esc(p.note):''}</span>
+      </button>
+      <button class="pl-edit" data-pledit="${esc(p.id)}" title="Edit">⠿</button>
+    </div>`}).join('')+'</div>';
+}
+
+function plDrill(id){
+  plEdit=id;
+  // A draft, so five moves are one write on leaving rather than five.
+  if(id){const p=plById(id); plDraft={name:p.name,note:p.note,refs:p.refs.slice()};}
+  else plDraft=null;
+  $('sheetBody').innerHTML=playlistSheet();
+  paintPlHead();
+}
+
+// The title doubles as the back control when drilled in, the same shape the
+// filter sheet uses — and through the same backCtl(), so it is reachable by
+// keyboard and announced, rather than being a bare h2 nothing can focus.
+function paintPlHead(){
+  const h=$('sheetTitle');
+  h.innerHTML=plEdit?'‹ Playlists':'Playlists';
+  h.className=plEdit?'back':'';
+  h.onclick=plEdit?()=>plSaveAndBack():null;
+  backCtl(h,!!plEdit,'Back to playlists, saving changes',()=>plSaveAndBack());
+}
+
+function plEditBody(){
+  const r=TR.playlists.resolve(plDraft.refs,rows);
+  return `<input class="srch" id="plName" value="${esc(plDraft.name)}"
+      placeholder="Playlist name" oninput="plDraft.name=this.value">`+
+    (r.missing?`<p class="win-note">${r.missing} event${r.missing===1?'':'s'} in this playlist `+
+      `${r.missing===1?'is':'are'} no longer in the data.</p>`:'')+
+    (r.events.length?r.events.map((e,n)=>
+      `<div class="ev ord" style="border-left-color:${col(e.type)}">
+        <span class="handle">⠿</span>
+        <span class="ev-main">
+          <span class="ev-name">${esc(e.name||e.type)}</span>
+          <span class="ev-meta">
+            <span class="tag" style="background:${col(e.type)}22;color:${col(e.type)}">${esc(e.type)}</span>
+            <span class="gmatch">${esc(shortLabel(e.game))}</span>
+            ${e.team?`<span class="team">${esc(e.team)}</span>`:''}
+          </span>
+        </span>
+        <span class="ord-btns">
+          <button data-plup="${n}" ${n===0?'disabled':''}>↑</button>
+          <button data-pldown="${n}" ${n===r.events.length-1?'disabled':''}>↓</button>
+          <button data-pldrop="${n}">✕</button>
+        </span>
+      </div>`).join('')
+      :'<div class="empty">Nothing in here yet.</div>')+
+    `<button class="pl-danger" onclick="plDelete()">Delete this playlist</button>`;
+}
+
+// Missing refs are dropped from the draft the moment it is edited, so the
+// buttons' indices and the stored refs can't drift apart. A playlist you edit
+// is a playlist you've seen, so silently shedding a ref you were just told
+// about is honest.
+function plLive(){
+  return TR.playlists.resolve(plDraft.refs,rows).events.map(TR.evId);
+}
+function plMove(n,d){ plDraft.refs=TR.playlists.reorder(plLive(),n,n+d);
+  $('sheetBody').innerHTML=playlistSheet(); }
+function plDrop(n){ const r=plLive(); r.splice(n,1); plDraft.refs=r;
+  $('sheetBody').innerHTML=playlistSheet(); }
+
+async function plSaveAndBack(){
+  const id=plEdit, d=plDraft;
+  plEdit=null; plDraft=null;
+  $('sheetBody').innerHTML=playlistSheet(); paintPlHead();
+  const p=plById(id);
+  if(!p||!d) return;
+  if(d.name===p.name&&d.note===p.note&&d.refs.join('\n')===p.refs.join('\n')) return;
+  if(!d.name.trim()){ alert('A playlist needs a name.'); return; }
+  try{
+    await TR.playlists.save(TR.secret(),{id,name:d.name.trim(),note:d.note,refs:d.refs});
+    PL=await TR.playlists.load(TR.secret());
+  }catch(e){ alert(e.message); return; }
+  $('sheetBody').innerHTML=playlistSheet();
+  if(plOpen===id) render();
+}
+
+async function plDelete(){
+  const id=plEdit;
+  if(!confirm('Delete this playlist? This cannot be undone.')) return;
+  try{
+    await TR.playlists.remove(TR.secret(),id);
+    PL=await TR.playlists.load(TR.secret());
+  }catch(e){ alert(e.message); return; }
+  // Never leave the page playing a list that no longer exists.
+  if(plOpen===id){ plOpen=null; render(); }
+  plEdit=null; plDraft=null;
+  $('sheetBody').innerHTML=playlistSheet(); paintPlHead();
 }
 
 // Committing is one write, however many filters the collection was gathered
@@ -1316,18 +1444,22 @@ function paintFilterHead(){
   h.innerHTML=c?`‹ ${c.title}`:'Filter events';
   h.className=c?'back':'';
   h.onclick=c?()=>drill(null):null;
-  backCtl(h,!!c,c?.title);
+  backCtl(h,!!c,c?`Back to all filters, ${c.title}`:'',()=>drill(null));
 }
 
 // A heading is not a control, so while it doubles as one it has to say so and
 // answer the keyboard too — tapping it is otherwise the only way out of a
 // category. Shared with openSheet, which resets the head for the other kinds.
-function backCtl(h,on,title){
+//
+// label and onBack are passed because two sheets drill now: the filter sheet's
+// categories and the playlists sheet's reorder screen. A screen reader must
+// hear which one it is leaving, and Enter must do the same thing the tap does.
+function backCtl(h,on,label,onBack){
   if(!on){['role','tabindex','aria-label'].forEach(a=>h.removeAttribute(a)); h.onkeydown=null; return}
   h.setAttribute('role','button');
   h.setAttribute('tabindex','0');
-  h.setAttribute('aria-label',title?`Back to all filters, ${title}`:'Back to all filters');
-  h.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault(); drill(null)}};
+  h.setAttribute('aria-label',label||'Back');
+  h.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault(); onBack()}};
 }
 
 function drill(key){
