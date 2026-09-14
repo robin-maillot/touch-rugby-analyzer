@@ -196,6 +196,36 @@
     padding:1px 5px;font-size:.62rem;color:#7dd3fc;flex-shrink:0}
   .empty{color:var(--dim);text-align:center;padding:36px 20px;font-size:.82rem}
 
+  /* ── Collect mode ──────────────────────────────────────────── */
+  /* The tick replaces the timestamp column rather than adding one, so a row
+     gains no width here and loses none when not collecting. */
+  body.collect .ev{grid-template-columns:34px 1fr}
+  body.collect .list{padding-bottom:64px}
+  .tick{width:22px;height:22px;border-radius:6px;border:2px solid var(--border);
+    display:flex;align-items:center;justify-content:center;font-size:.75rem;color:transparent}
+  .ev.sel .tick{background:var(--review);border-color:var(--review);color:#fff}
+  .ev.sel{background:var(--surface2);border-left-color:var(--review)!important}
+  .tray{display:none;background:#231733;border:1px solid var(--review);border-radius:8px;
+    padding:8px 11px;margin:6px 8px 0;font-size:.72rem;color:#e9d5ff;line-height:1.45}
+  body.collect .tray{display:block}
+  .tray b{color:#fff}
+  /* Pinned, so the count and the commit never scroll away from the rows being
+     ticked. */
+  .actionbar{position:fixed;left:0;right:0;bottom:0;z-index:30;display:none;
+    align-items:center;gap:8px;padding:9px 10px;background:var(--surface);
+    border-top:1px solid var(--review);padding-bottom:calc(9px + var(--safe-b))}
+  body.collect .actionbar{display:flex}
+  /* .icon-btn declares its own `display`, and an author rule always beats the
+     UA stylesheet's [hidden]{display:none} regardless of specificity — so
+     without this, setting collectBtn.hidden would silently do nothing while a
+     playlist plays. */
+  #collectBtn[hidden]{display:none}
+  .actionbar .n{font-size:.75rem;font-weight:700;color:var(--review);white-space:nowrap}
+  .actionbar .sp{flex:1 1 auto}
+  .ab-go{background:var(--review);border:1px solid var(--review);color:#fff;border-radius:8px;
+    height:36px;padding:0 13px;font-size:.78rem;font-weight:600;cursor:pointer}
+  .ab-go:disabled{opacity:.35}
+
   /* ── Bottom sheet ──────────────────────────────────────────── */
   .scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:40;display:none}
   .scrim.open{display:block}
@@ -350,13 +380,24 @@
     <div class="filterbar" id="filterbar">
       <span class="count" id="count">—</span>
     </div>
+    <button class="icon-btn" id="collectBtn" onclick="toggleCollect()"
+            title="Collect events into a playlist">☑</button>
     <button class="collapse-btn" id="collapseBtn" onclick="toggleList()"
             aria-expanded="true" title="Collapse the event list">⌄</button>
   </div>
+  <div class="tray" id="tray"></div>
   <div class="list" id="list">
     <div class="empty" id="empty">Loading…</div>
   </div>
  </div>
+</div>
+
+<div class="actionbar">
+  <span class="n" id="selN">0 selected</span>
+  <button class="icon-btn" id="selAll" onclick="selectAll()">All</button>
+  <span class="sp"></span>
+  <button class="icon-btn" onclick="toggleCollect()">Cancel</button>
+  <button class="ab-go" id="abGo" onclick="openSheet('addto')" disabled>Add to…</button>
 </div>
 
 <div class="scrim" id="scrim" onclick="closeSheet()"></div>
@@ -403,6 +444,16 @@ let PL=[], plOpen=null, plMissing=0;
 let plLoadError=null;
 
 function plById(id){return PL.find(p=>p.id===id)||null}
+
+// Collect mode: tick events into a pending selection, then commit the lot to a
+// playlist in one write.
+//
+// sel holds full TR.evId refs, never list indices. An index is a position in
+// `shown`, and `shown` is rebuilt by every filter change — so an index-based
+// selection would silently repoint at different events the moment the user
+// filtered, which is exactly the motion this mode exists to support.
+let collecting=false;
+const sel=new Set();
 
 // Categories ordered by how much they narrow: Competition/Division/Year first
 // (the ones that matter most once you're browsing across every game), then the
@@ -629,9 +680,10 @@ function render(keepWindow){
   const windowed=shown.slice(0,renderLimit);
   L.innerHTML=windowed.map(e=>{
     const id=TR.evId(e);
-    return `<div class="ev${activeId===id?' active':''}" style="border-left-color:${col(e.type)}"
+    const cls=collecting?(sel.has(id)?' sel':''):(activeId===id?' active':'');
+    return `<div class="ev${cls}" style="border-left-color:${col(e.type)}"
       data-t="${e.time}" data-id="${esc(id)}" data-game="${esc(String(e.game))}">
-      <span class="ev-t">${esc(shortT(e.timeStr))}</span>
+      ${collecting?'<span class="tick">✓</span>':`<span class="ev-t">${esc(shortT(e.timeStr))}</span>`}
       <span class="ev-main">
         <span class="ev-name">${esc(e.name||e.type)}</span>
         <span class="ev-meta"><span class="tag" style="background:${col(e.type)}22;color:${col(e.type)}">${esc(e.type)}</span>
@@ -645,9 +697,37 @@ function render(keepWindow){
     L.innerHTML+=`<button class="icon-btn" style="width:100%;height:40px;margin:4px 0 0"
       onclick="loadMore()">Load more (${shown.length-renderLimit} more)</button>`;
   }
+  paintCollect();
   paintMarks();
 }
 function loadMore(){renderLimit+=200;render(true)}
+
+// The ☑ is hidden while a playlist plays: a playing playlist is not a pool to
+// collect from, and editing one has a home already in the reorder screen.
+function paintCollect(){
+  $('collectBtn').hidden = !!plOpen;
+  $('selN').textContent=`${sel.size} selected`;
+  $('selAll').textContent=`All ${shown.length}`;
+  $('abGo').disabled=!sel.size;
+  $('abGo').textContent=sel.size?`Add ${sel.size} to…`:'Add to…';
+  $('tray').innerHTML=sel.size
+    ? `<b>${sel.size} collected.</b> Change the filter and keep tapping — the collection is kept until you save it.`
+    : 'Tap events to collect them. Filters can change while you do.';
+}
+
+function toggleCollect(){
+  collecting=!collecting;
+  document.body.classList.toggle('collect',collecting);
+  $('collectBtn').classList.toggle('on',collecting);
+  if(!collecting) sel.clear();
+  render();
+}
+
+// Named tickRow, not tick: `tick` is already the video-progress interval
+// handle declared with the rest of the player state above, and the two are
+// both top-level in a non-module script.
+function tickRow(id){ sel.has(id)?sel.delete(id):sel.add(id); render(true); }
+function selectAll(){ shown.forEach(e=>sel.add(TR.evId(e))); render(true); }
 // Function declarations, not const arrows: restoring a cached game calls
 // render() from the top-level IIFE before a const at this point in the file has
 // been evaluated, and a TDZ ReferenceError there silently leaves the list on
@@ -832,7 +912,11 @@ function toggleList(){
   LS.set('listCollapsed', on);
 }
 
-function toggleCinema(){const on=document.body.classList.toggle('cinema');
+function toggleCinema(){
+  // The pinned action bar would float over a full-screen video with no list
+  // behind it.
+  if(collecting) toggleCollect();
+  const on=document.body.classList.toggle('cinema');
   $('bCine').textContent=on?'⤡':'⤢';
   history.replaceState(null,'',on?'#cinema':location.pathname+location.search)}
 
@@ -898,7 +982,9 @@ const within=(ev,el)=>el&&ev.currentTarget.contains(el)?el:null;
 
 $('list').addEventListener('click',ev=>{
   const row=within(ev,ev.target.closest('.ev')); if(!row)return;
-  playEvent(+row.dataset.t,row.dataset.id,row.dataset.game);
+  // Same row, same data — collect mode only changes what a tap means.
+  if(collecting) tickRow(row.dataset.id);
+  else playEvent(+row.dataset.t,row.dataset.id,row.dataset.game);
 });
 
 $('sheetBody').addEventListener('click',ev=>{
@@ -907,7 +993,14 @@ $('sheetBody').addEventListener('click',ev=>{
   const p=within(ev,ev.target.closest('[data-pl]'));
   if(p){playPlaylist(p.dataset.pl);return}
   const g=within(ev,ev.target.closest('[data-game]'));
-  if(g)pickGame(g.dataset.game);
+  if(g){pickGame(g.dataset.game);return}
+  const a=within(ev,ev.target.closest('[data-addto]'));
+  if(a){addTo(a.dataset.addto);return}
+  if(within(ev,ev.target.closest('[data-addnew]'))){addTo(null);return}
+});
+
+$('sheetBody').addEventListener('keydown',ev=>{
+  if(ev.key==='Enter'&&ev.target.id==='newPlName'){ev.preventDefault();addTo(null)}
 });
 
 // The filter bar is rebuilt wholesale by render(), so its controls are
@@ -1062,9 +1155,9 @@ function openSheet(kind){
   if(kind==='filter')fCat=null;               // always open at the category list
   $('sheetTitle').className=''; $('sheetTitle').onclick=null; backCtl($('sheetTitle'),false);
   $('sheetTitle').textContent = kind==='game'?'Choose a game':kind==='moves'?'Strike moves'
-    :kind==='window'?'Playback window':kind==='playlists'?'Playlists':'Filter events';
+    :kind==='window'?'Playback window':kind==='playlists'?'Playlists':kind==='addto'?'Add to playlist':'Filter events';
   $('sheetBody').innerHTML = kind==='game'?gameSheet():kind==='moves'?movesSheetBody()
-    :kind==='window'?windowSheet():kind==='playlists'?playlistSheet():filterSheet();
+    :kind==='window'?windowSheet():kind==='playlists'?playlistSheet():kind==='addto'?addToBody():filterSheet();
   // The window sheet is painted rather than rendered with its state inlined, so
   // that a keystroke can update the chips without re-rendering the field.
   if(kind==='window')paintWin();
@@ -1112,6 +1205,41 @@ function playlistSheet(){
       ${esc(p.name)}
       <span class="gs">${r.events.length} events${gone}${p.note?' · '+esc(p.note):''}</span>
     </button>`}).join('')+'</div>';
+}
+
+// Committing is one write, however many filters the collection was gathered
+// across.
+// A naming field rather than prompt(): prompt() appears nowhere in this
+// codebase, and iOS standalone web apps handle it badly.
+function addToBody(){
+  return `<p class="win-note">Adding <b>${sel.size}</b> event${sel.size===1?'':'s'}.</p>`+
+    '<div class="glist">'+PL.map(p=>`<button data-addto="${esc(p.id)}">
+        ${esc(p.name)}<span class="gs">${p.refs.length} events</span></button>`).join('')+
+    '</div>'+
+    `<div class="grp"><h3>New playlist</h3>
+      <input class="srch" id="newPlName" placeholder="Name it…">
+      <button class="icon-btn" style="width:100%;height:38px" data-addnew="1">
+        ＋ Create and add ${sel.size}</button></div>`;
+}
+
+async function addTo(id){
+  const pl=id?plById(id):null;
+  const name=pl?pl.name:($('newPlName').value||'').trim();
+  if(!pl&&!name){ $('newPlName').focus(); return; }
+  // Existing refs first, new ones appended in the order they were ticked — the
+  // reorder screen is where an order is chosen deliberately. The Set drops a
+  // re-tick of something already in the playlist.
+  const refs=[...new Set([...(pl?pl.refs:[]),...sel])];
+  if(refs.length>TR.playlists.MAX_REFS){
+    alert(`A playlist holds at most ${TR.playlists.MAX_REFS} events.`); return;
+  }
+  const n=sel.size;
+  try{
+    await TR.playlists.save(TR.secret(),{id:pl?pl.id:'',name,note:pl?pl.note:'',refs});
+    PL=await TR.playlists.load(TR.secret());
+  }catch(e){ alert(e.message); return; }
+  closeSheet(); toggleCollect();
+  $('count').textContent=`Added ${n} to ${name}`;
 }
 
 function gameSheet(){
