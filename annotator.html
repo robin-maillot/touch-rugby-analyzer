@@ -447,6 +447,11 @@ function setStatus(msg, isError = false) {
   if (msg) setTimeout(() => { el.style.opacity = '0'; }, 3000);
 }
 
+// Annotation rows, markers and tooltips are built as HTML strings from values
+// that may have come off the sheet or a pasted CSV, so every such value goes
+// through here first: a cell is data, never markup the page should execute.
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;')}
+
 const COLORS = { 'Try':'#22c55e', 'Turnover':'#f97316', 'Penalty Attack':'#ef4444', 'Penalty Defence':'#b91c1c', 'Penalty':'#ef4444', 'Game Event':'#3b82f6', 'To Review':'#a855f7' };
 
 // ── Fetch game list into sheet select ──────────────────────────
@@ -465,7 +470,7 @@ async function fetchGameList() {
       sel.appendChild(opt);
     });
   } catch (err) {
-    sel.innerHTML = `<option value="">Could not load games: ${err.message}</option>`;
+    sel.innerHTML = `<option value="">Could not load games: ${esc(err.message)}</option>`;
   }
 }
 window.addEventListener('DOMContentLoaded', () => {
@@ -964,20 +969,20 @@ function renderList() {
   el.innerHTML = visible.map(a => {
     const yt = ytLink(a.time);
     const ytCell = yt ? `<a href="${yt}" target="_blank" title="Open YouTube -5s">▶ YT</a>` : '<span style="color:#333">—</span>';
-    const commentTitle = (a.comment || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/\n/g,'&#10;');
-    const commentDisplay = (a.comment || '').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+    const commentTitle = esc(a.comment).replace(/\n/g,'&#10;');   // &#10; keeps a multi-paragraph comment readable in the tooltip
+    const commentDisplay = esc(a.comment);
     const bad = inconsistentIds.has(a.id);
     const exp = bad ? displayTeam(expected.get(a.id)) : '';
     const warnHtml = bad
-      ? `<span class="ann-warn" title="Expected ${exp} based on the chain from prior events">⚠</span><button class="ann-fix-btn" onclick="event.stopPropagation();fixOneInconsistency(${a.id})" title="Set possession to ${exp} and recompute downstream">Fix</button>`
+      ? `<span class="ann-warn" title="Expected ${esc(exp)} based on the chain from prior events">⚠</span><button class="ann-fix-btn" onclick="event.stopPropagation();fixOneInconsistency(${a.id})" title="Set possession to ${esc(exp)} and recompute downstream">Fix</button>`
       : '';
     const canMove = TR.isAttackEnd(a.type, a.name) && a.type !== 'Try';
-    return `<div class="annotation-row${bad ? ' inconsistent' : ''}" style="border-color:${COLORS[a.type]}" onclick="seekTo(${a.time})">
-      <span class="ann-time">${a.timeStr}</span>
-      <span class="ann-type" style="color:${COLORS[a.type]}">${a.type}</span>
-      <span class="ann-name${TR.MENU[a.type] && TR.MENU[a.type].length ? ' ann-name-editable' : ''}" id="ann-name-${a.id}" onclick="event.stopPropagation();editAnnotationName(${a.id})" title="${TR.MENU[a.type] && TR.MENU[a.type].length ? 'Click to change' : ''}">${a.name || '—'}</span>
-      <span class="ann-move${canMove ? ' ann-name-editable' : ''}" id="ann-move-${a.id}" onclick="event.stopPropagation();editAnnotationMove(${a.id})" title="${canMove ? 'Click to set the strike move' : ''}">${canMove ? (a.strikeMove || '—') : ''}</span>
-      <span class="ann-possession">${warnHtml}${displayTeam(a.possessionOwner)}</span>
+    return `<div class="annotation-row${bad ? ' inconsistent' : ''}" style="border-color:${esc(COLORS[a.type])}" onclick="seekTo(${a.time})">
+      <span class="ann-time">${esc(a.timeStr)}</span>
+      <span class="ann-type" style="color:${esc(COLORS[a.type])}">${esc(a.type)}</span>
+      <span class="ann-name${TR.MENU[a.type] && TR.MENU[a.type].length ? ' ann-name-editable' : ''}" id="ann-name-${a.id}" onclick="event.stopPropagation();editAnnotationName(${a.id})" title="${TR.MENU[a.type] && TR.MENU[a.type].length ? 'Click to change' : ''}">${esc(a.name) || '—'}</span>
+      <span class="ann-move${canMove ? ' ann-name-editable' : ''}" id="ann-move-${a.id}" onclick="event.stopPropagation();editAnnotationMove(${a.id})" title="${canMove ? 'Click to set the strike move' : ''}">${canMove ? (esc(a.strikeMove) || '—') : ''}</span>
+      <span class="ann-possession">${warnHtml}${esc(displayTeam(a.possessionOwner))}</span>
       <span class="ann-comment" title="${commentTitle}">${commentDisplay || ''}</span>
       <span class="ann-yt">${ytCell}</span>
       <button class="ann-comment-btn" onclick="event.stopPropagation();openCommentEditor(${a.id})" title="${a.comment ? 'Edit comment' : 'Add comment'}">${a.comment ? '💬' : '✎'}</button>
@@ -993,8 +998,8 @@ function renderMarkers() {
   track.innerHTML = annotations.map(a => {
     // Markers sit on the video timeline, so position by video time (game time + offset).
     const pct = (gameToVideo(a.time) / dur * 100).toFixed(3);
-    return `<div class="marker" style="left:${pct}%;background:${COLORS[a.type]}" onclick="seekTo(${a.time})">
-      <div class="marker-tooltip">${a.type}${a.name ? ': '+a.name : ''} @ ${a.timeStr}</div>
+    return `<div class="marker" style="left:${pct}%;background:${esc(COLORS[a.type])}" onclick="seekTo(${a.time})">
+      <div class="marker-tooltip">${esc(a.type)}${a.name ? ': '+esc(a.name) : ''} @ ${esc(a.timeStr)}</div>
     </div>`;
   }).join('');
 }
@@ -1584,7 +1589,7 @@ function renderKeysModal() {
     const listening = keysListeningFor === action;
     return `<div class="keys-row">
       <div class="keys-action"><div class="keys-swatch" style="background:${swatch}"></div>${action}</div>
-      <span class="keys-key${listening ? ' listening' : ''}" data-key-for="${action}">${listening ? '…' : (key || '—')}</span>
+      <span class="keys-key${listening ? ' listening' : ''}" data-key-for="${action}">${listening ? '…' : (esc(key) || '—')}</span>
       <button class="keys-rebind" onclick="startKeyRebind('${action.replace(/'/g, "\\'")}')">${listening ? 'cancel' : 'edit'}</button>
     </div>`;
   }).join('');
