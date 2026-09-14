@@ -10,6 +10,13 @@ const LIVE_SHEET      = '_live';       // reserved tab name for live game state
 // Control-plane tabs the admin sheet editor may read/write (all in CONTROL_SHEET_ID).
 const ADMIN_SHEETS    = [GROUPS_SHEET, METADATA_SHEET, LIVE_SHEET];
 
+// User content, not control plane. Deliberately absent from ADMIN_SHEETS: the
+// admin sheet editor exists to repair the control tabs by hand, and putting
+// every account's playlists in one editable grid buys nothing.
+const PLAYLISTS_SHEET  = '_playlists';
+const PLAYLIST_HEADERS = ['Id', 'Owner', 'Name', 'Note', 'Refs', 'Updated At'];
+const PLAYLIST_MAX_REFS = 500;
+
 // Expected column order (must match what the Python pipeline reads)
 // Strike Move is appended LAST so the Python pipeline's positional reads of
 // columns 0-6 are unaffected. Every read path maps by header name, so tabs
@@ -65,6 +72,56 @@ function clearGroupsCache() {
 function isAdminSecret(secret) {
   const a = authFor(secret);
   return !!(a && a.role === 'admin');
+}
+
+// ── Playlist helpers ───────────────────────────────────────────
+// The _playlists tab, created on first use so a fresh control spreadsheet needs
+// no manual setup.
+function playlistsSheet() {
+  const ss = SpreadsheetApp.openById(CONTROL_SHEET_ID);
+  let sh = ss.getSheetByName(PLAYLISTS_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(PLAYLISTS_SHEET);
+    sh.appendRow(PLAYLIST_HEADERS);
+  }
+  return sh;
+}
+
+// Every playlist row. `row` is the 1-based sheet row, so a write can address it
+// directly rather than searching again. Never cached: the tab is small, it
+// changes on every edit, and the action=version fast-path must not let a client
+// skip a playlist change.
+function readPlaylists() {
+  const values = playlistsSheet().getDataRange().getDisplayValues();
+  if (values.length < 2) return [];
+  const h  = values[0].map(s => String(s).toLowerCase().trim());
+  const ii = h.indexOf('id'), oi = h.indexOf('owner'), ni = h.indexOf('name');
+  const ti = h.indexOf('note'), ri = h.indexOf('refs'), ui = h.indexOf('updated at');
+  if (ii < 0 || oi < 0) return [];
+  const out = [];
+  for (let i = 1; i < values.length; i++) {
+    const id = String(values[i][ii] || '').trim();
+    if (!id) continue;
+    out.push({
+      row:     i + 1,
+      id:      id,
+      owner:   String(values[i][oi] || '').trim(),
+      name:    ni >= 0 ? String(values[i][ni] || '') : '',
+      note:    ti >= 0 ? String(values[i][ti] || '') : '',
+      refs:    ri >= 0 ? String(values[i][ri] || '').split('\n').map(s => s.trim()).filter(Boolean) : [],
+      updated: ui >= 0 ? String(values[i][ui] || '') : '',
+    });
+  }
+  return out;
+}
+
+// The playlist row this secret owns, or null. Ownership is checked here on
+// every write and never trusted from the client, the same way canEditGame
+// guards a game tab.
+function ownedPlaylist(secret, id) {
+  if (!secret || !id) return null;
+  const want = String(id);
+  return readPlaylists().find(p => p.id === want && p.owner === String(secret)) || null;
 }
 
 // ── Metadata helper ────────────────────────────────────────────
@@ -309,6 +366,16 @@ function doGet(e) {
       return json({ ok: true, role: auth.role, group: auth.group });
     }
 
+    // action=playlists → the caller's own saved playlists. Never cached, and
+    // deliberately above the cacheKeySuffix line below: a playlist changes no
+    // game data, so it must not ride on the version-keyed game cache.
+    if (e.parameter.action === 'playlists') {
+      const mine = readPlaylists()
+        .filter(p => p.owner === String(e.parameter.secret))
+        .map(p => ({ id: p.id, name: p.name, note: p.note, refs: p.refs, updated: p.updated }));
+      return json({ ok: true, playlists: mine });
+    }
+
     // action=admin_sheet → raw grid (headers + data rows) of a control sheet,
     // for the admin sheet editor. Admin only; never cached (always live).
     if (e.parameter.action === 'admin_sheet') {
@@ -430,6 +497,45 @@ function doPost(e) {
     // row (lazily creating the row + Groups column as needed). Admins skip this
     // — they should set Groups explicitly via backfill.
     const callerGroup = auth.role === 'admin' ? '' : (auth.group || '');
+
+    // action=save_playlist → create, or replace one the caller owns. Any role
+    // may own playlists, viewer included: a viewer is exactly the person
+    // building a teaching set, and a playlist grants no access to anything — a
+    // ref only resolves against events the caller could already see.
+    //
+    // No bumpVersion(): a playlist changes no game data, and bumping would make
+    // every client refetch the heavy action=all payload for nothing.
+    if (data.action === 'save_playlist') {
+      const name = String(data.name == null ? '' : data.name).trim();
+      if (!name) return json({ ok: false, error: 'A playlist needs a name.' });
+      const refs = (data.refs || []).map(r => String(r).trim()).filter(Boolean);
+      if (refs.length > PLAYLIST_MAX_REFS) {
+        return json({ ok: false, error: 'A playlist holds at most ' + PLAYLIST_MAX_REFS + ' events.' });
+      }
+      const note    = String(data.note == null ? '' : data.note).trim();
+      const updated = new Date().toISOString();
+      const sh      = playlistsSheet();
+      if (data.id) {
+        const owned = ownedPlaylist(data.secret, data.id);
+        // A miss is reported rather than silently creating a second row — the
+        // client asked to replace something specific.
+        if (!owned) return json({ ok: false, error: 'Playlist not found.' });
+        sh.getRange(owned.row, 1, 1, PLAYLIST_HEADERS.length)
+          .setValues([[owned.id, owned.owner, name, note, refs.join('\n'), updated]]);
+        return json({ ok: true, id: owned.id });
+      }
+      const id = Utilities.getUuid();
+      sh.appendRow([id, String(data.secret), name, note, refs.join('\n'), updated]);
+      return json({ ok: true, id: id });
+    }
+
+    // action=delete_playlist → remove one the caller owns.
+    if (data.action === 'delete_playlist') {
+      const owned = ownedPlaylist(data.secret, data.id);
+      if (!owned) return json({ ok: false, error: 'Playlist not found.' });
+      playlistsSheet().deleteRow(owned.row);
+      return json({ ok: true });
+    }
 
     // action=update_rows → update Name/Comment for specific rows (admin only)
     if (data.action === 'update_rows') {
