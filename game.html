@@ -1358,13 +1358,19 @@ function plList(){
 // covers the case where the reload can't see what was just created — another
 // device deleting it in between, or a stale read — by landing on the list.
 async function plNew(){
+  // Same guard as plCommit: a create is the one non-idempotent playlist write,
+  // and two taps within one round trip must not produce two playlists. Set
+  // before the await, cleared in finally so a rejection can't strand it.
+  if(plSaving) return;
   const name=($('plNewName').value||'').trim();
   if(!name){ $('plNewName').focus(); return; }
   let id;
+  plSaving=true;
   try{
     ({id}=await TR.playlists.save(TR.secret(),{name,note:'',refs:[]}));
     PL=await TR.playlists.load(TR.secret());
   }catch(e){ alert(e.message); return; }
+  finally{ plSaving=false; }
   plDrill(id);
 }
 
