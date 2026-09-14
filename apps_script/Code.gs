@@ -16,6 +16,20 @@ const ADMIN_SHEETS    = [GROUPS_SHEET, METADATA_SHEET, LIVE_SHEET];
 const PLAYLISTS_SHEET  = '_playlists';
 const PLAYLIST_HEADERS = ['Id', 'Owner', 'Name', 'Note', 'Refs', 'Updated At'];
 const PLAYLIST_MAX_REFS = 500;
+// Truncated rather than rejected: a name/note that's too long is a paste
+// accident, not an attack, and a hard failure there would just make someone
+// retype the same paste and hit the wall again.
+const PLAYLIST_MAX_FIELD_LEN = 200;
+// A real ref (game#time#type#name) is well under 100 chars. This leaves
+// generous headroom for long game and event names while still refusing a
+// single pathological ref large enough to blow out the joined refs cell —
+// the risk readPlaylists() can't see coming since it reads the tab raw.
+const PLAYLIST_MAX_REF_LEN = 300;
+// Generous on purpose — far more playlists than anyone would build by hand —
+// but readPlaylists() loads the WHOLE _playlists tab on every action=playlists
+// call, from every account, so one owner's unbounded row count becomes
+// everyone's slow request. A cap here is the only thing enforcing that.
+const PLAYLIST_MAX_PER_OWNER = 200;
 
 // Expected column order (must match what the Python pipeline reads)
 // Strike Move is appended LAST so the Python pipeline's positional reads of
@@ -131,7 +145,15 @@ function readPlaylists() {
 // unchanged rather than coming back corrupted.
 function sheetSafe(s) {
   const v = String(s == null ? '' : s);
-  return /^[=+\-@]/.test(v.trim()) ? "'" + v : v;
+  const t = v.trim();
+  if (/^[=+\-@]/.test(t)) return "'" + v;
+  // A leading apostrophe IS Sheets' "treat this as text" marker, so it gets
+  // consumed on write just like the formula characters above — a playlist
+  // named "'19 season" would otherwise read back as "19 season". Escaping it
+  // with a second apostrophe round-trips losslessly: the marker is consumed,
+  // the escaped one stays as the value's real leading character.
+  if (t.charAt(0) === "'") return "'" + v;
+  return v;
 }
 
 // The only ref shape the client ever sends is TR.evId's: game#time#type#name,
@@ -140,7 +162,9 @@ function sheetSafe(s) {
 // arbitrary text and have read back verbatim, and a formula hidden in one of
 // them is the same leak as a formula in the name.
 function validPlaylistRef(r) {
-  const p = String(r).split('#');
+  const s = String(r);
+  if (s.length > PLAYLIST_MAX_REF_LEN) return false;
+  const p = s.split('#');
   return p.length >= 4 && p[0] !== '' && /^\d+(?:\.\d+)?$/.test(p[1]);
 }
 
@@ -563,7 +587,11 @@ function doPost(e) {
     // No bumpVersion(): a playlist changes no game data, and bumping would make
     // every client refetch the heavy action=all payload for nothing.
     if (data.action === 'save_playlist') {
-      const name = String(data.name == null ? '' : data.name).trim();
+      // Truncated, not rejected — see PLAYLIST_MAX_FIELD_LEN. The empty check
+      // runs on the trimmed name before the cap so an all-whitespace name
+      // still gets the normal "needs a name" message rather than a silent
+      // truncation to nothing.
+      const name = String(data.name == null ? '' : data.name).trim().slice(0, PLAYLIST_MAX_FIELD_LEN);
       if (!name) return json({ ok: false, error: 'A playlist needs a name.' });
       // A non-array refs (e.g. a bare string) is treated as no refs rather than
       // fed to .map, which would throw and surface as a raw exception instead
@@ -580,7 +608,7 @@ function doPost(e) {
       if (!refs.every(validPlaylistRef)) {
         return json({ ok: false, error: 'A playlist event reference is malformed.' });
       }
-      const note    = String(data.note == null ? '' : data.note).trim();
+      const note    = String(data.note == null ? '' : data.note).trim().slice(0, PLAYLIST_MAX_FIELD_LEN);
       const updated = new Date().toISOString();
       // Sanitised at the point of writing, not at the point of reading, so a
       // row can never hold a live formula in the first place. The refs are
@@ -604,8 +632,16 @@ function doPost(e) {
         });
       }
       // A brand-new row has no prior index to race on, so it appends unlocked.
+      // The count check races the same way — a generous soft cap, not a hard
+      // boundary — which is fine: it exists to stop one account from growing
+      // the shared tab without limit, not to be exact under concurrent taps.
+      const owner = String(data.secret);
+      const ownedCount = readPlaylists().filter(p => p.owner === owner).length;
+      if (ownedCount >= PLAYLIST_MAX_PER_OWNER) {
+        return json({ ok: false, error: 'An account holds at most ' + PLAYLIST_MAX_PER_OWNER + ' playlists.' });
+      }
       const id = Utilities.getUuid();
-      playlistsSheet().appendRow([id, String(data.secret), cells.name, cells.note, cells.refs, updated]);
+      playlistsSheet().appendRow([id, owner, cells.name, cells.note, cells.refs, updated]);
       return json({ ok: true, id: id });
     }
 
