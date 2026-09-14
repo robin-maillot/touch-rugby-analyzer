@@ -587,7 +587,7 @@ function render(keepWindow){
     (events.length?'No events match these filters.':'Pick a game to see its events.')+'</div>';return}
   const windowed=shown.slice(0,renderLimit);
   L.innerHTML=windowed.map(e=>{
-    const id=evId(e);
+    const id=TR.evId(e);
     return `<div class="ev${activeId===id?' active':''}" style="border-left-color:${col(e.type)}"
       data-t="${e.time}" data-id="${esc(id)}" data-game="${esc(String(e.game))}">
       <span class="ev-t">${esc(shortT(e.timeStr))}</span>
@@ -611,10 +611,6 @@ function loadMore(){renderLimit+=200;render(true)}
 // render() from the top-level IIFE before a const at this point in the file has
 // been evaluated, and a TDZ ReferenceError there silently leaves the list on
 // "Loading…". Only reproduces when localStorage already holds a cached game.
-// Index-free on purpose: an id built from the render position went stale the
-// moment a filter changed the list, losing the active row and breaking
-// prev/next. Game + time + type + name is unique in practice.
-function evId(e){return e.game+'#'+e.time+'#'+e.type+'#'+e.name}
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;')}
 // Game clocks run well under an hour, so the leading 0: / 00: is noise on a phone.
 function shortT(t){return String(t||'').replace(/^0?0:/,'')}
@@ -683,11 +679,11 @@ function playEvent(gameSecs,id,evGame){
 // filtering to tries is the next try, which is the point of filtering.
 function stepEvent(d){
   if(!shown.length)return;
-  let i=shown.findIndex(e=>evId(e)===activeId);
+  let i=shown.findIndex(e=>TR.evId(e)===activeId);
   i = i<0 ? (d>0?0:shown.length-1) : i+d;
   if(i<0||i>=shown.length)return;                 // stop at the ends, don't wrap
   const e=shown[i];
-  playEvent(e.time,evId(e),e.game);
+  playEvent(e.time,TR.evId(e),e.game);
 }
 
 function toggleLoop(){

@@ -1165,6 +1165,24 @@ test('mid-string',   () => { assert.equal(TR.optMatch('Dummy Switch', 'switch'),
 test('miss',         () => { assert.equal(TR.optMatch('Wiggle', 'zzz'), false); });
 test('non-string',   () => { assert.equal(TR.optMatch(2026, '26'), true); assert.equal(TR.optMatch(null, 'x'), false); });
 
+// ── TR.evId / TR.evKey / TR.refKey ────────────────────────────
+console.log('TR.evId / TR.evKey / TR.refKey');
+const EV1 = { game: '2025_m30_cup_fra_eng', time: 134, type: 'Try', name: '32 - Cut' };
+test('evId is all four parts', () => { assert.equal(TR.evId(EV1), '2025_m30_cup_fra_eng#134#Try#32 - Cut'); });
+test('evKey is game + time',   () => { assert.equal(TR.evKey(EV1), '2025_m30_cup_fra_eng#134'); });
+test('refKey trims a ref to its key', () => {
+  assert.equal(TR.refKey('2025_m30_cup_fra_eng#134#Try#32 - Cut'), '2025_m30_cup_fra_eng#134');
+});
+test('refKey survives a rename', () => {
+  const renamed = { ...EV1, type: 'Turnover', name: 'Ball Down' };
+  assert.equal(TR.refKey(TR.evId(EV1)), TR.evKey(renamed));
+});
+test('refKey on junk', () => {
+  assert.equal(TR.refKey(''), '');
+  assert.equal(TR.refKey(null), '');
+  assert.equal(TR.refKey('onlygame'), 'onlygame');
+});
+
 // ─────────────────────────────────────────────────────────────
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
