@@ -397,6 +397,10 @@ let F={type:new Set(),team:new Set(),name:new Set(),move:new Set(),
 // A playlist is a fixed, ordered list of hand-picked events; while one plays it
 // IS the list, so the filters are suppressed rather than allowed to narrow it.
 let PL=[], plOpen=null, plMissing=0;
+// Set when TR.playlists.load rejects, so the empty-state message can tell "you
+// have none" from "the server was unreachable" — PL=[] alone can't, since a
+// genuine zero-playlists account leaves PL looking exactly the same.
+let plLoadError=null;
 
 function plById(id){return PL.find(p=>p.id===id)||null}
 
@@ -452,7 +456,8 @@ function toSecs(t){const p=String(t||'').trim().split(':').map(Number);
     const [ar,lr]=await Promise.all([a.json(),l.json()]);
     if(ar.ok){LS.set('all',ar); ingest(ar.rows);}
     if(lr.ok){LS.set('list',lr); buildMeta(lr.sheets); if(picked) paintGame();}
-    try{ PL=await TR.playlists.load(TR.secret()); }catch(e){ PL=[]; }
+    try{ PL=await TR.playlists.load(TR.secret()); plLoadError=null; }
+    catch(e){ PL=[]; plLoadError=e.message; }
   }catch(e){ if(!ca) $('empty').textContent='Could not load events: '+e.message; }
   restore();
   if(!picked) openSheet('game');
@@ -587,7 +592,12 @@ function render(keepWindow){
     $('fCount').hidden=true;
   }else{
     $('fCount').hidden=!n; $('fCount').textContent=n;
-    $('count').textContent=`${shown.length}${shown.length!==events.length?' of '+events.length:''} events`;
+    // No #count write here: bar.innerHTML two lines down rebuilds the whole bar,
+    // including a fresh #count span with this same text baked in — so this
+    // assignment was always overwritten immediately. Worse, right after a
+    // playlist closes, the bar still holds the playlist's #count-less markup at
+    // this point, so $('count') is null and the assignment threw, aborting
+    // render() before the filter bar, event list, or scrub marks were rebuilt.
     const ms=TR.strikeMoveStats(moveEventsFor(shown));
     bar.innerHTML='<button class="chip drill" onclick="openSheet(\'moves\')">Moves '+
       `<b>${esc(movesSummary(ms))}</b></button>`+
@@ -697,7 +707,10 @@ function playEvent(gameSecs,id,evGame){
   else if(!player){pendingSeek=t;loadVideo(evGame)}
   else if(!ready){pendingSeek=t}
   else{player.seek(t);player.play()}
-  const ev=events.find(x=>x.game===evGame&&x.time===gameSecs);
+  // rows, not events: events is only the picked game's rows (paintGame), but a
+  // playing playlist can jump to any game regardless of what's picked, so the
+  // lookup has to search everything or the pill goes stale on a cross-game tap.
+  const ev=rows.find(x=>x.game===evGame&&x.time===gameSecs);
   if(ev){$('nowPill').innerHTML=
     `<span class="tag" style="background:${col(ev.type)}22;color:${col(ev.type)}">${esc(ev.type)}</span>`+
     `<b>${esc(ev.name||'')}</b> <span style="color:var(--dim)">${esc(ev.team||'')}</span>`;
@@ -1081,10 +1094,15 @@ function closeSheet(){$('scrim').classList.remove('open');$('sheet').classList.r
 // null leaves the playlist and returns to the ordinary filtered view.
 function playPlaylist(id){
   plOpen=id; activeId=null; closeSheet(); render();
-  if(id) LS.set('lastplaylist',id);
 }
 
 function playlistSheet(){
+  // Both a real empty account and a failed fetch leave PL===[], but they need
+  // different messages: telling someone with saved playlists to go make one
+  // just because the server didn't answer would send them looking for a
+  // feature they already used.
+  if(plLoadError)return '<div class="empty">Couldn\'t load playlists: '+
+    esc(plLoadError)+'</div>';
   if(!PL.length)return '<div class="empty">No playlists yet.<br>'+
     'Tap ☑ in the filter bar to start collecting events into one.</div>';
   return '<div class="glist">'+PL.map(p=>{
