@@ -367,11 +367,22 @@ function isGameLive(g) {
 // sessionStorage, so a staff or admin viewing the page would have their secret
 // stolen. Escape at render, the same fix game.html took in 00b52a3.
 // Quotes included: these values also sit inside double-quoted attributes.
+// Backtick and = are in the set too. Every sink here is element text or a
+// double-quoted attribute, where they'd be harmless — but an UNquoted attribute
+// added later would make them matter, and an escaper that is only safe given
+// the current call sites is a trap for the next edit.
 function esc(s) {
   return String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+    .replace(/`/g, '&#96;').replace(/=/g, '&#61;');
 }
+
+// HTML normalises \r\n to \n inside an attribute value, so a name carrying a
+// carriage return does not come back off dataset byte-identical and the
+// lastGames lookup misses — the button silently does nothing. Normalise both
+// sides rather than round-tripping something the parser will change.
+function nameKey(s) { return String(s == null ? '' : s).replace(/\r\n?/g, '\n'); }
 
 function fmtTime(seconds) {
   const s = Math.floor(seconds);
@@ -404,7 +415,13 @@ function ordinal(n) {
 }
 
 function eventTimeline(g) {
-  if (!g.tries || !g.tries.length) return '';
+  // Array.isArray, not a length check: tries is JSON.parse of a sheet cell any
+  // staff secret can write, so it can be any JSON value. A non-array with a
+  // truthy length ("a string", {length:2}) passed the old guard and threw on
+  // .map — and because firstLoad is cleared before render(), fetchLive's catch
+  // swallowed it with the spinner already hidden and #empty still display:none.
+  // The public page went permanently blank, on every refresh.
+  if (!Array.isArray(g.tries) || !g.tries.length) return '';
   let s1 = 0, s2 = 0, halves = 0;
   const rows = g.tries.map(t => {
     const type    = t.type || 'Try';
@@ -503,7 +520,7 @@ function renderCard(g, isLive, bumped) {
   // and the same encoding decoded entities on the way back, so the lookup missed
   // any name containing an escapable character. Delegated below.
   const expandBtn = TR.extractVideoId(g.youtubelink)
-    ? `<button class="expand-btn" data-watch="${esc(g.name)}">▶ Watch</button>`
+    ? `<button class="expand-btn" data-watch="${esc(nameKey(g.name))}">▶ Watch</button>`
     : '';
   return `
   <div class="card" onclick="this.querySelector('.stats-panel').classList.toggle('open')">
@@ -544,7 +561,8 @@ function theaterSideHtml(g, isLive, bumped) {
 }
 
 function openTheater(name) {
-  const g = lastGames.find(x => x.name === name);
+  const want = nameKey(name);
+  const g = lastGames.find(x => nameKey(x.name) === want);
   if (!g) return;
   const id = TR.extractVideoId(g.youtubelink);
   if (!id) return;
