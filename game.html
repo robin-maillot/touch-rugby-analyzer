@@ -1031,9 +1031,11 @@ $('list').addEventListener('click',ev=>{
 $('sheetBody').addEventListener('click',ev=>{
   const chip=within(ev,ev.target.closest('.chip[data-k]'));
   if(chip){tog(chip.dataset.k,chip.dataset.v,chip);return}
-  // data-pledit before data-pl: .pl-edit and .pl-go are siblings inside the
-  // same .pl-row, so a tap on the ⠿ button also matches closest('[data-pl]')
-  // on .pl-go unless the more specific hook is checked first.
+  // data-pledit is checked before data-pl even though .pl-edit and .pl-go
+  // are siblings under .pl-row (never nested), so closest() can't actually
+  // confuse the two today. Checking the more specific hook first is just
+  // cheap insurance in case the markup is ever restructured so the row
+  // itself carries the play hook.
   const pe=within(ev,ev.target.closest('[data-pledit]'));
   if(pe){plDrill(pe.dataset.pledit);return}
   const up=within(ev,ev.target.closest('[data-plup]'));
@@ -1375,6 +1377,12 @@ async function plDelete(){
   if(plOpen===id){ plOpen=null; render(); }
   plEdit=null; plDraft=null;
   $('sheetBody').innerHTML=playlistSheet(); paintPlHead();
+  // Same reason as plDrill/plSaveAndBack: the "Delete this playlist" button
+  // that had focus is gone after the innerHTML swap, so focus falls to
+  // <body> and the next Tab restarts from the top of the page. Unlike those
+  // paths there's no row to return to — id itself no longer exists — so
+  // land on the sheet container, same as plDrill's own no-target case.
+  $('sheet').focus();
 }
 
 // Committing is one write, however many filters the collection was gathered
