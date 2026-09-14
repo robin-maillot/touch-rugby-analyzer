@@ -17,19 +17,10 @@ function memStorage() {
   };
 }
 
-let passed = 0, failed = 0;
-function test(name, fn) {
-  try   { fn(); console.log(`  ✓ ${name}`); passed++; }
-  catch (e) { console.error(`  ✗ ${name}\n    ${e.message}`); failed++; }
-}
-
 const ctx = vm.createContext({
   sessionStorage: { getItem: () => null },
   localStorage:   memStorage(),
   window:         { location: { replace() {} } },
-  test,
-  assert,
-  console,
 });
 
 for (const f of ['js/config.js', 'js/utils.js', 'js/events.js', 'js/possession.js', 'js/consistency.js', 'js/player.js', 'js/field_games.js', 'js/strike_moves.js', 'js/playlists.js']) {
@@ -37,6 +28,12 @@ for (const f of ['js/config.js', 'js/utils.js', 'js/events.js', 'js/possession.j
 }
 
 const { TR } = ctx;
+
+let passed = 0, failed = 0;
+function test(name, fn) {
+  try   { fn(); console.log(`  ✓ ${name}`); passed++; }
+  catch (e) { console.error(`  ✗ ${name}\n    ${e.message}`); failed++; }
+}
 
 // ── TR.fmt ────────────────────────────────────────────────────
 console.log('TR.fmt');
@@ -1186,8 +1183,6 @@ test('refKey on junk', () => {
   assert.equal(TR.refKey('onlygame'), 'onlygame');
 });
 
-// Run playlist tests inside VM context to avoid prototype mismatches with deepEqual
-vm.runInContext(`
 // ── TR.playlists.resolve ──────────────────────────────────────
 console.log('TR.playlists.resolve');
 const PROWS = [
@@ -1195,14 +1190,18 @@ const PROWS = [
   { game: 'g1', time: 90,  type: 'Turnover', name: 'Ball Down'},
   { game: 'g2', time: 30,  type: 'Try',      name: '32 - Cut' },
 ];
+// TR.playlists.resolve builds its `events` array and result object with
+// vm-context literals, so they carry that context's Object/Array prototypes
+// even though this test code calls in from the main realm — same fix as
+// TR.strikeMoveStats above: structuredClone before deepEqual.
 test('all resolve', () => {
   const r = TR.playlists.resolve(['g1#10#Try#Scoop', 'g2#30#Try#32 - Cut'], PROWS);
   assert.equal(r.missing, 0);
-  assert.deepEqual(r.events.map(e => e.game), ['g1', 'g2']);
+  assert.deepEqual(structuredClone(r.events.map(e => e.game)), ['g1', 'g2']);
 });
 test('playlist order wins over clock order', () => {
   const r = TR.playlists.resolve(['g2#30#Try#32 - Cut', 'g1#10#Try#Scoop'], PROWS);
-  assert.deepEqual(r.events.map(e => e.time), [30, 10]);
+  assert.deepEqual(structuredClone(r.events.map(e => e.time)), [30, 10]);
 });
 test('a renamed event still resolves', () => {
   const r = TR.playlists.resolve(['g1#90#Turnover#6th Touch'], PROWS);
@@ -1215,8 +1214,8 @@ test('missing refs are counted, survivors kept', () => {
   assert.equal(r.events.length, 1);
 });
 test('empty inputs', () => {
-  assert.deepEqual(TR.playlists.resolve([], PROWS), { events: [], missing: 0 });
-  assert.deepEqual(TR.playlists.resolve(null, null), { events: [], missing: 0 });
+  assert.deepEqual(structuredClone(TR.playlists.resolve([], PROWS)), { events: [], missing: 0 });
+  assert.deepEqual(structuredClone(TR.playlists.resolve(null, null)), { events: [], missing: 0 });
 });
 test('duplicate game+time: first row in sheet order wins', () => {
   const dupes = [{ game: 'g1', time: 10, type: 'Try', name: 'first' },
@@ -1226,6 +1225,11 @@ test('duplicate game+time: first row in sheet order wins', () => {
 
 // ── TR.playlists.reorder ──────────────────────────────────────
 console.log('TR.playlists.reorder');
+// Unlike resolve, reorder builds its return array via .slice()/.splice() on
+// the `refs` argument, so the result inherits whichever realm that argument
+// came from. R4 is a main-realm array, so most of these compare clean; only
+// the null-input case falls through to a vm-context `[]` fallback inside
+// playlists.js and needs the same structuredClone fix.
 const R4 = ['a', 'b', 'c', 'd'];
 test('move down',      () => { assert.deepEqual(TR.playlists.reorder(R4, 0, 2), ['b', 'c', 'a', 'd']); });
 test('move up',        () => { assert.deepEqual(TR.playlists.reorder(R4, 3, 1), ['a', 'd', 'b', 'c']); });
@@ -1236,8 +1240,7 @@ test('out of range',   () => { assert.deepEqual(TR.playlists.reorder(R4, -1, 2),
                                assert.deepEqual(TR.playlists.reorder(R4, 0, 9), R4); });
 test('does not mutate',() => { TR.playlists.reorder(R4, 0, 3); assert.deepEqual(R4, ['a', 'b', 'c', 'd']); });
 test('empty',          () => { assert.deepEqual(TR.playlists.reorder([], 0, 0), []);
-                               assert.deepEqual(TR.playlists.reorder(null, 0, 1), []); });
-`, ctx);
+                               assert.deepEqual(structuredClone(TR.playlists.reorder(null, 0, 1)), []); });
 
 // ─────────────────────────────────────────────────────────────
 console.log(`\n${passed} passed, ${failed} failed`);
