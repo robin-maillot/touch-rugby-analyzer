@@ -124,6 +124,34 @@ function ownedPlaylist(secret, id) {
   return readPlaylists().find(p => p.id === want && p.owner === String(secret)) || null;
 }
 
+// Serialises the two playlist paths that look up a row index (ownedPlaylist)
+// and then act on that same index in a later, separate call: update-by-id and
+// delete. _playlists is one sheet shared by every account, so between the
+// lookup and the write a concurrent request for a DIFFERENT account could
+// delete a row above the one this request found, shifting every row below it
+// up by one — the index read here would then belong to someone else's
+// playlist by the time it's used. Every other handler in this file (game
+// rows, admin sheet edits) overwrites what it addressed by name or time and
+// is safe to repeat, so it never needs this; deleteRow is the one operation
+// on this sheet that renumbers rows out from under a concurrent reader, so it
+// and its paired read are the only things that need to run under a lock.
+// fn must do its lookup-then-write entirely inside the callback so both
+// happen under the same lock; its return value (a json(...) response) is
+// passed straight through.
+function withPlaylistLock(fn) {
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+  } catch (e) {
+    return json({ ok: false, error: 'Playlist is busy, try again.' });
+  }
+  try {
+    return fn();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 // ── Metadata helper ────────────────────────────────────────────
 // Reads _metadata sheet and returns { [sheetName]: { team1, team2, competition, year, division } }
 function getMetadata() {
@@ -508,33 +536,51 @@ function doPost(e) {
     if (data.action === 'save_playlist') {
       const name = String(data.name == null ? '' : data.name).trim();
       if (!name) return json({ ok: false, error: 'A playlist needs a name.' });
-      const refs = (data.refs || []).map(r => String(r).trim()).filter(Boolean);
+      // A non-array refs (e.g. a bare string) is treated as no refs rather than
+      // fed to .map, which would throw and surface as a raw exception instead
+      // of a normal error response. Newlines are stripped per-ref (not just
+      // trimmed) because refs are joined with '\n' into one cell on write and
+      // split on '\n' on read — an embedded newline would otherwise silently
+      // become two entries the next time this playlist is read.
+      const refs = (Array.isArray(data.refs) ? data.refs : [])
+        .map(r => String(r).replace(/[\r\n]+/g, '').trim())
+        .filter(Boolean);
       if (refs.length > PLAYLIST_MAX_REFS) {
         return json({ ok: false, error: 'A playlist holds at most ' + PLAYLIST_MAX_REFS + ' events.' });
       }
       const note    = String(data.note == null ? '' : data.note).trim();
       const updated = new Date().toISOString();
-      const sh      = playlistsSheet();
       if (data.id) {
-        const owned = ownedPlaylist(data.secret, data.id);
-        // A miss is reported rather than silently creating a second row — the
-        // client asked to replace something specific.
-        if (!owned) return json({ ok: false, error: 'Playlist not found.' });
-        sh.getRange(owned.row, 1, 1, PLAYLIST_HEADERS.length)
-          .setValues([[owned.id, owned.owner, name, note, refs.join('\n'), updated]]);
-        return json({ ok: true, id: owned.id });
+        // Locked: the row index comes from ownedPlaylist and is used by
+        // setValues a few lines later, so both must run under the same lock
+        // withPlaylistLock takes — see its comment.
+        return withPlaylistLock(() => {
+          const sh    = playlistsSheet();
+          const owned = ownedPlaylist(data.secret, data.id);
+          // A miss is reported rather than silently creating a second row — the
+          // client asked to replace something specific.
+          if (!owned) return json({ ok: false, error: 'Playlist not found.' });
+          sh.getRange(owned.row, 1, 1, PLAYLIST_HEADERS.length)
+            .setValues([[owned.id, owned.owner, name, note, refs.join('\n'), updated]]);
+          return json({ ok: true, id: owned.id });
+        });
       }
+      // A brand-new row has no prior index to race on, so it appends unlocked.
       const id = Utilities.getUuid();
-      sh.appendRow([id, String(data.secret), name, note, refs.join('\n'), updated]);
+      playlistsSheet().appendRow([id, String(data.secret), name, note, refs.join('\n'), updated]);
       return json({ ok: true, id: id });
     }
 
-    // action=delete_playlist → remove one the caller owns.
+    // action=delete_playlist → remove one the caller owns. Locked for the same
+    // reason as the save_playlist id branch: the row index is read here and
+    // deleteRow acts on it a moment later.
     if (data.action === 'delete_playlist') {
-      const owned = ownedPlaylist(data.secret, data.id);
-      if (!owned) return json({ ok: false, error: 'Playlist not found.' });
-      playlistsSheet().deleteRow(owned.row);
-      return json({ ok: true });
+      return withPlaylistLock(() => {
+        const owned = ownedPlaylist(data.secret, data.id);
+        if (!owned) return json({ ok: false, error: 'Playlist not found.' });
+        playlistsSheet().deleteRow(owned.row);
+        return json({ ok: true });
+      });
     }
 
     // action=update_rows → update Name/Comment for specific rows (admin only)
