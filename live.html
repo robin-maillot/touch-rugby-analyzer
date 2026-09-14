@@ -360,6 +360,30 @@ function isGameLive(g) {
   return (Date.now() - new Date(g.updatedAt).getTime()) < STALE_MS;
 }
 
+// Everything on this page is built from _live, which any account with a staff
+// secret can write via live_update — and action=live is public, so whatever
+// lands there is rendered for anonymous visitors. A team name carrying markup
+// would run as script for every spectator, and TR.secret() lives in
+// sessionStorage, so a staff or admin viewing the page would have their secret
+// stolen. Escape at render, the same fix game.html took in 00b52a3.
+// Quotes included: these values also sit inside double-quoted attributes.
+// Backtick and = are in the set too. Every sink here is element text or a
+// double-quoted attribute, where they'd be harmless — but an UNquoted attribute
+// added later would make them matter, and an escaper that is only safe given
+// the current call sites is a trap for the next edit.
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+    .replace(/`/g, '&#96;').replace(/=/g, '&#61;');
+}
+
+// HTML normalises \r\n to \n inside an attribute value, so a name carrying a
+// carriage return does not come back off dataset byte-identical and the
+// lastGames lookup misses — the button silently does nothing. Normalise both
+// sides rather than round-tripping something the parser will change.
+function nameKey(s) { return String(s == null ? '' : s).replace(/\r\n?/g, '\n'); }
+
 function fmtTime(seconds) {
   const s = Math.floor(seconds);
   const m = Math.floor(s / 60);
@@ -391,13 +415,19 @@ function ordinal(n) {
 }
 
 function eventTimeline(g) {
-  if (!g.tries || !g.tries.length) return '';
+  // Array.isArray, not a length check: tries is JSON.parse of a sheet cell any
+  // staff secret can write, so it can be any JSON value. A non-array with a
+  // truthy length ("a string", {length:2}) passed the old guard and threw on
+  // .map — and because firstLoad is cleared before render(), fetchLive's catch
+  // swallowed it with the spinner already hidden and #empty still display:none.
+  // The public page went permanently blank, on every refresh.
+  if (!Array.isArray(g.tries) || !g.tries.length) return '';
   let s1 = 0, s2 = 0, halves = 0;
   const rows = g.tries.map(t => {
     const type    = t.type || 'Try';
     const isT1    = t.scorer === 'Team 1';
     const isT2    = t.scorer === 'Team 2';
-    const team    = isT1 ? (g.team1 || 'Team 1') : isT2 ? (g.team2 || 'Team 2') : '';
+    const team    = esc(isT1 ? (g.team1 || 'Team 1') : isT2 ? (g.team2 || 'Team 2') : '');
     const time    = `<span class="ev-time">${fmtTime(t.time)}</span>`;
 
     if (type === 'Try') {
@@ -443,7 +473,9 @@ function metaLineHtml(g) {
     division    = parts[1];
     competition = parts.slice(2, parts.length - 2).join(' ');
   }
-  const labels = [date, start, competition, year, division].filter(Boolean);
+  // date and start are built by Intl from a parsed Date, so only the three
+  // pulled out of the sheet name need escaping.
+  const labels = [date, start, esc(competition), esc(year), esc(division)].filter(Boolean);
   return labels.length ? `<div class="card-meta">${labels.join(' · ')}</div>` : '';
 }
 
@@ -452,18 +484,18 @@ function scoreboardHtml(g, bumped) {
   const bump2 = bumped && bumped.t2 ? ' bump' : '';
   return `
     <div class="team">
-      <div class="team-name">${g.team1 || 'Team 1'}</div>
-      <div class="score${bump1}">${g.score1}</div>
+      <div class="team-name">${esc(g.team1 || 'Team 1')}</div>
+      <div class="score${bump1}">${esc(g.score1)}</div>
     </div>
     <div class="divider">–</div>
     <div class="team">
-      <div class="team-name">${g.team2 || 'Team 2'}</div>
-      <div class="score${bump2}">${g.score2}</div>
+      <div class="team-name">${esc(g.team2 || 'Team 2')}</div>
+      <div class="score${bump2}">${esc(g.score2)}</div>
     </div>`;
 }
 
 function statsInnerHtml(g) {
-  const fmt = (n, d) => d > 0 ? `${n}/${d}` : '–';
+  const fmt = (n, d) => d > 0 ? `${esc(n)}/${esc(d)}` : '–';
   return `
     <div class="stats-row">
       <div class="stats-label">Tries</div>
@@ -482,8 +514,13 @@ function renderCard(g, isLive, bumped) {
   const badge = isLive
     ? `<span class="live-badge">LIVE</span>`
     : `<span class="ended-badge">FT</span>`;
+  // The name rides in a data- attribute and comes back off dataset as the exact
+  // original string. An inline handler has to encode it as JavaScript SOURCE, so
+  // a name carrying a quote closed the attribute and injected a live handler —
+  // and the same encoding decoded entities on the way back, so the lookup missed
+  // any name containing an escapable character. Delegated below.
   const expandBtn = TR.extractVideoId(g.youtubelink)
-    ? `<button class="expand-btn" onclick="event.stopPropagation(); openTheater('${g.name}')">▶ Watch</button>`
+    ? `<button class="expand-btn" data-watch="${esc(nameKey(g.name))}">▶ Watch</button>`
     : '';
   return `
   <div class="card" onclick="this.querySelector('.stats-panel').classList.toggle('open')">
@@ -524,7 +561,8 @@ function theaterSideHtml(g, isLive, bumped) {
 }
 
 function openTheater(name) {
-  const g = lastGames.find(x => x.name === name);
+  const want = nameKey(name);
+  const g = lastGames.find(x => nameKey(x.name) === want);
   if (!g) return;
   const id = TR.extractVideoId(g.youtubelink);
   if (!id) return;
@@ -550,6 +588,26 @@ function closeTheater() {
 }
 
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeTheater(); });
+
+// Both grids are rebuilt wholesale by render(), so the Watch buttons are
+// delegated rather than re-bound on every refresh. Bounded to the container:
+// closest() alone would keep climbing to document, and a stray data-watch on
+// some ancestor later would turn every click in here into that hook.
+//
+// Capture, not bubble, and stopPropagation — the card's own onclick toggles the
+// stats panel, and by the time a bubbling listener on the container ran, that
+// would already have fired. This reproduces the event.stopPropagation() the
+// inline handler used to do.
+['grid', 'recent-grid'].forEach(id => {
+  const host = document.getElementById(id);
+  if (!host) return;
+  host.addEventListener('click', ev => {
+    const btn = ev.target.closest('[data-watch]');
+    if (!btn || !host.contains(btn)) return;
+    ev.stopPropagation();
+    openTheater(btn.dataset.watch);
+  }, true);
+});
 
 function render(games) {
   const grid          = document.getElementById('grid');
