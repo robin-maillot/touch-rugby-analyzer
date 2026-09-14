@@ -676,7 +676,8 @@ function render(keepWindow){
 
   const L=$('list');
   if(!shown.length){L.innerHTML='<div class="empty">'+
-    (events.length?'No events match these filters.':'Pick a game to see its events.')+'</div>';return}
+    (events.length?'No events match these filters.':'Pick a game to see its events.')+'</div>';
+    paintCollect();return}
   const windowed=shown.slice(0,renderLimit);
   L.innerHTML=windowed.map(e=>{
     const id=TR.evId(e);
@@ -721,6 +722,20 @@ function toggleCollect(){
   $('collectBtn').classList.toggle('on',collecting);
   if(!collecting) sel.clear();
   render();
+}
+
+// Collect mode's UI (the tick marks in #list, the #tray strip, the fixed
+// .actionbar) only makes sense over the ordinary filtered list. Opening a
+// playlist, collapsing the list, and entering cinema each swap that surface
+// for something collect can't render over, so every path that does one of
+// those must force collect mode off first — call this rather than adding
+// another one-off `if(collecting) toggleCollect()` at the next such call site.
+function exitCollect(){
+  if(!collecting) return;
+  collecting=false;
+  document.body.classList.remove('collect');
+  $('collectBtn').classList.remove('on');
+  sel.clear();
 }
 
 // Named tickRow, not tick: `tick` is already the video-progress interval
@@ -905,6 +920,10 @@ function applyZoom(){
 // not a shareable view of a moment.
 function toggleList(){
   const on = document.body.classList.toggle('list-collapsed');
+  // Collapsing hides only #list — .tray and .actionbar are its siblings, not
+  // its children — so collect mode's tray text and pinned bar would otherwise
+  // float over nothing. exitCollect() removing body.collect hides both via CSS.
+  if(on) exitCollect();
   const b  = $('collapseBtn');
   b.textContent = on ? '⌃' : '⌄';
   b.title = on ? 'Show the event list' : 'Collapse the event list';
@@ -915,7 +934,7 @@ function toggleList(){
 function toggleCinema(){
   // The pinned action bar would float over a full-screen video with no list
   // behind it.
-  if(collecting) toggleCollect();
+  if(collecting){ exitCollect(); render(); }
   const on=document.body.classList.toggle('cinema');
   $('bCine').textContent=on?'⤡':'⤢';
   history.replaceState(null,'',on?'#cinema':location.pathname+location.search)}
@@ -1186,6 +1205,9 @@ function closeSheet(){$('scrim').classList.remove('open');$('sheet').classList.r
 
 // null leaves the playlist and returns to the ordinary filtered view.
 function playPlaylist(id){
+  // A playing playlist is not a pool to collect from, and editing one already
+  // has a home in the reorder screen — see exitCollect().
+  exitCollect();
   plOpen=id; activeId=null; closeSheet(); render();
 }
 
@@ -1239,7 +1261,11 @@ async function addTo(id){
     PL=await TR.playlists.load(TR.secret());
   }catch(e){ alert(e.message); return; }
   closeSheet(); toggleCollect();
-  $('count').textContent=`Added ${n} to ${name}`;
+  // #count only exists in the non-playlist filter bar (render()'s `if(pl)`
+  // branch never creates it), so don't assume it survived whatever render()
+  // just did — a save can legitimately land with no such element on screen.
+  const countEl=$('count');
+  if(countEl) countEl.textContent=`Added ${n} to ${name}`;
 }
 
 function gameSheet(){
