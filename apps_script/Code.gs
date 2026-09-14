@@ -1049,8 +1049,17 @@ function writeLiveRow(sheetName, team1, team2, score1, score2, timeSeconds, poss
 
   const ytIdx = LIVE_HEADERS.length - 1; // Youtube Link is the last column
 
+  // Match on the RAW name, not the sanitised one. sheetSafe works precisely
+  // because Sheets treats the leading apostrophe as a format marker and drops
+  // it from the stored value — so the cell reads back as the raw name, and a
+  // comparison against the prefixed string could never match. Getting this
+  // wrong turns every update for such a name into an appendRow, growing _live
+  // without bound. clearLiveRow already keys off the raw name; this keeps them
+  // agreeing.
+  const key = String(sheetName == null ? '' : sheetName);
+
   for (let i = 1; i < values.length; i++) {
-    if (String(values[i][0]) === safeSheetName) {
+    if (String(values[i][0]) === key) {
       // Don't clobber a previously-set link with an empty update.
       if (!youtubelink && values[i][ytIdx]) newRow[ytIdx] = values[i][ytIdx];
       sheet.getRange(i + 1, 1, 1, newRow.length).setValues([newRow]);
