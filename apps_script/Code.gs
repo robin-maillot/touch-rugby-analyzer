@@ -1036,14 +1036,21 @@ function writeLiveRow(sheetName, team1, team2, score1, score2, timeSeconds, poss
     sheet.getRange(1, existing + 1, 1, LIVE_HEADERS.length - existing).setValues([LIVE_HEADERS.slice(existing)]);
   }
 
+  // action=live is a PUBLIC endpoint (no secret) that reads this sheet back
+  // with getDisplayValues() — every field a caller supplies here is a formula
+  // injection vector into a spreadsheet that also holds _groups (every
+  // account's secret and role), so each one goes through sheetSafe(), same as
+  // the playlist fields. Plain team names/scores/times/URLs never start with
+  // =+-@/', so sheetSafe() is a no-op for them and they round-trip unchanged.
   const nowStr = new Date().toISOString();
-  const newRow = [sheetName, team1 || '', team2 || '', score1 || 0, score2 || 0, timeSeconds || 0, nowStr, poss1 || 0, poss2 || 0, comps1 || 0, comps2 || 0, '', triesJson || '[]', youtubelink || ''];
+  const safeSheetName = sheetSafe(sheetName);
+  const newRow = [safeSheetName, sheetSafe(team1 || ''), sheetSafe(team2 || ''), sheetSafe(score1 || 0), sheetSafe(score2 || 0), sheetSafe(timeSeconds || 0), nowStr, sheetSafe(poss1 || 0), sheetSafe(poss2 || 0), sheetSafe(comps1 || 0), sheetSafe(comps2 || 0), '', sheetSafe(triesJson || '[]'), sheetSafe(youtubelink || '')];
   const values = sheet.getDataRange().getValues();
 
   const ytIdx = LIVE_HEADERS.length - 1; // Youtube Link is the last column
 
   for (let i = 1; i < values.length; i++) {
-    if (String(values[i][0]) === sheetName) {
+    if (String(values[i][0]) === safeSheetName) {
       // Don't clobber a previously-set link with an empty update.
       if (!youtubelink && values[i][ytIdx]) newRow[ytIdx] = values[i][ytIdx];
       sheet.getRange(i + 1, 1, 1, newRow.length).setValues([newRow]);
