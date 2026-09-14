@@ -44,3 +44,48 @@ TR.playlists.reorder = (refs, from, to) => {
   out.splice(to, 0, moved);
   return out;
 };
+
+// Fetch the caller's saved playlists from the backend. Uses a GET-style parameter
+// to avoid CORS preflight. Returns an array of playlists; throws if the request fails.
+TR.playlists.load = async () => {
+  const resp = await fetch(`${TR.APPS_SCRIPT_URL}?action=playlists&secret=${encodeURIComponent(TR.secret())}`);
+  const res = await resp.json();
+  if (!res.ok) throw new Error(res.error || 'Load failed');
+  return res.playlists;
+};
+
+// Save a playlist (create a new one, or update an existing one identified by id).
+// The playlist object should have {name, note, refs} for a new entry, or
+// {id, name, note, refs} for an update. Returns the uuid; throws if the request fails.
+TR.playlists.save = async (playlist) => {
+  const resp = await fetch(TR.APPS_SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({
+      secret: TR.secret(),
+      action: 'save_playlist',
+      id: playlist.id,
+      name: playlist.name,
+      note: playlist.note,
+      refs: playlist.refs
+    })
+  });
+  const res = await resp.json();
+  if (!res.ok) throw new Error(res.error || 'Save failed');
+  return res.id;
+};
+
+// Delete a playlist by its id. Throws if the request fails or the playlist does not exist.
+TR.playlists.remove = async (id) => {
+  const resp = await fetch(TR.APPS_SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({
+      secret: TR.secret(),
+      action: 'delete_playlist',
+      id: id
+    })
+  });
+  const res = await resp.json();
+  if (!res.ok) throw new Error(res.error || 'Remove failed');
+};
