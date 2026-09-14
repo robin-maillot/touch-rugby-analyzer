@@ -1023,6 +1023,11 @@ function closeSheet(){$('scrim').classList.remove('open');$('sheet').classList.r
   // restarting at the top of the page. Skipped if a render has since replaced it.
   const o=sheetOpener; sheetOpener=null;
   if(o && o.isConnected) o.focus();
+  // #filter and #moves hash restores open the sheet with no opener at all, so
+  // there's nothing to hand back to above. Left alone, activeElement stays on
+  // whatever was focused inside the sheet — now a display:none subtree — which
+  // strands a screen reader there and makes the next Tab restart from the top.
+  else if($('sheet').contains(document.activeElement)) document.activeElement.blur();
 }
 
 function gameSheet(){
