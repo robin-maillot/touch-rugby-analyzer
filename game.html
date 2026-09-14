@@ -354,7 +354,7 @@
 </div>
 
 <div class="scrim" id="scrim" onclick="closeSheet()"></div>
-<div class="sheet" id="sheet">
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" tabindex="-1">
   <div class="sheet-grab"></div>
   <div class="sheet-head"><h2 id="sheetTitle">Filter</h2>
     <button class="icon-btn" onclick="closeSheet()">Done</button></div>
@@ -403,6 +403,11 @@ const FCATS=[
 // null at the category list, otherwise the FCATS key being browsed. Reset on
 // every open, so the sheet never reopens stranded inside a category.
 let fCat=null, fNarrow='';
+// What had focus when the sheet was opened, so closeSheet can hand it back.
+// Declared up here with the rest of the state rather than beside the sheet
+// functions, because the load path closes a sheet before that far down the
+// script has run and a `let` in its own dead zone throws.
+let sheetOpener=null;
 
 // Twelve chips is about two phone rows — past that, scanning for one costs
 // more than typing three letters of it.
@@ -863,6 +868,23 @@ $('sheetBody').addEventListener('click',ev=>{
   if(g)pickGame(g.dataset.game);
 });
 
+// The sheet is modal, so Tab must not wander behind the scrim into a page the
+// pointer can't reach, and Escape has to offer the keyboard the way out that
+// tapping the scrim offers the thumb. Bound once, to the container, because
+// everything inside it is rebuilt from sheet data on every render.
+$('sheet').addEventListener('keydown',ev=>{
+  if(ev.key==='Escape'){ev.preventDefault(); closeSheet(); return}
+  if(ev.key!=='Tab')return;
+  const f=sheetFocusables(); if(!f.length){ev.preventDefault(); return}
+  const i=f.indexOf(document.activeElement);
+  // Wrapping is worked out here rather than left to the browser so that the two
+  // ends meet, and so a Tab pressed on the container itself — where focus starts
+  // — enters the list from whichever end the direction implies.
+  const n = ev.shiftKey ? (i<=0 ? f.length-1 : i-1)
+                        : (i===-1 || i===f.length-1 ? 0 : i+1);
+  ev.preventDefault(); f[n].focus();
+});
+
 function paintMarks(){
   const s=$('scrub'); s.querySelectorAll('.scrub-mark').forEach(n=>n.remove());
   const m=meta[videoGame]||{}; if(!dur||!videoGame)return;
@@ -960,7 +982,26 @@ function movesSheetBody(){
 }
 
 // ── Sheets ────────────────────────────────────────────────────
+// The scrim puts the page behind the sheet out of the thumb's reach, so the
+// keyboard has to be held to the same bargain: remember what opened the sheet
+// (`sheetOpener`, declared with the rest of the state above), keep Tab inside
+// it, and hand focus back on the way out.
+//
+// Queried afresh on every keypress rather than cached: the body is rebuilt by
+// innerHTML on every drill and every keystroke in the narrow box, and the title
+// is only a focusable back control some of the time.
+function sheetFocusables(){
+  return [...$('sheet').querySelectorAll('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])')]
+    .filter(el=>!el.disabled && el.offsetParent!==null);
+}
+
 function openSheet(kind){
+  // Taken before the sheet opens so closeSheet has somewhere to hand focus back
+  // to. Two open paths are hash restores with no opener at all, and a sheet
+  // that swaps kind while open keeps the control that opened it in the first
+  // place — hence both guards.
+  const o=document.activeElement;
+  if(!$('sheet').contains(o)) sheetOpener = o && o!==document.body && o.focus ? o : null;
   $('scrim').classList.add('open'); $('sheet').classList.add('open');
   if(kind==='filter')fCat=null;               // always open at the category list
   $('sheetTitle').className=''; $('sheetTitle').onclick=null; backCtl($('sheetTitle'),false);
@@ -971,8 +1012,18 @@ function openSheet(kind){
   // The window sheet is painted rather than rendered with its state inlined, so
   // that a keystroke can update the chips without re-rendering the field.
   if(kind==='window')paintWin();
+  // The container, never the first control: the filter sheet leads with a search
+  // box, and focusing that would throw up the on-screen keyboard every time a
+  // phone user taps Filter. Last, because a display:none element refuses focus.
+  $('sheet').focus();
 }
-function closeSheet(){$('scrim').classList.remove('open');$('sheet').classList.remove('open')}
+function closeSheet(){$('scrim').classList.remove('open');$('sheet').classList.remove('open');
+  // Back to whatever opened it — by Done, by scrim, by Escape, or as the side
+  // effect of picking a game — so the next Tab carries on from there instead of
+  // restarting at the top of the page. Skipped if a render has since replaced it.
+  const o=sheetOpener; sheetOpener=null;
+  if(o && o.isConnected) o.focus();
+}
 
 function gameSheet(){
   const keys=[...new Set(rows.map(r=>r.game))].filter(Boolean)
@@ -1007,7 +1058,7 @@ function catList(){
       oninput="F.q=this.value;render()">`+
     '<div class="glist">'+FCATS.filter(catShown).map(c=>{
       const set=F[c.key].size>0;
-      return `<button class="fcat${set?' on':''}" onclick="drill('${c.key}')">
+      return `<button class="fcat${set?' on':''}" data-cat="${c.key}" onclick="drill('${c.key}')">
         <span class="fc-t">${c.title}</span>
         <span class="fc-v${set?' set':''}">${esc(TR.filterSummary([...F[c.key]]))}</span>
         <span class="fc-x">›</span>
@@ -1037,9 +1088,17 @@ function backCtl(h,on,title){
 }
 
 function drill(key){
+  const from=fCat;
   fCat=key; fNarrow='';
   $('sheetBody').innerHTML=filterSheet();
   paintFilterHead();
+  // The control that was just activated has been rendered out of existence, and
+  // focus falls to <body> unless it is put somewhere — which would make the next
+  // Tab restart at the top of the page. Going in: the first option. Coming back:
+  // the row you came from. Never a search box, for openSheet's keyboard reason.
+  const t = key ? $('sheetBody').querySelector('.opts .chip')
+                : from && $('sheetBody').querySelector(`.fcat[data-cat="${from}"]`);
+  (t||$('sheet')).focus();
 }
 
 function catOpts(key){
