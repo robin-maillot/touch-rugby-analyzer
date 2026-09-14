@@ -1031,9 +1031,9 @@ $('list').addEventListener('click',ev=>{
 $('sheetBody').addEventListener('click',ev=>{
   const chip=within(ev,ev.target.closest('.chip[data-k]'));
   if(chip){tog(chip.dataset.k,chip.dataset.v,chip);return}
-  // data-pledit before data-pl: the ⠿ button sits inside a .pl-row that also
-  // carries the play hook, so testing play first would start playing the
-  // playlist whenever the edit button was tapped.
+  // data-pledit before data-pl: .pl-edit and .pl-go are siblings inside the
+  // same .pl-row, so a tap on the ⠿ button also matches closest('[data-pl]')
+  // on .pl-go unless the more specific hook is checked first.
   const pe=within(ev,ev.target.closest('[data-pledit]'));
   if(pe){plDrill(pe.dataset.pledit);return}
   const up=within(ev,ev.target.closest('[data-plup]'));
@@ -1276,6 +1276,11 @@ function plDrill(id){
   else plDraft=null;
   $('sheetBody').innerHTML=playlistSheet();
   paintPlHead();
+  // Same reason as the filter sheet's drill(): the ⠿ button just tapped is
+  // gone after the innerHTML swap, so focus falls to <body> and the next Tab
+  // would restart from the top of the page. Going in: the name field.
+  const t = id ? $('sheetBody').querySelector('#plName') : $('sheet');
+  (t||$('sheet')).focus();
 }
 
 // The title doubles as the back control when drilled in, the same shape the
@@ -1328,19 +1333,34 @@ function plMove(n,d){ plDraft.refs=TR.playlists.reorder(plLive(),n,n+d);
 function plDrop(n){ const r=plLive(); r.splice(n,1); plDraft.refs=r;
   $('sheetBody').innerHTML=playlistSheet(); }
 
+// Mirrors plDelete()'s shape: await the server call BEFORE clearing plEdit/
+// plDraft or repainting, so a rejection (offline, or the lock path in
+// Code.gs) leaves the user on the edit screen with their draft untouched
+// instead of silently losing the rename/reorder/removals they just made.
+// d is captured up front, before anything can destroy the #plName input
+// that oninput keeps it in sync with, so a retry after a failure still saves
+// the name the user actually typed.
 async function plSaveAndBack(){
   const id=plEdit, d=plDraft;
-  plEdit=null; plDraft=null;
-  $('sheetBody').innerHTML=playlistSheet(); paintPlHead();
   const p=plById(id);
-  if(!p||!d) return;
-  if(d.name===p.name&&d.note===p.note&&d.refs.join('\n')===p.refs.join('\n')) return;
+  const back=()=>{
+    plEdit=null; plDraft=null;
+    $('sheetBody').innerHTML=playlistSheet(); paintPlHead();
+    // Same reason as the filter sheet's drill(): the row being left is gone
+    // after the innerHTML swap, so focus must be placed explicitly or it
+    // falls to <body> and the next Tab restarts from the top of the page.
+    const t=[...$('sheetBody').querySelectorAll('[data-pledit]')]
+      .find(el=>el.dataset.pledit===id);
+    (t||$('sheet')).focus();
+  };
+  if(!p||!d){ back(); return; }
+  if(d.name===p.name&&d.note===p.note&&d.refs.join('\n')===p.refs.join('\n')){ back(); return; }
   if(!d.name.trim()){ alert('A playlist needs a name.'); return; }
   try{
     await TR.playlists.save(TR.secret(),{id,name:d.name.trim(),note:d.note,refs:d.refs});
     PL=await TR.playlists.load(TR.secret());
   }catch(e){ alert(e.message); return; }
-  $('sheetBody').innerHTML=playlistSheet();
+  back();
   if(plOpen===id) render();
 }
 
