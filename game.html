@@ -160,6 +160,10 @@
      blue "filter applied" accent. */
   .chip.drill{border-color:#7dd3fc}
   .chip.drill b{color:#7dd3fc;font-weight:700;margin-left:3px}
+  /* Playing a playlist: its own accent (the --review purple), distinct from
+     both the blue "filter applied" chips and the drill chip's cyan. */
+  .chip.pl{background:#231733;border-color:var(--review);color:#e9d5ff}
+  .count.warn{color:var(--turn)}
   .count{color:var(--dim);font-size:.7rem;flex-shrink:0;padding-left:2px;white-space:nowrap}
   .collapse-btn{flex-shrink:0;background:none;border:none;border-left:1px solid var(--border);
     color:var(--dim);font-size:.9rem;line-height:1;cursor:pointer;
@@ -307,6 +311,7 @@
     <span class="g-name" id="gName">Choose a game</span>
     <span class="g-sub"  id="gSub">tap to pick</span>
   </button>
+  <button class="icon-btn" onclick="openSheet('playlists')" title="Playlists">📋</button>
   <button class="icon-btn" id="filterBtn" onclick="openSheet('filter')">Filter <span class="badge" id="fCount" hidden>0</span></button>
 </div>
 
@@ -388,6 +393,13 @@ const WIN_BEFORE_CHIPS=[3,5,10,15], WIN_AFTER_CHIPS=[2,3,5,10];
 let F={type:new Set(),team:new Set(),name:new Set(),move:new Set(),
        comp:new Set(),div:new Set(),year:new Set(),q:''};
 
+// Saved playlists for this account, and which one is currently playing.
+// A playlist is a fixed, ordered list of hand-picked events; while one plays it
+// IS the list, so the filters are suppressed rather than allowed to narrow it.
+let PL=[], plOpen=null, plMissing=0;
+
+function plById(id){return PL.find(p=>p.id===id)||null}
+
 // Categories ordered by how much they narrow: Competition/Division/Year first
 // (the ones that matter most once you're browsing across every game), then the
 // original per-event groups. One table so the category list and the option
@@ -440,6 +452,7 @@ function toSecs(t){const p=String(t||'').trim().split(':').map(Number);
     const [ar,lr]=await Promise.all([a.json(),l.json()]);
     if(ar.ok){LS.set('all',ar); ingest(ar.rows);}
     if(lr.ok){LS.set('list',lr); buildMeta(lr.sheets); if(picked) paintGame();}
+    try{ PL=await TR.playlists.load(TR.secret()); }catch(e){ PL=[]; }
   }catch(e){ if(!ca) $('empty').textContent='Could not load events: '+e.message; }
   restore();
   if(!picked) openSheet('game');
@@ -468,6 +481,7 @@ function applyHash(){
   if(h==='cinema' && !document.body.classList.contains('cinema')) toggleCinema();
   if(h==='filter' && picked) openSheet('filter');
   if(h==='moves'  && picked) openSheet('moves');
+  if(h==='playlists' && picked) openSheet('playlists');
 }
 window.addEventListener('hashchange',applyHash);
 
@@ -504,7 +518,7 @@ function ingest(r){
 function pickGame(k){ game=k; picked=true; renderLimit=200;
   F={type:new Set(),team:new Set(),name:new Set(),move:new Set(),
      comp:new Set(),div:new Set(),year:new Set(),q:''};
-  activeId=null; closeSheet(); LS.set('lastgame',k);
+  activeId=null; plOpen=null; closeSheet(); LS.set('lastgame',k);
   // Video first: paintGame() renders the list, and a throw in there used to
   // leave the page with no video and no error to show for it.
   if(k) loadVideo(k); else clearVideo();
@@ -544,7 +558,15 @@ function shortLabel(g){
 function render(keepWindow){
   if(!keepWindow) renderLimit=200;
   const q=F.q.toLowerCase();
-  shown=events.filter(e=>
+  const pl=plOpen?plById(plOpen):null;
+  if(pl){
+    // A playlist is already a hand-picked set. Letting the filters narrow it
+    // further would leave the chips describing a list that isn't on screen.
+    const r=TR.playlists.resolve(pl.refs,rows);
+    shown=r.events; plMissing=r.missing;
+  }else{
+    plMissing=0;
+    shown=events.filter(e=>
     (!F.comp.size||F.comp.has(e.comp)) &&
     (!F.div.size||F.div.has(e.div)) &&
     (!F.year.size||F.year.has(e.year)) &&
@@ -553,34 +575,42 @@ function render(keepWindow){
     (!F.name.size||F.name.has(e.name)) &&
     (!F.move.size||F.move.has(e.move)) &&
     (!q||(e.name+' '+e.type+' '+e.team+' '+e.comment+' '+e.move).toLowerCase().includes(q)));
-
+  }
   const n=F.comp.size+F.div.size+F.year.size+F.type.size+F.team.size+F.name.size+F.move.size+(F.q?1:0);
-  $('fCount').hidden=!n; $('fCount').textContent=n;
-  $('count').textContent=`${shown.length}${shown.length!==events.length?' of '+events.length:''} events`;
 
   const bar=$('filterbar');
-  const ms=TR.strikeMoveStats(moveEventsFor(shown));
-  bar.innerHTML='<button class="chip drill" onclick="openSheet(\'moves\')">Moves '+
-    `<b>${esc(movesSummary(ms))}</b></button>`+
-    '<span class="count" id="count">'+
-    `${shown.length}${shown.length!==events.length?' of '+events.length:''} events</span>`;
-  // label is raw sheet data, so it goes through esc() like every other value
-  // written as markup — the ✕ is the only markup this chip is allowed to carry.
-  const add=(label,fn)=>{const b=document.createElement('button');b.className='chip on';
-    b.innerHTML=esc(label)+' <span class="x">✕</span>';b.onclick=fn;bar.appendChild(b)};
-  F.comp.forEach(v=>add(v,()=>{F.comp.delete(v);render()}));
-  F.div.forEach(v=>add(v,()=>{F.div.delete(v);render()}));
-  F.year.forEach(v=>add(v,()=>{F.year.delete(v);render()}));
-  F.type.forEach(v=>add(v,()=>{F.type.delete(v);render()}));
-  F.team.forEach(v=>add(v,()=>{F.team.delete(v);render()}));
-  F.name.forEach(v=>add(v,()=>{F.name.delete(v);render()}));
-  F.move.forEach(v=>add(v,()=>{F.move.delete(v);render()}));
-  if(F.q) add('“'+F.q+'”',()=>{F.q='';render()});
-  if(!n){ // quick-access type chips when nothing is filtered
-    ['Try','Turnover','Penalty Attack','Penalty Defence'].forEach(t=>{
-      if(!events.some(e=>e.type===t))return;
-      const b=document.createElement('button');b.className='chip';b.textContent=t;
-      b.onclick=()=>{F.type.add(t);render()};bar.appendChild(b)});
+  if(pl){
+    bar.innerHTML=`<button class="chip pl" data-plleave="1">
+        ${esc(pl.name)} <span class="x">✕</span></button>`+
+      `<span class="count">${shown.length} events</span>`+
+      (plMissing?`<span class="count warn">${plMissing} no longer in the data</span>`:'');
+    $('fCount').hidden=true;
+  }else{
+    $('fCount').hidden=!n; $('fCount').textContent=n;
+    $('count').textContent=`${shown.length}${shown.length!==events.length?' of '+events.length:''} events`;
+    const ms=TR.strikeMoveStats(moveEventsFor(shown));
+    bar.innerHTML='<button class="chip drill" onclick="openSheet(\'moves\')">Moves '+
+      `<b>${esc(movesSummary(ms))}</b></button>`+
+      '<span class="count" id="count">'+
+      `${shown.length}${shown.length!==events.length?' of '+events.length:''} events</span>`;
+    // label is raw sheet data, so it goes through esc() like every other value
+    // written as markup — the ✕ is the only markup this chip is allowed to carry.
+    const add=(label,fn)=>{const b=document.createElement('button');b.className='chip on';
+      b.innerHTML=esc(label)+' <span class="x">✕</span>';b.onclick=fn;bar.appendChild(b)};
+    F.comp.forEach(v=>add(v,()=>{F.comp.delete(v);render()}));
+    F.div.forEach(v=>add(v,()=>{F.div.delete(v);render()}));
+    F.year.forEach(v=>add(v,()=>{F.year.delete(v);render()}));
+    F.type.forEach(v=>add(v,()=>{F.type.delete(v);render()}));
+    F.team.forEach(v=>add(v,()=>{F.team.delete(v);render()}));
+    F.name.forEach(v=>add(v,()=>{F.name.delete(v);render()}));
+    F.move.forEach(v=>add(v,()=>{F.move.delete(v);render()}));
+    if(F.q) add('“'+F.q+'”',()=>{F.q='';render()});
+    if(!n){ // quick-access type chips when nothing is filtered
+      ['Try','Turnover','Penalty Attack','Penalty Defence'].forEach(t=>{
+        if(!events.some(e=>e.type===t))return;
+        const b=document.createElement('button');b.className='chip';b.textContent=t;
+        b.onclick=()=>{F.type.add(t);render()};bar.appendChild(b)});
+    }
   }
 
   const L=$('list');
@@ -861,8 +891,16 @@ $('list').addEventListener('click',ev=>{
 $('sheetBody').addEventListener('click',ev=>{
   const chip=within(ev,ev.target.closest('.chip[data-k]'));
   if(chip){tog(chip.dataset.k,chip.dataset.v,chip);return}
+  const p=within(ev,ev.target.closest('[data-pl]'));
+  if(p){playPlaylist(p.dataset.pl);return}
   const g=within(ev,ev.target.closest('[data-game]'));
   if(g)pickGame(g.dataset.game);
+});
+
+// The filter bar is rebuilt wholesale by render(), so its controls are
+// delegated too rather than re-bound on every paint.
+$('filterbar').addEventListener('click',ev=>{
+  if(within(ev,ev.target.closest('[data-plleave]'))) playPlaylist(null);
 });
 
 // Escape is the keyboard's version of tapping the scrim, so it has to work
@@ -1011,9 +1049,9 @@ function openSheet(kind){
   if(kind==='filter')fCat=null;               // always open at the category list
   $('sheetTitle').className=''; $('sheetTitle').onclick=null; backCtl($('sheetTitle'),false);
   $('sheetTitle').textContent = kind==='game'?'Choose a game':kind==='moves'?'Strike moves'
-    :kind==='window'?'Playback window':'Filter events';
+    :kind==='window'?'Playback window':kind==='playlists'?'Playlists':'Filter events';
   $('sheetBody').innerHTML = kind==='game'?gameSheet():kind==='moves'?movesSheetBody()
-    :kind==='window'?windowSheet():filterSheet();
+    :kind==='window'?windowSheet():kind==='playlists'?playlistSheet():filterSheet();
   // The window sheet is painted rather than rendered with its state inlined, so
   // that a keystroke can update the chips without re-rendering the field.
   if(kind==='window')paintWin();
@@ -1038,6 +1076,24 @@ function closeSheet(){$('scrim').classList.remove('open');$('sheet').classList.r
   // whatever was focused inside the sheet — now a display:none subtree — which
   // strands a screen reader there and makes the next Tab restart from the top.
   else if($('sheet').contains(document.activeElement)) document.activeElement.blur();
+}
+
+// null leaves the playlist and returns to the ordinary filtered view.
+function playPlaylist(id){
+  plOpen=id; activeId=null; closeSheet(); render();
+  if(id) LS.set('lastplaylist',id);
+}
+
+function playlistSheet(){
+  if(!PL.length)return '<div class="empty">No playlists yet.<br>'+
+    'Tap ☑ in the filter bar to start collecting events into one.</div>';
+  return '<div class="glist">'+PL.map(p=>{
+    const r=TR.playlists.resolve(p.refs,rows);
+    const gone=r.missing?` · ${r.missing} missing`:'';
+    return `<button class="${p.id===plOpen?'on':''}" data-pl="${esc(p.id)}">
+      ${esc(p.name)}
+      <span class="gs">${r.events.length} events${gone}${p.note?' · '+esc(p.note):''}</span>
+    </button>`}).join('')+'</div>';
 }
 
 function gameSheet(){
