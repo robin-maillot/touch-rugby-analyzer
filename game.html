@@ -498,6 +498,13 @@ let plEdit=null, plDraft=null;
 // functions, because the load path closes a sheet before that far down the
 // script has run and a `let` in its own dead zone throws.
 let sheetOpener=null;
+// Which kind of sheet is currently open, or null when none is. The load path
+// finishes after the sheet may already be on screen, and needs to know whether
+// what it just changed is what the user is looking at.
+let sheetKind=null;
+// Set while a reorder-screen commit is in flight, so a second exit (Escape on
+// top of a scrim tap) can't fire a second save for the same leave.
+let plSaving=false;
 
 // Twelve chips is about two phone rows — past that, scanning for one costs
 // more than typing three letters of it.
@@ -531,6 +538,15 @@ function toSecs(t){const p=String(t||'').trim().split(':').map(Number);
     if(lr.ok){LS.set('list',lr); buildMeta(lr.sheets); if(picked) paintGame();}
     try{ PL=await TR.playlists.load(TR.secret()); plLoadError=null; }
     catch(e){ PL=[]; plLoadError=e.message; }
+    // A warm cache runs restore() — and so applyHash() — above, before this
+    // resolves. A #playlists deep link has therefore already rendered plList()
+    // against PL=[] and plLoadError=null: the "No playlists yet" empty state,
+    // which is simply wrong for the repeat visitor who is the normal phone
+    // case. Nothing else repaints it (the second restore() returns early on
+    // `picked`), so the sheet is repainted here if it is still the one open.
+    // Covers the failed-load message too, which otherwise never reaches an
+    // already-open sheet either.
+    if(sheetKind==='playlists'&&!plEdit){ $('sheetBody').innerHTML=playlistSheet(); paintPlHead(); }
   }catch(e){ if(!ca) $('empty').textContent='Could not load events: '+e.message; }
   restore();
   if(!picked) openSheet('game');
@@ -636,6 +652,11 @@ function shortLabel(g){
 function render(keepWindow){
   if(!keepWindow) renderLimit=200;
   const q=F.q.toLowerCase();
+  // A playlist deleted on another device is gone from PL the next time it
+  // loads, and plOpen would then name nothing: no chip and so no ✕ is drawn,
+  // while paintCollect() keeps the ☑ hidden on the strength of plOpen — a
+  // state with nothing on screen able to leave it. Drop the stale id instead.
+  if(plOpen&&!plById(plOpen)) plOpen=null;
   const pl=plOpen?plById(plOpen):null;
   if(pl){
     // A playlist is already a hand-picked set. Letting the filters narrow it
@@ -1206,6 +1227,7 @@ function openSheet(kind){
   const o=document.activeElement;
   if(!$('sheet').contains(o)) sheetOpener = o && o!==document.body && o.focus ? o : null;
   $('scrim').classList.add('open'); $('sheet').classList.add('open');
+  sheetKind=kind;
   if(kind==='filter')fCat=null;               // always open at the category list
   if(kind==='playlists'){plEdit=null;plDraft=null;}   // never reopen stranded in a playlist
   $('sheetTitle').className=''; $('sheetTitle').onclick=null; backCtl($('sheetTitle'),false);
@@ -1222,7 +1244,19 @@ function openSheet(kind){
   // phone user taps Filter. Last, because a display:none element refuses focus.
   $('sheet').focus();
 }
-function closeSheet(){$('scrim').classList.remove('open');$('sheet').classList.remove('open');
+function closeSheet(){
+  // Spec §7: the reorder screen's edits are written with one save on LEAVING
+  // the screen — and Done, the scrim and Escape are all leaves, not just the
+  // ‹ Playlists title. They all arrive here, and used to close over the draft
+  // without a save and without a word, which is worst of all under Done: the
+  // button sits right beside the back control and its label means "commit".
+  //
+  // Routed through plSaveAndBack so all four exits are one behaviour: it awaits
+  // the write before clearing plEdit/plDraft, so a rejection leaves the user on
+  // the edit screen with the draft intact and the sheet still open, and the
+  // close only happens on the success it returns to.
+  if(plEdit){ plSaveAndBack().then(()=>{ if(!plEdit) closeSheet() }); return }
+  $('scrim').classList.remove('open');$('sheet').classList.remove('open');sheetKind=null;
   // Back to whatever opened it — by Done, by scrim, by Escape, or as the side
   // effect of picking a game — so the next Tab carries on from there instead of
   // restarting at the top of the page. Skipped if a render has since replaced it.
@@ -1272,16 +1306,19 @@ function plList(){
 }
 
 function plDrill(id){
-  plEdit=id;
+  // The lookup is guarded the way plCommit guards its own: an id that has since
+  // vanished (deleted on another device, then PL reloaded under a sheet still
+  // showing the old row) must land back on the list, not throw.
+  const p=id?plById(id):null;
+  plEdit=p?id:null;
   // A draft, so five moves are one write on leaving rather than five.
-  if(id){const p=plById(id); plDraft={name:p.name,note:p.note,refs:p.refs.slice()};}
-  else plDraft=null;
+  plDraft=p?{name:p.name,note:p.note||'',refs:p.refs.slice()}:null;
   $('sheetBody').innerHTML=playlistSheet();
   paintPlHead();
   // Same reason as the filter sheet's drill(): the ⠿ button just tapped is
   // gone after the innerHTML swap, so focus falls to <body> and the next Tab
   // would restart from the top of the page. Going in: the name field.
-  const t = id ? $('sheetBody').querySelector('#plName') : $('sheet');
+  const t = plEdit ? $('sheetBody').querySelector('#plName') : $('sheet');
   (t||$('sheet')).focus();
 }
 
@@ -1335,35 +1372,47 @@ function plMove(n,d){ plDraft.refs=TR.playlists.reorder(plLive(),n,n+d);
 function plDrop(n){ const r=plLive(); r.splice(n,1); plDraft.refs=r;
   $('sheetBody').innerHTML=playlistSheet(); }
 
-// Mirrors plDelete()'s shape: await the server call BEFORE clearing plEdit/
-// plDraft or repainting, so a rejection (offline, or the lock path in
-// Code.gs) leaves the user on the edit screen with their draft untouched
-// instead of silently losing the rename/reorder/removals they just made.
-// d is captured up front, before anything can destroy the #plName input
-// that oninput keeps it in sync with, so a retry after a failure still saves
-// the name the user actually typed.
-async function plSaveAndBack(){
+// The save half of leaving the reorder screen, on its own so that every exit
+// shares it — the ‹ Playlists title, Done, the scrim and Escape (the last three
+// via closeSheet). Resolves true when the draft has been dealt with and may be
+// cleared, false when it must be kept and the user left where they are.
+//
+// Mirrors plDelete()'s shape: await the server call BEFORE the caller clears
+// plEdit/plDraft or repaints, so a rejection (offline, or the lock path in
+// Code.gs) leaves the draft untouched instead of silently losing the
+// rename/reorder/removals just made. d is captured up front, before anything
+// can destroy the #plName input that oninput keeps it in sync with, so a retry
+// after a failure still saves the name the user actually typed.
+async function plCommit(){
   const id=plEdit, d=plDraft;
   const p=plById(id);
-  const back=()=>{
-    plEdit=null; plDraft=null;
-    $('sheetBody').innerHTML=playlistSheet(); paintPlHead();
-    // Same reason as the filter sheet's drill(): the row being left is gone
-    // after the innerHTML swap, so focus must be placed explicitly or it
-    // falls to <body> and the next Tab restarts from the top of the page.
-    const t=[...$('sheetBody').querySelectorAll('[data-pledit]')]
-      .find(el=>el.dataset.pledit===id);
-    (t||$('sheet')).focus();
-  };
-  if(!p||!d){ back(); return; }
-  if(d.name===p.name&&d.note===p.note&&d.refs.join('\n')===p.refs.join('\n')){ back(); return; }
-  if(!d.name.trim()){ alert('A playlist needs a name.'); return; }
+  if(!p||!d) return true;
+  if(d.name===p.name&&(d.note||'')===(p.note||'')&&d.refs.join('\n')===p.refs.join('\n')) return true;
+  if(!d.name.trim()){ alert('A playlist needs a name.'); return false; }
+  plSaving=true;
   try{
     await TR.playlists.save(TR.secret(),{id,name:d.name.trim(),note:d.note,refs:d.refs});
     PL=await TR.playlists.load(TR.secret());
-  }catch(e){ alert(e.message); return; }
-  back();
+  }catch(e){ alert(e.message); return false; }
+  finally{ plSaving=false; }
   if(plOpen===id) render();
+  return true;
+}
+
+async function plSaveAndBack(){
+  // One leave, one save: a scrim tap and an Escape can land within a round
+  // trip of each other, and the second must not write the draft again.
+  if(plSaving) return;
+  const id=plEdit;
+  if(!await plCommit()) return;
+  plEdit=null; plDraft=null;
+  $('sheetBody').innerHTML=playlistSheet(); paintPlHead();
+  // Same reason as the filter sheet's drill(): the row being left is gone
+  // after the innerHTML swap, so focus must be placed explicitly or it
+  // falls to <body> and the next Tab restarts from the top of the page.
+  const t=[...$('sheetBody').querySelectorAll('[data-pledit]')]
+    .find(el=>el.dataset.pledit===id);
+  (t||$('sheet')).focus();
 }
 
 async function plDelete(){
