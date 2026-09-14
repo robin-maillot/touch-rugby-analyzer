@@ -45,47 +45,44 @@ TR.playlists.reorder = (refs, from, to) => {
   return out;
 };
 
-// Fetch the caller's saved playlists from the backend. Uses a GET-style parameter
-// to avoid CORS preflight. Returns an array of playlists; throws if the request fails.
-TR.playlists.load = async () => {
-  const resp = await fetch(`${TR.APPS_SCRIPT_URL}?action=playlists&secret=${encodeURIComponent(TR.secret())}`);
-  const res = await resp.json();
-  if (!res.ok) throw new Error(res.error || 'Load failed');
-  return res.playlists;
-};
-
-// Save a playlist (create a new one, or update an existing one identified by id).
-// The playlist object should have {name, note, refs} for a new entry, or
-// {id, name, note, refs} for an update. Returns the uuid; throws if the request fails.
-TR.playlists.save = async (playlist) => {
-  const resp = await fetch(TR.APPS_SCRIPT_URL, {
+// ── Network ───────────────────────────────────────────────────
+// Apps Script web apps reject a CORS preflight, so every POST here sends
+// text/plain — the same shape every other write in the app uses.
+//
+// resp.json() throws SyntaxError on a non-JSON body (e.g. the HTML error page
+// Apps Script returns for a broken deployment or a permissions problem — a
+// live risk while this backend is mid-redeploy). Guarding it means a caller
+// always gets a showable Error, either the server's own message or a note
+// that the response wasn't valid, never a raw parser exception.
+TR.playlists._post = async (body) => {
+  const r = await fetch(TR.APPS_SCRIPT_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify({
-      secret: TR.secret(),
-      action: 'save_playlist',
-      id: playlist.id,
-      name: playlist.name,
-      note: playlist.note,
-      refs: playlist.refs
-    })
+    body: JSON.stringify(body),
   });
-  const res = await resp.json();
-  if (!res.ok) throw new Error(res.error || 'Save failed');
-  return res.id;
+  let j;
+  try { j = await r.json(); } catch (e) { throw new Error('The server did not return a valid response.'); }
+  if (!j.ok) throw new Error(j.error || 'Playlist save failed.');
+  return j;
 };
 
-// Delete a playlist by its id. Throws if the request fails or the playlist does not exist.
-TR.playlists.remove = async (id) => {
-  const resp = await fetch(TR.APPS_SCRIPT_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify({
-      secret: TR.secret(),
-      action: 'delete_playlist',
-      id: id
-    })
-  });
-  const res = await resp.json();
-  if (!res.ok) throw new Error(res.error || 'Remove failed');
+// Fetch the caller's saved playlists from the backend. Uses a GET-style
+// parameter to avoid a CORS preflight.
+TR.playlists.load = async (secret) => {
+  const r = await fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(secret)}&action=playlists`);
+  let j;
+  try { j = await r.json(); } catch (e) { throw new Error('The server did not return a valid response.'); }
+  if (!j.ok) throw new Error(j.error || 'Could not load playlists.');
+  return j.playlists || [];
 };
+
+// pl: {id?, name, note, refs}. Omitting id creates; passing one the caller
+// doesn't own is refused server-side. Resolves to {id} so callers can
+// destructure the id of a freshly-created playlist straight off the result.
+TR.playlists.save = (secret, pl) => TR.playlists._post({
+  secret, action: 'save_playlist',
+  id: pl.id || '', name: pl.name, note: pl.note || '', refs: pl.refs || [],
+});
+
+TR.playlists.remove = (secret, id) =>
+  TR.playlists._post({ secret, action: 'delete_playlist', id }).then(() => undefined);
