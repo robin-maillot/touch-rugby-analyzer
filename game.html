@@ -868,12 +868,20 @@ $('sheetBody').addEventListener('click',ev=>{
   if(g)pickGame(g.dataset.game);
 });
 
+// Escape is the keyboard's version of tapping the scrim, so it has to work
+// wherever focus happens to be — a playing YouTube iframe on the stage can hold
+// it outside the sheet, and a listener on the sheet would leave that user with
+// no way out at all. Hence the document, guarded on the sheet being open.
+document.addEventListener('keydown',ev=>{
+  if(ev.key!=='Escape' || !$('sheet').classList.contains('open'))return;
+  ev.preventDefault(); closeSheet();
+});
+
 // The sheet is modal, so Tab must not wander behind the scrim into a page the
-// pointer can't reach, and Escape has to offer the keyboard the way out that
-// tapping the scrim offers the thumb. Bound once, to the container, because
-// everything inside it is rebuilt from sheet data on every render.
+// pointer can't reach. Bound once, to the container, because everything inside
+// it is rebuilt from sheet data on every render. Escape is deliberately not
+// handled here: one listener owns it, so it can't close the sheet twice.
 $('sheet').addEventListener('keydown',ev=>{
-  if(ev.key==='Escape'){ev.preventDefault(); closeSheet(); return}
   if(ev.key!=='Tab')return;
   const f=sheetFocusables(); if(!f.length){ev.preventDefault(); return}
   const i=f.indexOf(document.activeElement);
@@ -987,9 +995,9 @@ function movesSheetBody(){
 // (`sheetOpener`, declared with the rest of the state above), keep Tab inside
 // it, and hand focus back on the way out.
 //
-// Queried afresh on every keypress rather than cached: the body is rebuilt by
-// innerHTML on every drill and every keystroke in the narrow box, and the title
-// is only a focusable back control some of the time.
+// Queried afresh on every keypress rather than cached: drilling rebuilds the
+// body, narrowing swaps the chips inside it, and the title is only a focusable
+// back control some of the time — so the set changes under any cache.
 function sheetFocusables(){
   return [...$('sheet').querySelectorAll('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])')]
     .filter(el=>!el.disabled && el.offsetParent!==null);
@@ -1021,7 +1029,12 @@ function closeSheet(){$('scrim').classList.remove('open');$('sheet').classList.r
   // Back to whatever opened it — by Done, by scrim, by Escape, or as the side
   // effect of picking a game — so the next Tab carries on from there instead of
   // restarting at the top of the page. Skipped if a render has since replaced it.
-  const o=sheetOpener; sheetOpener=null;
+  // render() rebuilds #filterbar wholesale, so the Moves chip that opened the
+  // moves sheet is routinely a detached node by the time it closes — a
+  // background fetch resolving while the sheet is open is enough. The freshly
+  // rendered chip is the same control, so hand focus to that instead.
+  let o=sheetOpener; sheetOpener=null;
+  if(o && !o.isConnected && o.classList.contains('drill')) o=$('filterbar').querySelector('.chip.drill');
   if(o && o.isConnected) o.focus();
   // #filter and #moves hash restores open the sheet with no opener at all, so
   // there's nothing to hand back to above. Left alone, activeElement stays on
