@@ -160,6 +160,10 @@
      blue "filter applied" accent. */
   .chip.drill{border-color:#7dd3fc}
   .chip.drill b{color:#7dd3fc;font-weight:700;margin-left:3px}
+  /* Playing a playlist: its own accent (the --review purple), distinct from
+     both the blue "filter applied" chips and the drill chip's cyan. */
+  .chip.pl{background:#231733;border-color:var(--review);color:#e9d5ff}
+  .count.warn{color:var(--turn)}
   .count{color:var(--dim);font-size:.7rem;flex-shrink:0;padding-left:2px;white-space:nowrap}
   .collapse-btn{flex-shrink:0;background:none;border:none;border-left:1px solid var(--border);
     color:var(--dim);font-size:.9rem;line-height:1;cursor:pointer;
@@ -183,14 +187,57 @@
     padding:2px 6px;border-radius:4px;flex-shrink:0}
   .team{font-size:.66rem;color:var(--text);flex-shrink:0;font-weight:600;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:11ch}
-  /* All-games mode only: names which match a card belongs to. Its own class,
-     not a reuse of .team (which is bold/light and sized for a team name) —
-     this wants the dimmer, wider treatment a match label needs. */
+  /* Names which match a card belongs to — shown in all-games mode, and while a
+     playlist plays, because a playlist spans matches whatever game is picked
+     (the headline case is eleven backdoors from four different matches, which
+     would otherwise be eleven indistinguishable rows under one match's header).
+     Its own class, not a reuse of .team (which is bold/light and sized for a
+     team name) — this wants the dimmer, wider treatment a match label needs. */
   .gmatch{font-size:.66rem;color:var(--dim);flex-shrink:0;white-space:nowrap;
     overflow:hidden;text-overflow:ellipsis;max-width:18ch}
   .move{background:var(--surface2);border:1px solid var(--border);border-radius:4px;
     padding:1px 5px;font-size:.62rem;color:#7dd3fc;flex-shrink:0}
   .empty{color:var(--dim);text-align:center;padding:36px 20px;font-size:.82rem}
+
+  /* ── Collect mode ──────────────────────────────────────────── */
+  /* The tick replaces the timestamp column rather than adding one, so a row
+     gains no width here and loses none when not collecting. */
+  body.collect .ev{grid-template-columns:34px 1fr}
+  body.collect .list{padding-bottom:64px}
+  .tick{width:22px;height:22px;border-radius:6px;border:2px solid var(--border);
+    display:flex;align-items:center;justify-content:center;font-size:.75rem;color:transparent}
+  .ev.sel .tick{background:var(--review);border-color:var(--review);color:#fff}
+  .ev.sel{background:var(--surface2);border-left-color:var(--review)!important}
+  .tray{display:none;background:#231733;border:1px solid var(--review);border-radius:8px;
+    padding:8px 11px;margin:6px 8px 0;font-size:.72rem;color:#e9d5ff;line-height:1.45}
+  body.collect .tray{display:block}
+  .tray b{color:#fff}
+  /* Pinned, so the count and the commit never scroll away from the rows being
+     ticked. */
+  .actionbar{position:fixed;left:0;right:0;bottom:0;z-index:30;display:none;
+    align-items:center;gap:8px;padding:9px 10px;background:var(--surface);
+    border-top:1px solid var(--review);padding-bottom:calc(9px + var(--safe-b))}
+  body.collect .actionbar{display:flex}
+  /* Collapsing the list hides only #list — .tray and .actionbar are its
+     siblings, not its children — so without this the tray text and the pinned
+     bar float over rows that aren't there. Hiding them, rather than exiting
+     collect mode, is what lets a collection survive a collapse: ⌄ sits right
+     beside ☑ in the same header row, and one mis-tap used to destroy an
+     unbounded amount of collecting with no warning. Declared AFTER the
+     body.collect rules above because it matches at the same specificity and
+     has to win on source order. */
+  body.list-collapsed .tray,
+  body.list-collapsed .actionbar{display:none}
+  /* .icon-btn declares its own `display`, and an author rule always beats the
+     UA stylesheet's [hidden]{display:none} regardless of specificity — so
+     without this, setting collectBtn.hidden (or filterBtn.hidden) would
+     silently do nothing while a playlist plays. */
+  #collectBtn[hidden],#filterBtn[hidden]{display:none}
+  .actionbar .n{font-size:.75rem;font-weight:700;color:var(--review);white-space:nowrap}
+  .actionbar .sp{flex:1 1 auto}
+  .ab-go{background:var(--review);border:1px solid var(--review);color:#fff;border-radius:8px;
+    height:36px;padding:0 13px;font-size:.78rem;font-weight:600;cursor:pointer}
+  .ab-go:disabled{opacity:.35}
 
   /* ── Bottom sheet ──────────────────────────────────────────── */
   .scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:40;display:none}
@@ -252,6 +299,26 @@
   .mv-rate.thin{color:var(--dim);font-weight:400}
   .mv-empty{color:var(--dim);text-align:center;padding:20px 0;font-size:.8rem}
 
+  /* ── Playlists sheet ───────────────────────────────────────── */
+  .pl-row{display:grid;grid-template-columns:1fr 44px;gap:6px;align-items:stretch;margin-bottom:6px}
+  .pl-row button{background:var(--surface2);border:1px solid var(--border);color:var(--text);
+    border-radius:8px;font-size:.8rem;cursor:pointer;font-family:inherit}
+  .pl-go{text-align:left;padding:10px 12px}
+  .pl-go .gs{display:block;font-size:.66rem;color:var(--dim);margin-top:2px}
+  .pl-row.on .pl-go{border-color:var(--review);background:#231733}
+  .pl-edit{font-size:1rem;color:var(--dim)}
+  /* Reorder rows: the label takes the timestamp's column too, ↑↓✕ take the
+     right. Scoped to .sheet-body so it also outranks `body.collect .ev`, which
+     would otherwise impose the two-column tick layout on a reorder row when the
+     playlists sheet is opened mid-collection. */
+  .sheet-body .ev.ord{grid-template-columns:1fr 70px;cursor:default}
+  .ord-btns{display:flex;gap:3px;justify-self:end}
+  .ord-btns button{width:30px;height:30px;border-radius:7px;background:var(--surface2);
+    border:1px solid var(--border);color:var(--dim);font-size:.75rem;cursor:pointer}
+  .pl-danger{width:100%;height:38px;margin-top:12px;background:var(--surface2);
+    border:1px solid var(--pdef);color:#fca5a5;border-radius:8px;font-size:.78rem;
+    cursor:pointer;font-family:inherit}
+
   /* ── Landscape: video beside the list ───────────────────────
      No min-width gate. A 667px-wide phone in landscape used to fall through to
      the portrait column, where a full-width 16:9 video is 375px tall — the whole
@@ -294,6 +361,7 @@
 </style>
 <script src="js/config.js"></script>
 <script src="js/utils.js"></script>
+<script src="js/playlists.js"></script>
 <script src="js/events.js"></script>
 <script src="js/strike_moves.js"></script>
 <script src="js/player.js"></script>
@@ -306,6 +374,7 @@
     <span class="g-name" id="gName">Choose a game</span>
     <span class="g-sub"  id="gSub">tap to pick</span>
   </button>
+  <button class="icon-btn" onclick="openSheet('playlists')" title="Playlists">📋</button>
   <button class="icon-btn" id="filterBtn" onclick="openSheet('filter')">Filter <span class="badge" id="fCount" hidden>0</span></button>
 </div>
 
@@ -344,13 +413,24 @@
     <div class="filterbar" id="filterbar">
       <span class="count" id="count">—</span>
     </div>
+    <button class="icon-btn" id="collectBtn" onclick="toggleCollect()"
+            title="Collect events into a playlist">☑</button>
     <button class="collapse-btn" id="collapseBtn" onclick="toggleList()"
             aria-expanded="true" title="Collapse the event list">⌄</button>
   </div>
+  <div class="tray" id="tray"></div>
   <div class="list" id="list">
     <div class="empty" id="empty">Loading…</div>
   </div>
  </div>
+</div>
+
+<div class="actionbar">
+  <span class="n" id="selN">0 selected</span>
+  <button class="icon-btn" id="selAll" onclick="selectAll()">All</button>
+  <span class="sp"></span>
+  <button class="icon-btn" onclick="toggleCollect()">Cancel</button>
+  <button class="ab-go" id="abGo" onclick="openSheet('addto')" disabled>Add to…</button>
 </div>
 
 <div class="scrim" id="scrim" onclick="closeSheet()"></div>
@@ -387,6 +467,27 @@ const WIN_BEFORE_CHIPS=[3,5,10,15], WIN_AFTER_CHIPS=[2,3,5,10];
 let F={type:new Set(),team:new Set(),name:new Set(),move:new Set(),
        comp:new Set(),div:new Set(),year:new Set(),q:''};
 
+// Saved playlists for this account, and which one is currently playing.
+// A playlist is a fixed, ordered list of hand-picked events; while one plays it
+// IS the list, so the filters are suppressed rather than allowed to narrow it.
+let PL=[], plOpen=null, plMissing=0;
+// Set when TR.playlists.load rejects, so the empty-state message can tell "you
+// have none" from "the server was unreachable" — PL=[] alone can't, since a
+// genuine zero-playlists account leaves PL looking exactly the same.
+let plLoadError=null;
+
+function plById(id){return PL.find(p=>p.id===id)||null}
+
+// Collect mode: tick events into a pending selection, then commit the lot to a
+// playlist in one write.
+//
+// sel holds full TR.evId refs, never list indices. An index is a position in
+// `shown`, and `shown` is rebuilt by every filter change — so an index-based
+// selection would silently repoint at different events the moment the user
+// filtered, which is exactly the motion this mode exists to support.
+let collecting=false;
+const sel=new Set();
+
 // Categories ordered by how much they narrow: Competition/Division/Year first
 // (the ones that matter most once you're browsing across every game), then the
 // original per-event groups. One table so the category list and the option
@@ -403,11 +504,22 @@ const FCATS=[
 // null at the category list, otherwise the FCATS key being browsed. Reset on
 // every open, so the sheet never reopens stranded inside a category.
 let fCat=null, fNarrow='';
+// null at the playlist list, otherwise the playlist id being edited. Reset on
+// every open, for the same reason fCat is: reopening the sheet must never
+// strand the user inside a playlist.
+let plEdit=null, plDraft=null;
 // What had focus when the sheet was opened, so closeSheet can hand it back.
 // Declared up here with the rest of the state rather than beside the sheet
 // functions, because the load path closes a sheet before that far down the
 // script has run and a `let` in its own dead zone throws.
 let sheetOpener=null;
+// Which kind of sheet is currently open, or null when none is. The load path
+// finishes after the sheet may already be on screen, and needs to know whether
+// what it just changed is what the user is looking at.
+let sheetKind=null;
+// Set while a reorder-screen commit is in flight, so a second exit (Escape on
+// top of a scrim tap) can't fire a second save for the same leave.
+let plSaving=false;
 
 // Twelve chips is about two phone rows — past that, scanning for one costs
 // more than typing three letters of it.
@@ -439,6 +551,17 @@ function toSecs(t){const p=String(t||'').trim().split(':').map(Number);
     const [ar,lr]=await Promise.all([a.json(),l.json()]);
     if(ar.ok){LS.set('all',ar); ingest(ar.rows);}
     if(lr.ok){LS.set('list',lr); buildMeta(lr.sheets); if(picked) paintGame();}
+    try{ PL=await TR.playlists.load(TR.secret()); plLoadError=null; }
+    catch(e){ PL=[]; plLoadError=e.message; }
+    // A warm cache runs restore() — and so applyHash() — above, before this
+    // resolves. A #playlists deep link has therefore already rendered plList()
+    // against PL=[] and plLoadError=null: the "No playlists yet" empty state,
+    // which is simply wrong for the repeat visitor who is the normal phone
+    // case. Nothing else repaints it (the second restore() returns early on
+    // `picked`), so the sheet is repainted here if it is still the one open.
+    // Covers the failed-load message too, which otherwise never reaches an
+    // already-open sheet either.
+    if(sheetKind==='playlists'&&!plEdit){ $('sheetBody').innerHTML=playlistSheet(); paintPlHead(); }
   }catch(e){ if(!ca) $('empty').textContent='Could not load events: '+e.message; }
   restore();
   if(!picked) openSheet('game');
@@ -465,8 +588,12 @@ function restore(){
 function applyHash(){
   const h=(location.hash||'').replace('#','');
   if(h==='cinema' && !document.body.classList.contains('cinema')) toggleCinema();
-  if(h==='filter' && picked) openSheet('filter');
+  // Not while a playlist plays: spec §8 suppresses the filters then, and the
+  // Filter button is hidden for the same reason — the hash is the only other
+  // way in.
+  if(h==='filter' && picked && !plOpen) openSheet('filter');
   if(h==='moves'  && picked) openSheet('moves');
+  if(h==='playlists' && picked) openSheet('playlists');
 }
 window.addEventListener('hashchange',applyHash);
 
@@ -503,7 +630,7 @@ function ingest(r){
 function pickGame(k){ game=k; picked=true; renderLimit=200;
   F={type:new Set(),team:new Set(),name:new Set(),move:new Set(),
      comp:new Set(),div:new Set(),year:new Set(),q:''};
-  activeId=null; closeSheet(); LS.set('lastgame',k);
+  activeId=null; plOpen=null; closeSheet(); LS.set('lastgame',k);
   // Video first: paintGame() renders the list, and a throw in there used to
   // leave the page with no video and no error to show for it.
   if(k) loadVideo(k); else clearVideo();
@@ -543,7 +670,20 @@ function shortLabel(g){
 function render(keepWindow){
   if(!keepWindow) renderLimit=200;
   const q=F.q.toLowerCase();
-  shown=events.filter(e=>
+  // A playlist deleted on another device is gone from PL the next time it
+  // loads, and plOpen would then name nothing: no chip and so no ✕ is drawn,
+  // while paintCollect() keeps the ☑ hidden on the strength of plOpen — a
+  // state with nothing on screen able to leave it. Drop the stale id instead.
+  if(plOpen&&!plById(plOpen)) plOpen=null;
+  const pl=plOpen?plById(plOpen):null;
+  if(pl){
+    // A playlist is already a hand-picked set. Letting the filters narrow it
+    // further would leave the chips describing a list that isn't on screen.
+    const r=TR.playlists.resolve(pl.refs,rows);
+    shown=r.events; plMissing=r.missing;
+  }else{
+    plMissing=0;
+    shown=events.filter(e=>
     (!F.comp.size||F.comp.has(e.comp)) &&
     (!F.div.size||F.div.has(e.div)) &&
     (!F.year.size||F.year.has(e.year)) &&
@@ -552,49 +692,75 @@ function render(keepWindow){
     (!F.name.size||F.name.has(e.name)) &&
     (!F.move.size||F.move.has(e.move)) &&
     (!q||(e.name+' '+e.type+' '+e.team+' '+e.comment+' '+e.move).toLowerCase().includes(q)));
-
+  }
   const n=F.comp.size+F.div.size+F.year.size+F.type.size+F.team.size+F.name.size+F.move.size+(F.q?1:0);
-  $('fCount').hidden=!n; $('fCount').textContent=n;
-  $('count').textContent=`${shown.length}${shown.length!==events.length?' of '+events.length:''} events`;
 
   const bar=$('filterbar');
-  const ms=TR.strikeMoveStats(moveEventsFor(shown));
-  bar.innerHTML='<button class="chip drill" onclick="openSheet(\'moves\')">Moves '+
-    `<b>${esc(movesSummary(ms))}</b></button>`+
-    '<span class="count" id="count">'+
-    `${shown.length}${shown.length!==events.length?' of '+events.length:''} events</span>`;
-  // label is raw sheet data, so it goes through esc() like every other value
-  // written as markup — the ✕ is the only markup this chip is allowed to carry.
-  const add=(label,fn)=>{const b=document.createElement('button');b.className='chip on';
-    b.innerHTML=esc(label)+' <span class="x">✕</span>';b.onclick=fn;bar.appendChild(b)};
-  F.comp.forEach(v=>add(v,()=>{F.comp.delete(v);render()}));
-  F.div.forEach(v=>add(v,()=>{F.div.delete(v);render()}));
-  F.year.forEach(v=>add(v,()=>{F.year.delete(v);render()}));
-  F.type.forEach(v=>add(v,()=>{F.type.delete(v);render()}));
-  F.team.forEach(v=>add(v,()=>{F.team.delete(v);render()}));
-  F.name.forEach(v=>add(v,()=>{F.name.delete(v);render()}));
-  F.move.forEach(v=>add(v,()=>{F.move.delete(v);render()}));
-  if(F.q) add('“'+F.q+'”',()=>{F.q='';render()});
-  if(!n){ // quick-access type chips when nothing is filtered
-    ['Try','Turnover','Penalty Attack','Penalty Defence'].forEach(t=>{
-      if(!events.some(e=>e.type===t))return;
-      const b=document.createElement('button');b.className='chip';b.textContent=t;
-      b.onclick=()=>{F.type.add(t);render()};bar.appendChild(b)});
+  if(pl){
+    bar.innerHTML=`<button class="chip pl" data-plleave="1">
+        ${esc(pl.name)} <span class="x">✕</span></button>`+
+      `<span class="count">${shown.length} events</span>`+
+      (plMissing?`<span class="count warn">${plMissing} no longer in the data</span>`:'');
+    $('fCount').hidden=true;
+    // Spec §8: the filters are suppressed while a playlist plays, so the way
+    // into them goes too. Leaving the button live let a user tap Filter, watch
+    // a chip light up, see nothing happen (render() ignores F here), and then
+    // find the list collapsed to a filter they never knowingly applied the
+    // moment they tapped the playlist's ✕.
+    $('filterBtn').hidden=true;
+  }else{
+    $('filterBtn').hidden=false;
+    $('fCount').hidden=!n; $('fCount').textContent=n;
+    // No #count write here: bar.innerHTML two lines down rebuilds the whole bar,
+    // including a fresh #count span with this same text baked in — so this
+    // assignment was always overwritten immediately. Worse, right after a
+    // playlist closes, the bar still holds the playlist's #count-less markup at
+    // this point, so $('count') is null and the assignment threw, aborting
+    // render() before the filter bar, event list, or scrub marks were rebuilt.
+    const ms=TR.strikeMoveStats(moveEventsFor(shown));
+    bar.innerHTML='<button class="chip drill" onclick="openSheet(\'moves\')">Moves '+
+      `<b>${esc(movesSummary(ms))}</b></button>`+
+      '<span class="count" id="count">'+
+      `${shown.length}${shown.length!==events.length?' of '+events.length:''} events</span>`;
+    // label is raw sheet data, so it goes through esc() like every other value
+    // written as markup — the ✕ is the only markup this chip is allowed to carry.
+    const add=(label,fn)=>{const b=document.createElement('button');b.className='chip on';
+      b.innerHTML=esc(label)+' <span class="x">✕</span>';b.onclick=fn;bar.appendChild(b)};
+    F.comp.forEach(v=>add(v,()=>{F.comp.delete(v);render()}));
+    F.div.forEach(v=>add(v,()=>{F.div.delete(v);render()}));
+    F.year.forEach(v=>add(v,()=>{F.year.delete(v);render()}));
+    F.type.forEach(v=>add(v,()=>{F.type.delete(v);render()}));
+    F.team.forEach(v=>add(v,()=>{F.team.delete(v);render()}));
+    F.name.forEach(v=>add(v,()=>{F.name.delete(v);render()}));
+    F.move.forEach(v=>add(v,()=>{F.move.delete(v);render()}));
+    if(F.q) add('“'+F.q+'”',()=>{F.q='';render()});
+    if(!n){ // quick-access type chips when nothing is filtered
+      ['Try','Turnover','Penalty Attack','Penalty Defence'].forEach(t=>{
+        if(!events.some(e=>e.type===t))return;
+        const b=document.createElement('button');b.className='chip';b.textContent=t;
+        b.onclick=()=>{F.type.add(t);render()};bar.appendChild(b)});
+    }
   }
 
   const L=$('list');
   if(!shown.length){L.innerHTML='<div class="empty">'+
-    (events.length?'No events match these filters.':'Pick a game to see its events.')+'</div>';return}
+    // A playlist's empty state can't be about filters — they're suppressed
+    // while one plays — so it says which of the two things happened instead.
+    (pl?(plMissing?'None of this playlist’s events are still in the data.'
+                  :'This playlist has no events in it yet.')
+       :events.length?'No events match these filters.':'Pick a game to see its events.')+'</div>';
+    paintCollect();return}
   const windowed=shown.slice(0,renderLimit);
   L.innerHTML=windowed.map(e=>{
-    const id=evId(e);
-    return `<div class="ev${activeId===id?' active':''}" style="border-left-color:${col(e.type)}"
+    const id=TR.evId(e);
+    const cls=collecting?(sel.has(id)?' sel':''):(activeId===id?' active':'');
+    return `<div class="ev${cls}" style="border-left-color:${col(e.type)}"
       data-t="${e.time}" data-id="${esc(id)}" data-game="${esc(String(e.game))}">
-      <span class="ev-t">${esc(shortT(e.timeStr))}</span>
+      ${collecting?'<span class="tick">✓</span>':`<span class="ev-t">${esc(shortT(e.timeStr))}</span>`}
       <span class="ev-main">
         <span class="ev-name">${esc(e.name||e.type)}</span>
         <span class="ev-meta"><span class="tag" style="background:${col(e.type)}22;color:${col(e.type)}">${esc(e.type)}</span>
-        ${game===''?`<span class="gmatch">${esc(shortLabel(e.game))}</span>`:''}
+        ${(game===''||pl)?`<span class="gmatch">${esc(shortLabel(e.game))}</span>`:''}
         ${e.team?`<span class="team">${esc(e.team)}</span>`:''}
         ${e.move?`<span class="move">${esc(e.move)}</span>`:''}
         ${e.comment?esc(e.comment.slice(0,32)):''}</span>
@@ -604,17 +770,58 @@ function render(keepWindow){
     L.innerHTML+=`<button class="icon-btn" style="width:100%;height:40px;margin:4px 0 0"
       onclick="loadMore()">Load more (${shown.length-renderLimit} more)</button>`;
   }
+  paintCollect();
   paintMarks();
 }
 function loadMore(){renderLimit+=200;render(true)}
+
+// The ☑ is hidden while a playlist plays: a playing playlist is not a pool to
+// collect from, and editing one has a home already in the reorder screen.
+function paintCollect(){
+  $('collectBtn').hidden = !!plOpen;
+  $('selN').textContent=`${sel.size} selected`;
+  $('selAll').textContent=`All ${shown.length}`;
+  $('abGo').disabled=!sel.size;
+  $('abGo').textContent=sel.size?`Add ${sel.size} to…`:'Add to…';
+  $('tray').innerHTML=sel.size
+    ? `<b>${sel.size} collected.</b> Change the filter and keep tapping — the collection is kept until you save it.`
+    : 'Tap events to collect them. Filters can change while you do.';
+}
+
+function toggleCollect(){
+  collecting=!collecting;
+  document.body.classList.toggle('collect',collecting);
+  $('collectBtn').classList.toggle('on',collecting);
+  if(!collecting) sel.clear();
+  render();
+}
+
+// Collect mode's UI (the tick marks in #list, the #tray strip, the fixed
+// .actionbar) only makes sense over the ordinary filtered list. Opening a
+// playlist and entering cinema each swap that surface for something collect
+// can't render over, so every path that does one of those must force collect
+// mode off first — call this rather than adding another one-off
+// `if(collecting) toggleCollect()` at the next such call site.
+//
+// Collapsing the list is NOT one of them: it hides the rows but keeps the page
+// underneath, so it hides the tray and the bar in CSS and keeps the selection.
+function exitCollect(){
+  if(!collecting) return;
+  collecting=false;
+  document.body.classList.remove('collect');
+  $('collectBtn').classList.remove('on');
+  sel.clear();
+}
+
+// Named tickRow, not tick: `tick` is already the video-progress interval
+// handle declared with the rest of the player state above, and the two are
+// both top-level in a non-module script.
+function tickRow(id){ sel.has(id)?sel.delete(id):sel.add(id); render(true); }
+function selectAll(){ shown.forEach(e=>sel.add(TR.evId(e))); render(true); }
 // Function declarations, not const arrows: restoring a cached game calls
 // render() from the top-level IIFE before a const at this point in the file has
 // been evaluated, and a TDZ ReferenceError there silently leaves the list on
 // "Loading…". Only reproduces when localStorage already holds a cached game.
-// Index-free on purpose: an id built from the render position went stale the
-// moment a filter changed the list, losing the active row and breaking
-// prev/next. Game + time + type + name is unique in practice.
-function evId(e){return e.game+'#'+e.time+'#'+e.type+'#'+e.name}
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;')}
 // Game clocks run well under an hour, so the leading 0: / 00: is noise on a phone.
 function shortT(t){return String(t||'').replace(/^0?0:/,'')}
@@ -670,7 +877,10 @@ function playEvent(gameSecs,id,evGame){
   else if(!player){pendingSeek=t;loadVideo(evGame)}
   else if(!ready){pendingSeek=t}
   else{player.seek(t);player.play()}
-  const ev=events.find(x=>x.game===evGame&&x.time===gameSecs);
+  // rows, not events: events is only the picked game's rows (paintGame), but a
+  // playing playlist can jump to any game regardless of what's picked, so the
+  // lookup has to search everything or the pill goes stale on a cross-game tap.
+  const ev=rows.find(x=>x.game===evGame&&x.time===gameSecs);
   if(ev){$('nowPill').innerHTML=
     `<span class="tag" style="background:${col(ev.type)}22;color:${col(ev.type)}">${esc(ev.type)}</span>`+
     `<b>${esc(ev.name||'')}</b> <span style="color:var(--dim)">${esc(ev.team||'')}</span>`;
@@ -683,11 +893,11 @@ function playEvent(gameSecs,id,evGame){
 // filtering to tries is the next try, which is the point of filtering.
 function stepEvent(d){
   if(!shown.length)return;
-  let i=shown.findIndex(e=>evId(e)===activeId);
+  let i=shown.findIndex(e=>TR.evId(e)===activeId);
   i = i<0 ? (d>0?0:shown.length-1) : i+d;
   if(i<0||i>=shown.length)return;                 // stop at the ends, don't wrap
   const e=shown[i];
-  playEvent(e.time,evId(e),e.game);
+  playEvent(e.time,TR.evId(e),e.game);
 }
 
 function toggleLoop(){
@@ -785,6 +995,11 @@ function applyZoom(){
 // not a shareable view of a moment.
 function toggleList(){
   const on = document.body.classList.toggle('list-collapsed');
+  // Deliberately NOT exitCollect(): ⌄ sits beside ☑ in the same header row, and
+  // discarding an unbounded collection on a mis-tap is a far worse outcome than
+  // a stray tray. The tray and the pinned bar are hidden in CSS under
+  // body.list-collapsed instead, so the selection simply survives the collapse
+  // and comes back with it.
   const b  = $('collapseBtn');
   b.textContent = on ? '⌃' : '⌄';
   b.title = on ? 'Show the event list' : 'Collapse the event list';
@@ -792,7 +1007,11 @@ function toggleList(){
   LS.set('listCollapsed', on);
 }
 
-function toggleCinema(){const on=document.body.classList.toggle('cinema');
+function toggleCinema(){
+  // The pinned action bar would float over a full-screen video with no list
+  // behind it.
+  if(collecting){ exitCollect(); render(); }
+  const on=document.body.classList.toggle('cinema');
   $('bCine').textContent=on?'⤡':'⤢';
   history.replaceState(null,'',on?'#cinema':location.pathname+location.search)}
 
@@ -858,14 +1077,49 @@ const within=(ev,el)=>el&&ev.currentTarget.contains(el)?el:null;
 
 $('list').addEventListener('click',ev=>{
   const row=within(ev,ev.target.closest('.ev')); if(!row)return;
-  playEvent(+row.dataset.t,row.dataset.id,row.dataset.game);
+  // Same row, same data — collect mode only changes what a tap means.
+  if(collecting) tickRow(row.dataset.id);
+  else playEvent(+row.dataset.t,row.dataset.id,row.dataset.game);
 });
 
 $('sheetBody').addEventListener('click',ev=>{
   const chip=within(ev,ev.target.closest('.chip[data-k]'));
   if(chip){tog(chip.dataset.k,chip.dataset.v,chip);return}
+  // data-pledit is checked before data-pl even though .pl-edit and .pl-go
+  // are siblings under .pl-row (never nested), so closest() can't actually
+  // confuse the two today. Checking the more specific hook first is just
+  // cheap insurance in case the markup is ever restructured so the row
+  // itself carries the play hook.
+  const pe=within(ev,ev.target.closest('[data-pledit]'));
+  if(pe){plDrill(pe.dataset.pledit);return}
+  const up=within(ev,ev.target.closest('[data-plup]'));
+  if(up){plMove(+up.dataset.plup,-1);return}
+  const dn=within(ev,ev.target.closest('[data-pldown]'));
+  if(dn){plMove(+dn.dataset.pldown,1);return}
+  const dr=within(ev,ev.target.closest('[data-pldrop]'));
+  if(dr){plDrop(+dr.dataset.pldrop);return}
+  const p=within(ev,ev.target.closest('[data-pl]'));
+  if(p){playPlaylist(p.dataset.pl);return}
   const g=within(ev,ev.target.closest('[data-game]'));
-  if(g)pickGame(g.dataset.game);
+  if(g){pickGame(g.dataset.game);return}
+  const a=within(ev,ev.target.closest('[data-addto]'));
+  if(a){addTo(a.dataset.addto);return}
+  if(within(ev,ev.target.closest('[data-addnew]'))){addTo(null);return}
+  if(within(ev,ev.target.closest('[data-plnew]'))){plNew();return}
+});
+
+// Enter in either naming field commits it, so the on-screen keyboard's own
+// return key finishes the job rather than needing a reach back to the button.
+$('sheetBody').addEventListener('keydown',ev=>{
+  if(ev.key!=='Enter')return;
+  if(ev.target.id==='newPlName'){ev.preventDefault();addTo(null)}
+  else if(ev.target.id==='plNewName'){ev.preventDefault();plNew()}
+});
+
+// The filter bar is rebuilt wholesale by render(), so its controls are
+// delegated too rather than re-bound on every paint.
+$('filterbar').addEventListener('click',ev=>{
+  if(within(ev,ev.target.closest('[data-plleave]'))) playPlaylist(null);
 });
 
 // Escape is the keyboard's version of tapping the scrim, so it has to work
@@ -1011,21 +1265,36 @@ function openSheet(kind){
   const o=document.activeElement;
   if(!$('sheet').contains(o)) sheetOpener = o && o!==document.body && o.focus ? o : null;
   $('scrim').classList.add('open'); $('sheet').classList.add('open');
+  sheetKind=kind;
   if(kind==='filter')fCat=null;               // always open at the category list
+  if(kind==='playlists'){plEdit=null;plDraft=null;}   // never reopen stranded in a playlist
   $('sheetTitle').className=''; $('sheetTitle').onclick=null; backCtl($('sheetTitle'),false);
   $('sheetTitle').textContent = kind==='game'?'Choose a game':kind==='moves'?'Strike moves'
-    :kind==='window'?'Playback window':'Filter events';
+    :kind==='window'?'Playback window':kind==='playlists'?'Playlists':kind==='addto'?'Add to playlist':'Filter events';
   $('sheetBody').innerHTML = kind==='game'?gameSheet():kind==='moves'?movesSheetBody()
-    :kind==='window'?windowSheet():filterSheet();
+    :kind==='window'?windowSheet():kind==='playlists'?playlistSheet():kind==='addto'?addToBody():filterSheet();
   // The window sheet is painted rather than rendered with its state inlined, so
   // that a keystroke can update the chips without re-rendering the field.
   if(kind==='window')paintWin();
+  if(kind==='playlists')paintPlHead();
   // The container, never the first control: the filter sheet leads with a search
   // box, and focusing that would throw up the on-screen keyboard every time a
   // phone user taps Filter. Last, because a display:none element refuses focus.
   $('sheet').focus();
 }
-function closeSheet(){$('scrim').classList.remove('open');$('sheet').classList.remove('open');
+function closeSheet(){
+  // Spec §7: the reorder screen's edits are written with one save on LEAVING
+  // the screen — and Done, the scrim and Escape are all leaves, not just the
+  // ‹ Playlists title. They all arrive here, and used to close over the draft
+  // without a save and without a word, which is worst of all under Done: the
+  // button sits right beside the back control and its label means "commit".
+  //
+  // Routed through plSaveAndBack so all four exits are one behaviour: it awaits
+  // the write before clearing plEdit/plDraft, so a rejection leaves the user on
+  // the edit screen with the draft intact and the sheet still open, and the
+  // close only happens on the success it returns to.
+  if(plEdit){ plSaveAndBack().then(()=>{ if(!plEdit) closeSheet() }); return }
+  $('scrim').classList.remove('open');$('sheet').classList.remove('open');sheetKind=null;
   // Back to whatever opened it — by Done, by scrim, by Escape, or as the side
   // effect of picking a game — so the next Tab carries on from there instead of
   // restarting at the top of the page. Skipped if a render has since replaced it.
@@ -1041,6 +1310,271 @@ function closeSheet(){$('scrim').classList.remove('open');$('sheet').classList.r
   // whatever was focused inside the sheet — now a display:none subtree — which
   // strands a screen reader there and makes the next Tab restart from the top.
   else if($('sheet').contains(document.activeElement)) document.activeElement.blur();
+}
+
+// null leaves the playlist and returns to the ordinary filtered view.
+function playPlaylist(id){
+  // A playing playlist is not a pool to collect from, and editing one already
+  // has a home in the reorder screen — see exitCollect().
+  exitCollect();
+  plOpen=id; activeId=null; closeSheet(); render();
+}
+
+function playlistSheet(){ return plEdit?plEditBody():plList(); }
+
+// Spec §7 level 1: the rows, then ＋ New playlist. Creating one only from
+// inside the collect flow's "Add to…" sheet meant an empty playlist could not
+// be started at all — you had to have something to put in it first.
+function plNewBody(){
+  return `<div class="grp"><h3>New playlist</h3>
+    <input class="srch" id="plNewName" placeholder="Name it…">
+    <button class="icon-btn" style="width:100%;height:38px" data-plnew="1">
+      ＋ New playlist</button></div>`;
+}
+
+function plList(){
+  // Both a real empty account and a failed fetch leave PL===[], but they need
+  // different messages: telling someone with saved playlists to go make one
+  // just because the server didn't answer would send them looking for a
+  // feature they already used.
+  if(plLoadError)return '<div class="empty">Couldn\'t load playlists: '+
+    esc(plLoadError)+'</div>';
+  if(!PL.length)return '<div class="empty">No playlists yet.<br>'+
+    'Tap ☑ in the filter bar to start collecting events into one.</div>'+plNewBody();
+  return '<div class="pl-list">'+PL.map(p=>{
+    const r=TR.playlists.resolve(p.refs,rows);
+    const gone=r.missing?` · ${r.missing} missing`:'';
+    return `<div class="pl-row${p.id===plOpen?' on':''}">
+      <button class="pl-go" data-pl="${esc(p.id)}">
+        ${esc(p.name)}
+        <span class="gs">${r.events.length} events${gone}${p.note?' · '+esc(p.note):''}</span>
+      </button>
+      <button class="pl-edit" data-pledit="${esc(p.id)}" title="Edit">⠿</button>
+    </div>`}).join('')+'</div>'+plNewBody();
+}
+
+// A brand-new playlist is empty, so it goes straight to the screen that can
+// name it, note it and (once events are added) order it. plDrill's own guard
+// covers the case where the reload can't see what was just created — another
+// device deleting it in between, or a stale read — by landing on the list.
+async function plNew(){
+  // Same guard as plCommit: a create is the one non-idempotent playlist write,
+  // and two taps within one round trip must not produce two playlists. Set
+  // before the await, cleared in finally so a rejection can't strand it.
+  if(plSaving) return;
+  const name=($('plNewName').value||'').trim();
+  if(!name){ $('plNewName').focus(); return; }
+  let id;
+  plSaving=true;
+  try{
+    ({id}=await TR.playlists.save(TR.secret(),{name,note:'',refs:[]}));
+    PL=await TR.playlists.load(TR.secret());
+  }catch(e){ alert(e.message); return; }
+  finally{ plSaving=false; }
+  plDrill(id);
+}
+
+function plDrill(id){
+  // The lookup is guarded the way plCommit guards its own: an id that has since
+  // vanished (deleted on another device, then PL reloaded under a sheet still
+  // showing the old row) must land back on the list, not throw.
+  const p=id?plById(id):null;
+  plEdit=p?id:null;
+  // A draft, so five moves are one write on leaving rather than five.
+  plDraft=p?{name:p.name,note:p.note||'',refs:p.refs.slice()}:null;
+  $('sheetBody').innerHTML=playlistSheet();
+  paintPlHead();
+  // Same reason as the filter sheet's drill(): the ⠿ button just tapped is
+  // gone after the innerHTML swap, so focus falls to <body> and the next Tab
+  // would restart from the top of the page. Going in: the name field.
+  const t = plEdit ? $('sheetBody').querySelector('#plName') : $('sheet');
+  (t||$('sheet')).focus();
+}
+
+// The title doubles as the back control when drilled in, the same shape the
+// filter sheet uses — and through the same backCtl(), so it is reachable by
+// keyboard and announced, rather than being a bare h2 nothing can focus.
+function paintPlHead(){
+  const h=$('sheetTitle');
+  h.innerHTML=plEdit?'‹ Playlists':'Playlists';
+  h.className=plEdit?'back':'';
+  h.onclick=plEdit?()=>plSaveAndBack():null;
+  backCtl(h,!!plEdit,'Back to playlists, saving changes',()=>plSaveAndBack());
+}
+
+function plEditBody(){
+  const r=TR.playlists.resolve(plDraft.refs,rows);
+  // The note is optional, and is the only place in the app that can set it —
+  // without a field here the Note column, its header constant, its request
+  // field and the list row's render branch were all carrying a value that was
+  // permanently ''.
+  return `<input class="srch" id="plName" value="${esc(plDraft.name)}"
+      placeholder="Playlist name" oninput="plDraft.name=this.value">`+
+    `<input class="srch" id="plNote" value="${esc(plDraft.note||'')}"
+      placeholder="Note (optional)" oninput="plDraft.note=this.value">`+
+    (r.missing?`<p class="win-note">${r.missing} event${r.missing===1?'':'s'} in this playlist `+
+      `${r.missing===1?'is':'are'} no longer in the data.</p>`:'')+
+    (r.events.length?r.events.map((e,n)=>
+      // No ⠿ handle here: it was never wired to anything, and the same glyph
+      // already means "drill in" one screen up — one symbol with two meanings,
+      // one of them a lie. The ↑↓ buttons do the reordering, deliberately (a
+      // 52px row in a scrolling sheet is a poor drag target).
+      `<div class="ev ord" style="border-left-color:${col(e.type)}">
+        <span class="ev-main">
+          <span class="ev-name">${esc(e.name||e.type)}</span>
+          <span class="ev-meta">
+            <span class="tag" style="background:${col(e.type)}22;color:${col(e.type)}">${esc(e.type)}</span>
+            <span class="gmatch">${esc(shortLabel(e.game))}</span>
+            ${e.team?`<span class="team">${esc(e.team)}</span>`:''}
+          </span>
+        </span>
+        <span class="ord-btns">
+          <button data-plup="${n}" ${n===0?'disabled':''}>↑</button>
+          <button data-pldown="${n}" ${n===r.events.length-1?'disabled':''}>↓</button>
+          <button data-pldrop="${n}">✕</button>
+        </span>
+      </div>`).join('')
+      :'<div class="empty">Nothing in here yet.</div>')+
+    `<button class="pl-danger" onclick="plDelete()">Delete this playlist</button>`;
+}
+
+// Missing refs are dropped from the draft the moment it is edited, so the
+// buttons' indices and the stored refs can't drift apart. A playlist you edit
+// is a playlist you've seen, so silently shedding a ref you were just told
+// about is honest.
+function plLive(){
+  return TR.playlists.resolve(plDraft.refs,rows).events.map(TR.evId);
+}
+// Reordering rebuilds the whole body, so the ↑ / ↓ / ✕ just pressed is a
+// destroyed node and focus falls to <body> — the next Tab then restarts at the
+// top of the page. plDrill, plSaveAndBack, plDelete and drill all place focus
+// explicitly for this reason; this is the screen where the control is pressed
+// repeatedly, so it is the one where losing focus hurts most.
+//
+// The button is found by comparing dataset values rather than by interpolating
+// an index into a selector — the convention this file settled on in 00b52a3 /
+// 6892607 — and the attribute for each key is a fixed literal here, never built
+// from data either.
+function plOrdFocus(key,n){
+  const q={plup:'[data-plup]',pldown:'[data-pldown]',pldrop:'[data-pldrop]'}[key];
+  const t=[...$('sheetBody').querySelectorAll(q)].find(el=>el.dataset[key]===String(n));
+  // At either end the matching button renders disabled and refuses focus, so
+  // the sheet container takes it instead — plDrill's own no-target fallback.
+  ((t&&!t.disabled)?t:$('sheet')).focus();
+}
+function plMove(n,d){ plDraft.refs=TR.playlists.reorder(plLive(),n,n+d);
+  $('sheetBody').innerHTML=playlistSheet();
+  // Follow the row: the same control, at the index the event moved to.
+  plOrdFocus(d<0?'plup':'pldown',n+d); }
+function plDrop(n){ const r=plLive(); r.splice(n,1); plDraft.refs=r;
+  $('sheetBody').innerHTML=playlistSheet();
+  // That row is gone, so ✕ at the same index is now the row that took its
+  // place — or, when the last row was removed, the one before it.
+  plOrdFocus('pldrop',Math.min(n,r.length-1)); }
+
+// The save half of leaving the reorder screen, on its own so that every exit
+// shares it — the ‹ Playlists title, Done, the scrim and Escape (the last three
+// via closeSheet). Resolves true when the draft has been dealt with and may be
+// cleared, false when it must be kept and the user left where they are.
+//
+// Mirrors plDelete()'s shape: await the server call BEFORE the caller clears
+// plEdit/plDraft or repaints, so a rejection (offline, or the lock path in
+// Code.gs) leaves the draft untouched instead of silently losing the
+// rename/reorder/removals just made. d is captured up front, before anything
+// can destroy the #plName input that oninput keeps it in sync with, so a retry
+// after a failure still saves the name the user actually typed.
+async function plCommit(){
+  const id=plEdit, d=plDraft;
+  const p=plById(id);
+  if(!p||!d) return true;
+  if(d.name===p.name&&(d.note||'')===(p.note||'')&&d.refs.join('\n')===p.refs.join('\n')) return true;
+  if(!d.name.trim()){ alert('A playlist needs a name.'); return false; }
+  plSaving=true;
+  try{
+    await TR.playlists.save(TR.secret(),{id,name:d.name.trim(),note:d.note,refs:d.refs});
+    PL=await TR.playlists.load(TR.secret());
+  }catch(e){ alert(e.message); return false; }
+  finally{ plSaving=false; }
+  if(plOpen===id) render();
+  return true;
+}
+
+async function plSaveAndBack(){
+  // One leave, one save: a scrim tap and an Escape can land within a round
+  // trip of each other, and the second must not write the draft again.
+  if(plSaving) return;
+  const id=plEdit;
+  if(!await plCommit()) return;
+  plEdit=null; plDraft=null;
+  $('sheetBody').innerHTML=playlistSheet(); paintPlHead();
+  // Same reason as the filter sheet's drill(): the row being left is gone
+  // after the innerHTML swap, so focus must be placed explicitly or it
+  // falls to <body> and the next Tab restarts from the top of the page.
+  const t=[...$('sheetBody').querySelectorAll('[data-pledit]')]
+    .find(el=>el.dataset.pledit===id);
+  (t||$('sheet')).focus();
+}
+
+async function plDelete(){
+  const id=plEdit;
+  if(!confirm('Delete this playlist? This cannot be undone.')) return;
+  try{
+    await TR.playlists.remove(TR.secret(),id);
+    PL=await TR.playlists.load(TR.secret());
+  }catch(e){ alert(e.message); return; }
+  // Never leave the page playing a list that no longer exists.
+  if(plOpen===id){ plOpen=null; render(); }
+  plEdit=null; plDraft=null;
+  $('sheetBody').innerHTML=playlistSheet(); paintPlHead();
+  // Same reason as plDrill/plSaveAndBack: the "Delete this playlist" button
+  // that had focus is gone after the innerHTML swap, so focus falls to
+  // <body> and the next Tab restarts from the top of the page. Unlike those
+  // paths there's no row to return to — id itself no longer exists — so
+  // land on the sheet container, same as plDrill's own no-target case.
+  $('sheet').focus();
+}
+
+// Committing is one write, however many filters the collection was gathered
+// across.
+// A naming field rather than prompt(): prompt() appears nowhere in this
+// codebase, and iOS standalone web apps handle it badly.
+function addToBody(){
+  return `<p class="win-note">Adding <b>${sel.size}</b> event${sel.size===1?'':'s'}.</p>`+
+    '<div class="glist">'+PL.map(p=>`<button data-addto="${esc(p.id)}">
+        ${esc(p.name)}<span class="gs">${p.refs.length} events</span></button>`).join('')+
+    '</div>'+
+    `<div class="grp"><h3>New playlist</h3>
+      <input class="srch" id="newPlName" placeholder="Name it…">
+      <button class="icon-btn" style="width:100%;height:38px" data-addnew="1">
+        ＋ Create and add ${sel.size}</button></div>`;
+}
+
+async function addTo(id){
+  const pl=id?plById(id):null;
+  const name=pl?pl.name:($('newPlName').value||'').trim();
+  if(!pl&&!name){ $('newPlName').focus(); return; }
+  // Existing refs first, new ones appended in the order they were ticked — the
+  // reorder screen is where an order is chosen deliberately. The Set drops a
+  // re-tick of something already in the playlist.
+  const refs=[...new Set([...(pl?pl.refs:[]),...sel])];
+  if(refs.length>TR.playlists.MAX_REFS){
+    alert(`A playlist holds at most ${TR.playlists.MAX_REFS} events.`); return;
+  }
+  const n=sel.size;
+  try{
+    await TR.playlists.save(TR.secret(),{id:pl?pl.id:'',name,note:pl?pl.note:'',refs});
+    PL=await TR.playlists.load(TR.secret());
+  }catch(e){ alert(e.message); return; }
+  // exitCollect(), not toggleCollect(): the collection has just been committed,
+  // so leaving the mode is the intent — toggle only happened to do that because
+  // collect was necessarily on. Every other path that leaves the mode says so
+  // the same way.
+  closeSheet(); exitCollect(); render();
+  // #count only exists in the non-playlist filter bar (render()'s `if(pl)`
+  // branch never creates it), so don't assume it survived whatever render()
+  // just did — a save can legitimately land with no such element on screen.
+  const countEl=$('count');
+  if(countEl) countEl.textContent=`Added ${n} to ${name}`;
 }
 
 function gameSheet(){
@@ -1068,6 +1602,12 @@ function catShown(c){return catVals(c).length>1||F[c.key].size>0}
 
 function filterSheet(){
   if(!picked)return '<div class="empty">Pick a game first.</div>';
+  // Spec §8: the filters are suppressed while a playlist plays, and the Filter
+  // button is hidden to say so. This is the sheet refusing to be a second way
+  // in — a chip tapped here would mutate F and light up while render() ignores
+  // F entirely, then collapse the list to that filter on leaving the playlist.
+  if(plOpen)return '<div class="empty">Filters are off while a playlist is playing.<br>'+
+    'Tap the playlist’s ✕ to go back to the filtered list.</div>';
   return fCat?catOpts(fCat):catList();
 }
 
@@ -1091,18 +1631,22 @@ function paintFilterHead(){
   h.innerHTML=c?`‹ ${c.title}`:'Filter events';
   h.className=c?'back':'';
   h.onclick=c?()=>drill(null):null;
-  backCtl(h,!!c,c?.title);
+  backCtl(h,!!c,c?`Back to all filters, ${c.title}`:'',()=>drill(null));
 }
 
 // A heading is not a control, so while it doubles as one it has to say so and
 // answer the keyboard too — tapping it is otherwise the only way out of a
 // category. Shared with openSheet, which resets the head for the other kinds.
-function backCtl(h,on,title){
+//
+// label and onBack are passed because two sheets drill now: the filter sheet's
+// categories and the playlists sheet's reorder screen. A screen reader must
+// hear which one it is leaving, and Enter must do the same thing the tap does.
+function backCtl(h,on,label,onBack){
   if(!on){['role','tabindex','aria-label'].forEach(a=>h.removeAttribute(a)); h.onkeydown=null; return}
   h.setAttribute('role','button');
   h.setAttribute('tabindex','0');
-  h.setAttribute('aria-label',title?`Back to all filters, ${title}`:'Back to all filters');
-  h.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault(); drill(null)}};
+  h.setAttribute('aria-label',label||'Back');
+  h.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault(); onBack()}};
 }
 
 function drill(key){

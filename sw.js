@@ -5,7 +5,7 @@
 // YouTube) always go straight to the network so live data is never stale.
 //
 // Bump CACHE_VERSION whenever shell assets change to force a refresh.
-const CACHE_VERSION = 'trl-shell-v22';
+const CACHE_VERSION = 'trl-shell-v23';
 
 const SHELL = [
   'index.html',
@@ -27,6 +27,7 @@ const SHELL = [
   'js/player.js',
   'js/consistency.js',
   'js/strike_moves.js',
+  'js/playlists.js',
   'manifest.json',
   'favicon-16x16.png',
   'favicon-32x32.png',

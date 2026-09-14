@@ -68,3 +68,16 @@ TR.optMatch = (value, needle) => {
   if (!needle) return true;
   return String(value == null ? '' : value).toLowerCase().includes(String(needle).toLowerCase());
 };
+
+// Identity for an event row. Index-free on purpose: an id built from the render
+// position goes stale the moment a filter changes the list.
+TR.evId = (e) => `${e.game}#${e.time}#${e.type}#${e.name}`;
+
+// The part of an id that survives an Event Editor rename. Playlists store the
+// full id (readable in the sheet) but resolve on this, so correcting a Name
+// can't orphan a saved entry. Safe to split on '#': sheet tab names and event
+// names never contain one.
+TR.evKey = (e) => `${e.game}#${e.time}`;
+
+// The same key, taken from a stored ref string rather than a live event.
+TR.refKey = (ref) => String(ref == null ? '' : ref).split('#').slice(0, 2).join('#');

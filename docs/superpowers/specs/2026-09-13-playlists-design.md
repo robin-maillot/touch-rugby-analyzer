@@ -206,14 +206,17 @@ must never strand the user inside a playlist.
 Tapping the row plays it. A ⠿ at the row's end drills in. Below them, **＋ New
 playlist**.
 
-**Level 2 — reorder.** Name field, then a row per event with a ⠿ handle and ↑↓
+**Level 2 — reorder.** Name and note fields, then a row per event with ↑↓
 buttons, an ✕ to remove, and **Delete playlist** at the foot. Changes are
-batched and written with one `save_playlist` on leaving the screen, so dragging
-five rows is one request rather than five.
+batched and written with one `save_playlist` on leaving the screen — by the back
+control, by **Done**, by the scrim or by Escape, all four the same way — so
+reordering five rows is one request rather than five.
 
-↑↓ buttons ship alongside the handle rather than drag alone: a 52px row on a
-phone inside a scrolling sheet is a poor drag target, and the buttons are also
-what makes the reordering testable without synthesising pointer events.
+**↑↓ buttons rather than drag.** A 52px row on a phone inside a scrolling sheet
+is a poor drag target, and buttons are also what makes the reordering testable
+without synthesising pointer events. No ⠿ handle appears on these rows: ⠿ means
+"drill in" one level up, and the same glyph meaning "drag me" here — while not
+being draggable — was a worse lie than no affordance at all.
 
 ### 8. Playing a playlist
 
@@ -230,11 +233,22 @@ hand-picked set; leaving the filter chips live would let them narrow it while
 claiming to describe the whole list. The filter bar shows the playlist chip and
 the count, nothing else, until the ✕ returns to the normal filtered view.
 
-`pickGame()` already resets `F` and `activeId`; it additionally clears `plOpen`
-and exits collect mode, so picking a game from the picker always lands in the
-ordinary filtered view. Deleting the playlist that is currently playing clears
-`plOpen` the same way, rather than leaving the page playing a list that no
-longer exists.
+The Filter button is hidden while a playlist plays, not merely ignored. Leaving
+it tappable let a user set a filter that appeared to do nothing, then saw it
+apply the moment they left the playlist — a filter they never knowingly chose.
+
+`pickGame()` already resets `F` and `activeId`; it additionally clears `plOpen`,
+so picking a game from the picker always lands in the ordinary filtered view.
+**It deliberately does not exit collect mode** — changing game is exactly when a
+cross-game collection has to survive, and `sel` holding refs rather than indices
+is what makes that safe. Collect exits only where the mode cannot be hosted at
+all: cinema. Collapsing the list hides the collect UI in CSS and keeps the
+selection.
+
+Deleting the playlist that is currently playing clears `plOpen`, rather than
+leaving the page playing a list that no longer exists — as does a reload of `PL`
+that no longer contains it, so a playlist deleted on another device cannot
+strand the page with a hidden collect toggle and no control to clear it.
 
 `#playlists` joins `#cinema` / `#filter` / `#moves` in `applyHash()`, so the
 sheet is linkable and survives a reload like the others.
