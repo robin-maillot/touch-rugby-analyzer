@@ -1421,131 +1421,52 @@ test('quote immediately after a closing quote is dropped', () => assert.deepEqua
 // leaves every other test passing, so pin it directly.
 //
 // The plain unquoted case alone no longer catches that mutation now that
-// TR.fromCSV has a loose-parse fallback: without the `\r` check, the two
-// rows merge into one ragged strict result, but the loose parse of this
-// exact (quote-free) text happens to recover the very same two rows, so the
-// fallback silently repairs the mutation and the test would still pass. A
-// quoted comma defeats that: it makes the loose parse itself ragged (it
-// splits the comma inside the quotes into an extra field), so there's no
-// fallback to hide behind — only a strict parser that ends a row on a bare
-// CR gets this right.
-test('bare CR ends a row',             () => assert.deepEqual(rt('a,b\rc,d'), [['a','b'],['c','d']]));
-test('bare CR ends a row (quoted comma defeats the loose-parse safety net)',
-  () => assert.deepEqual(rt('a,"b,c"\rd,e'), [['a','b,c'],['d','e']]));
-
-// An unterminated quoted field means the text isn't RFC 4180 at all — see the
-// big comment on the `if (quoted)` branch in TR.fromCSV. This is the case that
-// regressed: a legacy (pre-toCSV) export, written with no quoting, whose first
-// comment happens to begin with a literal ". Before the fallback existed, the
-// quote-aware parser consumed rows 2 and 3 into row 1's comment and reported
-// success loading 1 row out of 3 — silent, total data loss for a real file a
-// coach already has on disk.
-console.log('TR.fromCSV — legacy fallback (Finding 1)');
-test('unterminated quote falls back to legacy quote-blind parsing', () => {
-  // Shaped exactly like a pre-toCSV export: comments written raw, no quoting,
-  // and the first one merely begins with a stray ".
-  const legacy = [
-    '0:10,Try,Scoop,"great try,Team A',
-    '0:20,Turnover,6th Touch,ok,Team B',
-    '0:30,Try,Scoop,great again,Team A',
-  ].join('\r\n');
-  const rows = rt(legacy);
-  // Every row survives — the legacy importer's bounded damage (one mangled
-  // field), not the RFC 4180 parser's unbounded one (the whole file into
-  // field 4 of row 1).
-  assert.equal(rows.length, 3);
-  // The stray quote is literal in quote-blind mode, and the comma inside the
-  // comment still splits the field in two — exactly what the old
-  // split(',')/split('\n') importer produced for this file.
-  assert.deepEqual(rows[0], ['0:10', 'Try', 'Scoop', '"great try', 'Team A']);
-  assert.deepEqual(rows[1], ['0:20', 'Turnover', '6th Touch', 'ok', 'Team B']);
-  assert.deepEqual(rows[2], ['0:30', 'Try', 'Scoop', 'great again', 'Team A']);
+// ── TR.fromCSV is a PURE strict parser ───────────────────────
+// Three attempts to auto-detect a legacy file from its content were rejected:
+// every content heuristic has counterexamples, because a legacy file and a
+// valid RFC 4180 file can be shape-identical. The format marker decides
+// instead — the fixed export writes a UTF-8 BOM and nothing older did — and
+// that choice lives in the caller, which reads the file's bytes. So fromCSV
+// has no modes: strict, always, with a round trip that can be proven.
+console.log('TR.fromCSV — strict, no modes');
+test('an unterminated quote consumes to EOF, as RFC 4180 says', () => {
+  // Deliberately NOT "recovered". A legacy file never reaches this parser.
+  assert.deepEqual(rt('a,"b\r\nc,d'), [['a', 'b\r\nc,d']]);
 });
-// Superseded: the old claim here was "only real quote pairing distinguishes
-// well-formed text from a legacy fallback case", which was itself the bug —
-// a later balanced quote pair rebalances the count on genuinely mangled
-// input too (see the repro test below), so pairing can't be the signal.
-// The rule that replaced it is decided by shape (rectangular vs ragged), not
-// quotes at all, so pin THAT instead: a quoted field carrying a comma, a
-// doubled quote or an embedded newline must still come back exactly as
-// strict RFC 4180 says, because the fallback never gets a chance to fire.
-test('shape-rectangular strict parse never triggers the fallback', () => {
-  assert.deepEqual(rt('a,"b""c"'), [['a', 'b"c']]);
-  assert.deepEqual(rt('"a,b",c\r\n"d""e",f'), [['a,b', 'c'], ['d"e', 'f']]);
-  // Every row 3 fields wide, so strict is internally rectangular even though
-  // the middle field's raw text is scattered by commas and a real newline —
-  // the case the old parity check was blind to in the other direction.
-  assert.deepEqual(
-    rt('a,"b,c",x\r\nd,"e""f",y\r\nh,"i\nj",z'),
-    [['a', 'b,c', 'x'], ['d', 'e"f', 'y'], ['h', 'i\nj', 'z']]
-  );
+test('a quoted field spanning rows stays one field', () => {
+  assert.deepEqual(rt('a,"x\r\ny",z'), [['a', 'x\r\ny', 'z']]);
 });
 
-// The exact repro from the bug report: row 1's Comment merely *begins* with a
-// stray, unterminated quote (a legacy pre-toCSV export), but row 2 happens to
-// contain a BALANCED quoted phrase ('he said "wow" nice'). That balanced pair
-// rebalances the total quote count to even, so the `quoted` flag the old
-// fallback checked is false at EOF — the file looks "closed" — and the old
-// parity-based fallback never fires. Shape isn't fooled: the strict parse
-// only recovers 2 rows here (row 1 swallows row 2 into one oversized field),
-// which is fewer than the 3 non-blank lines a dumb split sees, so it's
-// treated as having lost rows and the rectangular, multi-column loose parse
-// wins instead.
-console.log('TR.fromCSV — legacy fallback survives a later balanced quote pair (Finding 2)');
-test('unterminated quote falls back even when a later row rebalances the quote count', () => {
-  const legacy = [
-    '0:10,Try,Scoop,"nice run,Team A',
-    '0:20,Turnover,6th Touch,he said "wow" nice,Team B',
-    '0:30,Try,Scoop,great again,Team A',
-  ].join('\r\n');
-  const rows = rt(legacy);
-  assert.equal(rows.length, 3);
-  // Row 1 takes the visible damage (the stray quote is literal, and the
-  // comma inside "nice run,Team A" still splits the field in two) — exactly
-  // what the quote-blind importer has always done with this shape. Rows 2
-  // and 3 are untouched: nothing merged, nothing lost.
-  assert.deepEqual(rows[0], ['0:10', 'Try', 'Scoop', '"nice run', 'Team A']);
-  assert.deepEqual(rows[1], ['0:20', 'Turnover', '6th Touch', 'he said "wow" nice', 'Team B']);
-  assert.deepEqual(rows[2], ['0:30', 'Try', 'Scoop', 'great again', 'Team A']);
+// ── toCSV → fromCSV is identity, fuzzed ──────────────────────
+// A hand-picked corpus proves only that the cases someone thought of survive.
+// This generates them, because the failures found in review were all values
+// nobody had thought to write down.
+console.log('CSV round trip (fuzz)');
+test('10000 random tables survive toCSV → fromCSV → csvUnguard', () => {
+  const atoms = ['a', 'Z', '1', '', ' ', ',', '"', "'", '=', '+', '-', '@', '\n', '\r\n', '\r',
+                 'é', 'ü', 'ß', 'tab\there', 'a, b', 'say "hi"', '-5m', "'19", '=1+1', '  lead'];
+  let seed = 20260915;
+  const rnd = (n) => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed % n; };
+  for (let t = 0; t < 10000; t++) {
+    const cols = 2 + rnd(8);                       // ≥2: a 1-column empty row can't round-trip
+    const rows = 1 + rnd(6);
+    const table = [];
+    for (let r = 0; r < rows; r++) {
+      const row = [];
+      for (let c = 0; c < cols; c++) {
+        let v = '';
+        for (let k = 0, n = rnd(3); k <= n; k++) v += atoms[rnd(atoms.length)];
+        row.push(v);
+      }
+      // A row of entirely empty fields is indistinguishable from a blank line,
+      // which the parser skips by design. Keep one field non-empty.
+      if (row.every(f => f === '')) row[0] = 'x';
+      table.push(row);
+    }
+    const back = structuredClone(TR.fromCSV(TR.toCSV(table))).map(r => r.map(f => TR.csvUnguard(f)));
+    assert.deepEqual(back, table);
+  }
 });
-
-// A legacy file whose stray quote is the ONLY quote character anywhere in the
-// text: nothing ever rebalances it, so strict absorbs everything from that
-// point to EOF into one field, losing every row after it. This is the shape
-// the original (pre-Finding-2) fallback was built for, re-verified against
-// the new shape-based rule with a real header row rather than bare data rows.
-test('legacy file with a stray leading quote and no other quotes anywhere returns all rows', () => {
-  const legacy = [
-    'Time,Type,Comment',
-    '0:10,Try,"nice shot',
-    '0:20,Turnover,great play',
-    '0:30,Try,another',
-  ].join('\r\n');
-  assert.deepEqual(rt(legacy), [
-    ['Time', 'Type', 'Comment'],
-    ['0:10', 'Try', '"nice shot'],
-    ['0:20', 'Turnover', 'great play'],
-    ['0:30', 'Try', 'another'],
-  ]);
-});
-
-// A well-formed file can legitimately be ragged — RFC 4180 doesn't require
-// uniform width, and this app has never guaranteed it either. When the loose
-// parse doesn't recover a *better* (rectangular) shape, there's nothing to
-// gain by switching, so the strict parse — ragged or not — is kept.
-test('a well-formed file that is genuinely ragged keeps the strict parse', () => {
-  assert.deepEqual(rt('a,b,c\r\nd,e'), [['a', 'b', 'c'], ['d', 'e']]);
-});
-
-// ── TR.fromCSVLoose ──────────────────────────────────────────
-// The quote-blind half on its own: quotes are just characters to it, never
-// structure, which is exactly why it survives a stray one that would
-// otherwise open a field the strict parser can't close.
-console.log('TR.fromCSVLoose');
-const rtLoose = (t) => structuredClone(TR.fromCSVLoose(t));
-test('quotes come back literal, not interpreted', () => assert.deepEqual(rtLoose('a,"b,c"'), [['a', '"b', 'c"']]));
-test('BOM stripped',        () => assert.deepEqual(rtLoose('﻿a,b'), [['a', 'b']]));
-test('blank lines skipped', () => assert.deepEqual(rtLoose('a,b\r\n\r\nc,d'), [['a', 'b'], ['c', 'd']]));
 
 // ── TR.csvUnguard ─────────────────────────────────────────────
 // The exact inverse of csvCell's formula guard. Only strips an apostrophe the
