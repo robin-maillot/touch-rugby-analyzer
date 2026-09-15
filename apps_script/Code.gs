@@ -375,10 +375,29 @@ function getSheetVersion() {
 //     Select spreadsheet: the spreadsheet whose ID matches CONTROL_SHEET_ID
 //     Event type:         On edit
 // Re-install if CONTROL_SHEET_ID changes.
+// Installable trigger on CONTROL_SHEET_ID. Covers _groups as well as
+// _metadata: editing a secret's group by hand changes which games that account
+// can see, and without this the change sat behind the groups cache and an
+// unbumped version until something unrelated wrote.
 function onMetadataEdit(e) {
   try {
     if (!e || !e.range) return;
-    if (e.range.getSheet().getName() !== METADATA_SHEET) return;
+    const name = e.range.getSheet().getName();
+    if (name !== METADATA_SHEET && name !== GROUPS_SHEET) return;
+    if (name === GROUPS_SHEET) clearGroupsCache();
+    cacheClear();
+  } catch (err) {}
+}
+
+// Installable trigger on SHEET_ID — the spreadsheet holding the game tabs.
+// There was none, so correcting a name, a comment or a timestamp directly in
+// the Sheets UI bumped nothing. Every page now skips the full refetch while the
+// version is unchanged, so a hand edit would otherwise never reach anyone.
+// Install with: Apps Script editor → Triggers → Add Trigger → onGameDataEdit,
+// from spreadsheet, On edit, choosing the game-data spreadsheet.
+function onGameDataEdit(e) {
+  try {
+    if (!e || !e.range) return;
     cacheClear();
   } catch (err) {}
 }
@@ -786,7 +805,14 @@ function doPost(e) {
       // Ensure the caller's group is on the game's metadata row. writeMeta has
       // a fast no-op path for pure addGroup calls when the group is already
       // present, so high-frequency live_update calls don't repeatedly write.
-      if (callerGroup) writeMeta(data.sheetName, { addGroup: callerGroup });
+      // Stamping a group onto the metadata row changes what canSeeGame lets
+      // that group see, which changes what action=list and action=all return.
+      // Without clearing, clients that skip the big refetch on an unchanged
+      // version would not see the newly visible game until some unrelated
+      // write happened to bump it. Only on a real write — writeMeta returns
+      // false when the group is already there, which is every heartbeat after
+      // the first.
+      if (callerGroup && writeMeta(data.sheetName, { addGroup: callerGroup })) cacheClear();
       return json({ ok: true });
     }
 
@@ -940,7 +966,7 @@ function writeMeta(sheetName, meta) {
   const isPureAddGroup = meta.addGroup && !Object.keys(meta).some(k => k !== 'addGroup' && meta[k] != null);
   if (isPureAddGroup && existingRow > 0 && ggi >= 0) {
     const cur = String(existingData[ggi] || '').trim().split(/\s+/).filter(Boolean);
-    if (cur.indexOf(meta.addGroup) >= 0) return;
+    if (cur.indexOf(meta.addGroup) >= 0) return false;   // nothing changed
   }
 
   // Start from existing data (to preserve fields not in this update) or a blank row
@@ -982,6 +1008,10 @@ function writeMeta(sheetName, meta) {
   } else {
     sheet.appendRow(row);
   }
+  // Callers use this to decide whether to invalidate caches. Returning false
+  // from the no-op path above keeps live_update's 30-second heartbeat from
+  // bumping the version on every beat.
+  return true;
 }
 
 // ── One-time utility: create/backfill _metadata from tab names ─
