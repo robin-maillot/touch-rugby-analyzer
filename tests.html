@@ -177,6 +177,24 @@
     });
   });
 
+  QUnit.module('TR.parseApiResponse', () => {
+    QUnit.test('parses a JSON body', t => {
+      t.deepEqual(TR.parseApiResponse(200, '{"ok":true,"updated":3}'), { ok: true, updated: 3 });
+      t.deepEqual(TR.parseApiResponse(200, '{"ok":false,"error":"Unauthorized"}'), { ok: false, error: 'Unauthorized' });
+    });
+    QUnit.test('an HTML page throws a readable error, not a parser error', t => {
+      t.throws(() => TR.parseApiResponse(405, '<!DOCTYPE html><html></html>'),
+        err => /page instead of data/i.test(err.message) && !/Unexpected token/.test(err.message));
+    });
+    QUnit.test('a non-JSON body is retryable', t => {
+      try { TR.parseApiResponse(200, 'not json'); t.ok(false, 'should have thrown'); }
+      catch (e) { t.equal(e.retryable, true); }
+    });
+    QUnit.test('an empty body throws', t => {
+      t.throws(() => TR.parseApiResponse(200, ''), /empty/i);
+    });
+  });
+
   QUnit.module('TR.isAttackEnd', () => {
     QUnit.test('true only when the ball changes hands', t => {
       t.equal(TR.isAttackEnd('Try', '32 - Cut'), true);

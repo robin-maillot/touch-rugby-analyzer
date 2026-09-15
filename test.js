@@ -1242,6 +1242,43 @@ test('does not mutate',() => { TR.playlists.reorder(R4, 0, 3); assert.deepEqual(
 test('empty',          () => { assert.deepEqual(TR.playlists.reorder([], 0, 0), []);
                                assert.deepEqual(structuredClone(TR.playlists.reorder(null, 0, 1)), []); });
 
+// ── TR.parseApiResponse ───────────────────────────────────────
+// The Apps Script /exec endpoint answers a POST with a 302 to a one-shot
+// googleusercontent URL. That second hop intermittently comes back as an HTML
+// error or sign-in page instead of the handler's JSON, and a bare resp.json()
+// then surfaces the raw "Unexpected token '<'" parser error to the user.
+console.log('TR.parseApiResponse');
+test('parses a normal JSON body', () => {
+  assert.deepEqual(structuredClone(TR.parseApiResponse(200, '{"ok":true,"updated":3}')), { ok: true, updated: 3 });
+});
+test('parses a JSON error body',  () => {
+  assert.deepEqual(structuredClone(TR.parseApiResponse(200, '{"ok":false,"error":"Unauthorized"}')), { ok: false, error: 'Unauthorized' });
+});
+test('HTML body throws, not a parser error', () => {
+  assert.throws(() => TR.parseApiResponse(405, '<!DOCTYPE html><html><body>nope</body></html>'),
+    err => !/Unexpected token/.test(err.message) && /405/.test(err.message));
+});
+test('HTML body names it a page, not data', () => {
+  assert.throws(() => TR.parseApiResponse(405, '<!DOCTYPE html><html></html>'), /page instead of data/i);
+});
+test('HTML body is flagged retryable',  () => {
+  try { TR.parseApiResponse(405, '<!DOCTYPE html>'); assert.fail('should throw'); }
+  catch (e) { assert.equal(e.retryable, true); }
+});
+test('leading whitespace before HTML',  () => {
+  assert.throws(() => TR.parseApiResponse(500, '\n  <!DOCTYPE html>'), /page instead of data/i);
+});
+test('an empty body throws',            () => {
+  assert.throws(() => TR.parseApiResponse(200, ''), /empty/i);
+});
+test('non-HTML junk throws too',        () => {
+  assert.throws(() => TR.parseApiResponse(200, 'not json at all'), /200/);
+});
+test('junk is retryable as well',       () => {
+  try { TR.parseApiResponse(200, 'not json at all'); assert.fail('should throw'); }
+  catch (e) { assert.equal(e.retryable, true); }
+});
+
 // ─────────────────────────────────────────────────────────────
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

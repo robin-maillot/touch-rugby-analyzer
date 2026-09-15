@@ -98,7 +98,7 @@
   /* Content panel + layout modes */
   .content-panel { display: flex; flex-direction: column; gap: 8px; flex: 1; overflow: hidden; min-height: 0; }
   .main.horizontal { flex-direction: row; align-items: stretch; }
-  .main.horizontal .video-wrapper { height: auto !important; width: var(--video-w, 45%); align-self: stretch; }
+  .main.horizontal .video-wrapper { height: auto !important; width: var(--video-w, 66.67%); align-self: stretch; }
   .main.horizontal .video-resize-handle { width: 5px; height: auto !important; cursor: col-resize; }
   .main.horizontal .content-panel { overflow-y: auto; overflow-x: hidden; }
   .layout-btn { background: #141925; border: 1px solid #2b3242; border-radius: 6px; color: #9ba6b9; font-size: 0.75rem; padding: 4px 10px; cursor: pointer; white-space: nowrap; flex-shrink: 0; transition: all 0.15s; }
@@ -192,6 +192,7 @@
     header > .btn-primary { display: none; }
     .main { padding: 6px 8px; gap: 6px; }
     .video-wrapper { height: var(--video-h, 30vh) !important; }
+    .main.horizontal .video-wrapper { height: auto !important; width: var(--video-w, 66.67%); }
     /* Bigger drag handle so a thumb can grab it */
     .video-resize-handle { height: 14px; border-radius: 4px; }
     .main.horizontal .video-resize-handle { width: 14px; height: auto !important; }
@@ -626,7 +627,9 @@ function toggleLayout() {
 }
 (function initLayout() {
   const saved = localStorage.getItem('annotator-layout');
-  if (saved === 'horizontal') {
+  // Side-by-side (2/3 video, 1/3 panel) is the default; phones stack instead.
+  const horizontal = saved ? saved === 'horizontal' : window.innerWidth > 640;
+  if (horizontal) {
     document.querySelector('.main').classList.add('horizontal');
     const btn = document.getElementById('layoutBtn');
     if (btn) { btn.textContent = '↕ Stack'; btn.classList.add('active'); }

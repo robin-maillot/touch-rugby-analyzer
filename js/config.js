@@ -241,6 +241,59 @@ if (typeof customElements !== 'undefined' && typeof HTMLElement !== 'undefined')
   if (!customElements.get('tr-logo')) customElements.define('tr-logo', TRLogo);
 }
 
+// ── API responses ──────────────────────────────────────────────
+// The Apps Script /exec endpoint answers a POST with a 302 to a one-shot
+// script.googleusercontent.com URL, and the browser fetches the real body from
+// there. That second hop intermittently returns an HTML error or sign-in page
+// rather than the handler's JSON — Google-side, nothing to do with the payload,
+// which is why the same save fails once and succeeds on the next click. A bare
+// resp.json() turns that into "Unexpected token '<', "<!DOCTYPE "...", which
+// tells the user nothing and reads like their data is corrupt.
+//
+// Parses the body, or throws an Error that says what actually happened. The
+// .retryable flag marks the "server sent something that isn't our JSON at all"
+// case — transient by nature, so an idempotent caller may simply try again.
+TR.parseApiResponse = (status, text) => {
+  const body = String(text == null ? '' : text).trim();
+  if (!body) {
+    const err = new Error(`the server sent an empty response (HTTP ${status}).`);
+    err.retryable = true;
+    throw err;
+  }
+  try {
+    return JSON.parse(body);
+  } catch (e) {
+    const isHtml = /^<(?:!doctype|html|\?xml)/i.test(body);
+    const err = new Error(isHtml
+      ? `the server returned a web page instead of data (HTTP ${status}). ` +
+        'This is a transient Google Apps Script hiccup, not a problem with your edits.'
+      : `the server sent a response that wasn't data (HTTP ${status}): ` +
+        body.slice(0, 80));
+    err.retryable = true;
+    throw err;
+  }
+};
+
+// POST JSON to the Apps Script endpoint and return the parsed reply.
+// opts.retries re-sends only on a retryable parse failure (above) — never on a
+// normal JSON error reply, and never by default: pass it only for an idempotent
+// action, since a retried create would write the row twice.
+TR.postJson = async (url, payload, opts) => {
+  const retries = (opts && opts.retries) || 0;
+  for (let attempt = 0; ; attempt++) {
+    const resp = await fetch(url, {
+      method:  'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body:    JSON.stringify(payload),
+    });
+    try {
+      return TR.parseApiResponse(resp.status, await resp.text());
+    } catch (err) {
+      if (!err.retryable || attempt >= retries) throw err;
+    }
+  }
+};
+
 // ── Service worker (offline app shell) ─────────────────────────
 // Caches static assets so pages load offline; see sw.js. Relative path keeps it
 // working under a project subpath on GitHub Pages.

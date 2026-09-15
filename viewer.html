@@ -37,6 +37,17 @@
   .logo span { font-size: 1rem; font-weight: 600; color: #fff; white-space: nowrap; }
   /* .nav-toggle / .header-nav dropdown styles now live in css/theme.css */
   #rowCount { font-size: 0.78rem; color: var(--text-muted); }
+  /* Names the one game on screen, the way game.html's picker button does —
+     the competition / year / division / #id that used to repeat down four
+     table columns, stated once. */
+  .game-chip { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+  /* display:flex above would otherwise beat the hidden attribute's UA default. */
+  .game-chip[hidden] { display: none; }
+  .gc-name { font-size: 0.82rem; font-weight: 600; color: var(--text); white-space: nowrap;
+             overflow: hidden; text-overflow: ellipsis; }
+  .gc-sub  { font-size: 0.68rem; color: var(--text-muted); white-space: nowrap;
+             overflow: hidden; text-overflow: ellipsis; }
+  @media (max-width: 640px) { .game-chip { max-width: 45vw; } }
 
   /* ── Layout modes (3-state video button) ──────────────────── */
   .split.mode-rows  .video-panel,
@@ -382,6 +393,10 @@
 
 <header>
   <tr-logo></tr-logo>
+  <span class="game-chip" id="gameChip" hidden>
+    <span class="gc-name" id="gcName"></span>
+    <span class="gc-sub"  id="gcSub"></span>
+  </span>
   <span id="rowCount"></span>
   <button id="toggleVideoBtn" class="active" data-mode="both" onclick="cycleVideoLayout()" title="Cycle layout: Both → Rows → Video">&#9783; Both</button>
   <div class="sec-group" id="beforeGroup" title="Seconds before event to start video / copy link">
@@ -652,12 +667,14 @@ async function saveEdits() {
   btn.textContent = '⏳ Saving…';
   const changes = [...pendingEdits.values()];
   try {
-    const resp   = await fetch(TR.APPS_SCRIPT_URL, {
-      method:  'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body:    JSON.stringify({ secret: TR.secret(), action: 'update_rows', changes }),
-    });
-    const result = await resp.json();
+    // retries: 1 — update_rows writes the same values to the same matched rows,
+    // so re-sending it is safe, and the transient non-JSON reply TR.postJson
+    // retries on (see js/config.js) is exactly what made this fail on one click
+    // and succeed on the next.
+    const result = await TR.postJson(
+      TR.APPS_SCRIPT_URL,
+      { secret: TR.secret(), action: 'update_rows', changes },
+      { retries: 1 });
     if (!result.ok) throw new Error(result.error);
     pendingEdits.clear();
     // Clear dirty styling
@@ -672,6 +689,10 @@ async function saveEdits() {
   } catch (err) {
     const msg = err.message === 'Failed to fetch'
       ? 'Save failed: could not reach the server. Check that the Apps Script deployment URL is correct and the script is deployed as a web app accessible to anyone.'
+      : err.retryable
+      // Already retried once. Your edits are still pending, so Save again is
+      // the right move — say so, rather than leaving a raw parser error.
+      ? 'Save failed twice: ' + err.message + '\n\nYour changes are still here — press Save again.'
       : 'Save failed: ' + err.message;
     alert(msg);
     btn.disabled = false;
@@ -691,6 +712,18 @@ let activeFilters = {};
 
 // Column indices (resolved after headers load)
 let colTime = -1, colType = -1, colName = -1, colGame = -1, colComment = -1, colAction = -1, colStrike = -1;
+// Metadata columns that carry the same value on every row of one game. With a
+// single game selected they say nothing per row, so the table drops them and
+// the header chip states them once instead.
+let colCompetition = -1, colYear = -1, colDivision = -1, colId = -1;
+
+// True for a column the table hides because the selected game fixes its value.
+// Game was already hidden this way; Competition / Year / Division / ID join it.
+function isPerGameCol(i) {
+  if (!selectedGame) return false;
+  return i === colGame || i === colCompetition || i === colYear ||
+         i === colDivision || i === colId;
+}
 
 // Full metadata entry per game (provides youtubelink, gcsObject, teams, etc.)
 let gameMetaMap = {};
@@ -843,6 +876,10 @@ function processRows(rows) {
   colComment = hli('comment');
   colAction  = hli('action owner');
   colStrike  = hli('strike move');
+  colCompetition = hli('competition');
+  colYear        = hli('year');
+  colDivision    = hli('division');
+  colId          = hli('id');
 
   // Hide rows from games that have no video (only once metadata has loaded;
   // skip on a cold cache so we don't hide everything before the list arrives).
@@ -863,6 +900,7 @@ function processRows(rows) {
   buildSearchColSelect();
   buildFilterDropdowns();
   populateGameFilter();
+  renderGameChip();
   renderHeaders();
   applyFilters();
 
@@ -897,12 +935,33 @@ function populateGameFilter() {
   if (selectedGame) sel.value = selectedGame;
 }
 
+// The header chip: with one game selected it states that game once, so the
+// Competition / Year / Division / ID columns don't have to repeat it on every
+// row. textContent throughout — these values come from the sheet.
+function renderGameChip() {
+  const chip = document.getElementById('gameChip');
+  if (!chip) return;
+  if (!selectedGame) { chip.hidden = true; return; }
+  const meta = gameMetaMap[selectedGame] || null;
+  const teams = meta && meta.team1 && meta.team2
+    ? `${meta.team1} vs ${meta.team2}`
+    : (gameLabelMap[selectedGame] || selectedGame);
+  const sub = meta
+    ? [meta.year, meta.division, meta.competition].filter(Boolean).join(' ') +
+      (meta.id ? ` #${meta.id}` : '')
+    : '';
+  document.getElementById('gcName').textContent = teams;
+  document.getElementById('gcSub').textContent  = sub;
+  chip.hidden = false;
+}
+
 function selectGame(val) {
   selectedGame = val;
   const url = new URL(location.href);
   if (val) url.searchParams.set('game', val);
   else url.searchParams.delete('game');
   history.replaceState(null, '', url);
+  renderGameChip();
   renderHeaders();
   applyFilters();
 }
@@ -1037,7 +1096,7 @@ function renderHeaders() {
   thead.innerHTML = '';
   const tr = document.createElement('tr');
   headers.forEach((h, i) => {
-    if (selectedGame && i === colGame) return;
+    if (isPerGameCol(i)) return;
     // The strike move renders under the Name instead of taking a column of its
     // own. It stays in headers/allData so the filter and search still see it.
     if (i === colStrike) return;
@@ -1074,7 +1133,7 @@ function renderRows(rows) {
     tr.dataset.filteredIdx = filteredIdx;
 
     row.forEach((cell, i) => {
-      if (selectedGame && i === colGame) return;
+      if (isPerGameCol(i)) return;
       // The strike move renders under the Name instead of taking a column of its
       // own. It stays in headers/allData so the filter and search still see it.
       if (i === colStrike) return;
