@@ -133,18 +133,18 @@ TR.slugify = (s, fallback) => {
   return out || fallback || 'file';
 };
 
-// Parse RFC 4180 text into rows of fields — the counterpart to TR.toCSV, and a
-// real parser rather than a pair of splits. A field may legitimately hold a
-// comma, a doubled quote or a newline; splitting on those turns one row into
-// several and silently truncates the field that contained them.
-//
-// Bare LF is accepted alongside CRLF, because files this app wrote before
-// toCSV existed joined rows with LF and must still import. A leading BOM is
-// consumed rather than left glued to the first header, where it would make a
-// column lookup miss.
-TR.fromCSV = (text) => {
-  let s = String(text == null ? '' : text);
-  if (s.charCodeAt(0) === 0xFEFF) s = s.slice(1);
+// Strip a leading byte-order mark. Shared by both parse modes below — the
+// wrong place to do this is inside a parsing loop, where a stray BOM would
+// otherwise glue itself to the first header cell.
+function stripBOM(text) {
+  const s = String(text == null ? '' : text);
+  return s.charCodeAt(0) === 0xFEFF ? s.slice(1) : s;
+}
+
+// The strict RFC 4180 loop, factored out so TR.fromCSV can run it and then
+// decide, rather than committing to its output unconditionally. Unchanged in
+// substance from the parser this file has always had.
+function fromCSVStrict(s) {
   const rows = [];
   let row = [], field = '', quoted = false, i = 0;
   const endField = () => { row.push(field); field = ''; };
@@ -173,29 +173,77 @@ TR.fromCSV = (text) => {
     field += c; i++;
   }
   if (field !== '' || row.length) endRow();
-
-  // A quoted field that is still open at EOF means the text was never RFC 4180
-  // in the first place — it's a legacy export (or a hand-edited file) written
-  // before toCSV existed, with comments dumped raw and unquoted. There, a
-  // comment that merely *begins* with a literal " (e.g. `"great try`) opens a
-  // quoted field that nothing ever closes, and the parser above — reasonably,
-  // for real RFC 4180 — consumes every comma and newline from there to EOF
-  // into that one field. A three-row file becomes one row with two rows'
-  // worth of data silently swallowed into a comment.
-  //
-  // The old split(',')/split('\n') importer this replaced had no concept of
-  // quoting at all, so the same file just mangled the one field with the
-  // stray quote and kept every row. That bounded, visible damage is strictly
-  // better than losing the file, so when we detect this shape, re-parse in
-  // that old, quote-blind mode instead: every " literal, rows on newlines,
-  // fields on commas. Well-formed RFC 4180 text never ends mid-quote, so this
-  // branch is a no-op for every file toCSV produced.
-  if (quoted) {
-    return s.split(/\r\n|\r|\n/)
-      .filter(l => l.trim() !== '')
-      .map(l => l.split(','));
-  }
   return rows;
+}
+
+// True when every row has as many fields as the first. Every file this app
+// has ever written — old unquoted exports and new quoted ones alike — has
+// this shape, header included: it's what "a CSV" means here, independent of
+// how the text got sliced into rows.
+function isRectangular(rows) {
+  return rows.length > 0 && rows.every(r => r.length === rows[0].length);
+}
+
+// The old importer this file replaced, before toCSV/fromCSV existed: no
+// quoting at all, rows on any newline, fields on commas. Kept alive — not
+// deleted — as the second half of the two-parse strategy in TR.fromCSV below,
+// and exposed on its own so that half can be tested in isolation: feed it a
+// quoted field and the quotes come back out as ordinary characters, which is
+// exactly the property that makes it a safe fallback for text that was never
+// RFC 4180 in the first place.
+TR.fromCSVLoose = (text) => {
+  const s = stripBOM(text);
+  return s.split(/\r\n|\r|\n/)
+    .filter(l => l.trim() !== '')
+    .map(l => l.split(','));
+};
+
+// Parse CSV text into rows of fields — the counterpart to TR.toCSV.
+//
+// This runs BOTH a real RFC 4180 parser (fromCSVStrict, a real parser rather
+// than a pair of splits — a field may legitimately hold a comma, a doubled
+// quote or a newline, and splitting on those turns one row into several and
+// truncates the field that held them) and the old quote-blind splitter
+// (fromCSVLoose) that this file's exporter used before toCSV existed, then
+// picks whichever result actually looks like the table this app writes.
+//
+// Why bother running both, instead of asking the strict parser "did something
+// go wrong?" A prior version tried exactly that, by checking whether a quoted
+// field was still open at EOF. That's a parity check — it only notices an
+// ODD number of quotes in the whole file — not a correctness check, and it
+// fails on completely ordinary input: a legacy file's first stray quote opens
+// a field that swallows the rest of the document, but if any LATER row
+// happens to contain a balanced quoted phrase (someone typing `he said "wow"
+// nice` in a Comment), the quote count returns to even, the parser looks
+// "closed" at EOF, and the merge happens silently — the exact bug this
+// function exists to catch slips through the check meant to catch it.
+//
+// Quote counting can't tell a mangled file from a clean one because it never
+// looks at the RESULT, only at how the scan ended. Shape does: files this app
+// writes are rectangular, every row carrying exactly the header's field
+// count, and a legacy file with a stray quote makes the strict parser
+// produce something that ISN'T — a field balloons to swallow whole
+// neighbouring rows. So: parse both ways, and if the strict parse lost rows
+// relative to a dumb per-line split (or isn't even internally rectangular)
+// while the loose parse IS a rectangular, genuinely multi-column table
+// (single-column data never comes from this app — real exports are always
+// several fields wide, so a one-column "rectangle" out of the loose parse
+// isn't good evidence of anything), trust the loose parse instead. Otherwise
+// keep the strict result — including when both parses are ragged, which
+// means the file is just a ragged file and re-parsing it differently won't
+// help.
+//
+// This restores, on purpose, exactly the behaviour `main` had before toCSV
+// existed: every legacy file quote-splits the same way it always did. The
+// fallback is a restoration, not a new risk.
+TR.fromCSV = (text) => {
+  const s = stripBOM(text);
+  const strictRows = fromCSVStrict(s);
+  const looseRows = TR.fromCSVLoose(s);
+
+  const strictIntact = isRectangular(strictRows) && strictRows.length === looseRows.length;
+  if (!strictIntact && isRectangular(looseRows) && looseRows[0].length > 1) return looseRows;
+  return strictRows;
 };
 
 // The exact inverse of csvCell's formula guard.
