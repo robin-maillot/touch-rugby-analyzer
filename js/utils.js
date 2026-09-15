@@ -81,3 +81,45 @@ TR.evKey = (e) => `${e.game}#${e.time}`;
 
 // The same key, taken from a stored ref string rather than a live event.
 TR.refKey = (ref) => String(ref == null ? '' : ref).split('#').slice(0, 2).join('#');
+
+// One RFC 4180 CSV field.
+//
+// Two jobs. The quoting is ordinary — double every embedded quote, wrap the
+// field when it carries a quote, a comma, CR or LF.
+//
+// The second job is the one that matters. Excel and Google Sheets EXECUTE a
+// cell whose first character is = + - or @, and an event Comment is free text
+// an annotator typed, so an exported file could run code on whoever opens it.
+// The leading apostrophe is the conventional spreadsheet text marker and is
+// consumed on display. Same class of bug sheetSafe() closes server-side, except
+// this payload would land in the recipient's spreadsheet rather than ours.
+//
+// Guard first, quote second: quoting first would bury the apostrophe inside the
+// quotes, where it protects nothing.
+TR.csvCell = (v) => {
+  let s = v == null ? '' : String(v);
+  if (/^[=+\-@]/.test(s)) s = "'" + s;
+  return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+};
+
+// Rows of fields → RFC 4180 text. CRLF between rows, which is what the format
+// says and what Excel expects; no trailing newline, so the file has no phantom
+// final row.
+TR.toCSV = (rows) => (rows || [])
+  .map(r => (r || []).map(c => TR.csvCell(c)).join(','))
+  .join('\r\n');
+
+// A filename-safe slug. Diacritics are folded rather than dropped, because this
+// dataset is largely French and "Équipe" deserves better than "quipe".
+//
+// Order matters: truncate BEFORE trimming separators. A cut at the cap can land
+// mid-separator, and trimming first would leave the dash behind.
+TR.slugify = (s, fallback) => {
+  const out = String(s == null ? '' : s)
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .slice(0, 60)
+    .replace(/^-+|-+$/g, '');
+  return out || fallback || 'file';
+};
