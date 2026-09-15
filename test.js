@@ -1394,6 +1394,59 @@ test('BOM stripped',       () => assert.deepEqual(rt('﻿a,b'), [['a','b']]));
 test('quote mid-field is literal', () => assert.deepEqual(rt(`a,b"c`), [['a','b"c']]));
 test('empty input',        () => { assert.deepEqual(rt(''), []); assert.deepEqual(rt(null), []); });
 test('quoted empty field', () => assert.deepEqual(rt('a,""'), [['a','']]));
+// A lone "" is one field that is empty, and the blank-line skip (deliberately,
+// see the 'blank lines skipped' test above) can't tell that apart from a truly
+// blank line — so it vanishes too. Known and intentional, not a bug: harmless
+// here because the annotator always writes 9-10 columns, never one.
+test('quoted empty field alone on a line vanishes, like a blank line', () => assert.deepEqual(rt('"a"\r\n""\r\n"b"'), [['a'],['b']]));
+test('non-string input is stringified', () => { assert.deepEqual(rt(42), [['42']]); assert.deepEqual(rt(true), [['true']]); });
+test('file of only newlines',          () => assert.deepEqual(rt('\r\n\r\n\n\n'), []));
+// A closing quote immediately followed by another character (not a comma,
+// newline or doubled quote) has nowhere to go per RFC 4180; the parser drops
+// the closing quote and treats what follows as ordinary text in the same
+// field. Pinned as known, not a bug: malformed input, not toCSV's output.
+test('quote immediately after a closing quote is dropped', () => assert.deepEqual(rt('"a"b,c'), [['ab','c']]));
+// A bare CR with no following LF must still end a row (old exports before
+// toCSV existed, and files touched by classic-Mac tools, use CR alone).
+// Mutation testing found that deleting the `|| c === '\r'` row-ending check
+// leaves every other test passing, so pin it directly.
+test('bare CR ends a row',             () => assert.deepEqual(rt('a,b\rc,d'), [['a','b'],['c','d']]));
+
+// An unterminated quoted field means the text isn't RFC 4180 at all — see the
+// big comment on the `if (quoted)` branch in TR.fromCSV. This is the case that
+// regressed: a legacy (pre-toCSV) export, written with no quoting, whose first
+// comment happens to begin with a literal ". Before the fallback existed, the
+// quote-aware parser consumed rows 2 and 3 into row 1's comment and reported
+// success loading 1 row out of 3 — silent, total data loss for a real file a
+// coach already has on disk.
+console.log('TR.fromCSV — legacy fallback (Finding 1)');
+test('unterminated quote falls back to legacy quote-blind parsing', () => {
+  // Shaped exactly like a pre-toCSV export: comments written raw, no quoting,
+  // and the first one merely begins with a stray ".
+  const legacy = [
+    '0:10,Try,Scoop,"great try,Team A',
+    '0:20,Turnover,6th Touch,ok,Team B',
+    '0:30,Try,Scoop,great again,Team A',
+  ].join('\r\n');
+  const rows = rt(legacy);
+  // Every row survives — the legacy importer's bounded damage (one mangled
+  // field), not the RFC 4180 parser's unbounded one (the whole file into
+  // field 4 of row 1).
+  assert.equal(rows.length, 3);
+  // The stray quote is literal in quote-blind mode, and the comma inside the
+  // comment still splits the field in two — exactly what the old
+  // split(',')/split('\n') importer produced for this file.
+  assert.deepEqual(rows[0], ['0:10', 'Try', 'Scoop', '"great try', 'Team A']);
+  assert.deepEqual(rows[1], ['0:20', 'Turnover', '6th Touch', 'ok', 'Team B']);
+  assert.deepEqual(rows[2], ['0:30', 'Try', 'Scoop', 'great again', 'Team A']);
+});
+test('well-formed RFC 4180 text never triggers the fallback', () => {
+  // A quote count alone can't distinguish these; only real quote *pairing*
+  // (tracked by the `quoted` flag at EOF) can, so exercise several shapes
+  // that a naive "even number of quotes" heuristic would get wrong too.
+  assert.deepEqual(rt('a,"b""c"'), [['a', 'b"c']]);
+  assert.deepEqual(rt('"a,b",c\r\n"d""e",f'), [['a,b', 'c'], ['d"e', 'f']]);
+});
 
 // ── TR.csvUnguard ─────────────────────────────────────────────
 // The exact inverse of csvCell's formula guard. Only strips an apostrophe the

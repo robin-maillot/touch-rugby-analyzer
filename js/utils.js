@@ -173,6 +173,28 @@ TR.fromCSV = (text) => {
     field += c; i++;
   }
   if (field !== '' || row.length) endRow();
+
+  // A quoted field that is still open at EOF means the text was never RFC 4180
+  // in the first place — it's a legacy export (or a hand-edited file) written
+  // before toCSV existed, with comments dumped raw and unquoted. There, a
+  // comment that merely *begins* with a literal " (e.g. `"great try`) opens a
+  // quoted field that nothing ever closes, and the parser above — reasonably,
+  // for real RFC 4180 — consumes every comma and newline from there to EOF
+  // into that one field. A three-row file becomes one row with two rows'
+  // worth of data silently swallowed into a comment.
+  //
+  // The old split(',')/split('\n') importer this replaced had no concept of
+  // quoting at all, so the same file just mangled the one field with the
+  // stray quote and kept every row. That bounded, visible damage is strictly
+  // better than losing the file, so when we detect this shape, re-parse in
+  // that old, quote-blind mode instead: every " literal, rows on newlines,
+  // fields on commas. Well-formed RFC 4180 text never ends mid-quote, so this
+  // branch is a no-op for every file toCSV produced.
+  if (quoted) {
+    return s.split(/\r\n|\r|\n/)
+      .filter(l => l.trim() !== '')
+      .map(l => l.split(','));
+  }
   return rows;
 };
 

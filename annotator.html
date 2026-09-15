@@ -1423,7 +1423,7 @@ function exportCSV() {
   const link = document.createElement('a');
   const url = URL.createObjectURL(blob);
   link.href = url;
-  link.download = `${videoBaseName}.csv`;
+  link.download = TR.slugify(videoBaseName, 'annotations') + '.csv';
   // In the document, and revoked on a later turn of the loop. A detached anchor
   // and a synchronous revoke are the two ways this silently does nothing on
   // iOS Safari — it can ignore a click on an element never in the tree, and
@@ -1462,7 +1462,14 @@ function loadCSV(e) {
       const timeStr = cell(timeIdx), type = cell(typeIdx), name = cell(nameIdx);
       const possessionOwner = cell(possessionIdx);
       const comment = cell(commentIdx);
-      const actionOwner = cell(actionOwnerIdx) || TR.inferActionOwner(possessionOwner, type, name);
+      // A cell gates on its RAW value here, not the trimmed one: a whitespace-
+      // only Action Owner (e.g. "   ") is a cell someone deliberately left
+      // blank, and pre-dates this import rewrite producing an explicit ''.
+      // Gating on the trimmed value instead would treat it the same as a
+      // missing column and infer a value nobody asked for, silently rewriting
+      // data on import of files that already exist.
+      const rawActionOwner = actionOwnerIdx >= 0 ? parts[actionOwnerIdx] : undefined;
+      const actionOwner = rawActionOwner ? TR.csvUnguard(rawActionOwner).trim() : TR.inferActionOwner(possessionOwner, type, name);
       if (!timeStr || !COLORS[type]) continue;
       const cleanTime = timeStr.includes(' ') ? timeStr.split(' ')[1] : timeStr;
       const tp = cleanTime.split(':').map(Number);
