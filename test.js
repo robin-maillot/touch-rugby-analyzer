@@ -1349,6 +1349,8 @@ test('leading tab before formula',   () => assert.equal(TR.csvCell('\t=1+1'), "'
 // neutralised and quoted — quoting first would bury the apostrophe inside.
 test('formula + comma',  () => assert.equal(TR.csvCell('=A1,B1'), `"'=A1,B1"`));
 test('apostrophe mid-string is untouched', () => assert.equal(TR.csvCell("Dad's Army"), "Dad's Army"));
+test('leading apostrophe is doubled', () => assert.equal(TR.csvCell("'19 season"), "''19 season"));
+test('leading apostrophe before formula', () => assert.equal(TR.csvCell("'=1+1"), "''=1+1"));
 
 // ── TR.toCSV ──────────────────────────────────────────────────
 console.log('TR.toCSV');

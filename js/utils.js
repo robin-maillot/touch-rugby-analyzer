@@ -90,9 +90,11 @@ TR.refKey = (ref) => String(ref == null ? '' : ref).split('#').slice(0, 2).join(
 // The second job is the one that matters. Excel and Google Sheets EXECUTE a
 // cell whose first character is = + - or @, and an event Comment is free text
 // an annotator typed, so an exported file could run code on whoever opens it.
-// The leading apostrophe is the conventional spreadsheet text marker and is
-// consumed on display. Same class of bug sheetSafe() closes server-side, except
-// this payload would land in the recipient's spreadsheet rather than ours.
+// The same apps also treat a leading apostrophe as their "force as text"
+// marker and consume it on read — so '19 season would silently come back as
+// 19 season. Same class of bug sheetSafe() closes server-side. Doubling the
+// apostrophe fixes both: their marker eats our extra one and the user's real
+// character survives.
 //
 // Guard first, quote second: quoting first would bury the apostrophe inside the
 // quotes, where it protects nothing.
@@ -101,9 +103,7 @@ TR.csvCell = (v) => {
   // Spreadsheet apps strip leading whitespace before checking for a formula
   // character, so the test must too — but prefix the ORIGINAL string, not the
   // trimmed one, or the user's own leading space/tab is silently eaten.
-  if (/^[=+\-@]/.test(s.trim())) s = "'" + s;
-  // A leading apostrophe is left alone: it's a Sheets-only "treat as text"
-  // marker, but this is a CSV file, where RFC 4180 gives it no meaning at all.
+  if (/^['=+\-@]/.test(s.trim())) s = "'" + s;
   return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 };
 
