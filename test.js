@@ -1377,6 +1377,54 @@ test('no trailing dash after truncation', () => {
   assert.equal(s.endsWith('-'), false);
 });
 
+
+// ── TR.fromCSV ────────────────────────────────────────────────
+console.log('TR.fromCSV');
+const rt = (t) => structuredClone(TR.fromCSV(t));
+test('simple rows',        () => assert.deepEqual(rt('a,b\r\nc,d'), [['a','b'],['c','d']]));
+test('LF endings too',     () => assert.deepEqual(rt('a,b\nc,d'), [['a','b'],['c','d']]));
+test('quoted comma',       () => assert.deepEqual(rt('a,"b,c"'), [['a','b,c']]));
+test('doubled quote',      () => assert.deepEqual(rt('a,"say ""hi"""'), [['a','say "hi"']]));
+test('embedded newline',   () => assert.deepEqual(rt('a,"line1\nline2"\r\nb,c'), [['a','line1\nline2'],['b','c']]));
+test('embedded CRLF',      () => assert.deepEqual(rt('a,"l1\r\nl2"'), [['a','l1\r\nl2']]));
+test('empty fields',       () => assert.deepEqual(rt('a,,c'), [['a','','c']]));
+test('trailing newline',   () => assert.deepEqual(rt('a,b\r\n'), [['a','b']]));
+test('blank lines skipped',() => assert.deepEqual(rt('a,b\r\n\r\nc,d'), [['a','b'],['c','d']]));
+test('BOM stripped',       () => assert.deepEqual(rt('﻿a,b'), [['a','b']]));
+test('quote mid-field is literal', () => assert.deepEqual(rt(`a,b"c`), [['a','b"c']]));
+test('empty input',        () => { assert.deepEqual(rt(''), []); assert.deepEqual(rt(null), []); });
+test('quoted empty field', () => assert.deepEqual(rt('a,""'), [['a','']]));
+
+// ── TR.csvUnguard ─────────────────────────────────────────────
+// The exact inverse of csvCell's formula guard. Only strips an apostrophe the
+// guard could have written, so a hand-authored leading apostrophe survives.
+console.log('TR.csvUnguard');
+test('undoes a guarded dash',      () => assert.equal(TR.csvUnguard("'-5m"), '-5m'));
+test('undoes a guarded equals',    () => assert.equal(TR.csvUnguard("'=1+1"), '=1+1'));
+test('undoes a guarded apostrophe',() => assert.equal(TR.csvUnguard("''19"), "'19"));
+test('undoes across whitespace',   () => assert.equal(TR.csvUnguard("' =1+1"), ' =1+1'));
+test('keeps a hand-typed apostrophe', () => assert.equal(TR.csvUnguard("'19 season"), "'19 season"));
+test('leaves plain values alone',  () => { assert.equal(TR.csvUnguard('Try'), 'Try'); assert.equal(TR.csvUnguard(''), ''); });
+test('nullish',                    () => { assert.equal(TR.csvUnguard(null), ''); assert.equal(TR.csvUnguard(undefined), ''); });
+
+// ── CSV round trip ────────────────────────────────────────────
+// The half a write-only test can't prove: what comes back out.
+console.log('CSV round trip');
+test('nasty values survive a write then read', () => {
+  const original = [
+    ['Time','Type','Comment','Team'],
+    ['0:10','Try','a comma, inside','France'],
+    ['0:20','Turnover','say "play on"','Éire'],
+    ['0:30','Try','-5m from the line','België'],
+    ['0:40','Try',"'19 season squad",'Ünited'],
+    ['0:50','Try','line one\nline two','X'],
+    ['1:00','Try','','Y'],
+  ];
+  const back = structuredClone(TR.fromCSV(TR.toCSV(original)))
+    .map(row => row.map(f => TR.csvUnguard(f)));
+  assert.deepEqual(back, original);
+});
+
 // ─────────────────────────────────────────────────────────────
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

@@ -132,3 +132,60 @@ TR.slugify = (s, fallback) => {
     .replace(/^-+|-+$/g, '');
   return out || fallback || 'file';
 };
+
+// Parse RFC 4180 text into rows of fields — the counterpart to TR.toCSV, and a
+// real parser rather than a pair of splits. A field may legitimately hold a
+// comma, a doubled quote or a newline; splitting on those turns one row into
+// several and silently truncates the field that contained them.
+//
+// Bare LF is accepted alongside CRLF, because files this app wrote before
+// toCSV existed joined rows with LF and must still import. A leading BOM is
+// consumed rather than left glued to the first header, where it would make a
+// column lookup miss.
+TR.fromCSV = (text) => {
+  let s = String(text == null ? '' : text);
+  if (s.charCodeAt(0) === 0xFEFF) s = s.slice(1);
+  const rows = [];
+  let row = [], field = '', quoted = false, i = 0;
+  const endField = () => { row.push(field); field = ''; };
+  // A wholly empty line is skipped rather than becoming a row of one empty
+  // field, so a trailing newline or a blank separator line doesn't invent data.
+  const endRow = () => {
+    endField();
+    if (row.length > 1 || row[0] !== '') rows.push(row);
+    row = [];
+  };
+  while (i < s.length) {
+    const c = s[i];
+    if (quoted) {
+      if (c === '"') {
+        if (s[i + 1] === '"') { field += '"'; i += 2; continue; }   // doubled = literal
+        quoted = false; i++; continue;
+      }
+      field += c; i++; continue;
+    }
+    // Only opens a quoted field at the start of one; a quote later in the field
+    // is an ordinary character, which is how malformed input stays readable.
+    if (c === '"' && field === '') { quoted = true; i++; continue; }
+    if (c === ',') { endField(); i++; continue; }
+    if (c === '\r' && s[i + 1] === '\n') { endRow(); i += 2; continue; }
+    if (c === '\n' || c === '\r') { endRow(); i++; continue; }
+    field += c; i++;
+  }
+  if (field !== '' || row.length) endRow();
+  return rows;
+};
+
+// The exact inverse of csvCell's formula guard.
+//
+// csvCell only ever prefixes an apostrophe when the TRIMMED value starts with
+// one of ' = + - @, so stripping one is correct exactly when the remainder
+// still does. That precision is the point: a hand-typed "'19 season" —
+// apostrophe then a digit — is left alone, because csvCell could not have
+// produced it. Stripping unconditionally would eat that apostrophe.
+TR.csvUnguard = (v) => {
+  const s = v == null ? '' : String(v);
+  if (s[0] !== "'") return s;
+  const rest = s.slice(1);
+  return /^['=+\-@]/.test(rest.trim()) ? rest : s;
+};
