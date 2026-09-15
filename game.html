@@ -318,6 +318,9 @@
   .pl-danger{width:100%;height:38px;margin-top:12px;background:var(--surface2);
     border:1px solid var(--pdef);color:#fca5a5;border-radius:8px;font-size:.78rem;
     cursor:pointer;font-family:inherit}
+  /* Same footprint as .pl-danger below it, but this is not destructive, so it
+     keeps the ordinary button colours. */
+  .pl-export{width:100%;height:38px;margin-top:12px}
 
   /* ── Landscape: video beside the list ───────────────────────
      No min-width gate. A 667px-wide phone in landscape used to fall through to
@@ -1106,6 +1109,7 @@ $('sheetBody').addEventListener('click',ev=>{
   if(a){addTo(a.dataset.addto);return}
   if(within(ev,ev.target.closest('[data-addnew]'))){addTo(null);return}
   if(within(ev,ev.target.closest('[data-plnew]'))){plNew();return}
+  if(within(ev,ev.target.closest('[data-plexport]'))){plExport();return}
 });
 
 // Enter in either naming field commits it, so the on-screen keyboard's own
@@ -1440,7 +1444,41 @@ function plEditBody(){
         </span>
       </div>`).join('')
       :'<div class="empty">Nothing in here yet.</div>')+
+    `<button class="icon-btn pl-export" data-plexport="1"
+       ${r.events.length?'':'disabled'}>⬇ Export CSV</button>`+
     `<button class="pl-danger" onclick="plDelete()">Delete this playlist</button>`;
+}
+
+// Exports the DRAFT, not the saved row: what is on screen is what comes out, so
+// a reorder the user hasn't left the screen with still exports in the order
+// they're looking at.
+function plExport(){
+  if(!plDraft) return;
+  const r=TR.playlists.resolve(plDraft.refs,rows);
+  if(!r.events.length) return;          // the button is disabled too; belt and braces
+  const head=['#','Game','Time','Type','Name','Team','Move','Comment','YouTube Link'];
+  const body=r.events.map((e,n)=>[
+    // Position in the FILE, not in the stored ref list — a ref that no longer
+    // resolves is absent here, and a # that skipped 4 would send the reader
+    // hunting for a row that isn't coming.
+    n+1,
+    // The full label, not shortLabel: a playlist spans matches, and two
+    // "France vs England" rows from different years must be tellable apart.
+    labels[e.game]||e.game,
+    e.timeStr, e.type, e.name, e.team, e.move, e.comment,
+    // seekLink applies the game's videoOffset and the 5s lookback, and returns
+    // '' when the game has no video or the moment predates the recording. The
+    // row still exports, so the file's length always matches the list above it.
+    TR.player.seekLink(meta[e.game],e.time)
+  ]);
+  // BOM: without it Excel reads the file as the system codepage and mangles
+  // every accented team name, and this dataset is largely French.
+  const blob=new Blob(['﻿'+TR.toCSV([head,...body])],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=TR.slugify(plDraft.name,'playlist')+'.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 // Missing refs are dropped from the draft the moment it is edited, so the
