@@ -1401,7 +1401,10 @@ function exportCSV() {
   const headers = ['Time','Type','Name','Possession Owner'];
   if (fullGame) headers.push('Turnover');
   headers.push('To Review','Comment','Action Owner','Strike Move','YouTube Link');
-  const rows = [headers.join(','),
+  // Raw values into TR.toCSV, which applies TR.csvCell to each one exactly
+  // once. Never pre-escape a field here: csvCell is not idempotent, and a
+  // second pass would quote the quoting and guard the guard.
+  const rows = [headers,
     ...annotations.map(a => {
       const toReview = a.type === 'To Review' ? 'Yes' : '';
       const outType = a.type;
@@ -1411,14 +1414,24 @@ function exportCSV() {
       // empty when no video URL is loaded.
       cols.push(toReview, a.comment || '', a.actionOwner || '',
                 TR.recordedMoveOf(a.type, a.name, a.strikeMove), ytLink(a.time));
-      return cols.join(',');
+      return cols;
     })
   ];
-  const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+  // BOM so Excel reads the file as UTF-8 instead of the system codepage, which
+  // otherwise mangles every accented team name.
+  const blob = new Blob(['﻿' + TR.toCSV(rows)], { type: 'text/csv;charset=utf-8' });
   const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = `${videoBaseName}.csv`;
-  link.click(); URL.revokeObjectURL(link.href);
+  const url = URL.createObjectURL(blob);
+  link.href = url;
+  link.download = TR.slugify(videoBaseName, 'annotations') + '.csv';
+  // In the document, and revoked on a later turn of the loop. A detached anchor
+  // and a synchronous revoke are the two ways this silently does nothing on
+  // iOS Safari — it can ignore a click on an element never in the tree, and
+  // read the blob URL after the click has returned.
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 // ── CSV import ─────────────────────────────────────────────────
@@ -1427,9 +1440,12 @@ function loadCSV(e) {
   currentVideoOffset = 0;   // a CSV carries no game offset; don't inherit a prior game's
   const reader = new FileReader();
   reader.onload = ev => {
-    const allLines = ev.target.result.trim().split('\n').filter(l => l.trim());
+    // A real parser, not a pair of splits: a Comment is free text an annotator
+    // typed, so a comma, a quote or a newline inside one is routine — and each
+    // of those broke the old split into extra columns or extra rows.
+    const allLines = TR.fromCSV(ev.target.result);
     if (allLines.length < 2) { alert('No valid annotations found in CSV.'); return; }
-    const headers = allLines[0].split(',').map(h => h.trim().toLowerCase());
+    const headers = allLines[0].map(h => h.trim().toLowerCase());
     const col = name => headers.indexOf(name.toLowerCase());
     const timeIdx = col('time'), typeIdx = col('type'), nameIdx = col('name');
     const possessionIdx = col('possession owner');
@@ -1437,18 +1453,29 @@ function loadCSV(e) {
     const strikeIdx  = col('strike move');   // -1 in CSVs exported before this column existed
     if (timeIdx < 0 || typeIdx < 0 || nameIdx < 0) { alert('CSV missing required columns (Time, Type, Name).'); return; }
     const loaded = [];
-    for (const line of allLines.slice(1)) {
-      const parts = line.split(',');
-      const timeStr = parts[timeIdx]?.trim(), type = parts[typeIdx]?.trim(), name = parts[nameIdx]?.trim() || '';
-      const possessionOwner = possessionIdx >= 0 && parts[possessionIdx] ? parts[possessionIdx].trim() : '';
-      const comment = commentIdx >= 0 && parts[commentIdx] ? parts[commentIdx].trim() : '';
-      const actionOwner = actionOwnerIdx >= 0 && parts[actionOwnerIdx] ? parts[actionOwnerIdx].trim() : TR.inferActionOwner(possessionOwner, type, name);
+    for (const parts of allLines.slice(1)) {
+      // csvUnguard before trim: the export's guard prefixes an apostrophe to a
+      // value the spreadsheet would otherwise execute, and this undoes exactly
+      // that — including when the value's own leading space pushed the formula
+      // character off the front.
+      const cell = i => i >= 0 && parts[i] != null ? TR.csvUnguard(parts[i]).trim() : '';
+      const timeStr = cell(timeIdx), type = cell(typeIdx), name = cell(nameIdx);
+      const possessionOwner = cell(possessionIdx);
+      const comment = cell(commentIdx);
+      // A cell gates on its RAW value here, not the trimmed one: a whitespace-
+      // only Action Owner (e.g. "   ") is a cell someone deliberately left
+      // blank, and pre-dates this import rewrite producing an explicit ''.
+      // Gating on the trimmed value instead would treat it the same as a
+      // missing column and infer a value nobody asked for, silently rewriting
+      // data on import of files that already exist.
+      const rawActionOwner = actionOwnerIdx >= 0 ? parts[actionOwnerIdx] : undefined;
+      const actionOwner = rawActionOwner ? TR.csvUnguard(rawActionOwner).trim() : TR.inferActionOwner(possessionOwner, type, name);
       if (!timeStr || !COLORS[type]) continue;
       const cleanTime = timeStr.includes(' ') ? timeStr.split(' ')[1] : timeStr;
       const tp = cleanTime.split(':').map(Number);
       const time = tp.length === 3 ? tp[0]*3600+tp[1]*60+tp[2] : tp[0]*60+tp[1];
       if (isNaN(time)) continue;
-      const strikeMove = strikeIdx >= 0 && parts[strikeIdx] ? parts[strikeIdx].trim() : '';
+      const strikeMove = cell(strikeIdx);
       loaded.push({ id: Date.now()+Math.random(), type, name, possessionOwner, actionOwner, comment, strikeMove, time, timeStr: cleanTime });
     }
     if (!loaded.length) { alert('No valid annotations found in CSV.'); return; }

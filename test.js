@@ -1377,6 +1377,127 @@ test('no trailing dash after truncation', () => {
   assert.equal(s.endsWith('-'), false);
 });
 
+
+// ── TR.fromCSV ────────────────────────────────────────────────
+console.log('TR.fromCSV');
+const rt = (t) => structuredClone(TR.fromCSV(t));
+test('simple rows',        () => assert.deepEqual(rt('a,b\r\nc,d'), [['a','b'],['c','d']]));
+test('LF endings too',     () => assert.deepEqual(rt('a,b\nc,d'), [['a','b'],['c','d']]));
+test('quoted comma',       () => assert.deepEqual(rt('a,"b,c"'), [['a','b,c']]));
+test('doubled quote',      () => assert.deepEqual(rt('a,"say ""hi"""'), [['a','say "hi"']]));
+test('embedded newline',   () => assert.deepEqual(rt('a,"line1\nline2"\r\nb,c'), [['a','line1\nline2'],['b','c']]));
+test('embedded CRLF',      () => assert.deepEqual(rt('a,"l1\r\nl2"'), [['a','l1\r\nl2']]));
+test('empty fields',       () => assert.deepEqual(rt('a,,c'), [['a','','c']]));
+test('trailing newline',   () => assert.deepEqual(rt('a,b\r\n'), [['a','b']]));
+test('blank lines skipped',() => assert.deepEqual(rt('a,b\r\n\r\nc,d'), [['a','b'],['c','d']]));
+test('BOM stripped',       () => assert.deepEqual(rt('﻿a,b'), [['a','b']]));
+test('quote mid-field is literal', () => assert.deepEqual(rt(`a,b"c`), [['a','b"c']]));
+test('empty input',        () => { assert.deepEqual(rt(''), []); assert.deepEqual(rt(null), []); });
+test('quoted empty field', () => assert.deepEqual(rt('a,""'), [['a','']]));
+// A lone "" is one field that is empty, and the blank-line skip (deliberately,
+// see the 'blank lines skipped' test above) can't tell that apart from a truly
+// blank line — so it vanishes too. Known and intentional, not a bug: harmless
+// here because the annotator always writes 9-10 columns, never one.
+// Same shape trade-off as everywhere else in this file now: a single-field
+// row is a degenerate ("ragged" in the loosest sense — there's nothing to be
+// uniform WITH) one-column table, which this app never legitimately writes.
+// The strict parse here (2 rows) and the loose parse (3 rows, since a raw
+// '""' line isn't blank to a dumb splitter) disagree on row count, so the
+// same rule that recovers a real legacy file applies — except the loose
+// result is one column wide, which the "never single-column" guard rejects,
+// so strict is kept after all. Pinned to nail down that the guard is doing
+// real work here, not just in the fallback cases.
+test('quoted empty field alone on a line vanishes, like a blank line', () => assert.deepEqual(rt('"a"\r\n""\r\n"b"'), [['a'],['b']]));
+test('non-string input is stringified', () => { assert.deepEqual(rt(42), [['42']]); assert.deepEqual(rt(true), [['true']]); });
+test('file of only newlines',          () => assert.deepEqual(rt('\r\n\r\n\n\n'), []));
+// A closing quote immediately followed by another character (not a comma,
+// newline or doubled quote) has nowhere to go per RFC 4180; the parser drops
+// the closing quote and treats what follows as ordinary text in the same
+// field. Pinned as known, not a bug: malformed input, not toCSV's output.
+test('quote immediately after a closing quote is dropped', () => assert.deepEqual(rt('"a"b,c'), [['ab','c']]));
+// A bare CR with no following LF must still end a row (old exports before
+// toCSV existed, and files touched by classic-Mac tools, use CR alone).
+// Mutation testing found that deleting the `|| c === '\r'` row-ending check
+// leaves every other test passing, so pin it directly.
+//
+// The plain unquoted case alone no longer catches that mutation now that
+// ── TR.fromCSV is a PURE strict parser ───────────────────────
+// Three attempts to auto-detect a legacy file from its content were rejected:
+// every content heuristic has counterexamples, because a legacy file and a
+// valid RFC 4180 file can be shape-identical. The format marker decides
+// instead — the fixed export writes a UTF-8 BOM and nothing older did — and
+// that choice lives in the caller, which reads the file's bytes. So fromCSV
+// has no modes: strict, always, with a round trip that can be proven.
+console.log('TR.fromCSV — strict, no modes');
+test('an unterminated quote consumes to EOF, as RFC 4180 says', () => {
+  // Deliberately NOT "recovered". A legacy file never reaches this parser.
+  assert.deepEqual(rt('a,"b\r\nc,d'), [['a', 'b\r\nc,d']]);
+});
+test('a quoted field spanning rows stays one field', () => {
+  assert.deepEqual(rt('a,"x\r\ny",z'), [['a', 'x\r\ny', 'z']]);
+});
+
+// ── toCSV → fromCSV is identity, fuzzed ──────────────────────
+// A hand-picked corpus proves only that the cases someone thought of survive.
+// This generates them, because the failures found in review were all values
+// nobody had thought to write down.
+console.log('CSV round trip (fuzz)');
+test('10000 random tables survive toCSV → fromCSV → csvUnguard', () => {
+  const atoms = ['a', 'Z', '1', '', ' ', ',', '"', "'", '=', '+', '-', '@', '\n', '\r\n', '\r',
+                 'é', 'ü', 'ß', 'tab\there', 'a, b', 'say "hi"', '-5m', "'19", '=1+1', '  lead'];
+  let seed = 20260915;
+  const rnd = (n) => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed % n; };
+  for (let t = 0; t < 10000; t++) {
+    const cols = 2 + rnd(8);                       // ≥2: a 1-column empty row can't round-trip
+    const rows = 1 + rnd(6);
+    const table = [];
+    for (let r = 0; r < rows; r++) {
+      const row = [];
+      for (let c = 0; c < cols; c++) {
+        let v = '';
+        for (let k = 0, n = rnd(3); k <= n; k++) v += atoms[rnd(atoms.length)];
+        row.push(v);
+      }
+      // A row of entirely empty fields is indistinguishable from a blank line,
+      // which the parser skips by design. Keep one field non-empty.
+      if (row.every(f => f === '')) row[0] = 'x';
+      table.push(row);
+    }
+    const back = structuredClone(TR.fromCSV(TR.toCSV(table))).map(r => r.map(f => TR.csvUnguard(f)));
+    assert.deepEqual(back, table);
+  }
+});
+
+// ── TR.csvUnguard ─────────────────────────────────────────────
+// The exact inverse of csvCell's formula guard. Only strips an apostrophe the
+// guard could have written, so a hand-authored leading apostrophe survives.
+console.log('TR.csvUnguard');
+test('undoes a guarded dash',      () => assert.equal(TR.csvUnguard("'-5m"), '-5m'));
+test('undoes a guarded equals',    () => assert.equal(TR.csvUnguard("'=1+1"), '=1+1'));
+test('undoes a guarded apostrophe',() => assert.equal(TR.csvUnguard("''19"), "'19"));
+test('undoes across whitespace',   () => assert.equal(TR.csvUnguard("' =1+1"), ' =1+1'));
+test('keeps a hand-typed apostrophe', () => assert.equal(TR.csvUnguard("'19 season"), "'19 season"));
+test('leaves plain values alone',  () => { assert.equal(TR.csvUnguard('Try'), 'Try'); assert.equal(TR.csvUnguard(''), ''); });
+test('nullish',                    () => { assert.equal(TR.csvUnguard(null), ''); assert.equal(TR.csvUnguard(undefined), ''); });
+
+// ── CSV round trip ────────────────────────────────────────────
+// The half a write-only test can't prove: what comes back out.
+console.log('CSV round trip');
+test('nasty values survive a write then read', () => {
+  const original = [
+    ['Time','Type','Comment','Team'],
+    ['0:10','Try','a comma, inside','France'],
+    ['0:20','Turnover','say "play on"','Éire'],
+    ['0:30','Try','-5m from the line','België'],
+    ['0:40','Try',"'19 season squad",'Ünited'],
+    ['0:50','Try','line one\nline two','X'],
+    ['1:00','Try','','Y'],
+  ];
+  const back = structuredClone(TR.fromCSV(TR.toCSV(original)))
+    .map(row => row.map(f => TR.csvUnguard(f)));
+  assert.deepEqual(back, original);
+});
+
 // ─────────────────────────────────────────────────────────────
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

@@ -132,3 +132,80 @@ TR.slugify = (s, fallback) => {
     .replace(/^-+|-+$/g, '');
   return out || fallback || 'file';
 };
+
+// Strip a leading byte-order mark before parsing, not inside the loop, where a
+// stray BOM would glue itself to the first header cell and make a column
+// lookup miss. The export writes one so Excel reads the file as UTF-8.
+function stripBOM(text) {
+  const s = String(text == null ? '' : text);
+  return s.charCodeAt(0) === 0xFEFF ? s.slice(1) : s;
+}
+
+// The RFC 4180 loop itself, kept separate from the BOM handling above so each
+// reads as one job.
+function fromCSVStrict(s) {
+  const rows = [];
+  let row = [], field = '', quoted = false, i = 0;
+  const endField = () => { row.push(field); field = ''; };
+  // A wholly empty line is skipped rather than becoming a row of one empty
+  // field, so a trailing newline or a blank separator line doesn't invent data.
+  const endRow = () => {
+    endField();
+    if (row.length > 1 || row[0] !== '') rows.push(row);
+    row = [];
+  };
+  while (i < s.length) {
+    const c = s[i];
+    if (quoted) {
+      if (c === '"') {
+        if (s[i + 1] === '"') { field += '"'; i += 2; continue; }   // doubled = literal
+        quoted = false; i++; continue;
+      }
+      field += c; i++; continue;
+    }
+    // Only opens a quoted field at the start of one; a quote later in the field
+    // is an ordinary character, which is how malformed input stays readable.
+    if (c === '"' && field === '') { quoted = true; i++; continue; }
+    if (c === ',') { endField(); i++; continue; }
+    if (c === '\r' && s[i + 1] === '\n') { endRow(); i += 2; continue; }
+    if (c === '\n' || c === '\r') { endRow(); i++; continue; }
+    field += c; i++;
+  }
+  if (field !== '' || row.length) endRow();
+  return rows;
+}
+
+// True when every row has as many fields as the first. Every file this app
+// has ever written — old unquoted exports and new quoted ones alike — has
+// this shape, header included: it's what "a CSV" means here, independent of
+// how the text got sliced into rows.
+// Parse CSV text into rows of fields — strict RFC 4180, the exact counterpart
+// to TR.toCSV. A real parser rather than a pair of splits: a field may hold a
+// comma, a doubled quote or a newline, and splitting on those turns one row
+// into several while truncating the field that held them.
+//
+// Deliberately one mode. Three earlier attempts tried to auto-detect an older,
+// unquoted export and fall back to a quote-blind split, and each was rejected:
+// a legacy file and a valid CSV can be byte-for-byte shape-identical, so no
+// content heuristic separates them. Quote parity was fooled by an ordinary
+// balanced `"wow"` later in the file; row shape was fooled by a comment
+// containing a newline, and corrupted files this app had written itself.
+//
+// The whole problem turned out to be self-inflicted: the annotator's CSV export
+// had never actually been used, so there are no old files to stay compatible
+// with. One strict parser, a provable round trip, and nothing to guess.
+TR.fromCSV = (text) => fromCSVStrict(stripBOM(text));
+
+// The exact inverse of csvCell's formula guard.
+//
+// csvCell only ever prefixes an apostrophe when the TRIMMED value starts with
+// one of ' = + - @, so stripping one is correct exactly when the remainder
+// still does. That precision is the point: a hand-typed "'19 season" —
+// apostrophe then a digit — is left alone, because csvCell could not have
+// produced it. Stripping unconditionally would eat that apostrophe.
+TR.csvUnguard = (v) => {
+  const s = v == null ? '' : String(v);
+  if (s[0] !== "'") return s;
+  const rest = s.slice(1);
+  return /^['=+\-@]/.test(rest.trim()) ? rest : s;
+};
