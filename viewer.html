@@ -19,7 +19,12 @@
 <link rel="stylesheet" href="css/theme.css">
 <style>
   /* Identity tokens now live in css/theme.css; only page-specific vars here. */
-  :root { --vp-w: 420px; }
+  /* Two thirds video, one third table. A proportion rather than the fixed
+     420px this used to be: that was most of a laptop screen and a sliver of a
+     desktop one, so the page opened wrong on everything except whatever
+     monitor it was picked on. Dragging still overrides it in px — the handle
+     measures the rendered width, not this value. */
+  :root { --vp-w: calc(200% / 3); }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
