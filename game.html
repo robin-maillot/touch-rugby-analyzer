@@ -1475,10 +1475,20 @@ function plExport(){
   // every accented team name, and this dataset is largely French.
   const blob=new Blob(['﻿'+TR.toCSV([head,...body])],{type:'text/csv;charset=utf-8'});
   const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
+  const url=URL.createObjectURL(blob);
+  a.href=url;
   a.download=TR.slugify(plDraft.name,'playlist')+'.csv';
+  // In the document, and revoked on a later turn of the loop. A detached anchor
+  // is enough on desktop — annotator.html has shipped that way for a long time —
+  // but this is the phone page, and iOS Safari is the browser most likely to
+  // ignore a click on an element that was never in the tree, then hand the blob
+  // to a viewer that reads the URL after the click returns. Both are cheap to
+  // rule out; a download that silently does nothing is the worst failure this
+  // feature has.
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(a.href);
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 
 // Missing refs are dropped from the draft the moment it is edited, so the
