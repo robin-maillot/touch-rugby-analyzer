@@ -98,7 +98,12 @@ TR.refKey = (ref) => String(ref == null ? '' : ref).split('#').slice(0, 2).join(
 // quotes, where it protects nothing.
 TR.csvCell = (v) => {
   let s = v == null ? '' : String(v);
-  if (/^[=+\-@]/.test(s)) s = "'" + s;
+  // Spreadsheet apps strip leading whitespace before checking for a formula
+  // character, so the test must too — but prefix the ORIGINAL string, not the
+  // trimmed one, or the user's own leading space/tab is silently eaten.
+  if (/^[=+\-@]/.test(s.trim())) s = "'" + s;
+  // A leading apostrophe is left alone: it's a Sheets-only "treat as text"
+  // marker, but this is a CSV file, where RFC 4180 gives it no meaning at all.
   return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 };
 
@@ -116,7 +121,7 @@ TR.toCSV = (rows) => (rows || [])
 // mid-separator, and trimming first would leave the dash behind.
 TR.slugify = (s, fallback) => {
   const out = String(s == null ? '' : s)
-    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .slice(0, 60)

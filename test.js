@@ -1340,6 +1340,11 @@ test('formula =',        () => assert.equal(TR.csvCell('=1+1'), "'=1+1"));
 test('formula +',        () => assert.equal(TR.csvCell('+5'), "'+5"));
 test('formula -',        () => assert.equal(TR.csvCell('-5m clips'), "'-5m clips"));
 test('formula @',        () => assert.equal(TR.csvCell('@here'), "'@here"));
+test('formula number',   () => assert.equal(TR.csvCell(-5), "'-5"));
+// The guard checks a trimmed copy, but prefixes the ORIGINAL string, or a
+// leading space/tab would slip the formula past a naive first-char check.
+test('leading space before formula', () => assert.equal(TR.csvCell(' =1+1'), "' =1+1"));
+test('leading tab before formula',   () => assert.equal(TR.csvCell('\t=1+1'), "'\t=1+1"));
 // The guard runs BEFORE quoting, so a formula carrying a comma is both
 // neutralised and quoted — quoting first would bury the apostrophe inside.
 test('formula + comma',  () => assert.equal(TR.csvCell('=A1,B1'), `"'=A1,B1"`));
