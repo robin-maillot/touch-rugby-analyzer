@@ -321,6 +321,7 @@
   /* Same footprint as .pl-danger below it, but this is not destructive, so it
      keeps the ordinary button colours. */
   .pl-export{width:100%;height:38px;margin-top:12px}
+  .pl-export:disabled{opacity:.4}
 
   /* ── Landscape: video beside the list ───────────────────────
      No min-width gate. A 667px-wide phone in landscape used to fall through to
@@ -511,6 +512,15 @@ let fCat=null, fNarrow='';
 // every open, for the same reason fCat is: reopening the sheet must never
 // strand the user inside a playlist.
 let plEdit=null, plDraft=null;
+// The resolution plEditBody() last painted from, stashed so plExport() can
+// reuse it instead of resolving plDraft.refs against `rows` a second time.
+// `rows` is reassigned whole by ingest() when a fetch lands, independently of
+// whatever the playlists sheet is showing (the loader skips repainting it
+// while plEdit is set) — so a second resolve at click time can silently
+// disagree with what the screen last painted. Only ever read behind plExport's
+// `if(!plDraft) return` guard: it is stale (or null) whenever plEdit/plDraft
+// are null, but nothing reads it in that state.
+let plResolved=null;
 // What had focus when the sheet was opened, so closeSheet can hand it back.
 // Declared up here with the rest of the state rather than beside the sheet
 // functions, because the load path closes a sheet before that far down the
@@ -1412,7 +1422,7 @@ function paintPlHead(){
 }
 
 function plEditBody(){
-  const r=TR.playlists.resolve(plDraft.refs,rows);
+  const r=plResolved=TR.playlists.resolve(plDraft.refs,rows);
   // The note is optional, and is the only place in the app that can set it —
   // without a field here the Note column, its header constant, its request
   // field and the list row's render branch were all carrying a value that was
@@ -1452,9 +1462,17 @@ function plEditBody(){
 // Exports the DRAFT, not the saved row: what is on screen is what comes out, so
 // a reorder the user hasn't left the screen with still exports in the order
 // they're looking at.
+//
+// Reuses plResolved — the resolution plEditBody() painted the screen from —
+// rather than resolving plDraft.refs against `rows` again here. `rows` can be
+// reassigned between paint and click (a fetch landing while the user reorders),
+// and resolving fresh at click time would then export something the screen
+// never showed. plResolved can't go stale on ORDER either: plMove/plDrop/
+// plDrill all repaint through playlistSheet() -> plEditBody(), which recomputes
+// it every time, and this button only exists in the DOM plEditBody() just drew.
 function plExport(){
   if(!plDraft) return;
-  const r=TR.playlists.resolve(plDraft.refs,rows);
+  const r=plResolved;
   if(!r.events.length) return;          // the button is disabled too; belt and braces
   const head=['#','Game','Time','Type','Name','Team','Move','Comment','YouTube Link'];
   const body=r.events.map((e,n)=>[

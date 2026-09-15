@@ -98,6 +98,10 @@ TR.refKey = (ref) => String(ref == null ? '' : ref).split('#').slice(0, 2).join(
 //
 // Guard first, quote second: quoting first would bury the apostrophe inside the
 // quotes, where it protects nothing.
+//
+// Write-only: applying this twice guards and quotes twice over. The only
+// caller is toCSV(), whose joined string can't be fed back in by accident —
+// but call it exactly once per value, never on an already-exported cell.
 TR.csvCell = (v) => {
   let s = v == null ? '' : String(v);
   // Spreadsheet apps strip leading whitespace before checking for a formula
