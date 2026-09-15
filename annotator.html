@@ -821,11 +821,13 @@ function renderSubmenu(type) {
 }
 
 // ── Strike move (optional second stage) ────────────────────────
-// Turnovers and attack penalties can record the move that was being run when
-// the attack failed. Offered after the sub-type is picked and always skippable.
+// Turnovers and attack penalties record the move that was being run when the
+// attack failed; a defensive penalty records the move that drew it (the attack
+// keeps the ball, so it counts towards no rate — see TR.offersStrikeMove).
+// Offered after the sub-type is picked and always skippable.
 // Simple Mode is excluded: being one click is the entire point of it.
 function offersStrikeMove(type, name) {
-  return !isDefaultOther() && type !== 'Try' && TR.isAttackEnd(type, name);
+  return !isDefaultOther() && TR.offersStrikeMove(type, name);
 }
 
 function renderMoveMenu(type, name, selectedMove = null) {
@@ -979,7 +981,7 @@ function renderList() {
     const warnHtml = bad
       ? `<span class="ann-warn" title="Expected ${esc(exp)} based on the chain from prior events">⚠</span><button class="ann-fix-btn" onclick="event.stopPropagation();fixOneInconsistency(${a.id})" title="Set possession to ${esc(exp)} and recompute downstream">Fix</button>`
       : '';
-    const canMove = TR.isAttackEnd(a.type, a.name) && a.type !== 'Try';
+    const canMove = TR.offersStrikeMove(a.type, a.name);
     return `<div class="annotation-row${bad ? ' inconsistent' : ''}" style="border-color:${esc(COLORS[a.type])}" onclick="seekTo(${a.time})">
       <span class="ann-time">${esc(a.timeStr)}</span>
       <span class="ann-type" style="color:${esc(COLORS[a.type])}">${esc(a.type)}</span>
@@ -1048,7 +1050,7 @@ function editAnnotationName(id) {
 // because leaving an attempt untagged is always allowed.
 function editAnnotationMove(id) {
   const ann = annotations.find(a => a.id === id);
-  if (!ann || ann.type === 'Try' || !TR.isAttackEnd(ann.type, ann.name)) return;
+  if (!ann || !TR.offersStrikeMove(ann.type, ann.name)) return;
 
   const span = document.getElementById(`ann-move-${id}`);
   if (!span) return;
@@ -1328,7 +1330,7 @@ async function pushToSheet(override = false) {
       a.type === 'To Review' ? 'Yes' : '',
       a.comment || '',
       a.actionOwner || '',
-      TR.strikeMoveOf(a.type, a.name, a.strikeMove),
+      TR.recordedMoveOf(a.type, a.name, a.strikeMove),
     ];
   });
 
@@ -1408,7 +1410,7 @@ function exportCSV() {
       // Per-event YouTube deep link (timestamped to the event, 5s lookback);
       // empty when no video URL is loaded.
       cols.push(toReview, a.comment || '', a.actionOwner || '',
-                TR.strikeMoveOf(a.type, a.name, a.strikeMove), ytLink(a.time));
+                TR.recordedMoveOf(a.type, a.name, a.strikeMove), ytLink(a.time));
       return cols.join(',');
     })
   ];
@@ -1558,7 +1560,7 @@ document.addEventListener('keydown', e => {
   }
   // Sub-type by number — suppressed only while the *move* menu is the thing
   // actually on screen (pendingType set AND that pending type/name offers a
-  // strike move). For types with no move stage (e.g. Penalty Defence, Try),
+  // strike move). For types with no move stage (e.g. Try, Game Event),
   // #submenu still shows the full sub-type list with live hotkey hints even
   // once the team menu is up — those digits must keep working, matching
   // pre-existing behaviour (correcting a sub-type choice while the team menu

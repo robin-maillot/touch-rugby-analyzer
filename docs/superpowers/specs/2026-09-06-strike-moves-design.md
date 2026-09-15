@@ -40,6 +40,12 @@ An attempt **ends exactly when the ball changes hands**, which
 must not offer the move picker on them — one less tap on the sideline, and no
 junk in the denominator.
 
+> **Superseded for Penalty Defence (2026-09-15).** The picker *is* now offered
+> on a defensive penalty, to record the move that drew it — see
+> [2026-09-15-pen-defence-moves-design.md](2026-09-15-pen-defence-moves-design.md).
+> The denominator reasoning above is unchanged and still enforced: that move is
+> context only and never reaches a rate. `6 Again` remains excluded outright.
+
 Try rate for move M:
 
 ```

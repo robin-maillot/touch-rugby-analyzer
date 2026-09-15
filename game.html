@@ -617,7 +617,7 @@ function ingest(r){
       // Derived, not read raw: a Try's move IS its name, and the viewer's inline
       // edit can leave the stored Strike Move column stale after a rename.
       // Same fix as viewer.html f14dbee.
-      move:TR.strikeMoveOf(type,name,rawMove), game:x[I.g],
+      move:TR.recordedMoveOf(type,name,rawMove), game:x[I.g],
       comp:I.cp>=0?(x[I.cp]||'').trim():'', year:I.yr>=0?(x[I.yr]||'').trim():'',
       div:I.dv>=0?(x[I.dv]||'').trim():''};
   }).filter(e=>e.type);
@@ -1161,6 +1161,11 @@ function paintMarks(){
 // shape TR.strikeMoveStats expects. e.move is already the derived value (see
 // ingest()), so this just hands it back through — TR.strikeMoveOf is
 // idempotent on an already-derived move, it never re-derives to something else.
+// ingest() derives with TR.recordedMoveOf, which is the wider of the two: a
+// defensive penalty carries a move here so the card and filters can show it.
+// That is safe to pass through — strikeMoveStats gates on TR.isAttackEnd, so
+// the penalty is dropped before any rate sees it, which is what keeps one
+// attack out of the denominator twice.
 function moveEventsFor(list){
   return list.map(e=>({type:e.type,name:e.name,strikeMove:e.move,actionOwner:e.team}));
 }

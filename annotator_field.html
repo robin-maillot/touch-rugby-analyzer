@@ -1594,7 +1594,7 @@ function applySubtype() {
 function renderMoveSelect(a) {
   const wrap = document.getElementById('editMoveWrap');
   const sel  = document.getElementById('editMove');
-  const show = a.type !== 'Try' && TR.isAttackEnd(a.type, a.name);
+  const show = TR.offersStrikeMove(a.type, a.name);
   wrap.style.display = show ? '' : 'none';
   if (!show) return;
   const opts = ['', ...TR.STRIKE_MOVES];
@@ -2325,7 +2325,7 @@ async function pushToSheet(override = false) {
 
   // Column order must match HEADERS in Code.gs, Strike Move last.
   const rows = annotations.map(a => [a.timeStr, a.possessionOwner, a.type, a.name, '', a.comment,
-                                     a.actionOwner, TR.strikeMoveOf(a.type, a.name, a.strikeMove)]);
+                                     a.actionOwner, TR.recordedMoveOf(a.type, a.name, a.strikeMove)]);
 
   try {
     const analyzable = isAnalysable() ? 'TRUE' : 'FALSE';

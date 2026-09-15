@@ -1279,6 +1279,53 @@ test('junk is retryable as well',       () => {
   catch (e) { assert.equal(e.retryable, true); }
 });
 
+// ── TR.offersStrikeMove ───────────────────────────────────────
+// Which events the annotators offer the move picker on. Wider than
+// TR.isAttackEnd: a defensive penalty keeps the ball, so it is not an attempt,
+// but the move being run when the defence infringed is still worth recording.
+console.log('TR.offersStrikeMove');
+test('Turnover offers one',        () => assert.equal(TR.offersStrikeMove('Turnover', 'Ball Down'), true));
+test('Penalty Attack offers one',  () => assert.equal(TR.offersStrikeMove('Penalty Attack', 'Forward Pass'), true));
+test('Penalty Defence offers one', () => assert.equal(TR.offersStrikeMove('Penalty Defence', 'Offside'), true));
+test('Try does not — name is the move', () => assert.equal(TR.offersStrikeMove('Try', '32 - Cut'), false));
+test('6 Again does not',           () => assert.equal(TR.offersStrikeMove('Turnover', '6 Again'), false));
+test('Game Event does not',        () => assert.equal(TR.offersStrikeMove('Game Event', 'Game Start'), false));
+test('To Review does not',         () => assert.equal(TR.offersStrikeMove('To Review', ''), false));
+
+// ── TR.recordedMoveOf ─────────────────────────────────────────
+// What the move column shows and exports, as opposed to TR.strikeMoveOf, which
+// answers the narrower "what move was this an attempt at" for the rate maths.
+console.log('TR.recordedMoveOf');
+test('Try uses its own name',      () => assert.equal(TR.recordedMoveOf('Try', '33 - Quicky', ''), '33 - Quicky'));
+test('Turnover uses its move',     () => assert.equal(TR.recordedMoveOf('Turnover', 'Ball Down', '32 - Cut'), '32 - Cut'));
+test('Pen Defence keeps its move', () => assert.equal(TR.recordedMoveOf('Penalty Defence', 'Offside', '32'), '32'));
+test('Pen Defence untagged is empty', () => assert.equal(TR.recordedMoveOf('Penalty Defence', 'Offside', ''), ''));
+test('6 Again drops its move',     () => assert.equal(TR.recordedMoveOf('Turnover', '6 Again', '32'), ''));
+test('Game Event drops its move',  () => assert.equal(TR.recordedMoveOf('Game Event', 'Game Start', '32'), ''));
+
+// A defensive penalty records a move for context only. It must never reach the
+// rate maths: the same attack goes on to end in a Try, Turnover or Penalty
+// Attack that carries its own move, so counting the penalty too would put one
+// attack in the denominator twice.
+console.log('Pen Defence moves stay out of the rate maths');
+test('strikeMoveOf still drops it', () => assert.equal(TR.strikeMoveOf('Penalty Defence', 'Offside', '32'), ''));
+test('not an attack end',           () => assert.equal(TR.isAttackEnd('Penalty Defence', 'Offside'), false));
+test('adds no attempt to the stats', () => {
+  const without = TR.strikeMoveStats([
+    { type: 'Try',      name: '32', strikeMove: '',   actionOwner: 'Team 1' },
+    { type: 'Turnover', name: 'Ball Down', strikeMove: '32', actionOwner: 'Team 1' },
+  ]);
+  const withPenDef = TR.strikeMoveStats([
+    { type: 'Try',      name: '32', strikeMove: '',   actionOwner: 'Team 1' },
+    { type: 'Turnover', name: 'Ball Down', strikeMove: '32', actionOwner: 'Team 1' },
+    { type: 'Penalty Defence', name: 'Offside', strikeMove: '32', actionOwner: 'Team 1' },
+  ]);
+  assert.deepEqual(structuredClone(withPenDef.moves), structuredClone(without.moves));
+  assert.equal(withPenDef.moves[0].attempts, 2);
+  assert.equal(withPenDef.moves[0].rate, 0.5);
+  assert.equal(withPenDef.coverage.total, without.coverage.total);
+});
+
 // ─────────────────────────────────────────────────────────────
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

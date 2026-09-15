@@ -206,6 +206,38 @@
     });
   });
 
+  QUnit.module('TR.offersStrikeMove', () => {
+    QUnit.test('failed attempts and defensive penalties offer one', t => {
+      t.equal(TR.offersStrikeMove('Turnover', 'Ball Down'), true);
+      t.equal(TR.offersStrikeMove('Penalty Attack', 'Forward Pass'), true);
+      t.equal(TR.offersStrikeMove('Penalty Defence', 'Offside'), true);
+    });
+    QUnit.test('a Try, 6 Again and the rest do not', t => {
+      t.equal(TR.offersStrikeMove('Try', '32 - Cut'), false);
+      t.equal(TR.offersStrikeMove('Turnover', '6 Again'), false);
+      t.equal(TR.offersStrikeMove('Game Event', 'Game Start'), false);
+      t.equal(TR.offersStrikeMove('To Review', ''), false);
+    });
+  });
+
+  QUnit.module('TR.recordedMoveOf', () => {
+    QUnit.test('shows what was recorded, defensive penalties included', t => {
+      t.equal(TR.recordedMoveOf('Try', '33 - Quicky', ''), '33 - Quicky');
+      t.equal(TR.recordedMoveOf('Turnover', 'Ball Down', '32 - Cut'), '32 - Cut');
+      t.equal(TR.recordedMoveOf('Penalty Defence', 'Offside', '32'), '32');
+    });
+    QUnit.test('but the rate maths still drops the penalty', t => {
+      t.equal(TR.strikeMoveOf('Penalty Defence', 'Offside', '32'), '');
+      const stats = TR.strikeMoveStats([
+        { type: 'Try', name: '32', strikeMove: '', actionOwner: 'Team 1' },
+        { type: 'Turnover', name: 'Ball Down', strikeMove: '32', actionOwner: 'Team 1' },
+        { type: 'Penalty Defence', name: 'Offside', strikeMove: '32', actionOwner: 'Team 1' },
+      ]);
+      t.equal(stats.moves[0].attempts, 2, 'the penalty adds no attempt');
+      t.equal(stats.moves[0].rate, 0.5);
+    });
+  });
+
   // ── TR.inferPossessionAfter ────────────────────────────────────
   QUnit.module('TR.inferPossessionAfter', () => {
     QUnit.test('Try → other team gets possession', t => {
