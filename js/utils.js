@@ -81,3 +81,54 @@ TR.evKey = (e) => `${e.game}#${e.time}`;
 
 // The same key, taken from a stored ref string rather than a live event.
 TR.refKey = (ref) => String(ref == null ? '' : ref).split('#').slice(0, 2).join('#');
+
+// One RFC 4180 CSV field.
+//
+// Two jobs. The quoting is ordinary — double every embedded quote, wrap the
+// field when it carries a quote, a comma, CR or LF.
+//
+// The second job is the one that matters. Excel and Google Sheets EXECUTE a
+// cell whose first character is = + - or @, and an event Comment is free text
+// an annotator typed, so an exported file could run code on whoever opens it.
+// The same apps also treat a leading apostrophe as their "force as text"
+// marker and consume it on read — so '19 season would silently come back as
+// 19 season. Same class of bug sheetSafe() closes server-side. Doubling the
+// apostrophe fixes both: their marker eats our extra one and the user's real
+// character survives.
+//
+// Guard first, quote second: quoting first would bury the apostrophe inside the
+// quotes, where it protects nothing.
+//
+// Write-only: applying this twice guards and quotes twice over. The only
+// caller is toCSV(), whose joined string can't be fed back in by accident —
+// but call it exactly once per value, never on an already-exported cell.
+TR.csvCell = (v) => {
+  let s = v == null ? '' : String(v);
+  // Spreadsheet apps strip leading whitespace before checking for a formula
+  // character, so the test must too — but prefix the ORIGINAL string, not the
+  // trimmed one, or the user's own leading space/tab is silently eaten.
+  if (/^['=+\-@]/.test(s.trim())) s = "'" + s;
+  return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+};
+
+// Rows of fields → RFC 4180 text. CRLF between rows, which is what the format
+// says and what Excel expects; no trailing newline, so the file has no phantom
+// final row.
+TR.toCSV = (rows) => (rows || [])
+  .map(r => (r || []).map(c => TR.csvCell(c)).join(','))
+  .join('\r\n');
+
+// A filename-safe slug. Diacritics are folded rather than dropped, because this
+// dataset is largely French and "Équipe" deserves better than "quipe".
+//
+// Order matters: truncate BEFORE trimming separators. A cut at the cap can land
+// mid-separator, and trimming first would leave the dash behind.
+TR.slugify = (s, fallback) => {
+  const out = String(s == null ? '' : s)
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .slice(0, 60)
+    .replace(/^-+|-+$/g, '');
+  return out || fallback || 'file';
+};

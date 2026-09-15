@@ -1326,6 +1326,57 @@ test('adds no attempt to the stats', () => {
   assert.equal(withPenDef.coverage.total, without.coverage.total);
 });
 
+// ── TR.csvCell ────────────────────────────────────────────────
+console.log('TR.csvCell');
+test('plain value',      () => assert.equal(TR.csvCell('Try'), 'Try'));
+test('empty and nullish',() => { assert.equal(TR.csvCell(''), ''); assert.equal(TR.csvCell(null), ''); assert.equal(TR.csvCell(undefined), ''); });
+test('number',           () => assert.equal(TR.csvCell(3), '3'));
+test('zero is not blank',() => assert.equal(TR.csvCell(0), '0'));
+test('comma quotes',     () => assert.equal(TR.csvCell('a,b'), '"a,b"'));
+test('quote doubles',    () => assert.equal(TR.csvCell('say "hi"'), '"say ""hi"""'));
+test('newline quotes',   () => assert.equal(TR.csvCell('a\nb'), '"a\nb"'));
+test('CR quotes',        () => assert.equal(TR.csvCell('a\rb'), '"a\rb"'));
+test('formula =',        () => assert.equal(TR.csvCell('=1+1'), "'=1+1"));
+test('formula +',        () => assert.equal(TR.csvCell('+5'), "'+5"));
+test('formula -',        () => assert.equal(TR.csvCell('-5m clips'), "'-5m clips"));
+test('formula @',        () => assert.equal(TR.csvCell('@here'), "'@here"));
+test('formula number',   () => assert.equal(TR.csvCell(-5), "'-5"));
+// The guard checks a trimmed copy, but prefixes the ORIGINAL string, or a
+// leading space/tab would slip the formula past a naive first-char check.
+test('leading space before formula', () => assert.equal(TR.csvCell(' =1+1'), "' =1+1"));
+test('leading tab before formula',   () => assert.equal(TR.csvCell('\t=1+1'), "'\t=1+1"));
+// The guard runs BEFORE quoting, so a formula carrying a comma is both
+// neutralised and quoted — quoting first would bury the apostrophe inside.
+test('formula + comma',  () => assert.equal(TR.csvCell('=A1,B1'), `"'=A1,B1"`));
+test('apostrophe mid-string is untouched', () => assert.equal(TR.csvCell("Dad's Army"), "Dad's Army"));
+test('leading apostrophe is doubled', () => assert.equal(TR.csvCell("'19 season"), "''19 season"));
+test('leading apostrophe before formula', () => assert.equal(TR.csvCell("'=1+1"), "''=1+1"));
+
+// ── TR.toCSV ──────────────────────────────────────────────────
+console.log('TR.toCSV');
+test('header and rows', () => assert.equal(
+  TR.toCSV([['#', 'Name'], [1, 'Scoop'], [2, 'a,b']]),
+  '#,Name\r\n1,Scoop\r\n2,"a,b"'));
+test('single row',   () => assert.equal(TR.toCSV([['a', 'b']]), 'a,b'));
+test('empty input',  () => { assert.equal(TR.toCSV([]), ''); assert.equal(TR.toCSV(null), ''); });
+test('no trailing newline', () => assert.equal(TR.toCSV([['a'], ['b']]).endsWith('\n'), false));
+
+// ── TR.slugify ────────────────────────────────────────────────
+console.log('TR.slugify');
+test('spaces to dashes', () => assert.equal(TR.slugify('Backdoor teaching set', 'playlist'), 'backdoor-teaching-set'));
+test('punctuation collapses', () => assert.equal(TR.slugify('France v England!! (2025)', 'playlist'), 'france-v-england-2025'));
+test('diacritics stripped',   () => assert.equal(TR.slugify('Équipe Française', 'playlist'), 'equipe-francaise'));
+test('path characters',       () => assert.equal(TR.slugify('a/b\\c', 'playlist'), 'a-b-c'));
+test('fallback when empty',   () => { assert.equal(TR.slugify('', 'playlist'), 'playlist'); assert.equal(TR.slugify('!!!', 'playlist'), 'playlist'); assert.equal(TR.slugify(null, 'playlist'), 'playlist'); });
+// Truncation happens before the trim, so a cut landing mid-separator cannot
+// leave a trailing dash.
+test('truncates to 60',  () => assert.equal(TR.slugify('a'.repeat(80), 'playlist').length, 60));
+test('no trailing dash after truncation', () => {
+  const s = TR.slugify('a'.repeat(59) + ' bbbb', 'playlist');
+  assert.equal(s.length <= 60, true);
+  assert.equal(s.endsWith('-'), false);
+});
+
 // ─────────────────────────────────────────────────────────────
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

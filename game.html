@@ -318,6 +318,10 @@
   .pl-danger{width:100%;height:38px;margin-top:12px;background:var(--surface2);
     border:1px solid var(--pdef);color:#fca5a5;border-radius:8px;font-size:.78rem;
     cursor:pointer;font-family:inherit}
+  /* Same footprint as .pl-danger below it, but this is not destructive, so it
+     keeps the ordinary button colours. */
+  .pl-export{width:100%;height:38px;margin-top:12px}
+  .pl-export:disabled{opacity:.4}
 
   /* ── Landscape: video beside the list ───────────────────────
      No min-width gate. A 667px-wide phone in landscape used to fall through to
@@ -508,6 +512,15 @@ let fCat=null, fNarrow='';
 // every open, for the same reason fCat is: reopening the sheet must never
 // strand the user inside a playlist.
 let plEdit=null, plDraft=null;
+// The resolution plEditBody() last painted from, stashed so plExport() can
+// reuse it instead of resolving plDraft.refs against `rows` a second time.
+// `rows` is reassigned whole by ingest() when a fetch lands, independently of
+// whatever the playlists sheet is showing (the loader skips repainting it
+// while plEdit is set) — so a second resolve at click time can silently
+// disagree with what the screen last painted. Only ever read behind plExport's
+// `if(!plDraft) return` guard: it is stale (or null) whenever plEdit/plDraft
+// are null, but nothing reads it in that state.
+let plResolved=null;
 // What had focus when the sheet was opened, so closeSheet can hand it back.
 // Declared up here with the rest of the state rather than beside the sheet
 // functions, because the load path closes a sheet before that far down the
@@ -1106,6 +1119,7 @@ $('sheetBody').addEventListener('click',ev=>{
   if(a){addTo(a.dataset.addto);return}
   if(within(ev,ev.target.closest('[data-addnew]'))){addTo(null);return}
   if(within(ev,ev.target.closest('[data-plnew]'))){plNew();return}
+  if(within(ev,ev.target.closest('[data-plexport]'))){plExport();return}
 });
 
 // Enter in either naming field commits it, so the on-screen keyboard's own
@@ -1408,7 +1422,7 @@ function paintPlHead(){
 }
 
 function plEditBody(){
-  const r=TR.playlists.resolve(plDraft.refs,rows);
+  const r=plResolved=TR.playlists.resolve(plDraft.refs,rows);
   // The note is optional, and is the only place in the app that can set it —
   // without a field here the Note column, its header constant, its request
   // field and the list row's render branch were all carrying a value that was
@@ -1440,7 +1454,59 @@ function plEditBody(){
         </span>
       </div>`).join('')
       :'<div class="empty">Nothing in here yet.</div>')+
+    `<button class="icon-btn pl-export" data-plexport="1"
+       ${r.events.length?'':'disabled'}>⬇ Export CSV</button>`+
     `<button class="pl-danger" onclick="plDelete()">Delete this playlist</button>`;
+}
+
+// Exports the DRAFT, not the saved row: what is on screen is what comes out, so
+// a reorder the user hasn't left the screen with still exports in the order
+// they're looking at.
+//
+// Reuses plResolved — the resolution plEditBody() painted the screen from —
+// rather than resolving plDraft.refs against `rows` again here. `rows` can be
+// reassigned between paint and click (a fetch landing while the user reorders),
+// and resolving fresh at click time would then export something the screen
+// never showed. plResolved can't go stale on ORDER either: plMove/plDrop/
+// plDrill all repaint through playlistSheet() -> plEditBody(), which recomputes
+// it every time, and this button only exists in the DOM plEditBody() just drew.
+function plExport(){
+  if(!plDraft) return;
+  const r=plResolved;
+  if(!r.events.length) return;          // the button is disabled too; belt and braces
+  const head=['#','Game','Time','Type','Name','Team','Move','Comment','YouTube Link'];
+  const body=r.events.map((e,n)=>[
+    // Position in the FILE, not in the stored ref list — a ref that no longer
+    // resolves is absent here, and a # that skipped 4 would send the reader
+    // hunting for a row that isn't coming.
+    n+1,
+    // The full label, not shortLabel: a playlist spans matches, and two
+    // "France vs England" rows from different years must be tellable apart.
+    labels[e.game]||e.game,
+    e.timeStr, e.type, e.name, e.team, e.move, e.comment,
+    // seekLink applies the game's videoOffset and the 5s lookback, and returns
+    // '' when the game has no video or the moment predates the recording. The
+    // row still exports, so the file's length always matches the list above it.
+    TR.player.seekLink(meta[e.game],e.time)
+  ]);
+  // BOM: without it Excel reads the file as the system codepage and mangles
+  // every accented team name, and this dataset is largely French.
+  const blob=new Blob(['﻿'+TR.toCSV([head,...body])],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');
+  const url=URL.createObjectURL(blob);
+  a.href=url;
+  a.download=TR.slugify(plDraft.name,'playlist')+'.csv';
+  // In the document, and revoked on a later turn of the loop. A detached anchor
+  // is enough on desktop — annotator.html has shipped that way for a long time —
+  // but this is the phone page, and iOS Safari is the browser most likely to
+  // ignore a click on an element that was never in the tree, then hand the blob
+  // to a viewer that reads the URL after the click returns. Both are cheap to
+  // rule out; a download that silently does nothing is the worst failure this
+  // feature has.
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 
 // Missing refs are dropped from the draft the moment it is edited, so the
