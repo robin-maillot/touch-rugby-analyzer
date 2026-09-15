@@ -26,12 +26,17 @@ action.
 It exports the **draft**, not the saved row. `plEditBody()` already computes
 
 ```js
-const r = TR.playlists.resolve(plDraft.refs, rows);
+const r = plResolved = TR.playlists.resolve(plDraft.refs, rows);
 ```
 
-and the export reuses exactly that result — same events, same order. What is on
-screen is what comes out, so a reorder the user has not yet left the screen with
-still exports in the order they are looking at. One resolution, not two.
+stashing the result in a module-level `plResolved`, and the export reuses that
+stash rather than resolving again. Resolving a second time at click time would
+read whatever `rows` holds *then* — and `rows` is reassigned whole when a
+fetch lands, independently of what the playlists sheet is showing — so a click
+some time after paint could silently export something other than what is on
+screen. The stash can't go stale on order either: `plMove`/`plDrop`/`plDrill`
+all repaint through `plEditBody()`, which recomputes it on every reorder. What
+is on screen is what comes out. One resolution, reused, not two.
 
 Disabled when the playlist resolves to no events, so the button can never
 produce a file with a header and nothing under it.
@@ -109,9 +114,10 @@ The file is prefixed with a UTF-8 **BOM** (`﻿`). Without it Excel reads the
 file as the system codepage and mangles every accented team name, and this
 dataset is largely French and European.
 
-The filename is slugified from the playlist name, in this order: lowercase,
-collapse every run of non-alphanumerics to a single `-`, truncate to 60
-characters, then trim leading and trailing `-`. Trimming last matters — cutting
+The filename is slugified from the playlist name, in this order: fold
+diacritics (NFD normalize, strip the combining marks), lowercase, collapse
+every run of non-alphanumerics to a single `-`, truncate to 60 characters, then
+trim leading and trailing `-`. Trimming last matters — cutting
 at 60 can land mid-separator and would otherwise leave `some-name-.csv`. A name
 that slugifies to nothing falls back to `playlist`.
 

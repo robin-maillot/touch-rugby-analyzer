@@ -351,7 +351,7 @@ to an event with no video.
 
 - [ ] **Step 2: Bump the service worker cache**
 
-`game.html`, `js/utils.js` and `README.md` are all shell assets. Read the current value first:
+`game.html` and `js/utils.js` are both shell assets. Read the current value first:
 
 ```bash
 grep -n "CACHE_VERSION" sw.js
