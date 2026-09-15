@@ -74,7 +74,7 @@
   /* ── Split layout ─────────────────────────────────────────── */
   .split { display: flex; flex: 1; overflow: hidden; min-height: 0; }
 
-  .video-panel { width: var(--vp-w); min-width: 260px; max-width: 70vw; display: flex; flex-direction: column; border-right: 1px solid var(--border); flex-shrink: 0; }
+  .video-panel { width: var(--vp-w); min-width: 260px; max-width: 80vw; display: flex; flex-direction: column; border-right: 1px solid var(--border); flex-shrink: 0; }
 
   .resize-handle { width: 5px; cursor: col-resize; background: var(--border); flex-shrink: 0; transition: background 0.15s; user-select: none; }
   .resize-handle:hover, .resize-handle.dragging { background: var(--accent); }
@@ -1721,7 +1721,7 @@ function setupResizeHandle() {
       document.documentElement.style.setProperty('--vp-h', newH + 'px');
     } else {
       const splitW = split.getBoundingClientRect().width;
-      const newW   = Math.max(260, Math.min(splitW * 0.70, startSize + (e.clientX - startPos)));
+      const newW   = Math.max(260, Math.min(splitW * 0.80, startSize + (e.clientX - startPos)));
       document.documentElement.style.setProperty('--vp-w', newW + 'px');
     }
   });
