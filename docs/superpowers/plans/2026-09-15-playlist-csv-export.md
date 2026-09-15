@@ -147,7 +147,7 @@ TR.slugify = (s, fallback) => {
 node test.js
 ```
 
-Expected: the new `✓` lines, `0 failed`, exit 0. The suite was at 213 passed before this task; it should now read 238 passed.
+Expected: the new `✓` lines, `0 failed`, exit 0. The suite was at 238 passed before this task; it should now read 263 passed.
 
 - [ ] **Step 5: Commit**
 
@@ -265,7 +265,7 @@ Do NOT add an `onclick` to the button — `game.html` routes every data-carrying
 node test.js
 ```
 
-Expected: 238 passed, 0 failed. (This task changes no file the harness loads; run it to confirm nothing broke.)
+Expected: 263 passed, 0 failed. (This task changes no file the harness loads; run it to confirm nothing broke.)
 
 - [ ] **Step 6: Syntax-check the inline script**
 
@@ -365,7 +365,7 @@ Bump the number by one (at the time of writing it reads `'trl-shell-v24'`, so it
 node test.js
 ```
 
-Expected: 238 passed, 0 failed.
+Expected: 263 passed, 0 failed.
 
 - [ ] **Step 4: Commit**
 
