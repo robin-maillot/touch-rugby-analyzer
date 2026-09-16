@@ -558,12 +558,27 @@ function toSecs(t){const p=String(t||'').trim().split(':').map(Number);
   if(cl) buildMeta(cl.sheets);
   if(ca){ ingest(ca.rows); restore(); }
   try{
-    const [a,l]=await Promise.all([
-      fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&action=all`),
-      fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&action=list`)]);
-    const [ar,lr]=await Promise.all([a.json(),l.json()]);
-    if(ar.ok){LS.set('all',ar); ingest(ar.rows);}
-    if(lr.ok){LS.set('list',lr); buildMeta(lr.sheets); if(picked) paintGame();}
+    // action=all is ~590KB and takes 10-30s, because the server's cache tops
+    // out at 95KB and so has never once held it — every request re-reads all 33
+    // game sheets. games/dashboard/analytics/viewer all sidestep that with the
+    // 35-byte version check; this page was the one that didn't, and it is the
+    // phone page people open most. Ask what the spreadsheet's version is first
+    // and skip the big fetch entirely when both caches were built from it.
+    let fresh=false;
+    if(ca&&cl&&ca.version!=null&&cl.version!=null){
+      try{
+        const vr=await (await fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&action=version`)).json();
+        fresh = vr.ok && vr.version===ca.version && vr.version===cl.version;
+      }catch(e){}   // version unreachable → fall through and fetch properly
+    }
+    if(!fresh){
+      const [a,l]=await Promise.all([
+        fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&action=all`),
+        fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&action=list`)]);
+      const [ar,lr]=await Promise.all([a.json(),l.json()]);
+      if(ar.ok){LS.set('all',ar); ingest(ar.rows);}
+      if(lr.ok){LS.set('list',lr); buildMeta(lr.sheets); if(picked) paintGame();}
+    }
     try{ PL=await TR.playlists.load(TR.secret()); plLoadError=null; }
     catch(e){ PL=[]; plLoadError=e.message; }
     // A warm cache runs restore() — and so applyHash() — above, before this

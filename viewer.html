@@ -19,7 +19,12 @@
 <link rel="stylesheet" href="css/theme.css">
 <style>
   /* Identity tokens now live in css/theme.css; only page-specific vars here. */
-  :root { --vp-w: 420px; }
+  /* Two thirds video, one third table. A proportion rather than the fixed
+     420px this used to be: that was most of a laptop screen and a sliver of a
+     desktop one, so the page opened wrong on everything except whatever
+     monitor it was picked on. Dragging still overrides it in px — the handle
+     measures the rendered width, not this value. */
+  :root { --vp-w: calc(200% / 3); }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -69,7 +74,7 @@
   /* ── Split layout ─────────────────────────────────────────── */
   .split { display: flex; flex: 1; overflow: hidden; min-height: 0; }
 
-  .video-panel { width: var(--vp-w); min-width: 260px; max-width: 70vw; display: flex; flex-direction: column; border-right: 1px solid var(--border); flex-shrink: 0; }
+  .video-panel { width: var(--vp-w); min-width: 260px; max-width: 80vw; display: flex; flex-direction: column; border-right: 1px solid var(--border); flex-shrink: 0; }
 
   .resize-handle { width: 5px; cursor: col-resize; background: var(--border); flex-shrink: 0; transition: background 0.15s; user-select: none; }
   .resize-handle:hover, .resize-handle.dragging { background: var(--accent); }
@@ -1716,7 +1721,7 @@ function setupResizeHandle() {
       document.documentElement.style.setProperty('--vp-h', newH + 'px');
     } else {
       const splitW = split.getBoundingClientRect().width;
-      const newW   = Math.max(260, Math.min(splitW * 0.70, startSize + (e.clientX - startPos)));
+      const newW   = Math.max(260, Math.min(splitW * 0.80, startSize + (e.clientX - startPos)));
       document.documentElement.style.setProperty('--vp-w', newW + 'px');
     }
   });
