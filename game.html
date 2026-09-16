@@ -82,6 +82,11 @@
     background:rgba(11,14,20,.82);backdrop-filter:blur(6px);border-radius:8px;padding:5px 8px;
     font-size:.7rem;pointer-events:none;opacity:0;transition:opacity .2s}
   .now-pill.show{opacity:1}
+  /* The comment only lives in the event row, so collapsing the list takes it
+     away. The pill is the one place it can go: shown there, and only there,
+     while the list is hidden, so an open list isn't told the same thing twice. */
+  .now-pill .cmt{display:none;color:var(--dim);min-width:0;overflow:hidden;text-overflow:ellipsis}
+  body.list-collapsed .now-pill .cmt{display:inline}
   .zoom-tag{position:absolute;top:8px;right:8px;background:rgba(11,14,20,.82);border-radius:6px;
     padding:2px 7px;font-size:.66rem;color:var(--dim);opacity:0;transition:opacity .2s}
   .zoom-tag.show{opacity:1}
@@ -334,12 +339,15 @@
     body.cinema .left{width:100%}
   }
 
-  /* Eight transport buttons at 42px with 6px gaps want 394px of row; a 375px
-     phone has 359px inside the padding. Tightening both to 38/4 brings it to
-     348 and keeps every control reachable without a scroll. */
-  @media (max-width:400px){
-    .transport{gap:4px}
-    .t-btn{min-width:38px;padding:0 4px}
+  /* Nine transport buttons at 42px with 6px gaps want 452px of row, so the
+     tightening now has to start at 460 rather than 400 — a 414px phone would
+     otherwise scroll. Inside it, 34/3 — with the wider play button at 48 —
+     brings the row to 344, which fits the 359px a 375px phone has between the
+     padding, and keeps every control reachable without a scroll. */
+  @media (max-width:460px){
+    .transport{gap:3px}
+    .t-btn{min-width:34px;padding:0 3px}
+    .t-btn.play{min-width:48px}
   }
 
   /* Short and wide — a phone on its side. Aspect-ratio sizing is what makes the
@@ -403,6 +411,7 @@
   <div class="transport">
     <button class="t-btn" id="bPrev"  onclick="stepEvent(-1)" title="Previous event" disabled>⏮</button>
     <button class="t-btn" id="bBack"  onclick="skip(-5)" title="Back 5 seconds" disabled>−5</button>
+    <button class="t-btn" id="bBack1" onclick="skip(-1)" title="Back 1 second" disabled>−1</button>
     <button class="t-btn play" id="bPlay" onclick="togglePlay()" disabled>▶</button>
     <button class="t-btn" id="bFwd"   onclick="skip(5)" title="Forward 5 seconds" disabled>+5</button>
     <button class="t-btn" id="bNext"  onclick="stepEvent(1)" title="Next event" disabled>⏭</button>
@@ -883,7 +892,7 @@ function loadVideo(g){
   if(!TR.player.providerFor(m)){
     $('stageEmpty').style.display='flex';
     $('stageEmpty').textContent='This game has no video linked yet.';
-    ['bPlay','bBack','bFwd','bRate','bZoom','bPrev','bNext','bLoop'].forEach(i=>$(i).disabled=true);
+    ['bPlay','bBack','bBack1','bFwd','bRate','bZoom','bPrev','bNext','bLoop'].forEach(i=>$(i).disabled=true);
     return;
   }
   $('stageEmpty').style.display='none';
@@ -891,7 +900,7 @@ function loadVideo(g){
   player=TR.player.create({provider:'youtube',container:$('ytZoom'),
     videoId:TR.extractVideoId(m.youtubelink),
     onReady(){ready=true;dur=player.getDuration()||0;
-      ['bPlay','bBack','bFwd','bRate','bZoom','bPrev','bNext','bLoop'].forEach(i=>$(i).disabled=false);
+      ['bPlay','bBack','bBack1','bFwd','bRate','bZoom','bPrev','bNext','bLoop'].forEach(i=>$(i).disabled=false);
       if(pendingSeek!=null){player.seek(pendingSeek);player.play();pendingSeek=null}
       tick=setInterval(progress,250); paintMarks();},
     onStateChange(s){$('bPlay').textContent=s==='playing'?'⏸':'▶'}});
@@ -904,7 +913,7 @@ function clearVideo(){
   ready=false; dur=0; if(tick){clearInterval(tick);tick=null}
   $('stageEmpty').style.display='flex';
   $('stageEmpty').textContent='Pick a game, then tap any event to watch it';
-  ['bPlay','bBack','bFwd','bRate','bZoom','bPrev','bNext','bLoop'].forEach(i=>$(i).disabled=true);
+  ['bPlay','bBack','bBack1','bFwd','bRate','bZoom','bPrev','bNext','bLoop'].forEach(i=>$(i).disabled=true);
   paintMarks();
 }
 
@@ -928,7 +937,8 @@ function playEvent(gameSecs,id,evGame){
   const ev=rows.find(x=>x.game===evGame&&x.time===gameSecs);
   if(ev){$('nowPill').innerHTML=
     `<span class="tag" style="background:${col(ev.type)}22;color:${col(ev.type)}">${esc(ev.type)}</span>`+
-    `<b>${esc(ev.name||'')}</b> <span style="color:var(--dim)">${esc(ev.team||'')}</span>`;
+    `<b>${esc(ev.name||'')}</b> <span style="color:var(--dim)">${esc(ev.team||'')}</span>`+
+    (ev.comment?`<span class="cmt">${esc(ev.comment)}</span>`:'');
     $('nowPill').classList.add('show');}
   document.querySelectorAll('.ev').forEach(n=>n.classList.remove('active'));
   render(true);
