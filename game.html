@@ -469,7 +469,7 @@ const RATES=[1,0.5], ZOOMS=[1,2];
 let winBefore=5, winAfter=3;
 const WIN_BEFORE_CHIPS=[3,5,10,15], WIN_AFTER_CHIPS=[2,3,5,10];
 let F={type:new Set(),team:new Set(),name:new Set(),move:new Set(),
-       comp:new Set(),div:new Set(),year:new Set(),q:''};
+       comp:new Set(),div:new Set(),year:new Set(),q:'',from:null,to:null};
 
 // Saved playlists for this account, and which one is currently playing.
 // A playlist is a fixed, ordered list of hand-picked events; while one plays it
@@ -608,6 +608,16 @@ function restore(){
   const want = params.has('game') ? params.get('game') : LS.get('lastgame');
   if(want==='' ){ if(rows.length) pickGame(''); }
   else if(want && rows.some(r=>r.game===want)) pickGame(want);
+  // After pickGame, which resets F — a link's filters must survive it.
+  // Repeatable params (?type=Turnover&type=Penalty+Attack) rather than a
+  // delimiter, since move and type names carry spaces and punctuation.
+  const num=v=>{const n=Number(v); return Number.isFinite(n)?n:null;};
+  ['move','type','team','name'].forEach(k=>{
+    params.getAll(k).filter(Boolean).forEach(v=>F[k].add(v));
+  });
+  if(params.has('from')) F.from=num(params.get('from'));
+  if(params.has('to'))   F.to  =num(params.get('to'));
+  if(F.move.size||F.type.size||F.team.size||F.name.size||F.from!=null||F.to!=null) render();
   applyHash();
 }
 
@@ -657,7 +667,7 @@ function ingest(r){
 // "nothing chosen yet" by the `picked` flag, not by truthiness.
 function pickGame(k){ game=k; picked=true; renderLimit=200;
   F={type:new Set(),team:new Set(),name:new Set(),move:new Set(),
-     comp:new Set(),div:new Set(),year:new Set(),q:''};
+     comp:new Set(),div:new Set(),year:new Set(),q:'',from:null,to:null};
   activeId=null; plOpen=null; closeSheet(); LS.set('lastgame',k);
   // Video first: paintGame() renders the list, and a throw in there used to
   // leave the page with no video and no error to show for it.
@@ -719,9 +729,11 @@ function render(keepWindow){
     (!F.team.size||F.team.has(e.team)) &&
     (!F.name.size||F.name.has(e.name)) &&
     (!F.move.size||F.move.has(e.move)) &&
+    (F.from==null||e.time>=F.from) && (F.to==null||e.time<=F.to) &&
     (!q||(e.name+' '+e.type+' '+e.team+' '+e.comment+' '+e.move).toLowerCase().includes(q)));
   }
-  const n=F.comp.size+F.div.size+F.year.size+F.type.size+F.team.size+F.name.size+F.move.size+(F.q?1:0);
+  const n=F.comp.size+F.div.size+F.year.size+F.type.size+F.team.size+F.name.size+F.move.size
+          +(F.q?1:0)+((F.from!=null||F.to!=null)?1:0);
 
   const bar=$('filterbar');
   if(pl){
@@ -761,6 +773,11 @@ function render(keepWindow){
     F.team.forEach(v=>add(v,()=>{F.team.delete(v);render()}));
     F.name.forEach(v=>add(v,()=>{F.name.delete(v);render()}));
     F.move.forEach(v=>add(v,()=>{F.move.delete(v);render()}));
+    // A window arrived at from a link is invisible otherwise — the events just
+    // stop, with nothing on screen saying why or offering a way out.
+    if(F.from!=null||F.to!=null)
+      add((F.from!=null?fmtS(F.from):'start')+'–'+(F.to!=null?fmtS(F.to):'end'),
+          ()=>{F.from=null;F.to=null;render()});
     if(F.q) add('“'+F.q+'”',()=>{F.q='';render()});
     if(!n){ // quick-access type chips when nothing is filtered
       ['Try','Turnover','Penalty Attack','Penalty Defence'].forEach(t=>{
@@ -1777,7 +1794,7 @@ function narrow(v){
 
 function tog(k,v,el){F[k].has(v)?F[k].delete(v):F[k].add(v);el.classList.toggle('on');render()}
 function clearF(){F={type:new Set(),team:new Set(),name:new Set(),move:new Set(),
-    comp:new Set(),div:new Set(),year:new Set(),q:''};
+    comp:new Set(),div:new Set(),year:new Set(),q:'',from:null,to:null};
   drill(null); render()}
 </script>
 </body>

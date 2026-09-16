@@ -217,6 +217,13 @@
     .game-move-grid th { text-align: left; color: #8a93a6; font-weight: 500; padding: 3px 5px; }
     .game-move-grid td { padding: 3px 5px; border-top: 1px solid #1e2433; }
     .game-move-rate { color: #8a93a6; }
+    /* Underlined on hover only: every figure in this table is a link, and
+       styling them all as links at rest would read as noise rather than
+       affordance. */
+    .move-link { color: inherit; text-decoration: none; cursor: pointer;
+      border-bottom: 1px solid transparent; }
+    .move-link:hover, .move-link:focus-visible {
+      color: #fff; border-bottom-color: #3b82f6; outline: none; }
     /* Same idiom as #commentText:empty and .pop-empty above: italic marks a
        value that isn't a solid fact yet - here, a rate no failure has tested.
        Italic alone is easy to miss in a column that is already uniformly grey,
@@ -1218,15 +1225,25 @@ async function renderStats(halfValue) {
 
   const meta = currentGame.meta;
   let rangeStart, rangeEnd, startLink, endLink;
+  // rawStart/rawEnd are the SHEET clock, not GameTime. GameTime is normalised —
+  // each half restarts at 0 and the halves are joined by a notional stoppage —
+  // which is right for this page's charts and wrong for anything outside it.
+  // The Event Viewer filters on raw sheet time, so links must carry raw bounds
+  // or late-game events fall outside a window that looks correct here.
+  let rawStart, rawEnd;
   if (halfValue === 'all') {
     rangeStart = starts[0].GameTime;
     rangeEnd   = ends[ends.length - 1].GameTime;
+    rawStart   = starts[0]._raw;
+    rawEnd     = ends[ends.length - 1]._raw;
     startLink  = makeYtUrl(meta, starts[0]._raw);
     endLink    = makeYtUrl(meta, ends[ends.length - 1]._raw);
   } else {
     const hi   = parseInt(halfValue);
     rangeStart = starts[hi].GameTime;
     rangeEnd   = ends[hi].GameTime;
+    rawStart   = starts[hi]._raw;
+    rawEnd     = ends[hi]._raw;
     startLink  = makeYtUrl(meta, starts[hi]._raw);
     endLink    = makeYtUrl(meta, ends[hi]._raw);
   }
@@ -1299,7 +1316,7 @@ async function renderStats(halfValue) {
        <tbody>${tbody}</tbody>
      </table>`;
 
-  renderGameStrikeMoves(filtered, team1, team2);
+  renderGameStrikeMoves(filtered, team1, team2, rawStart, rawEnd);
 }
 
 // Per-game move breakdown, split by the team that ran the move. Counts lead;
@@ -1307,7 +1324,26 @@ async function renderStats(halfValue) {
 // that team's own failed attempts have a tagged move — a single game rarely
 // gives a move enough attempts for a percentage to mean much, and with no
 // failures tagged every move would otherwise compute to a hollow 100%.
-function renderGameStrikeMoves(events, team1, team2) {
+function renderGameStrikeMoves(events, team1, team2, rangeStart, rangeEnd) {
+  // Every figure in this card links into the Event Viewer showing exactly the
+  // events behind it — same game, same team, same move, same outcome, and the
+  // same half. Click a 2 and you land on those 2 rows, not on an approximation.
+  const FAIL_TYPES = ['Turnover', 'Penalty Attack'];
+  const moveLink = (team, move, types) => {
+    const q = new URLSearchParams();
+    // The picker's value is the sheet name, and it is what every other deep
+    // link on this page uses.
+    q.set('game', document.getElementById('gameSelect').value || '');
+    q.append('team', team);
+    q.append('move', move);
+    (types || []).forEach(t => q.append('type', t));
+    if (rangeStart != null) q.set('from', Math.floor(rangeStart));
+    if (rangeEnd   != null) q.set('to',   Math.ceil(rangeEnd));
+    return 'game.html?' + q.toString();
+  };
+  const cell = (team, move, types, text, title) =>
+    `<a class="move-link" href="${moveLink(team, move, types)}" title="${title}">${text}</a>`;
+
   // This page's events are {Type, Name, 'Action Owner', 'Strike Move', ...};
   // the module expects {type, name, actionOwner, strikeMove}.
   const toModuleEvent = e => ({
@@ -1354,7 +1390,10 @@ function renderGameStrikeMoves(events, team1, team2) {
       const byTries = s.moves.slice().sort((a, b) =>
         b.tries - a.tries || a.move.localeCompare(b.move));
       rows = byTries.map(m => `<tr>
-          <td>${m.move}</td><td>${m.tries}</td><td>${m.fails}</td><td></td>
+          <td>${cell(team, m.move, null, m.move, `Every ${m.move} by ${team}`)}</td>
+          <td>${cell(team, m.move, ['Try'], m.tries, `${team}'s tries from ${m.move}`)}</td>
+          <td>${cell(team, m.move, FAIL_TYPES, m.fails, `${team}'s failed ${m.move} attempts`)}</td>
+          <td></td>
         </tr>`).join('');
     } else {
       // Already sorted rate-descending with a deterministic tie-break; do not
@@ -1366,7 +1405,9 @@ function renderGameStrikeMoves(events, team1, team2) {
         const rateCls = 'game-move-rate' + (m.rateKnown ? '' : ' unknown');
         const title   = m.rateKnown ? '' : ' title="No failed attempt tagged for this move yet"';
         return `<tr>
-          <td>${m.move}</td><td>${m.tries}</td><td>${m.fails}</td>
+          <td>${cell(team, m.move, null, m.move, `Every ${m.move} by ${team}`)}</td>
+          <td>${cell(team, m.move, ['Try'], m.tries, `${team}'s tries from ${m.move}`)}</td>
+          <td>${cell(team, m.move, FAIL_TYPES, m.fails, `${team}'s failed ${m.move} attempts`)}</td>
           <td class="${rateCls}"${title}>${(m.rate * 100).toFixed(0)}%</td>
         </tr>`;
       }).join('');
