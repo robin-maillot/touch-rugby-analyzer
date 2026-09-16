@@ -1225,25 +1225,27 @@ async function renderStats(halfValue) {
 
   const meta = currentGame.meta;
   let rangeStart, rangeEnd, startLink, endLink;
-  // rawStart/rawEnd are the SHEET clock, not GameTime. GameTime is normalised —
-  // each half restarts at 0 and the halves are joined by a notional stoppage —
-  // which is right for this page's charts and wrong for anything outside it.
-  // The Event Viewer filters on raw sheet time, so links must carry raw bounds
-  // or late-game events fall outside a window that looks correct here.
-  let rawStart, rawEnd;
+  // sheetFrom/sheetTo are the SHEET clock, not GameTime — and deliberately not
+  // named rawStart/rawEnd, which already exist in buildPossessions() meaning the
+  // opposite (they are GameTime there). GameTime is normalised: each half
+  // restarts at 0 and the halves are joined by a notional stoppage, which is
+  // right for this page's charts and wrong for anything outside it. The Event
+  // Viewer filters on raw sheet time, so links must carry raw bounds or
+  // late-game events fall outside a window that looks correct here.
+  let sheetFrom, sheetTo;
   if (halfValue === 'all') {
     rangeStart = starts[0].GameTime;
     rangeEnd   = ends[ends.length - 1].GameTime;
-    rawStart   = starts[0]._raw;
-    rawEnd     = ends[ends.length - 1]._raw;
+    sheetFrom  = starts[0]._raw;
+    sheetTo    = ends[ends.length - 1]._raw;
     startLink  = makeYtUrl(meta, starts[0]._raw);
     endLink    = makeYtUrl(meta, ends[ends.length - 1]._raw);
   } else {
     const hi   = parseInt(halfValue);
     rangeStart = starts[hi].GameTime;
     rangeEnd   = ends[hi].GameTime;
-    rawStart   = starts[hi]._raw;
-    rawEnd     = ends[hi]._raw;
+    sheetFrom  = starts[hi]._raw;
+    sheetTo    = ends[hi]._raw;
     startLink  = makeYtUrl(meta, starts[hi]._raw);
     endLink    = makeYtUrl(meta, ends[hi]._raw);
   }
@@ -1316,7 +1318,13 @@ async function renderStats(halfValue) {
        <tbody>${tbody}</tbody>
      </table>`;
 
-  renderGameStrikeMoves(filtered, team1, team2, rawStart, rawEnd);
+  // Only narrow by time when a half is actually selected. On Full Game the
+  // window IS the whole game, so it filters nothing while cluttering the link
+  // and raising a chip in the viewer that implies a narrowing there isn't one.
+  const halfSelected = halfValue !== 'all';
+  renderGameStrikeMoves(filtered, team1, team2,
+                        halfSelected ? sheetFrom : null,
+                        halfSelected ? sheetTo   : null);
 }
 
 // Per-game move breakdown, split by the team that ran the move. Counts lead;
