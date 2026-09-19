@@ -1336,7 +1336,10 @@ function renderGameStrikeMoves(events, team1, team2, rangeStart, rangeEnd) {
   // Every figure in this card links into the Event Viewer showing exactly the
   // events behind it — same game, same team, same move, same outcome, and the
   // same half. Click a 2 and you land on those 2 rows, not on an approximation.
-  const FAIL_TYPES = ['Turnover', 'Penalty Attack'];
+  // A tagged touch is a failure of that move too — it is counted as one in
+  // TR.strikeMoveStats, so the Fails link has to ask for it or the link and the
+  // number above it would disagree.
+  const FAIL_TYPES = ['Turnover', 'Penalty Attack', 'Touch'];
   const moveLink = (team, move, types) => {
     const q = new URLSearchParams();
     // The picker's value is the sheet name, and it is what every other deep

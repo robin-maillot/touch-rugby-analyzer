@@ -220,7 +220,18 @@ glance. Tap it to open a second sheet listing every move tried, best first, trie
 attempts beside a rate — de-emphasised below 2 attempts, or for a move that has never
 itself been tagged on a failed attempt (its rate would otherwise read 100% by
 construction, not performance). It's a separate sheet rather than another row to scroll
-past: the Stats sheet answers who is winning, this answers what is working. **‹ Stats**
+past: the Stats sheet answers who is winning, this answers what is working.
+
+**Tagging a touch as a failed move.** A called move that ends in a touch didn't break the
+line, so a touch can carry a strike move and counts against that move's rate. Tap the
+touch's pin, then pick the move from the **Strike move** list in the edit sheet — there is
+deliberately no pop-up strip after every touch, because touches happen six times a
+possession and most of them are settle or drive, not a called move. A touch tagged this way
+is pushed to the sheet even when **Upload touches** is off, since it is the record of the
+move being stopped; untagged touches still stay on the device unless that setting is on.
+
+Tag the touch where the move was stopped, and not also the turnover that ends the same
+possession — two tags on one attempt count it twice. **‹ Stats**
 returns to the Stats sheet, not the game.
 
 ### Ball Live after every touch

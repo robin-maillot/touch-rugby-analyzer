@@ -2651,7 +2651,7 @@ async function pushToSheet(override = false) {
     alert('You\'re in offline mode, so there\'s no account to upload with.\n\nThis game is safe on this device — log in from the hub and upload it then. It will be saved under whichever account you use.');
     return;
   }
-  if (!annotations.filter(a => uploadTouches || a.type !== 'Touch').length) {
+  if (!annotations.filter(a => keepForPush(a)).length) {
     alert('No events to push.' + (annotations.length ? '\n\nThis game has only touch events, and uploading those is switched off in Setup.' : ''));
     return;
   }
@@ -2696,7 +2696,7 @@ async function pushToSheet(override = false) {
   // Column order must match HEADERS in Code.gs, Strike Move last. The pitch
   // position still rides in Comment; the move gets its own column.
   const rows = annotations
-    .filter(a => uploadTouches || a.type !== 'Touch')
+    .filter(keepForPush)
     .map(a => [a.timeStr, a.possessionOwner, a.type, a.name, '', commentWithPos(a),
                a.actionOwner, TR.recordedMoveOf(a.type, a.name, a.strikeMove)]);
 
@@ -2837,6 +2837,14 @@ let subtypeTimer = null;
 // positions that matter most (tries, turnovers, penalties) always upload, and
 // the touches would multiply the row count of every sheet tab.
 let uploadTouches = localStorage.getItem('fieldUploadTouches') === '1';
+
+// Touches stay on the device unless asked for — except one that carries a
+// strike move, which is a record of that move being stopped and is the whole
+// point of tagging it. Without this, tagging a touch would change nothing
+// beyond the sideline and every rate would keep its 100% artefact.
+function keepForPush(a) {
+  return uploadTouches || a.type !== 'Touch' || !!a.strikeMove;
+}
 function setUploadTouches(on) {
   uploadTouches = !!on;
   try { localStorage.setItem('fieldUploadTouches', on ? '1' : '0'); } catch (e) {}

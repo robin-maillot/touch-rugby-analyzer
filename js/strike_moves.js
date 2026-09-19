@@ -18,7 +18,13 @@ TR.strikeMoveStats = (events) => {
   const cov = { tries: { tagged: 0, total: 0 }, fails: { tagged: 0, total: 0 } };
 
   (events || []).forEach(e => {
-    if (!e || !TR.isAttackEnd(e.type, e.name)) return;
+    // A tagged touch joins the attempt set even though it ends nothing: a
+    // called move stopped by a touch did not break the line. Untagged touches
+    // are ordinary play and never enter the denominator, so switching touch
+    // uploading on cannot dilute coverage.
+    const counts = TR.isAttackEnd(e.type, e.name) ||
+                   (TR.isTouchFailure ? TR.isTouchFailure(e.type, e.strikeMove) : false);
+    if (!e || !counts) return;
     const isTry = e.type === 'Try';
     const side  = isTry ? cov.tries : cov.fails;
     side.total++;
