@@ -230,8 +230,10 @@ possession and most of them are settle or drive, not a called move. A touch tagg
 is pushed to the sheet even when **Upload touches** is off, since it is the record of the
 move being stopped; untagged touches still stay on the device unless that setting is on.
 
-Tag the touch where the move was stopped, and not also the turnover that ends the same
-possession — two tags on one attempt count it twice. **‹ Stats**
+A possession is not one attempt. A move can be called at every touch, so one set
+legitimately produces several — tag each touch that carried a called move, and the try or
+turnover that ends the set as well. They are separate attempts, not one attempt tagged
+twice. **‹ Stats**
 returns to the Stats sheet, not the game.
 
 ### Ball Live after every touch

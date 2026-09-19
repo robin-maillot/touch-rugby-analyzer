@@ -53,8 +53,10 @@ TR.isAttackEnd = (type, name) =>
 // asymmetry is deliberate — were untagged touches in the denominator, coverage
 // would collapse the moment touch uploading is switched on.
 //
-// Tag the touch where the called move was stopped, and not also the turnover
-// that ends the same possession: two tags on one attempt count it twice.
+// A possession is not one attempt. A move can be called at every touch, so one
+// set legitimately produces several — tag each touch that carried a called
+// move, and the turnover or try that ends the set as well. They are separate
+// attempts, not one attempt tagged twice.
 TR.isTouchFailure = (type, strikeMove) => type === 'Touch' && !!strikeMove;
 
 // The move this event was an attempt at, or '' when it isn't one or wasn't
