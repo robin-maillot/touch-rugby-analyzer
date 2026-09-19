@@ -153,7 +153,7 @@ test('Turnover returns its move',   () => assert.equal(TR.strikeMoveOf('Turnover
 test('Pen Attack returns its move', () => assert.equal(TR.strikeMoveOf('Penalty Attack', 'Forward Pass', '23'), '23'));
 test('untagged returns empty',      () => assert.equal(TR.strikeMoveOf('Turnover', 'Ball Down', ''), ''));
 test('undefined move returns empty',() => assert.equal(TR.strikeMoveOf('Turnover', 'Ball Down', undefined), ''));
-test('6 Again drops its move',      () => assert.equal(TR.strikeMoveOf('Turnover', '6 Again', '32'), ''));
+test('6 Again keeps its move',      () => assert.equal(TR.strikeMoveOf('Turnover', '6 Again', '32'), '32'));
 test('Pen Defence keeps its move',  () => assert.equal(TR.strikeMoveOf('Penalty Defence', 'Offside', '32'), '32'));
 test('Game Event drops its move',   () => assert.equal(TR.strikeMoveOf('Game Event', 'Game Start', '32'), ''));
 
@@ -936,16 +936,19 @@ test('untagged touches never dilute coverage', () => {
   assert.equal(stats(noisy).moves[0].attempts, 2);
 });
 
-test('counting is wider than ending the possession', () => {
-  // Neither a touch nor a defensive penalty ends the attack, and both now count:
-  // a set holds several attempts, and an attempt that did not score is a fail
-  // whatever left the attack with the ball.
-  assert.equal(TR.isAttackEnd('Touch', 'Touch 4'), false);
-  assert.equal(TR.isAttackEnd('Penalty Defence', 'Offside'), false);
-  assert.equal(stats([ev('Touch', 'Touch 4', '32')]).moves.length, 1);
-  assert.equal(stats([ev('Penalty Defence', 'Offside', '32')]).moves.length, 1);
-  // 6 Again is still out: it is the same attempt continuing, not a new one.
-  assert.deepEqual(stats([ev('Turnover', '6 Again', '32')]).moves, []);
+test('counting no longer asks whether the ball changed hands', () => {
+  // None of these three ends the attack, and all three count. Whether the ball
+  // changed hands turned out to be the wrong question: a move was called and,
+  // try aside, it did not score.
+  ['Touch', 'Penalty Defence', 'Turnover'].forEach(t => {
+    const name = t === 'Touch' ? 'Touch 4' : t === 'Turnover' ? '6 Again' : 'Offside';
+    assert.equal(TR.isAttackEnd(t, name), false, t + ' should not end the attack');
+    assert.equal(stats([ev(t, name, '32')]).moves.length, 1, t + ' should still count');
+  });
+  // Only these are never attempts, plus an untagged touch.
+  assert.deepEqual(stats([ev('Game Event', 'Game Start', '32')]).moves, []);
+  assert.deepEqual(stats([ev('To Review', '', '32')]).moves, []);
+  assert.deepEqual(stats([ev('Touch', 'Touch 2', '')]).moves, []);
 });
 
 
@@ -1030,16 +1033,16 @@ test('coverage counts attack-ends only', () => {
     ev('Try', 'Scoop', ''),                    // attack end, tagged (name is the move)
     ev('Turnover', 'Ball Down', '32'),         // attack end, tagged
     ev('Turnover', 'Ball Down', ''),           // attack end, untagged
-    ev('Turnover', '6 Again', '32'),           // NOT an attack end
+    ev('Turnover', '6 Again', '32'),           // counts: a fresh count, still no try
     ev('Penalty Defence', 'Offside', '32'),    // counts: an attempt that didn't score
     ev('Game Event', 'Game Start', ''),        // never an attempt
   ]);
-  // 1 Try (tagged) + 3 fail-side attempts: 2 turnovers (1 tagged) and the
-  // defensive penalty (tagged). 6 Again and Game Event are not attempts.
+  // 1 Try (tagged) + 4 fail-side attempts: 3 turnovers including the 6 Again
+  // (2 tagged) and the defensive penalty (tagged). Only Game Event is out.
   assert.deepEqual(s.coverage, {
-    tagged: 3, total: 4, pct: 3 / 4,
+    tagged: 4, total: 5, pct: 4 / 5,
     tries: { tagged: 1, total: 1, pct: 1 },
-    fails: { tagged: 2, total: 3, pct: 2 / 3 },
+    fails: { tagged: 3, total: 4, pct: 3 / 4 },
   });
 });
 
@@ -1080,10 +1083,14 @@ test('a stale stored move loses to the Name on a Try', () => {
   assert.equal(s.moves[0].tries, 1);
 });
 
-test('a stale stored move is dropped when the name stops ending an attack', () => {
+test('a 6 Again carries its move like any other turnover', () => {
+  // It used to be dropped, on the reading that a 6 Again continued the same
+  // attempt. It does not: the count restarts, so the move that was called is
+  // over, and it did not score.
   const s = stats([ev('Turnover', '6 Again', '32')]);
-  assert.deepEqual(s.moves, []);
-  assert.equal(s.coverage.total, 0);
+  assert.equal(s.moves.length, 1);
+  assert.equal(s.moves[0].fails, 1);
+  assert.equal(s.coverage.total, 1);
 });
 
 test('coverage is reported per side', () => {
@@ -1340,7 +1347,7 @@ test('Turnover offers one',        () => assert.equal(TR.offersStrikeMove('Turno
 test('Penalty Attack offers one',  () => assert.equal(TR.offersStrikeMove('Penalty Attack', 'Forward Pass'), true));
 test('Penalty Defence offers one', () => assert.equal(TR.offersStrikeMove('Penalty Defence', 'Offside'), true));
 test('Try does not — name is the move', () => assert.equal(TR.offersStrikeMove('Try', '32 - Cut'), false));
-test('6 Again does not',           () => assert.equal(TR.offersStrikeMove('Turnover', '6 Again'), false));
+test('6 Again offers one',         () => assert.equal(TR.offersStrikeMove('Turnover', '6 Again'), true));
 test('Game Event does not',        () => assert.equal(TR.offersStrikeMove('Game Event', 'Game Start'), false));
 test('To Review does not',         () => assert.equal(TR.offersStrikeMove('To Review', ''), false));
 
@@ -1352,7 +1359,7 @@ test('Try uses its own name',      () => assert.equal(TR.recordedMoveOf('Try', '
 test('Turnover uses its move',     () => assert.equal(TR.recordedMoveOf('Turnover', 'Ball Down', '32 - Cut'), '32 - Cut'));
 test('Pen Defence keeps its move', () => assert.equal(TR.recordedMoveOf('Penalty Defence', 'Offside', '32'), '32'));
 test('Pen Defence untagged is empty', () => assert.equal(TR.recordedMoveOf('Penalty Defence', 'Offside', ''), ''));
-test('6 Again drops its move',     () => assert.equal(TR.recordedMoveOf('Turnover', '6 Again', '32'), ''));
+test('6 Again keeps its move',     () => assert.equal(TR.recordedMoveOf('Turnover', '6 Again', '32'), '32'));
 test('Game Event drops its move',  () => assert.equal(TR.recordedMoveOf('Game Event', 'Game Start', '32'), ''));
 
 // A defensive penalty counts as an attempt that did not score. It leaves the
