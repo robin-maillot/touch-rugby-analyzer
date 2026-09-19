@@ -28,6 +28,14 @@ TR.isTurnover = (type, name) => {
 // rate per move can be computed. Sliced so a caller can't mutate TR.MENU.
 TR.STRIKE_MOVES      = TR.MENU['Try'].slice();
 TR.STRIKE_MOVE_TYPES = ['Try', 'Turnover', 'Penalty Attack'];
+
+// Every event type that can carry a called move. Wider than STRIKE_MOVE_TYPES,
+// which is only the set whose members END a possession — a defensive penalty
+// and a 6 Again both leave the attack the ball and a fresh count, and a Touch
+// leaves the set running entirely, yet a move was still called and still did
+// not score. Touch is handled separately below because only a TAGGED touch
+// counts; the rest count tagged or not.
+TR.MOVE_BEARING_TYPES = ['Try', 'Turnover', 'Penalty Attack', 'Penalty Defence'];
 TR.MIN_MOVE_ATTEMPTS = 2;
 
 // Selectable in the annotators, but never rate-bearing. On a Try these are what
@@ -59,18 +67,21 @@ TR.isAttackEnd = (type, name) =>
 // attempts, not one attempt tagged twice.
 TR.isTouchFailure = (type, strikeMove) => type === 'Touch' && !!strikeMove;
 
-// Which events enter a move's record. Wider than isAttackEnd, which only asks
-// whether the ball changed hands:
-//   - a touch that stopped a called move (tagged ones only, see above);
-//   - a DEFENSIVE penalty, which leaves the attack the ball and a fresh count
-//     but still did not produce a try.
-// The rate this feeds is tries ÷ attempts, so "fails" means "attempts that did
-// not score" rather than "the defence stopped it" — a move that reliably wins
-// penalties is a good move that will read as a poor one here. Worth knowing
-// before reading the column.
+// Which events enter a move's record. Deliberately NOT expressed in terms of
+// isAttackEnd: whether the ball changed hands turned out to be the wrong
+// question. A set can end in a try, a turnover, a penalty either way, a fresh
+// count, or the runner simply being touched — a move was called in each case,
+// and in every case but the try it did not score.
+//
+// So the rate is tries ÷ attempts and "fails" means "did not score", not "the
+// defence stopped it". A defensive penalty and a 6 Again are good attacking
+// outcomes that read as fails here. Worth knowing before judging a move that
+// reliably wins penalties.
+//
+// Only Game Event and To Review are never attempts — and an untagged touch,
+// which is ordinary play rather than a called move.
 TR.countsAsAttempt = (type, name, strikeMove) =>
-     TR.isAttackEnd(type, name)
-  || type === 'Penalty Defence'
+     TR.MOVE_BEARING_TYPES.includes(type)
   || TR.isTouchFailure(type, strikeMove);
 
 // The move this event was an attempt at, or '' when it isn't one or wasn't
@@ -87,8 +98,7 @@ TR.strikeMoveOf = (type, name, strikeMove) =>
 // Touch is offered too: unlike a defensive penalty, a touch that stopped a
 // called move IS counted as that move failing (see TR.isTouchFailure).
 TR.offersStrikeMove = (type, name) =>
-  (type !== 'Try' && TR.isAttackEnd(type, name)) ||
-  type === 'Penalty Defence' || type === 'Touch';
+  (type !== 'Try' && TR.MOVE_BEARING_TYPES.includes(type)) || type === 'Touch';
 
 // The move to SHOW and EXPORT — the annotator's move column, the CSV, the
 // Strike Move cell pushed to the sheet, the Events viewer's tag.

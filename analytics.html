@@ -979,7 +979,9 @@ function renderFilteredTypeChart(evs, byType, activeType) {
     // For the three types that end an attack, breaking down by strike move
     // answers a different and more useful question than breaking down by name.
     const byMove = document.getElementById('fBreakdownByMove')?.checked;
-    const useMove = byMove && TR.STRIKE_MOVE_TYPES.includes(activeType);
+    // MOVE_BEARING_TYPES, not STRIKE_MOVE_TYPES: a defensive penalty carries a
+    // move too, so the by-move breakdown has to be offered for it.
+    const useMove = byMove && (TR.MOVE_BEARING_TYPES || TR.STRIKE_MOVE_TYPES).includes(activeType);
     const counts = countBy(evs, e => useMove
       ? (TR.strikeMoveOf(e.type, e.name, e.strikeMove) || '(untagged)')
       : (e.name || '(blank)'));
