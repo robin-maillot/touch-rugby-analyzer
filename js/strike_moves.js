@@ -22,8 +22,9 @@ TR.strikeMoveStats = (events) => {
     // called move stopped by a touch did not break the line. Untagged touches
     // are ordinary play and never enter the denominator, so switching touch
     // uploading on cannot dilute coverage.
-    const counts = TR.isAttackEnd(e.type, e.name) ||
-                   (TR.isTouchFailure ? TR.isTouchFailure(e.type, e.strikeMove) : false);
+    const counts = TR.countsAsAttempt
+      ? TR.countsAsAttempt(e.type, e.name, e.strikeMove)
+      : TR.isAttackEnd(e.type, e.name);   // stale cached events.js — degrade, don't throw
     if (!e || !counts) return;
     const isTry = e.type === 'Try';
     const side  = isTry ? cov.tries : cov.fails;

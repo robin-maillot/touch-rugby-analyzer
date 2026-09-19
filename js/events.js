@@ -59,41 +59,45 @@ TR.isAttackEnd = (type, name) =>
 // attempts, not one attempt tagged twice.
 TR.isTouchFailure = (type, strikeMove) => type === 'Touch' && !!strikeMove;
 
+// Which events enter a move's record. Wider than isAttackEnd, which only asks
+// whether the ball changed hands:
+//   - a touch that stopped a called move (tagged ones only, see above);
+//   - a DEFENSIVE penalty, which leaves the attack the ball and a fresh count
+//     but still did not produce a try.
+// The rate this feeds is tries ÷ attempts, so "fails" means "attempts that did
+// not score" rather than "the defence stopped it" — a move that reliably wins
+// penalties is a good move that will read as a poor one here. Worth knowing
+// before reading the column.
+TR.countsAsAttempt = (type, name, strikeMove) =>
+     TR.isAttackEnd(type, name)
+  || type === 'Penalty Defence'
+  || TR.isTouchFailure(type, strikeMove);
+
 // The move this event was an attempt at, or '' when it isn't one or wasn't
 // tagged. A Try's move IS its Name — derived rather than stored twice, so
 // renaming a Try can't leave a stale move behind.
-//
-// Deliberately narrower than TR.recordedMoveOf below: this is the stats-facing
-// answer, so a defensive penalty yields '' even when a move is recorded on it.
 TR.strikeMoveOf = (type, name, strikeMove) =>
-    type === 'Try'                            ? (name || '')
-  : TR.isAttackEnd(type, name)                ? (strikeMove || '')
-  : TR.isTouchFailure(type, strikeMove)       ? strikeMove
+    type === 'Try'                              ? (name || '')
+  : TR.countsAsAttempt(type, name, strikeMove)  ? (strikeMove || '')
   : '';
 
-// ── Recording a move vs. counting one ──────────────────────────
-// Which events the annotators offer the move picker on. An attack penalty or a
-// turnover ends the attempt, so its move feeds the try rate. A DEFENSIVE
-// penalty does not end anything — the attack keeps the ball — but the move it
-// was running when the defence infringed is still worth recording: it is how
-// you find the moves that pressure a defence into conceding. So the picker is
-// offered, and the value is stored and exported, while every rate stays
-// untouched (TR.isAttackEnd, which the stats gate on, still says false).
-//
-// A Try is excluded because its move IS its name, not a separate field.
+// ── Where the picker appears ───────────────────────────────────
+// Every event that can carry a move offers one. A Try is excluded because its
+// move IS its name, not a separate field.
 // Touch is offered too: unlike a defensive penalty, a touch that stopped a
 // called move IS counted as that move failing (see TR.isTouchFailure).
 TR.offersStrikeMove = (type, name) =>
   (type !== 'Try' && TR.isAttackEnd(type, name)) ||
   type === 'Penalty Defence' || type === 'Touch';
 
-// The move to SHOW and EXPORT for an event — the annotator's move column, the
-// CSV, the Strike Move cell pushed to the sheet, the Events viewer's tag.
-// Use TR.strikeMoveOf instead for anything that counts attempts or rates: that
-// one drops a defensive penalty's move on purpose, so one attack can never land
-// in the denominator twice (the penalty, and then the Try or Turnover that
-// actually ended the same attack).
+// The move to SHOW and EXPORT — the annotator's move column, the CSV, the
+// Strike Move cell pushed to the sheet, the Events viewer's tag.
+//
+// This used to be deliberately wider than TR.strikeMoveOf, back when a
+// defensive penalty's move was recorded but never counted. Now that a defensive
+// penalty and a tagged touch both count, the two rules agree exactly, so this
+// delegates rather than restating them and risking a silent drift. Splitting
+// them again means giving this its own body once more, not editing one of the
+// two in place.
 TR.recordedMoveOf = (type, name, strikeMove) =>
-    type === 'Try'                    ? (name || '')
-  : TR.offersStrikeMove(type, name)   ? (strikeMove || '')
-  : '';
+  TR.strikeMoveOf(type, name, strikeMove);

@@ -1339,7 +1339,7 @@ function renderGameStrikeMoves(events, team1, team2, rangeStart, rangeEnd) {
   // A tagged touch is a failure of that move too — it is counted as one in
   // TR.strikeMoveStats, so the Fails link has to ask for it or the link and the
   // number above it would disagree.
-  const FAIL_TYPES = ['Turnover', 'Penalty Attack', 'Touch'];
+  const FAIL_TYPES = ['Turnover', 'Penalty Attack', 'Touch', 'Penalty Defence'];
   const moveLink = (team, move, types) => {
     const q = new URLSearchParams();
     // The picker's value is the sheet name, and it is what every other deep

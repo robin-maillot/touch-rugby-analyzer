@@ -154,7 +154,7 @@ test('Pen Attack returns its move', () => assert.equal(TR.strikeMoveOf('Penalty 
 test('untagged returns empty',      () => assert.equal(TR.strikeMoveOf('Turnover', 'Ball Down', ''), ''));
 test('undefined move returns empty',() => assert.equal(TR.strikeMoveOf('Turnover', 'Ball Down', undefined), ''));
 test('6 Again drops its move',      () => assert.equal(TR.strikeMoveOf('Turnover', '6 Again', '32'), ''));
-test('Pen Defence drops its move',  () => assert.equal(TR.strikeMoveOf('Penalty Defence', 'Offside', '32'), ''));
+test('Pen Defence keeps its move',  () => assert.equal(TR.strikeMoveOf('Penalty Defence', 'Offside', '32'), '32'));
 test('Game Event drops its move',   () => assert.equal(TR.strikeMoveOf('Game Event', 'Game Start', '32'), ''));
 
 // ── TR.otherTeam ──────────────────────────────────────────────
@@ -936,11 +936,16 @@ test('untagged touches never dilute coverage', () => {
   assert.equal(stats(noisy).moves[0].attempts, 2);
 });
 
-test('a touch still does not end a possession for the other gates', () => {
-  // Penalty Defence records a move without counting it; a touch counts. The
-  // two must not have quietly swapped behaviour.
-  assert.deepEqual(stats([ev('Penalty Defence', 'Offside', '32')]).moves, []);
+test('counting is wider than ending the possession', () => {
+  // Neither a touch nor a defensive penalty ends the attack, and both now count:
+  // a set holds several attempts, and an attempt that did not score is a fail
+  // whatever left the attack with the ball.
+  assert.equal(TR.isAttackEnd('Touch', 'Touch 4'), false);
+  assert.equal(TR.isAttackEnd('Penalty Defence', 'Offside'), false);
   assert.equal(stats([ev('Touch', 'Touch 4', '32')]).moves.length, 1);
+  assert.equal(stats([ev('Penalty Defence', 'Offside', '32')]).moves.length, 1);
+  // 6 Again is still out: it is the same attempt continuing, not a new one.
+  assert.deepEqual(stats([ev('Turnover', '6 Again', '32')]).moves, []);
 });
 
 
@@ -1026,14 +1031,15 @@ test('coverage counts attack-ends only', () => {
     ev('Turnover', 'Ball Down', '32'),         // attack end, tagged
     ev('Turnover', 'Ball Down', ''),           // attack end, untagged
     ev('Turnover', '6 Again', '32'),           // NOT an attack end
-    ev('Penalty Defence', 'Offside', '32'),    // NOT an attack end
-    ev('Game Event', 'Game Start', ''),        // NOT an attack end
+    ev('Penalty Defence', 'Offside', '32'),    // counts: an attempt that didn't score
+    ev('Game Event', 'Game Start', ''),        // never an attempt
   ]);
-  // 1 Try (tagged) + 2 fail-side attack-ends (1 tagged, 1 untagged).
+  // 1 Try (tagged) + 3 fail-side attempts: 2 turnovers (1 tagged) and the
+  // defensive penalty (tagged). 6 Again and Game Event are not attempts.
   assert.deepEqual(s.coverage, {
-    tagged: 2, total: 3, pct: 2 / 3,
+    tagged: 3, total: 4, pct: 3 / 4,
     tries: { tagged: 1, total: 1, pct: 1 },
-    fails: { tagged: 1, total: 2, pct: 0.5 },
+    fails: { tagged: 2, total: 3, pct: 2 / 3 },
   });
 });
 
@@ -1349,14 +1355,13 @@ test('Pen Defence untagged is empty', () => assert.equal(TR.recordedMoveOf('Pena
 test('6 Again drops its move',     () => assert.equal(TR.recordedMoveOf('Turnover', '6 Again', '32'), ''));
 test('Game Event drops its move',  () => assert.equal(TR.recordedMoveOf('Game Event', 'Game Start', '32'), ''));
 
-// A defensive penalty records a move for context only. It must never reach the
-// rate maths: the same attack goes on to end in a Try, Turnover or Penalty
-// Attack that carries its own move, so counting the penalty too would put one
-// attack in the denominator twice.
-console.log('Pen Defence moves stay out of the rate maths');
-test('strikeMoveOf still drops it', () => assert.equal(TR.strikeMoveOf('Penalty Defence', 'Offside', '32'), ''));
-test('not an attack end',           () => assert.equal(TR.isAttackEnd('Penalty Defence', 'Offside'), false));
-test('adds no attempt to the stats', () => {
+// A defensive penalty counts as an attempt that did not score. It leaves the
+// attack the ball and a fresh count, so it is a good attacking outcome reading
+// as a fail here — the rate is tries ÷ attempts, and this was not a try.
+console.log('Pen Defence counts as an attempt');
+test('strikeMoveOf keeps it',  () => assert.equal(TR.strikeMoveOf('Penalty Defence', 'Offside', '32'), '32'));
+test('still not an attack end',() => assert.equal(TR.isAttackEnd('Penalty Defence', 'Offside'), false));
+test('adds one failed attempt', () => {
   const without = TR.strikeMoveStats([
     { type: 'Try',      name: '32', strikeMove: '',   actionOwner: 'Team 1' },
     { type: 'Turnover', name: 'Ball Down', strikeMove: '32', actionOwner: 'Team 1' },
@@ -1366,10 +1371,21 @@ test('adds no attempt to the stats', () => {
     { type: 'Turnover', name: 'Ball Down', strikeMove: '32', actionOwner: 'Team 1' },
     { type: 'Penalty Defence', name: 'Offside', strikeMove: '32', actionOwner: 'Team 1' },
   ]);
-  assert.deepEqual(structuredClone(withPenDef.moves), structuredClone(without.moves));
-  assert.equal(withPenDef.moves[0].attempts, 2);
-  assert.equal(withPenDef.moves[0].rate, 0.5);
-  assert.equal(withPenDef.coverage.total, without.coverage.total);
+  assert.equal(without.moves[0].attempts, 2);
+  assert.equal(withPenDef.moves[0].attempts, 3);
+  assert.equal(withPenDef.moves[0].tries, 1);
+  assert.equal(withPenDef.moves[0].fails, 2);
+  assert.equal(withPenDef.coverage.total, without.coverage.total + 1);
+});
+test('an untagged one is a missed tag, unlike an untagged touch', () => {
+  // A defensive penalty is a discrete, notable event, so leaving it untagged is
+  // a gap in coverage. An untagged touch is just ordinary play.
+  const s = TR.strikeMoveStats([
+    { type: 'Penalty Defence', name: 'Offside', strikeMove: '', actionOwner: 'T1' },
+    { type: 'Touch',           name: 'Touch 2', strikeMove: '', actionOwner: 'T1' },
+  ]);
+  assert.equal(s.coverage.fails.total, 1);
+  assert.equal(s.coverage.fails.tagged, 0);
 });
 
 // ── TR.csvCell ────────────────────────────────────────────────
