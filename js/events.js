@@ -46,6 +46,17 @@ TR.EXCLUDED_MOVES = ['Other', 'Interception'];
 TR.isAttackEnd = (type, name) =>
   TR.STRIKE_MOVE_TYPES.includes(type) && TR.isTurnover(type, name);
 
+// A touch does not end the attack, but a called move that ends in a touch did
+// not break the line — so a TAGGED touch is a failure of that move, and counts.
+// Untagged touches never count: touches 1-3 are meant to be touched (settle,
+// drive, yards), so an untagged touch is ordinary play, not a missed tag. That
+// asymmetry is deliberate — were untagged touches in the denominator, coverage
+// would collapse the moment touch uploading is switched on.
+//
+// Tag the touch where the called move was stopped, and not also the turnover
+// that ends the same possession: two tags on one attempt count it twice.
+TR.isTouchFailure = (type, strikeMove) => type === 'Touch' && !!strikeMove;
+
 // The move this event was an attempt at, or '' when it isn't one or wasn't
 // tagged. A Try's move IS its Name — derived rather than stored twice, so
 // renaming a Try can't leave a stale move behind.
@@ -53,8 +64,9 @@ TR.isAttackEnd = (type, name) =>
 // Deliberately narrower than TR.recordedMoveOf below: this is the stats-facing
 // answer, so a defensive penalty yields '' even when a move is recorded on it.
 TR.strikeMoveOf = (type, name, strikeMove) =>
-    type === 'Try'             ? (name || '')
-  : TR.isAttackEnd(type, name) ? (strikeMove || '')
+    type === 'Try'                            ? (name || '')
+  : TR.isAttackEnd(type, name)                ? (strikeMove || '')
+  : TR.isTouchFailure(type, strikeMove)       ? strikeMove
   : '';
 
 // ── Recording a move vs. counting one ──────────────────────────
@@ -67,8 +79,11 @@ TR.strikeMoveOf = (type, name, strikeMove) =>
 // untouched (TR.isAttackEnd, which the stats gate on, still says false).
 //
 // A Try is excluded because its move IS its name, not a separate field.
+// Touch is offered too: unlike a defensive penalty, a touch that stopped a
+// called move IS counted as that move failing (see TR.isTouchFailure).
 TR.offersStrikeMove = (type, name) =>
-  (type !== 'Try' && TR.isAttackEnd(type, name)) || type === 'Penalty Defence';
+  (type !== 'Try' && TR.isAttackEnd(type, name)) ||
+  type === 'Penalty Defence' || type === 'Touch';
 
 // The move to SHOW and EXPORT for an event — the annotator's move column, the
 // CSV, the Strike Move cell pushed to the sheet, the Events viewer's tag.

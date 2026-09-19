@@ -132,6 +132,19 @@ test('Penalty Defence does not',   () => assert.equal(TR.isAttackEnd('Penalty De
 test('Game Event does not',        () => assert.equal(TR.isAttackEnd('Game Event', 'Game Start'), false));
 test('To Review does not',         () => assert.equal(TR.isAttackEnd('To Review', ''), false));
 
+// ── Touches as move failures ──────────────────────────────────
+console.log('TR.isTouchFailure');
+test('a tagged touch is a failure',   () => assert.equal(TR.isTouchFailure('Touch', '32 - Cut'), true));
+test('an untagged touch is not',      () => assert.equal(TR.isTouchFailure('Touch', ''), false));
+test('undefined move is not',         () => assert.equal(TR.isTouchFailure('Touch', undefined), false));
+test('only a Touch qualifies',        () => assert.equal(TR.isTouchFailure('Turnover', '32 - Cut'), false));
+test('a touch never ends the attack', () => assert.equal(TR.isAttackEnd('Touch', 'Touch 3'), false));
+test('the picker is offered on it',   () => assert.equal(TR.offersStrikeMove('Touch', 'Touch 3'), true));
+test('a tagged touch has a move',     () => assert.equal(TR.strikeMoveOf('Touch', 'Touch 3', '32 - Cut'), '32 - Cut'));
+test('an untagged touch has none',    () => assert.equal(TR.strikeMoveOf('Touch', 'Touch 3', ''), ''));
+test('it is recorded as well as counted',
+  () => assert.equal(TR.recordedMoveOf('Touch', 'Touch 3', '32 - Cut'), '32 - Cut'));
+
 // ── TR.strikeMoveOf ───────────────────────────────────────────
 console.log('TR.strikeMoveOf');
 test('Try returns its own name',    () => assert.equal(TR.strikeMoveOf('Try', '33 - Quicky', ''), '33 - Quicky'));
@@ -897,6 +910,39 @@ const ev = (type, name, strikeMove, actionOwner) => ({ type, name, strikeMove, a
 // file's own object/array literals even when every field matches —
 // structuredClone re-realizes the value in this (the main) realm first.
 const stats = (events) => structuredClone(TR.strikeMoveStats(events));
+
+test('a tagged touch counts as a failure of that move', () => {
+  // The distortion this exists to fix: without touches, a move that is run
+  // constantly and almost never breaks the line reads as a perfect one.
+  const tries  = [ev('Try', '32 - Cut', ''), ev('Try', '32 - Cut', '')];
+  const before = stats(tries);
+  assert.equal(before.moves[0].rate, 1);
+  const after = stats(tries.concat(
+    Array.from({ length: 18 }, () => ev('Touch', 'Touch 3', '32 - Cut'))));
+  assert.equal(after.moves[0].tries, 2);
+  assert.equal(after.moves[0].attempts, 20);
+  assert.equal(after.moves[0].rate, 0.1);
+  assert.equal(after.moves[0].rateKnown, true);
+  assert.equal(after.ratesMeaningful, true);
+});
+
+test('untagged touches never dilute coverage', () => {
+  // Touches 1-3 are meant to be touched, so an untagged touch is ordinary play,
+  // not a missed tag. Were they counted, switching touch upload on would drop
+  // coverage through the floor overnight.
+  const base = [ev('Try', '32', ''), ev('Touch', 'Touch 2', '32')];
+  const noisy = base.concat(Array.from({ length: 500 }, () => ev('Touch', 'Touch 1', '')));
+  assert.deepEqual(stats(noisy).coverage, stats(base).coverage);
+  assert.equal(stats(noisy).moves[0].attempts, 2);
+});
+
+test('a touch still does not end a possession for the other gates', () => {
+  // Penalty Defence records a move without counting it; a touch counts. The
+  // two must not have quietly swapped behaviour.
+  assert.deepEqual(stats([ev('Penalty Defence', 'Offside', '32')]).moves, []);
+  assert.equal(stats([ev('Touch', 'Touch 4', '32')]).moves.length, 1);
+});
+
 
 test('empty input', () => {
   const s = stats([]);
