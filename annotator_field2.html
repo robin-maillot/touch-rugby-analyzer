@@ -816,7 +816,8 @@
     body.game-finished #pitchSection { display: none; }
 
     .pitch-stage { flex: 1 1 auto; min-height: 0; display: flex; gap: 7px; }
-    body.lay-stack .pitch-stage { flex-direction: column; }
+    body.lay-stack .pitch-stage,
+    body.lay-split .pitch-stage { flex-direction: column; }
     body.lay-rail  .pitch-stage,
     body.lay-wide  .pitch-stage { flex-direction: row; }
     /* No explicit height: the row's default stretch gives it the stage's height,
@@ -840,7 +841,7 @@
     .own-band { fill: rgba(255,255,255,0.035); }
     #bandTop, #bandBot { transition: fill-opacity .18s; }
     .band-label {
-      font-size: 6px; font-weight: 800; letter-spacing: 0.14em;
+      font-size: 7px; font-weight: 800; letter-spacing: 0.14em;
       text-anchor: middle; pointer-events: none;
     }
     #labelTop, #labelBot { fill: #fff; transition: fill-opacity .18s; }
@@ -862,6 +863,9 @@
        count hasn't started. Drawn hollow so it never reads as a tagged event. */
     .pin-restart .pin-dot { fill: none; stroke-dasharray: 2 1.6; stroke-width: 0.8; }
     .pin-restart .pin-txt { fill: rgba(255,255,255,0.75); }
+    /* Direction of play: a chevron on the ball — the last touch, or the tap-off —
+       pointing at the try line the team in possession is attacking. */
+    .play-dir { stroke: rgba(255,255,255,0.9); stroke-width: 0.5; stroke-linejoin: round; pointer-events: none; }
 
     #touchDots { flex: 0 0 auto; display: flex; justify-content: center; gap: 5px; padding: 3px 0 5px; }
     .tdot {
@@ -887,6 +891,15 @@
       flex: 0 0 auto; grid-template-columns: repeat(3, 1fr); grid-auto-rows: minmax(50px, auto);
     }
     #touchDots { grid-column: 1 / -1; }
+    /* Split — a turned pitch on a wide screen: one row of buttons above the
+       pitch, the touch counter at its head, so the pitch gets the full width
+       instead of sharing it with a rail and a panel. */
+    body.lay-split .act-rail {
+      order: -1; flex: 0 0 auto;
+      grid-template-columns: auto repeat(6, minmax(0, 1fr)); grid-auto-rows: 46px;
+    }
+    body.lay-split #touchDots { grid-column: auto; align-items: center; padding: 0 6px; }
+    body.lay-split .rail-btn  { min-height: 0; }
     .rail-btn {
       min-height: 46px; padding: 4px 3px;
       border-radius: 11px; border: 1px solid var(--border);
@@ -1000,6 +1013,12 @@
     }
     body.game-running.lay-wide:not(.game-finished) #possWrap   { flex: 0 0 auto; }
     body.game-running.lay-wide:not(.game-finished) #recentWrap { flex: 1 1 auto; max-height: none; min-height: 0; overflow-y: auto; }
+    /* Split: possession and the last four share one row under the pitch. */
+    body.game-running.lay-split:not(.game-finished) #sidePanel {
+      display: flex; flex-direction: row; gap: 8px; flex: 0 0 auto; min-height: 0;
+    }
+    body.game-running.lay-split:not(.game-finished) #possWrap   { flex: 0 0 clamp(260px, 36%, 420px); align-self: flex-start; }
+    body.game-running.lay-split:not(.game-finished) #recentWrap { flex: 1 1 auto; flex-basis: 92px; height: 92px; min-width: 0; }
     /* Vertical again: with the height back, the toggle reads better stacked. */
     body.game-running.lay-wide:not(.game-finished) .poss-toggle { flex-direction: column; }
 
@@ -1127,7 +1146,15 @@
         <option value="M45">M45</option>
         <option value="" selected>NONE</option>
       </select>
-      <input id="metaCompetition" placeholder="Competition" oninput="onMetaChange()">
+      <!-- Suggestions, not a fixed list: anything else can still be typed. -->
+      <input id="metaCompetition" placeholder="Competition" list="competitionOptions" oninput="onMetaChange()">
+      <datalist id="competitionOptions">
+        <option value="Euros"></option>
+        <option value="World Cup"></option>
+        <option value="SuperTouch"></option>
+        <option value="Asia Pacific Opens"></option>
+        <option value="Asia Pacific Seniors"></option>
+      </datalist>
       <input id="metaId" placeholder="ID" style="max-width:70px" title="Optional disambiguator for repeat fixtures" oninput="onMetaChange()">
     </div>
   </div>
@@ -2790,7 +2817,9 @@ async function pushToSheet(override = false) {
 // Drawing units. The playing area is 70m long × 50m wide, so 100 units across
 // maps to 140 down — draw it any other way and the 5m and 10m lines lie.
 const PITCH_LEN  = 140;                       // try line to try line
-const PITCH_BAND = 10;                        // ~5m dead-ball area at each end
+// Drawn deeper than the real ~5m dead-ball area: it's the try target, and a
+// bigger band is a much easier tap at speed than a true-to-scale sliver.
+const PITCH_BAND = 18;
 const M          = PITCH_LEN / 70;            // drawing units per metre
 const PIN_R      = 5.2;
 const PEN_KINDS  = ['Penalty Attack', 'Penalty Defence', '6 Again'];
@@ -3068,7 +3097,8 @@ function renderPitch() {
 
   layer.innerHTML = prev.map(a => pinSVG(a, !cur.length && !restart, false)).join('') +
                     restartSVG +
-                    cur.map(a => pinSVG(a, true, a === live)).join('');
+                    cur.map(a => pinSVG(a, true, a === live)).join('') +
+                    playDirSVG(restart, cur, prev, attacking);
 
   // Touch counter, at the top of the rail so it stays put whichever way the ball
   // is going — the in-goal bands now carry the team names instead.
@@ -3095,6 +3125,32 @@ function renderPitch() {
   }
 }
 
+// Where the ball is on screen, and which way the team holding it is going. The
+// arrow sits on the tap-off, else the newest pin of this set, else the event
+// that just ended the last one (a turnover's pin, say, before the first touch).
+// That pin may be drawn in its old owner's frame; the arrow is always drawn for
+// the team in possession now.
+function playDirSVG(restart, cur, prev, color) {
+  if (isFinished()) return '';
+  let at = null;
+  if (restart) at = toView(restart.x, restart.y, runsDown(possession));
+  else {
+    const src = [...cur].reverse().find(a => a.x != null)
+      || (!cur.length && prev.length && prev[prev.length - 1].type !== 'Try' && prev[prev.length - 1].x != null
+          ? prev[prev.length - 1] : null);
+    if (src) at = toView(src.x, src.y, runsDown(src.possessionOwner));
+  }
+  if (!at) return '';
+  // Attack runs towards a < 0 for the "up" team, a > PITCH_LEN for the other;
+  // place() then decides which way that is on screen.
+  const dA = runsDown(possession) ? 1 : -1;
+  const d  = pitchOrient === 'h' ? { x: -dA, y: 0 } : { x: 0, y: dA };
+  const n  = { x: -d.y, y: d.x };
+  const tip = PIN_R + 6.5, base = PIN_R + 2.4, half = 2.6;
+  const pt = (k, s) => `${(at.vx + d.x * k + n.x * s).toFixed(2)},${(at.vy + d.y * k + n.y * s).toFixed(2)}`;
+  return `<polygon class="play-dir" points="${pt(tip, 0)} ${pt(base, half)} ${pt(base, -half)}" fill="${color}"/>`;
+}
+
 // ── Orientation and layout ─────────────────────────────────────
 // The pitch is a fixed shape, so only one of its dimensions can ever fill the
 // space; the other has slack. Rather than guess where that slack falls, work out
@@ -3119,6 +3175,7 @@ function resolveLayout() {
   // BTN_ROWS covers two rows of buttons plus the touch-counter row, which spans
   // the full width when the buttons are stacked underneath rather than beside.
   const STATUS = 30, BTN_ROWS = 140, POSS = 52, RECENT = 126, PANEL = 230, GAP = 8;
+  const BTN_ROW = 46, BELOW = 92;   // split: one row of buttons, one row under
   // Six buttons at a usable size need ~350px of column. Where there isn't that
   // much — a phone held sideways — the rail goes to two columns rather than
   // pushing Undo off the bottom of the screen.
@@ -3135,6 +3192,9 @@ function resolveLayout() {
     ['rail',  area(W - RAIL - GAP, H - STATUS - POSS - RECENT - GAP * 3, ar)],
     // wide: buttons beside the pitch and the rest in a panel beside that
     ['wide',  area(W - RAIL - PANEL - GAP * 2, H - STATUS - GAP, ar)],
+    // split: one row of buttons above, possession and last four in a row below.
+    // Turned pitch only — upright, a single row of seven would be too narrow.
+    ['split', ar > 1 ? area(W, H - BTN_ROW - STATUS - BELOW - GAP * 3, ar) : 0],
   ];
 
   let best = null;
@@ -3151,6 +3211,7 @@ function resolveLayout() {
   document.body.classList.toggle('lay-wide',  best.place === 'wide');
   document.body.classList.toggle('lay-rail',  best.place === 'rail');
   document.body.classList.toggle('lay-stack', best.place === 'stack');
+  document.body.classList.toggle('lay-split', best.place === 'split');
   document.body.classList.toggle('pitch-h',   pitchOrient === 'h');
   const btn = document.getElementById('rotateBtn');
   if (btn) {
