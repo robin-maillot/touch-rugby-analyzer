@@ -24,7 +24,10 @@ everything pressable sits in a rail beside it:
 - **The sixth tap is the handover.** It's tagged `Turnover / 6th Touch`
   automatically and the ball changes hands.
 - **Tap the try band** at the attacking end to score. It carries the attacking
-  team's name and colour, so it always says whose try it would be.
+  team's name and colour, so it always says whose try it would be. The bands are
+  drawn deeper than a true in-goal so they're an easy target at speed.
+- **A small arrow on the ball** — the last touch, or the 0 tap-off — points at
+  the try line the team in possession is attacking.
 - **After a try, and at each kick-off**, a hollow **0** appears on halfway: the
   tap-off. Nothing is recorded until you tap the first touch, but that's where
   the ball is, so a penalty placed without aiming lands there.
@@ -42,7 +45,9 @@ sized from the width, and the page never scrolls while a game is running.
 A fixed-shape pitch can only ever fill one dimension of a screen; the other has
 slack. So rather than guess, the page works out how big the pitch would come out
 in each combination — **upright or turned**, with the buttons **beneath it,
-beside it, or beside it with the last four beside that** — and picks the biggest.
+beside it, or beside it with the last four beside that**, or (turned only)
+**a row of buttons above it with possession and the last four in a row below** —
+and picks the biggest.
 The controls therefore never eat the dimension that is limiting the pitch, and
 the answer differs by device:
 
@@ -51,7 +56,7 @@ the answer differs by device:
 | Phone portrait | upright | rail beside | 233 × 372 |
 | Phone landscape | **turned** | rail + panel beside | 333 × 208 |
 | Tablet portrait | upright | rail beside | 495 × 793 |
-| Tablet landscape | **turned** | rail + panel beside | 775 × 484 |
+| Tablet landscape | **turned** | buttons above, rest below | ~900 × 508 |
 
 **⟳ Turn** overrides the choice and pins it for that device — the controls still
 rearrange around whichever way you pinned it. On a tablet held landscape, turning
@@ -92,7 +97,7 @@ once. When the ball turns over, the whole screen changes colour.
 
 ## The tagging loop
 
-1. **＋ New Game** → **⚙ Setup** → team names, year, division, competition.
+1. **＋ New Game** → **⚙ Setup** → team names, year, division, competition (Euros, World Cup, SuperTouch, Asia Pacific Opens and Asia Pacific Seniors are offered as suggestions; anything else can be typed).
 2. Set **possession**, then **Start** on the kickoff whistle. The pitch appears.
 3. Tap each touch. Watch the six dots down the left edge.
 4. When the set ends:
