@@ -104,7 +104,7 @@ once. When the ball turns over, the whole screen changes colour.
 
 ## The tagging loop
 
-1. **＋ New Game** → **⚙ Setup** → team names, year, division, competition (Euros, World Cup, SuperTouch, Asia Pacific Opens and Asia Pacific Seniors are offered as suggestions; anything else can be typed).
+1. **＋ New Game** → **⚙ Setup** → team names, year, division, competition — pick Euros, World Cup, SuperTouch, Asia Pacific Opens or Asia Pacific Seniors from the list, or **Other…** to type any other name.
 2. Set **possession**, then **Start** on the kickoff whistle. The pitch appears.
 3. Tap each touch. Watch the six dots down the left edge.
 4. When the set ends:

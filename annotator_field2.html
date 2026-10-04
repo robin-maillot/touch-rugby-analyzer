@@ -1191,15 +1191,18 @@
         <option value="M45">M45</option>
         <option value="" selected>NONE</option>
       </select>
-      <!-- Suggestions, not a fixed list: anything else can still be typed. -->
-      <input id="metaCompetition" placeholder="Competition" list="competitionOptions" oninput="onMetaChange()">
-      <datalist id="competitionOptions">
-        <option value="Euros"></option>
-        <option value="World Cup"></option>
-        <option value="SuperTouch"></option>
-        <option value="Asia Pacific Opens"></option>
-        <option value="Asia Pacific Seniors"></option>
-      </datalist>
+      <!-- The usual competitions are one pick; "Other…" opens the text box for
+           anything else. #metaCompetition stays the field every reader uses. -->
+      <select id="metaCompetitionSel" style="max-width:190px" onchange="pickCompetition(this.value)">
+        <option value="">Competition…</option>
+        <option>Euros</option>
+        <option>World Cup</option>
+        <option>SuperTouch</option>
+        <option>Asia Pacific Opens</option>
+        <option>Asia Pacific Seniors</option>
+        <option value="__other">Other…</option>
+      </select>
+      <input id="metaCompetition" placeholder="Competition" style="display:none" oninput="onMetaChange()">
       <input id="metaId" placeholder="ID" style="max-width:70px" title="Optional disambiguator for repeat fixtures" oninput="onMetaChange()">
     </div>
   </div>
@@ -1588,6 +1591,31 @@ function relTime(ts) {
   return Math.round(s / 86400) + 'd ago';
 }
 
+// ── Competition picker ─────────────────────────────────────────
+const COMPETITIONS = ['Euros', 'World Cup', 'SuperTouch', 'Asia Pacific Opens', 'Asia Pacific Seniors'];
+
+function pickCompetition(v) {
+  const input = $('metaCompetition');
+  const other = v === '__other';
+  input.style.display = other ? '' : 'none';
+  if (other) {
+    // Keep a free-text name already there; a preset is cleared to start fresh.
+    if (COMPETITIONS.includes(input.value)) input.value = '';
+    input.focus();
+  } else {
+    input.value = v;
+  }
+  onMetaChange();
+}
+
+// A loaded game's competition picks its preset, or shows as free text.
+function syncCompetitionPicker() {
+  const v     = $('metaCompetition').value.trim();
+  const isPre = COMPETITIONS.includes(v);
+  $('metaCompetitionSel').value = isPre ? v : v ? '__other' : '';
+  $('metaCompetition').style.display = !v || isPre ? 'none' : '';
+}
+
 const escapeHtml = s => String(s).replace(/[&<>"']/g, c =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -1665,6 +1693,7 @@ function loadGame(rec, isNew) {
   $('metaYear').value        = m.year || String(new Date().getFullYear());
   $('metaDivision').value    = m.division;
   $('metaCompetition').value = m.competition;
+  syncCompetitionPicker();
   $('metaId').value          = m.id;
   $('metaYoutube').value     = m.youtubelink;
   $('possBtn1').textContent  = m.team1.trim() || 'Team 1';
