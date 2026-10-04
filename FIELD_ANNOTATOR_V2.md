@@ -26,6 +26,13 @@ everything pressable sits in a rail beside it:
 - **Tap the try band** at the attacking end to score. It carries the attacking
   team's name and colour, so it always says whose try it would be. The bands are
   drawn deeper than a true in-goal so they're an easy target at speed.
+- **Optional try picker.** Tick *Pop up the try options when a try is scored* in
+  ⚙ Setup (remembered per device) and every try opens a full-screen picker:
+  first the ruck — **32, 23, 21, 33, French Flair, Other** — then the combo for
+  that ruck (Cut, Long, Backdoor, Quicky, Scoop, or *Just 32* for none). 21 and
+  French Flair finish in one tap; Other holds Scoop and Interception. It only
+  offers names that already exist, so the stats read them exactly as before.
+  **Skip** leaves the try as *Other*, as ignoring the strip does.
 - **A small arrow on the ball** — the last touch, or the 0 tap-off — points at
   the try line the team in possession is attacking.
 - **After a try, and at each kick-off**, a hollow **0** appears on halfway: the
@@ -46,7 +53,7 @@ A fixed-shape pitch can only ever fill one dimension of a screen; the other has
 slack. So rather than guess, the page works out how big the pitch would come out
 in each combination — **upright or turned**, with the buttons **beneath it,
 beside it, or beside it with the last four beside that**, or (turned only)
-**a row of buttons above it with possession and the last four in a row below** —
+**a row of buttons above it with possession and the last four in a panel beside it** —
 and picks the biggest.
 The controls therefore never eat the dimension that is limiting the pitch, and
 the answer differs by device:
@@ -56,7 +63,7 @@ the answer differs by device:
 | Phone portrait | upright | rail beside | 233 × 372 |
 | Phone landscape | **turned** | rail + panel beside | 333 × 208 |
 | Tablet portrait | upright | rail beside | 495 × 793 |
-| Tablet landscape | **turned** | buttons above, rest below | ~900 × 508 |
+| Tablet landscape | **turned** | buttons above, panel beside | 876 × 497 |
 
 **⟳ Turn** overrides the choice and pins it for that device — the controls still
 rearrange around whichever way you pinned it. On a tablet held landscape, turning
@@ -97,7 +104,7 @@ once. When the ball turns over, the whole screen changes colour.
 
 ## The tagging loop
 
-1. **＋ New Game** → **⚙ Setup** → team names, year, division, competition (Euros, World Cup, SuperTouch, Asia Pacific Opens and Asia Pacific Seniors are offered as suggestions; anything else can be typed).
+1. **＋ New Game** → **⚙ Setup** → team names, year, category (division) and competition. Both are pick lists — MXO, MO, WO, M30… for the category; Euros, World Cup, SuperTouch, Asia Pacific Opens or Asia Pacific Seniors for the competition — and both end in **Other…**, which opens a box to type any other name.
 2. Set **possession**, then **Start** on the kickoff whistle. The pitch appears.
 3. Tap each touch. Watch the six dots down the left edge.
 4. When the set ends:

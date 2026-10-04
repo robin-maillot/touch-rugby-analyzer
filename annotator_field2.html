@@ -764,6 +764,48 @@
       #stopCard { border-radius: 16px; max-width: 460px; }
     }
     .stop-title { font-size: 1.05rem; font-weight: 700; padding: 18px 20px 6px; }
+
+    /* ── Try picker ──────────────────────────────────────────────
+       Opt-in from Setup: after a try, the ruck then the combo, as big buttons
+       over most of the screen. It writes the same names as the strip does. ── */
+    #tryOverlay {
+      display: none; position: fixed; inset: 0; z-index: 210;
+      background: rgba(0,0,0,0.78); padding: 4vh 4vw;
+      align-items: stretch; justify-content: center;
+    }
+    #tryOverlay.open { display: flex; }
+    #tryCard {
+      flex: 1; max-width: 1000px; display: flex; flex-direction: column; gap: 12px;
+      background: var(--surface); border-radius: 18px; padding: 16px;
+      padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    }
+    .try-head { display: flex; align-items: center; gap: 10px; }
+    .try-title { flex: 1; font-size: 1.1rem; font-weight: 800; }
+    .try-title small { display: block; font-size: 0.72rem; font-weight: 600; color: var(--text-dim); margin-top: 2px; }
+    .try-head button {
+      min-height: 44px; padding: 0 16px; border-radius: 11px; border: 1px solid var(--border);
+      background: var(--surface-2); color: var(--text-muted); font-family: inherit; font-size: 0.85rem; font-weight: 700; cursor: pointer;
+    }
+    /* Fixed-size tiles in rows, centred: the same tile whichever step it is
+       and however many options it has — six rucks read as 3×2, five combos as
+       3 + 2 — rather than columns stretched to fill the card. */
+    #tryGrid {
+      flex: 1; min-height: 0; display: grid; gap: 12px;
+      grid-template-columns: repeat(2, minmax(0, 200px)); grid-auto-rows: 96px;
+      justify-content: center; align-content: center;
+      overflow-y: auto;
+    }
+    @media (min-width: 600px) {
+      #tryGrid { grid-template-columns: repeat(3, minmax(0, 260px)); grid-auto-rows: 150px; gap: 16px; }
+    }
+    .try-opt {
+      border-radius: 14px; border: 1px solid var(--border); background: var(--surface-2);
+      color: var(--text); font-family: inherit; font-size: 1.25rem; font-weight: 800; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .try-opt small { display: block; font-size: 0.7rem; font-weight: 600; color: var(--text-dim); margin-top: 3px; }
+    .try-opt:active { transform: scale(0.98); background: var(--surface-3); }
+    .try-opt.plain { border-style: dashed; color: var(--text-muted); }
     .stop-body  { font-size: 0.84rem; color: var(--text-muted); line-height: 1.45; padding: 0 20px 14px; }
     .stop-warn {
       margin: 0 16px 14px;
@@ -1000,27 +1042,30 @@
     #sidePanel { display: contents; }
 
     /* Wide is now chosen by measurement rather than by a media query — see
-       resolveLayout() — so it hangs off a body class. */
-    body.game-running.lay-wide:not(.game-finished) main { flex-direction: row; align-items: stretch; justify-content: center; }
+       resolveLayout() — so it hangs off a body class. Split shares the panel:
+       its buttons go in a row above the pitch, but possession and the last
+       events sit on the right, so the pitch gets back the height a row under
+       it would take. */
+    body.game-running.lay-wide:not(.game-finished) main,
+    body.game-running.lay-split:not(.game-finished) main { flex-direction: row; align-items: stretch; justify-content: center; }
     /* The pitch keeps a flex width and letterboxes inside it. Sizing it from its
        own aspect ratio would be tighter, but an aspect-ratio box with an
        indefinite height contributes nothing to intrinsic width, so the rail ends
        up overflowing the section and the panel lands on top of it. */
-    body.game-running.lay-wide:not(.game-finished) #pitchSection { flex: 1 1 auto; min-width: 0; }
-    body.game-running.lay-wide:not(.game-finished) #sidePanel {
+    body.game-running.lay-wide:not(.game-finished) #pitchSection,
+    body.game-running.lay-split:not(.game-finished) #pitchSection { flex: 1 1 auto; min-width: 0; }
+    body.game-running.lay-wide:not(.game-finished) #sidePanel,
+    body.game-running.lay-split:not(.game-finished) #sidePanel {
       display: flex; flex-direction: column; gap: 8px;
       flex: 0 0 clamp(168px, 24%, 230px); min-height: 0;
     }
-    body.game-running.lay-wide:not(.game-finished) #possWrap   { flex: 0 0 auto; }
-    body.game-running.lay-wide:not(.game-finished) #recentWrap { flex: 1 1 auto; max-height: none; min-height: 0; overflow-y: auto; }
-    /* Split: possession and the last four share one row under the pitch. */
-    body.game-running.lay-split:not(.game-finished) #sidePanel {
-      display: flex; flex-direction: row; gap: 8px; flex: 0 0 auto; min-height: 0;
-    }
-    body.game-running.lay-split:not(.game-finished) #possWrap   { flex: 0 0 clamp(260px, 36%, 420px); align-self: flex-start; }
-    body.game-running.lay-split:not(.game-finished) #recentWrap { flex: 1 1 auto; flex-basis: 92px; height: 92px; min-width: 0; }
+    body.game-running.lay-wide:not(.game-finished) #possWrap,
+    body.game-running.lay-split:not(.game-finished) #possWrap   { flex: 0 0 auto; }
+    body.game-running.lay-wide:not(.game-finished) #recentWrap,
+    body.game-running.lay-split:not(.game-finished) #recentWrap { flex: 1 1 auto; max-height: none; min-height: 0; overflow-y: auto; }
     /* Vertical again: with the height back, the toggle reads better stacked. */
-    body.game-running.lay-wide:not(.game-finished) .poss-toggle { flex-direction: column; }
+    body.game-running.lay-wide:not(.game-finished) .poss-toggle,
+    body.game-running.lay-split:not(.game-finished) .poss-toggle { flex-direction: column; }
 
     /* ── Field maps in the stats sheet ──────────────────────────
        Both teams are drawn attacking upwards here, whichever ends they were
@@ -1133,7 +1178,10 @@
   <div>
     <div class="settings-row">
       <input id="metaYear"        placeholder="Year"        style="max-width:80px" oninput="onMetaChange()">
-      <select id="metaDivision" style="max-width:90px" onchange="onMetaChange()">
+      <!-- Category and competition work the same way: the usual values are one
+           pick, "Other…" opens a text box. The text input is the field every
+           reader uses; the select only ever writes into it. -->
+      <select id="metaDivisionSel" style="max-width:110px" onchange="pickPreset('metaDivision', this.value)">
         <option value="MXO">MXO</option>
         <option value="MO">MO</option>
         <option value="WO">WO</option>
@@ -1145,16 +1193,19 @@
         <option value="W35">W35</option>
         <option value="M45">M45</option>
         <option value="" selected>NONE</option>
+        <option value="__other">Other…</option>
       </select>
-      <!-- Suggestions, not a fixed list: anything else can still be typed. -->
-      <input id="metaCompetition" placeholder="Competition" list="competitionOptions" oninput="onMetaChange()">
-      <datalist id="competitionOptions">
-        <option value="Euros"></option>
-        <option value="World Cup"></option>
-        <option value="SuperTouch"></option>
-        <option value="Asia Pacific Opens"></option>
-        <option value="Asia Pacific Seniors"></option>
-      </datalist>
+      <input id="metaDivision" placeholder="Category" style="display:none;max-width:110px" oninput="onMetaChange()">
+      <select id="metaCompetitionSel" style="max-width:190px" onchange="pickPreset('metaCompetition', this.value)">
+        <option value="">Competition…</option>
+        <option>Euros</option>
+        <option>World Cup</option>
+        <option>SuperTouch</option>
+        <option>Asia Pacific Opens</option>
+        <option>Asia Pacific Seniors</option>
+        <option value="__other">Other…</option>
+      </select>
+      <input id="metaCompetition" placeholder="Competition" style="display:none" oninput="onMetaChange()">
       <input id="metaId" placeholder="ID" style="max-width:70px" title="Optional disambiguator for repeat fixtures" oninput="onMetaChange()">
     </div>
   </div>
@@ -1176,6 +1227,13 @@
       <span>Upload the individual touches too (type <code>Touch</code>). Off by default: positions on
       tries, turnovers and penalties always upload, but the touch-by-touch rows would add a lot of
       lines to the sheet tab.</span>
+    </label>
+  </div>
+  <div>
+    <label class="v2-switch">
+      <input type="checkbox" id="tryPopupInput" onchange="setTryPopup(this.checked)">
+      <span>Pop up the try options when a try is scored — the ruck, then the combo, in a
+      full-screen picker instead of the strip under the pitch.</span>
     </label>
   </div>
   <div id="sheetPreview">fill metadata to generate tab name</div>
@@ -1277,6 +1335,18 @@
       <span id="stopOfflineWarnBody">It's saved on this device only. Upload it later from the games list.</span>
     </div>
     <div class="stop-actions" id="stopActions"></div>
+  </div>
+</div>
+
+<!-- Try picker (opt-in from Setup) -->
+<div id="tryOverlay" onclick="if(event.target===this)closeTryPicker()">
+  <div id="tryCard" role="dialog" aria-modal="true" aria-labelledby="tryTitle">
+    <div class="try-head">
+      <button id="tryBackBtn" onclick="tryPickerStep(null)">&larr; Back</button>
+      <div class="try-title" id="tryTitle"></div>
+      <button onclick="closeTryPicker()">Skip &#10005;</button>
+    </div>
+    <div id="tryGrid"></div>
   </div>
 </div>
 
@@ -1524,6 +1594,34 @@ function relTime(ts) {
   return Math.round(s / 86400) + 'd ago';
 }
 
+// ── Category and competition pickers ───────────────────────────
+// Each is a select of the usual values beside a text input. The input holds the
+// value; the select fills it, or with "Other…" shows it for typing. The presets
+// are read off the select itself, so the markup is the only list.
+const presetsOf = id => [...$(id + 'Sel').options].map(o => o.value).filter(v => v !== '__other');
+
+function pickPreset(id, v) {
+  const input = $(id);
+  const other = v === '__other';
+  input.style.display = other ? '' : 'none';
+  if (other) {
+    // Keep free text already there; a preset is cleared to start fresh.
+    if (presetsOf(id).includes(input.value)) input.value = '';
+    input.focus();
+  } else {
+    input.value = v;
+  }
+  onMetaChange();
+}
+
+// A loaded game's value picks its preset, or shows as free text.
+function syncPresetPicker(id) {
+  const v     = $(id).value.trim();
+  const isPre = presetsOf(id).includes(v);
+  $(id + 'Sel').value = isPre ? v : '__other';
+  $(id).style.display = isPre ? 'none' : '';
+}
+
 const escapeHtml = s => String(s).replace(/[&<>"']/g, c =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -1599,8 +1697,10 @@ function loadGame(rec, isNew) {
   $('metaTeam1').value       = m.team1;
   $('metaTeam2').value       = m.team2;
   $('metaYear').value        = m.year || String(new Date().getFullYear());
-  $('metaDivision').value    = m.division;
+  $('metaDivision').value    = m.division || '';
   $('metaCompetition').value = m.competition;
+  syncPresetPicker('metaDivision');
+  syncPresetPicker('metaCompetition');
   $('metaId').value          = m.id;
   $('metaYoutube').value     = m.youtubelink;
   $('possBtn1').textContent  = m.team1.trim() || 'Team 1';
@@ -3175,7 +3275,7 @@ function resolveLayout() {
   // BTN_ROWS covers two rows of buttons plus the touch-counter row, which spans
   // the full width when the buttons are stacked underneath rather than beside.
   const STATUS = 30, BTN_ROWS = 140, POSS = 52, RECENT = 126, PANEL = 230, GAP = 8;
-  const BTN_ROW = 46, BELOW = 92;   // split: one row of buttons, one row under
+  const BTN_ROW = 46;               // split: one row of buttons above the pitch
   // Six buttons at a usable size need ~350px of column. Where there isn't that
   // much — a phone held sideways — the rail goes to two columns rather than
   // pushing Undo off the bottom of the screen.
@@ -3192,9 +3292,9 @@ function resolveLayout() {
     ['rail',  area(W - RAIL - GAP, H - STATUS - POSS - RECENT - GAP * 3, ar)],
     // wide: buttons beside the pitch and the rest in a panel beside that
     ['wide',  area(W - RAIL - PANEL - GAP * 2, H - STATUS - GAP, ar)],
-    // split: one row of buttons above, possession and last four in a row below.
+    // split: one row of buttons above the pitch, the panel beside it.
     // Turned pitch only — upright, a single row of seven would be too narrow.
-    ['split', ar > 1 ? area(W, H - BTN_ROW - STATUS - BELOW - GAP * 3, ar) : 0],
+    ['split', ar > 1 ? area(W - PANEL - GAP, H - BTN_ROW - STATUS - GAP * 2, ar) : 0],
   ];
 
   let best = null;
@@ -3263,7 +3363,11 @@ function onPitchTap(ev) {
   if (isFinished() || !isGameRunning()) return;
   const pt = pitchPoint(ev);
   if (armedPen) { placePen(pt); return; }
-  if (pt.inTry) { tag('Try', 'Other', possession, pt); offerSubtype(); return; }
+  if (pt.inTry) {
+    tag('Try', 'Other', possession, pt);
+    if (tryPopup) openTryPicker(); else offerSubtype();
+    return;
+  }
 
   const n = touchCount() + 1;
   // The sixth touch is the handover itself, so it's tagged as the possession's
@@ -3358,6 +3462,83 @@ function pickSubtype(name) {
   // defensive penalty — there, the move that drew it. Same strip, same
   // timeout — ignoring it simply leaves the move blank.
   if (TR.offersStrikeMove(a.type, a.name)) offerMoveStrip(i);
+}
+
+// ── Try picker ─────────────────────────────────────────────────
+// The full-screen alternative to the try strip, switched on in Setup. Step one
+// is the ruck, step two the combo. The tree is read off TR.MENU['Try'] rather
+// than written out, so it can only ever produce a name the strip could — a
+// "32 - Cut" here is the same "32 - Cut" every stats page already counts.
+const TRY_RUCKS = ['32', '23', '21', '33', 'French Flair'];
+
+let tryPopup = localStorage.getItem('fieldTryPopup') === '1';
+let tryIdx   = null;
+
+function setTryPopup(on) {
+  tryPopup = !!on;
+  try { localStorage.setItem('fieldTryPopup', on ? '1' : '0'); } catch (e) {}
+}
+
+// Ruck → the full names under it. Anything that isn't a ruck or a "ruck - combo"
+// (Scoop, Interception, Other) lands under Other.
+function tryTree() {
+  const names = TR.MENU['Try'] || [];
+  const tree  = new Map(TRY_RUCKS.map(r => [r, []]));
+  tree.set('Other', []);
+  names.forEach(n => {
+    const ruck = TRY_RUCKS.find(r => n === r || n.startsWith(r + ' - '));
+    tree.get(ruck || 'Other').push(n);
+  });
+  return tree;
+}
+
+function openTryPicker(idx) {
+  const i = idx == null ? annotations.length - 1 : idx;
+  if (!annotations[i] || annotations[i].type !== 'Try') return;
+  // The strip and the picker would both be writing this try's name.
+  closeSubtype(); closeMoveStrip();
+  tryIdx = i;
+  document.getElementById('tryOverlay').classList.add('open');
+  tryPickerStep(null);
+}
+
+// null draws the rucks; a ruck draws its combos, or picks it outright if it has none.
+function tryPickerStep(ruck) {
+  const tree  = tryTree();
+  const team  = teamName(annotations[tryIdx]?.possessionOwner);
+  const title = document.getElementById('tryTitle');
+  const grid  = document.getElementById('tryGrid');
+  document.getElementById('tryBackBtn').style.visibility = ruck ? 'visible' : 'hidden';
+  if (!ruck) {
+    title.innerHTML = `Try — ${escapeHtml(team)}<small>Which ruck?</small>`;
+    grid.innerHTML = [...tree.keys()].filter(r => tree.get(r).length).map(r =>
+      `<button class="try-opt" data-ruck="${r}">${r}</button>`).join('');
+    return;
+  }
+  const names = tree.get(ruck) || [];
+  if (ruck !== 'Other' && names.length === 1) { pickTry(names[0]); return; }
+  title.innerHTML = `${ruck}<small>${ruck === 'Other' ? 'Which one?' : 'Which combo?'}</small>`;
+  grid.innerHTML = names.map(n => {
+    const isPlain = n === ruck && ruck !== 'Other';
+    const label   = isPlain ? `Just ${ruck}` : n.startsWith(ruck + ' - ') ? n.slice(ruck.length + 3) : n;
+    return `<button class="try-opt${isPlain ? ' plain' : ''}" data-try="${n}">${label}` +
+           (isPlain ? '<small>no combo</small>' : '') + `</button>`;
+  }).join('');
+}
+
+function pickTry(name) {
+  const i = tryIdx;
+  closeTryPicker();
+  if (i === null || !annotations[i]) return;
+  // Through the strip's own path, so possession, owner and saving behave the same.
+  subtypeIdx = i;
+  pickSubtype(name);
+}
+
+// Closing without a pick leaves the try as "Other" — the same as ignoring the strip.
+function closeTryPicker() {
+  tryIdx = null;
+  document.getElementById('tryOverlay').classList.remove('open');
 }
 
 // ── Strike move strip ──────────────────────────────────────────
@@ -3674,6 +3855,13 @@ window.addEventListener('DOMContentLoaded', () => {
   const wrap = document.getElementById('pitchWrap');
   wrap.innerHTML = pitchSVG();
   document.getElementById('uploadTouchesInput').checked = uploadTouches;
+  document.getElementById('tryPopupInput').checked = tryPopup;
+  document.getElementById('tryGrid').addEventListener('click', ev => {
+    const r = ev.target.closest('[data-ruck]');
+    if (r) { tryPickerStep(r.dataset.ruck); return; }
+    const t = ev.target.closest('[data-try]');
+    if (t) pickTry(t.dataset.try);
+  });
   resolveLayout();
   // The best layout depends on the space available, so it is re-decided whenever
   // that changes — a rotation, a keyboard opening, Setup being opened.
