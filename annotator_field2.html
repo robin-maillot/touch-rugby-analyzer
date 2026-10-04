@@ -1000,27 +1000,30 @@
     #sidePanel { display: contents; }
 
     /* Wide is now chosen by measurement rather than by a media query — see
-       resolveLayout() — so it hangs off a body class. */
-    body.game-running.lay-wide:not(.game-finished) main { flex-direction: row; align-items: stretch; justify-content: center; }
+       resolveLayout() — so it hangs off a body class. Split shares the panel:
+       its buttons go in a row above the pitch, but possession and the last
+       events sit on the right, so the pitch gets back the height a row under
+       it would take. */
+    body.game-running.lay-wide:not(.game-finished) main,
+    body.game-running.lay-split:not(.game-finished) main { flex-direction: row; align-items: stretch; justify-content: center; }
     /* The pitch keeps a flex width and letterboxes inside it. Sizing it from its
        own aspect ratio would be tighter, but an aspect-ratio box with an
        indefinite height contributes nothing to intrinsic width, so the rail ends
        up overflowing the section and the panel lands on top of it. */
-    body.game-running.lay-wide:not(.game-finished) #pitchSection { flex: 1 1 auto; min-width: 0; }
-    body.game-running.lay-wide:not(.game-finished) #sidePanel {
+    body.game-running.lay-wide:not(.game-finished) #pitchSection,
+    body.game-running.lay-split:not(.game-finished) #pitchSection { flex: 1 1 auto; min-width: 0; }
+    body.game-running.lay-wide:not(.game-finished) #sidePanel,
+    body.game-running.lay-split:not(.game-finished) #sidePanel {
       display: flex; flex-direction: column; gap: 8px;
       flex: 0 0 clamp(168px, 24%, 230px); min-height: 0;
     }
-    body.game-running.lay-wide:not(.game-finished) #possWrap   { flex: 0 0 auto; }
-    body.game-running.lay-wide:not(.game-finished) #recentWrap { flex: 1 1 auto; max-height: none; min-height: 0; overflow-y: auto; }
-    /* Split: possession and the last four share one row under the pitch. */
-    body.game-running.lay-split:not(.game-finished) #sidePanel {
-      display: flex; flex-direction: row; gap: 8px; flex: 0 0 auto; min-height: 0;
-    }
-    body.game-running.lay-split:not(.game-finished) #possWrap   { flex: 0 0 clamp(260px, 36%, 420px); align-self: flex-start; }
-    body.game-running.lay-split:not(.game-finished) #recentWrap { flex: 1 1 auto; flex-basis: 92px; height: 92px; min-width: 0; }
+    body.game-running.lay-wide:not(.game-finished) #possWrap,
+    body.game-running.lay-split:not(.game-finished) #possWrap   { flex: 0 0 auto; }
+    body.game-running.lay-wide:not(.game-finished) #recentWrap,
+    body.game-running.lay-split:not(.game-finished) #recentWrap { flex: 1 1 auto; max-height: none; min-height: 0; overflow-y: auto; }
     /* Vertical again: with the height back, the toggle reads better stacked. */
-    body.game-running.lay-wide:not(.game-finished) .poss-toggle { flex-direction: column; }
+    body.game-running.lay-wide:not(.game-finished) .poss-toggle,
+    body.game-running.lay-split:not(.game-finished) .poss-toggle { flex-direction: column; }
 
     /* ── Field maps in the stats sheet ──────────────────────────
        Both teams are drawn attacking upwards here, whichever ends they were
@@ -3175,7 +3178,7 @@ function resolveLayout() {
   // BTN_ROWS covers two rows of buttons plus the touch-counter row, which spans
   // the full width when the buttons are stacked underneath rather than beside.
   const STATUS = 30, BTN_ROWS = 140, POSS = 52, RECENT = 126, PANEL = 230, GAP = 8;
-  const BTN_ROW = 46, BELOW = 92;   // split: one row of buttons, one row under
+  const BTN_ROW = 46;               // split: one row of buttons above the pitch
   // Six buttons at a usable size need ~350px of column. Where there isn't that
   // much — a phone held sideways — the rail goes to two columns rather than
   // pushing Undo off the bottom of the screen.
@@ -3192,9 +3195,9 @@ function resolveLayout() {
     ['rail',  area(W - RAIL - GAP, H - STATUS - POSS - RECENT - GAP * 3, ar)],
     // wide: buttons beside the pitch and the rest in a panel beside that
     ['wide',  area(W - RAIL - PANEL - GAP * 2, H - STATUS - GAP, ar)],
-    // split: one row of buttons above, possession and last four in a row below.
+    // split: one row of buttons above the pitch, the panel beside it.
     // Turned pitch only — upright, a single row of seven would be too narrow.
-    ['split', ar > 1 ? area(W, H - BTN_ROW - STATUS - BELOW - GAP * 3, ar) : 0],
+    ['split', ar > 1 ? area(W - PANEL - GAP, H - BTN_ROW - STATUS - GAP * 2, ar) : 0],
   ];
 
   let best = null;

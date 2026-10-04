@@ -46,7 +46,7 @@ A fixed-shape pitch can only ever fill one dimension of a screen; the other has
 slack. So rather than guess, the page works out how big the pitch would come out
 in each combination — **upright or turned**, with the buttons **beneath it,
 beside it, or beside it with the last four beside that**, or (turned only)
-**a row of buttons above it with possession and the last four in a row below** —
+**a row of buttons above it with possession and the last four in a panel beside it** —
 and picks the biggest.
 The controls therefore never eat the dimension that is limiting the pitch, and
 the answer differs by device:
@@ -56,7 +56,7 @@ the answer differs by device:
 | Phone portrait | upright | rail beside | 233 × 372 |
 | Phone landscape | **turned** | rail + panel beside | 333 × 208 |
 | Tablet portrait | upright | rail beside | 495 × 793 |
-| Tablet landscape | **turned** | buttons above, rest below | ~900 × 508 |
+| Tablet landscape | **turned** | buttons above, panel beside | 876 × 497 |
 
 **⟳ Turn** overrides the choice and pins it for that device — the controls still
 rearrange around whichever way you pinned it. On a tablet held landscape, turning
