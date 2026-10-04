@@ -26,6 +26,13 @@ everything pressable sits in a rail beside it:
 - **Tap the try band** at the attacking end to score. It carries the attacking
   team's name and colour, so it always says whose try it would be. The bands are
   drawn deeper than a true in-goal so they're an easy target at speed.
+- **Optional try picker.** Tick *Pop up the try options when a try is scored* in
+  ⚙ Setup (remembered per device) and every try opens a full-screen picker:
+  first the ruck — **32, 23, 21, 33, French Flair, Other** — then the combo for
+  that ruck (Cut, Long, Backdoor, Quicky, Scoop, or *Just 32* for none). 21 and
+  French Flair finish in one tap; Other holds Scoop and Interception. It only
+  offers names that already exist, so the stats read them exactly as before.
+  **Skip** leaves the try as *Other*, as ignoring the strip does.
 - **A small arrow on the ball** — the last touch, or the 0 tap-off — points at
   the try line the team in possession is attacking.
 - **After a try, and at each kick-off**, a hollow **0** appears on halfway: the
