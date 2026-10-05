@@ -652,15 +652,21 @@ function ingest(r){
   headers=r[0].map(h=>h.trim());
   const hi=n=>headers.findIndex(h=>h.toLowerCase()===n);
   const I={t:hi('time'),ty:hi('type'),nm:hi('name'),ao:hi('action owner'),
-    cm:hi('comment'),sm:hi('strike move'),g:hi('game'),t1:hi('team 1'),t2:hi('team 2'),
+    cm:hi('comment'),sm:hi('strike move'),dt:hi('detail'),g:hi('game'),t1:hi('team 1'),t2:hi('team 2'),
     cp:hi('competition'),yr:hi('year'),dv:hi('division')};
   const sub=(v,a,b)=>{const s=(v||'').trim();return s==='Team 1'?a:s==='Team 2'?b:s};
   rows=r.slice(1).filter(x=>x.some(c=>c!=='')).map(x=>{
     const type=(x[I.ty]||'').trim(), name=(x[I.nm]||'').trim();
     const rawMove=I.sm>=0?(x[I.sm]||'').trim():'';
+    const detail=TR.parseDetail(I.dt>=0?x[I.dt]:'');
     return {
       time:toSecs(x[I.t]), timeStr:x[I.t]||'', type, name,
-      team:sub(x[I.ao],x[I.t1],x[I.t2]), comment:I.cm>=0?(x[I.cm]||''):'',
+      team:sub(x[I.ao],x[I.t1],x[I.t2]),
+      // Older v2 games carried the pitch position in Comment as "@62,48";
+      // it's data, not a note, so it's dropped from what's shown.
+      comment:I.cm>=0?TR.stripLegacyPos(x[I.cm]):'',
+      // A try's scorer, side and channel, e.g. "#7 · Open · ML".
+      detail, tags:type==='Try'?TR.detailLabel(detail):'',
       // Derived, not read raw: a Try's move IS its name, and the viewer's inline
       // edit can leave the stored Strike Move column stale after a rename.
       // Same fix as viewer.html f14dbee.
@@ -739,7 +745,7 @@ function render(keepWindow){
     (!F.name.size||F.name.has(e.name)) &&
     (!F.move.size||F.move.has(e.move)) &&
     (F.from==null||e.time>=F.from) && (F.to==null||e.time<=F.to) &&
-    (!q||(e.name+' '+e.type+' '+e.team+' '+e.comment+' '+e.move).toLowerCase().includes(q)));
+    (!q||(e.name+' '+e.type+' '+e.team+' '+e.comment+' '+e.move+' '+e.tags).toLowerCase().includes(q)));
   }
   const n=F.comp.size+F.div.size+F.year.size+F.type.size+F.team.size+F.name.size+F.move.size
           +(F.q?1:0)+((F.from!=null||F.to!=null)?1:0);
@@ -817,6 +823,7 @@ function render(keepWindow){
         ${(game===''||pl)?`<span class="gmatch">${esc(shortLabel(e.game))}</span>`:''}
         ${e.team?`<span class="team">${esc(e.team)}</span>`:''}
         ${e.move?`<span class="move">${esc(e.move)}</span>`:''}
+        ${e.tags?`<span class="move">${esc(e.tags)}</span>`:''}
         ${e.comment?esc(e.comment.slice(0,32)):''}</span>
       </span>
     </div>`}).join('');
@@ -938,6 +945,7 @@ function playEvent(gameSecs,id,evGame){
   if(ev){$('nowPill').innerHTML=
     `<span class="tag" style="background:${col(ev.type)}22;color:${col(ev.type)}">${esc(ev.type)}</span>`+
     `<b>${esc(ev.name||'')}</b> <span style="color:var(--dim)">${esc(ev.team||'')}</span>`+
+    (ev.tags?` <span style="color:var(--dim)">${esc(ev.tags)}</span>`:'')+
     (ev.comment?`<span class="cmt">${esc(ev.comment)}</span>`:'');
     $('nowPill').classList.add('show');}
   document.querySelectorAll('.ev').forEach(n=>n.classList.remove('active'));
@@ -1516,7 +1524,7 @@ function plExport(){
   if(!plDraft) return;
   const r=plResolved;
   if(!r.events.length) return;          // the button is disabled too; belt and braces
-  const head=['#','Game','Time','Type','Name','Team','Move','Comment','YouTube Link'];
+  const head=['#','Game','Time','Type','Name','Team','Move','Details','Comment','YouTube Link'];
   const body=r.events.map((e,n)=>[
     // Position in the FILE, not in the stored ref list — a ref that no longer
     // resolves is absent here, and a # that skipped 4 would send the reader
@@ -1525,7 +1533,7 @@ function plExport(){
     // The full label, not shortLabel: a playlist spans matches, and two
     // "France vs England" rows from different years must be tellable apart.
     labels[e.game]||e.game,
-    e.timeStr, e.type, e.name, e.team, e.move, e.comment,
+    e.timeStr, e.type, e.name, e.team, e.move, e.tags, e.comment,
     // seekLink applies the game's videoOffset and the 5s lookback, and returns
     // '' when the game has no video or the moment predates the recording. The
     // row still exports, so the file's length always matches the list above it.

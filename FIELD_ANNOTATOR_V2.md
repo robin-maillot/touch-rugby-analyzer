@@ -274,16 +274,33 @@ have nothing to do with the games.
 
 ## What reaches the Google Sheet
 
-The sheet keeps its seven-column shape (`Time, Possession Owner, Type, Name,
-To Review, Comment, Action Owner`). The pitch position rides in the **Comment**
-column — the one free-text column — as `@x,y`:
+The sheet uses the same columns as every other annotator (`Time, Possession
+Owner, Type, Name, To Review, Comment, Action Owner, Strike Move`) plus one more
+at the end, **Detail**. Detail holds `key:value` tags separated by `; `, so new
+stats don't need new columns:
+
+| Tag | Meaning |
+|---|---|
+| `pos:62,48` | pitch position, x,y 0–100, attack-normalised (every positioned event) |
+| `player:7` | a try's scorer, by shirt number |
+| `side:open` / `side:blind` | which side of the ruck the try went |
+| `ch:MM` / `ML` / `LW` / `W+` | the channel the try was scored in |
 
 ```
-0:02:44   Team 1   Try        Other   ""   @50,100          Team 1
-0:01:54   Team 1   Turnover   Other   ""   dropped it @62,48  Team 1
+Time      Poss     Type       Name       … Comment       … Strike Move  Detail
+0:02:44   Team 1   Try        32 - Cut   …               … 32 - Cut     pos:50,100; player:7; side:open; ch:ML
+0:01:54   Team 1   Turnover   Other      … dropped it    …              pos:62,48
 ```
 
-Anything you actually typed as a comment is kept in front of it.
+Comment holds only what you typed. Games pushed before Detail existed carried
+the position in Comment as `@62,48`; Game Analysis still reads it from there
+(and hides it from the comment), so those games keep their positions. The tags
+are read and written in one place, `TR.parseDetail` / `TR.formatDetail` in
+`js/events.js`.
+
+**Try details** — side, channel and scorer — are set in the try picker's last
+step (when the pop-up is on), or any time from the event's edit sheet. Every one
+is optional.
 
 **The individual touches are not uploaded by default.** Setup has a switch,
 *"Upload the individual touches too"*. Off, only the events v1 would have produced
