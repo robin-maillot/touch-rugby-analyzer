@@ -111,3 +111,74 @@ TR.offersStrikeMove = (type, name) =>
 // two in place.
 TR.recordedMoveOf = (type, name, strikeMove) =>
   TR.strikeMoveOf(type, name, strikeMove);
+
+// ── Detail tags ────────────────────────────────────────────────
+// The Detail column holds "key:value; key:value" tags rather than a column per
+// stat, most of which would be empty on most rows:
+//
+//   pos:62,48            pitch position, x,y 0-100, attack-normalised
+//   player:7             the try scorer's shirt number
+//   side:open | blind    which side of the ruck the try went
+//   ch:MM | ML | LW | W+ the channel it was scored in
+//
+// "; " separates tags because a value may contain spaces; the first ":" ends
+// the key, so a value may contain colons. Unknown keys survive a round trip, so
+// a stat added later never needs a new column or a reader change to be kept.
+TR.DETAIL_SIDES    = ['open', 'blind'];
+TR.DETAIL_CHANNELS = ['MM', 'ML', 'LW', 'W+'];
+const DETAIL_ORDER = ['pos', 'player', 'side', 'ch'];
+
+TR.parseDetail = (str) => {
+  const out = {};
+  String(str || '').split(';').forEach(part => {
+    const i = part.indexOf(':');
+    if (i <= 0) return;
+    const key = part.slice(0, i).trim().toLowerCase();
+    const val = part.slice(i + 1).trim();
+    if (key && val) out[key] = val;
+  });
+  return out;
+};
+
+// Known keys first in a fixed order, the rest alphabetically, so the same tags
+// always write the same cell. Empty values are dropped; separators that would
+// corrupt the cell are stripped from values rather than escaped.
+TR.formatDetail = (obj) => {
+  const tags = {};
+  Object.entries(obj || {}).forEach(([k, v]) => {
+    const val = v == null ? '' : String(v).replace(/[;\r\n]+/g, ' ').trim();
+    if (val) tags[k.trim().toLowerCase()] = val;
+  });
+  const rest = Object.keys(tags).filter(k => !DETAIL_ORDER.includes(k)).sort();
+  return [...DETAIL_ORDER.filter(k => k in tags), ...rest]
+    .map(k => `${k}:${tags[k]}`)
+    .join('; ');
+};
+
+// Before Detail existed, field annotator v2 appended the position to Comment as
+// "@62,48". Read from Detail first and fall back to that, so older games keep
+// their positions.
+const LEGACY_POS = /(?:^|\s)@(\d{1,3}(?:\.\d+)?),(\d{1,3}(?:\.\d+)?)(?=\s|$)/;
+
+TR.detailPos = (detail, comment) => {
+  const d = typeof detail === 'string' ? TR.parseDetail(detail) : (detail || {});
+  const m = d.pos ? /^(\d{1,3}(?:\.\d+)?),(\d{1,3}(?:\.\d+)?)$/.exec(d.pos) : LEGACY_POS.exec(String(comment || ''));
+  if (!m) return null;
+  const x = +m[1], y = +m[2];
+  return x <= 100 && y <= 100 ? { x, y } : null;
+};
+
+// The comment as a person wrote it — without a legacy "@x,y" position token.
+TR.stripLegacyPos = (comment) =>
+  String(comment || '').replace(LEGACY_POS, '').trim();
+
+// A short human label for the try tags, e.g. "#7 · Open · ML". Position is left
+// out: it reads as a number pair, not as a fact about the try.
+TR.detailLabel = (detail) => {
+  const d = typeof detail === 'string' ? TR.parseDetail(detail) : (detail || {});
+  return [
+    d.player ? '#' + d.player : '',
+    d.side ? d.side.charAt(0).toUpperCase() + d.side.slice(1) : '',
+    d.ch || '',
+  ].filter(Boolean).join(' · ');
+};
