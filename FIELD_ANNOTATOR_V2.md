@@ -306,7 +306,16 @@ under *Try details to record* (per device). With any of them on, a try opens the
 pop-up split in two: the move on the left, the ticked details on the right (open
 / blind, MM / ML / LW / W+, and a digits-only box for the scorer's number) —
 stacked instead on a phone held upright. Every tap saves as it's made and **Done**
-(or Enter in the number box) closes it. With the move pop-up off but details on,
+(or Enter in the number box) closes it.
+
+**Open / blind is pre-selected** from the last ruck — the last touch of the set
+before the try. The blind side is the narrower one, between that ruck and its
+nearer touchline; a try landing there is marked *Blind*, one across the ruck
+*Open*, and the panel says *from the last ruck*. Tap the other side to change
+it, or the same one to clear it. Nothing is guessed for a try with no touch
+before it (straight off the tap), a ruck dead centre, or a side already set.
+
+With the move pop-up off but details on,
 only the details pane shows. They can also be set or corrected any time from the
 event's edit sheet. Every one is optional.
 

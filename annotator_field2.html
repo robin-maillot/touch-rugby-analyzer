@@ -2074,6 +2074,7 @@ function applyTryTag(key, val) {
   }
   a.tags = { ...(a.tags || {}) };
   if (v) a.tags[key] = v; else delete a.tags[key];
+  if (key === 'side') delete a.sideGuessed;
   const el = document.getElementById(key === 'side' ? 'editSide' : key === 'ch' ? 'editCh' : 'editPlayer');
   el.classList.toggle('set', !!v);
   updateUI();
@@ -3610,6 +3611,7 @@ function openTryPicker(idx) {
   // The strip and the picker would both be writing this try's name.
   closeSubtype(); closeMoveStrip();
   tryIdx = i;
+  guessTrySide(i);
   const split = tryDetailsWanted();
   const card  = document.getElementById('tryCard');
   card.classList.toggle('split', split);
@@ -3662,6 +3664,34 @@ function pickTry(name) {
   tryPickerStep(null);
 }
 
+// The ruck a try came off: the last touch of the same set. Walks back over the
+// set's own events only, so a touch from the other team's previous set is
+// never mistaken for it.
+function ruckBefore(i) {
+  const owner = annotations[i].possessionOwner;
+  for (let j = i - 1; j >= 0 && isSetFiller(annotations[j]); j--) {
+    const e = annotations[j];
+    if (e.type === 'Touch' && e.x != null && e.possessionOwner === owner) return e;
+  }
+  return null;
+}
+
+// Pre-select open or blind from where the try landed against the last ruck.
+// Only when Side is being recorded and nothing is set yet — a side already
+// picked is never overwritten. Saved like a tap, so closing keeps it; tapping
+// the other side changes it, tapping it again clears it.
+function guessTrySide(i) {
+  const a = annotations[i];
+  if (!tryDetailOn.side || !a || (a.tags && a.tags.side)) return;
+  const ruck = ruckBefore(i);
+  const side = ruck ? TR.inferTrySide(ruck.x, a.x) : '';
+  if (!side) return;
+  a.tags = { ...(a.tags || {}), side };
+  a.sideGuessed = true;
+  updateUI();
+  saveSession();
+}
+
 // The right-hand pane: only the details switched on in Setup. The tiles redraw
 // on every tap; the number box is never redrawn while in use, so typing keeps
 // the keyboard.
@@ -3673,7 +3703,8 @@ function renderTryDetails() {
   const tile = (key, v, label) =>
     `<button class="try-tag${t[key] === v ? ' on' : ''}" data-tag="${key}" data-val="${v}">${label || v}</button>`;
   const secs = [];
-  if (tryDetailOn.side) secs.push(`<div class="try-sec"><div class="try-pane-label">Side</div><div class="try-row" style="--n:2">` +
+  const guessed = a.sideGuessed && t.side ? ' <b>from the last ruck</b>' : '';
+  if (tryDetailOn.side) secs.push(`<div class="try-sec"><div class="try-pane-label">Side${guessed}</div><div class="try-row" style="--n:2">` +
     TR.DETAIL_SIDES.map(v => tile('side', v, v.charAt(0).toUpperCase() + v.slice(1))).join('') + `</div></div>`);
   if (tryDetailOn.ch) secs.push(`<div class="try-sec"><div class="try-pane-label">Channel</div><div class="try-row" style="--n:4">` +
     TR.DETAIL_CHANNELS.map(v => tile('ch', v)).join('') + `</div></div>`);
@@ -3688,6 +3719,8 @@ function setTryTag(key, val) {
   if (!a) return;
   a.tags = { ...(a.tags || {}) };
   if (!val || a.tags[key] === val) delete a.tags[key]; else a.tags[key] = val;
+  // Once someone has touched the side it's theirs, not the guess.
+  if (key === 'side') delete a.sideGuessed;
   updateUI();
   saveSession();
 }

@@ -1622,6 +1622,22 @@ test('partial tags', () => {
   assert.equal(TR.detailLabel('pos:1,2'), '');
 });
 
+console.log('TR.inferTrySide');
+test('ruck near the left touchline: a try further left is blind', () => assert.equal(TR.inferTrySide(20, 8), 'blind'));
+test('ruck near the left touchline: a try to its right is open', () => assert.equal(TR.inferTrySide(20, 60), 'open'));
+test('ruck near the right touchline: a try further right is blind', () => assert.equal(TR.inferTrySide(75, 95), 'blind'));
+test('ruck near the right touchline: a try to its left is open', () => assert.equal(TR.inferTrySide(75, 30), 'open'));
+test('just off centre still has a narrower side', () => {
+  assert.equal(TR.inferTrySide(49, 40), 'blind');
+  assert.equal(TR.inferTrySide(51, 40), 'open');
+});
+test('no call when it cannot be told', () => {
+  assert.equal(TR.inferTrySide(50, 20), '');
+  assert.equal(TR.inferTrySide(30, 30), '');
+  assert.equal(TR.inferTrySide(null, 30), '');
+  assert.equal(TR.inferTrySide(30, undefined), '');
+});
+
 // ── Server copy of the strike-move rule ───────────────────────
 // Code.gs can't load js/events.js, so it carries its own deriveStrikeMove for
 // the inline-edit path. It drifted once — 6 Again, Penalty Defence and tagged

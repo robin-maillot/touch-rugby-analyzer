@@ -182,3 +182,17 @@ TR.detailLabel = (detail) => {
     d.ch || '',
   ].filter(Boolean).join(' · ');
 };
+
+// Which side of the last ruck a try went, from where each was on the pitch.
+// Both x values are attack-normalised (0 = the attacking team's left touchline,
+// 100 = its right), and both belong to the scoring team's set, so they share a
+// frame. The blind side is the narrower one — between the ruck and its nearer
+// touchline — and anything across the ruck from it is open. Returns '' when it
+// can't be told: no ruck, a ruck dead centre (both sides equal), or a try
+// straight through the ruck's own line.
+TR.inferTrySide = (ruckX, tryX) => {
+  if (ruckX == null || tryX == null || isNaN(ruckX) || isNaN(tryX)) return '';
+  if (ruckX === 50 || tryX === ruckX) return '';
+  const blindIsLeft = ruckX < 50;
+  return (tryX < ruckX) === blindIsLeft ? 'blind' : 'open';
+};
