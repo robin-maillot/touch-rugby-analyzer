@@ -33,6 +33,9 @@ everything pressable sits in a rail beside it:
   French Flair finish in one tap; Other holds Scoop and Interception. It only
   offers names that already exist, so the stats read them exactly as before.
   **Skip** leaves the try as *Other*, as ignoring the strip does.
+- **Optional try details.** Tick any of *open / blind side*, *channel* and *try
+  scorer's number* in ⚙ Setup and the try pop-up gains a second panel for them
+  beside the move — see [What reaches the Google Sheet](#what-reaches-the-google-sheet).
 - **A small arrow on the ball** — the last touch, or the 0 tap-off — points at
   the try line the team in possession is attacking.
 - **After a try, and at each kick-off**, a hollow **0** appears on halfway: the
@@ -298,9 +301,14 @@ the position in Comment as `@62,48`; Game Analysis still reads it from there
 are read and written in one place, `TR.parseDetail` / `TR.formatDetail` in
 `js/events.js`.
 
-**Try details** — side, channel and scorer — are set in the try picker's last
-step (when the pop-up is on), or any time from the event's edit sheet. Every one
-is optional.
+**Try details** — side, channel and scorer — are each switched on in ⚙ Setup
+under *Try details to record* (per device). With any of them on, a try opens the
+pop-up split in two: the move on the left, the ticked details on the right (open
+/ blind, MM / ML / LW / W+, and a digits-only box for the scorer's number) —
+stacked instead on a phone held upright. Every tap saves as it's made and **Done**
+(or Enter in the number box) closes it. With the move pop-up off but details on,
+only the details pane shows. They can also be set or corrected any time from the
+event's edit sheet. Every one is optional.
 
 **The individual touches are not uploaded by default.** Setup has a switch,
 *"Upload the individual touches too"*. Off, only the events v1 would have produced

@@ -810,26 +810,38 @@
     .try-opt:active { transform: scale(0.98); background: var(--surface-3); }
     .try-opt.plain { border-style: dashed; color: var(--text-muted); }
 
-    /* Step three — the try's details. Three short rows rather than the tile
-       grid: every one is optional, and the whole lot should be one screen. */
-    #tryGrid.details {
-      display: flex; flex-direction: column; gap: 14px; justify-content: flex-start;
-      align-content: stretch; max-width: 820px; width: 100%; margin: 0 auto;
+    /* Two panes when any try detail is switched on in Setup: the move on the
+       left, the details on the right — or stacked, on a screen too narrow to
+       split. With no details on, the move pane is the whole card, as before. */
+    #tryBody { flex: 1; min-height: 0; display: flex; gap: 16px; }
+    #tryMovePane, #tryDetailPane { flex: 1 1 0; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
+    #tryDetailPane { display: none; overflow-y: auto; }
+    #tryCard.split #tryDetailPane { display: flex; border-left: 1px solid var(--border); padding-left: 16px; }
+    #tryCard.split.no-move #tryMovePane { display: none; }
+    #tryCard.split.no-move #tryDetailPane { border-left: none; padding-left: 0; }
+    @media (max-width: 699px) {
+      #tryBody { flex-direction: column; overflow-y: auto; }
+      #tryCard.split #tryDetailPane { border-left: none; padding-left: 0; border-top: 1px solid var(--border); padding-top: 12px; flex: 0 0 auto; overflow: visible; }
+      #tryCard.split #tryMovePane { flex: 0 0 auto; }
     }
-    .try-sec-label { font-size: 0.68rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 6px; }
+    .try-pane-label { font-size: 0.68rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); }
+    .try-pane-label b { color: var(--accent); letter-spacing: 0; text-transform: none; font-size: 0.8rem; margin-left: 4px; }
+    /* Half a card holds three tiles across at a smaller fixed size. */
+    #tryCard.split #tryGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: 84px; gap: 10px; align-content: start; justify-content: stretch; }
+    .try-opt.on { border-color: var(--accent); color: var(--accent); }
+    .try-sec { display: flex; flex-direction: column; gap: 6px; }
     .try-row { display: grid; gap: 8px; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); }
-    .try-row.nums { grid-template-columns: repeat(8, minmax(0, 1fr)); }
     .try-tag {
-      min-height: 56px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-2);
-      color: var(--text); font-family: inherit; font-size: 1.05rem; font-weight: 800; cursor: pointer;
+      min-height: 64px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-2);
+      color: var(--text); font-family: inherit; font-size: 1.1rem; font-weight: 800; cursor: pointer;
       -webkit-tap-highlight-color: transparent;
     }
-    .try-row.nums .try-tag { min-height: 48px; font-size: 0.95rem; }
     .try-tag.on { background: var(--accent); border-color: var(--accent); color: #fff; }
-    .try-other-num {
-      width: 100%; min-height: 48px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-2);
-      color: var(--text); font-family: inherit; font-size: 0.95rem; font-weight: 800; text-align: center;
+    .try-num {
+      width: 100%; min-height: 64px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-2);
+      color: var(--text); font-family: inherit; font-size: 1.6rem; font-weight: 800; text-align: center;
     }
+    .try-num:focus { outline: none; border-color: var(--accent); }
     #tryDoneBtn { background: var(--accent); border-color: var(--accent); color: #fff; }
     .stop-body  { font-size: 0.84rem; color: var(--text-muted); line-height: 1.45; padding: 0 20px 14px; }
     .stop-warn {
@@ -1261,6 +1273,12 @@
       full-screen picker instead of the strip under the pitch.</span>
     </label>
   </div>
+  <div>
+    <div class="settings-label">Try details to record — each one ticked adds a panel beside the move in the try pop-up</div>
+    <label class="v2-switch"><input type="checkbox" id="tryDetSideInput"   onchange="setTryDetail('side', this.checked)"><span>Open / blind side</span></label>
+    <label class="v2-switch"><input type="checkbox" id="tryDetChInput"     onchange="setTryDetail('ch', this.checked)"><span>Channel — MM, ML, LW, W+</span></label>
+    <label class="v2-switch"><input type="checkbox" id="tryDetPlayerInput" onchange="setTryDetail('player', this.checked)"><span>Try scorer's number</span></label>
+  </div>
   <div id="sheetPreview">fill metadata to generate tab name</div>
   <div id="sheetClashWarning" style="display:none;font-size:0.72rem;color:var(--orange);padding:2px 0"></div>
   <div id="groupInfo" style="font-size:0.72rem;padding:2px 0"></div>
@@ -1372,7 +1390,13 @@
       <button id="tryDoneBtn" onclick="closeTryPicker()" style="display:none">Done &#10003;</button>
       <button id="trySkipBtn" onclick="closeTryPicker()">Skip &#10005;</button>
     </div>
-    <div id="tryGrid"></div>
+    <div id="tryBody">
+      <div id="tryMovePane">
+        <div class="try-pane-label" id="tryMoveLabel"></div>
+        <div id="tryGrid"></div>
+      </div>
+      <div id="tryDetailPane"></div>
+    </div>
   </div>
 </div>
 
@@ -3435,7 +3459,7 @@ function onPitchTap(ev) {
   if (armedPen) { placePen(pt); return; }
   if (pt.inTry) {
     tag('Try', 'Other', possession, pt);
-    if (tryPopup) openTryPicker(); else offerSubtype();
+    if (tryPopupWanted()) openTryPicker(); else offerSubtype();
     return;
   }
 
@@ -3535,18 +3559,35 @@ function pickSubtype(name) {
 }
 
 // ── Try picker ─────────────────────────────────────────────────
-// The full-screen alternative to the try strip, switched on in Setup. Step one
-// is the ruck, step two the combo. The tree is read off TR.MENU['Try'] rather
-// than written out, so it can only ever produce a name the strip could — a
+// The full-screen alternative to the try strip, switched on in Setup. The move
+// is the ruck, then the combo. The tree is read off TR.MENU['Try'] rather than
+// written out, so it can only ever produce a name the strip could — a
 // "32 - Cut" here is the same "32 - Cut" every stats page already counts.
+//
+// Setup can also switch on any of three try details — side, channel, scorer.
+// With one or more on, the card splits: the move on the left, those details on
+// the right, every tap saving as it's made, and Done closes. With none on it
+// stays the one-pane picker that closes the moment the combo is picked.
 const TRY_RUCKS = ['32', '23', '21', '33', 'French Flair'];
 
 let tryPopup = localStorage.getItem('fieldTryPopup') === '1';
 let tryIdx   = null;
+let tryRuck  = null;    // the ruck whose combos the move pane is showing
+
+const TRY_DETAIL_KEYS = ['side', 'ch', 'player'];
+const tryDetailOn = {};
+TRY_DETAIL_KEYS.forEach(k => { tryDetailOn[k] = localStorage.getItem('fieldTryDetail_' + k) === '1'; });
+const tryDetailsWanted = () => TRY_DETAIL_KEYS.some(k => tryDetailOn[k]);
+// Whether a try opens the pop-up at all: for the move, the details, or both.
+const tryPopupWanted   = () => tryPopup || tryDetailsWanted();
 
 function setTryPopup(on) {
   tryPopup = !!on;
   try { localStorage.setItem('fieldTryPopup', on ? '1' : '0'); } catch (e) {}
+}
+function setTryDetail(key, on) {
+  tryDetailOn[key] = !!on;
+  try { localStorage.setItem('fieldTryDetail_' + key, on ? '1' : '0'); } catch (e) {}
 }
 
 // Ruck → the full names under it. Anything that isn't a ruck or a "ruck - combo"
@@ -3561,6 +3602,7 @@ function tryTree() {
   });
   return tree;
 }
+const ruckOf = name => TRY_RUCKS.find(r => name === r || name.startsWith(r + ' - ')) || 'Other';
 
 function openTryPicker(idx) {
   const i = idx == null ? annotations.length - 1 : idx;
@@ -3568,31 +3610,44 @@ function openTryPicker(idx) {
   // The strip and the picker would both be writing this try's name.
   closeSubtype(); closeMoveStrip();
   tryIdx = i;
+  const split = tryDetailsWanted();
+  const card  = document.getElementById('tryCard');
+  card.classList.toggle('split', split);
+  card.classList.toggle('no-move', split && !tryPopup);
+  document.getElementById('tryDoneBtn').style.display = split ? '' : 'none';
+  document.getElementById('trySkipBtn').style.display = split ? 'none' : '';
+  document.getElementById('tryTitle').innerHTML =
+    `Try — ${escapeHtml(teamName(annotations[i].possessionOwner))}`;
   document.getElementById('tryOverlay').classList.add('open');
   tryPickerStep(null);
+  renderTryDetails();
 }
 
 // null draws the rucks; a ruck draws its combos, or picks it outright if it has none.
 function tryPickerStep(ruck) {
+  const a     = annotations[tryIdx];
   const tree  = tryTree();
-  const team  = teamName(annotations[tryIdx]?.possessionOwner);
-  const title = document.getElementById('tryTitle');
+  const label = document.getElementById('tryMoveLabel');
   const grid  = document.getElementById('tryGrid');
-  grid.classList.remove('details');
+  tryRuck = ruck;
   document.getElementById('tryBackBtn').style.visibility = ruck ? 'visible' : 'hidden';
+  // Once a move is picked in the split card the pane stays open, so it says
+  // what was picked and marks it — tapping another tile simply changes it.
+  const picked = a && a.name && a.name !== 'Other' ? a.name : '';
+  const sel    = picked ? ` <b>${escapeHtml(picked)}</b>` : '';
   if (!ruck) {
-    title.innerHTML = `Try — ${escapeHtml(team)}<small>Which ruck?</small>`;
+    label.innerHTML = `Move — which ruck?${sel}`;
     grid.innerHTML = [...tree.keys()].filter(r => tree.get(r).length).map(r =>
-      `<button class="try-opt" data-ruck="${r}">${r}</button>`).join('');
+      `<button class="try-opt${picked && ruckOf(picked) === r ? ' on' : ''}" data-ruck="${r}">${r}</button>`).join('');
     return;
   }
   const names = tree.get(ruck) || [];
   if (ruck !== 'Other' && names.length === 1) { pickTry(names[0]); return; }
-  title.innerHTML = `${ruck}<small>${ruck === 'Other' ? 'Which one?' : 'Which combo?'}</small>`;
+  label.innerHTML = `${ruck} — ${ruck === 'Other' ? 'which one?' : 'which combo?'}${sel}`;
   grid.innerHTML = names.map(n => {
     const isPlain = n === ruck && ruck !== 'Other';
-    const label   = isPlain ? `Just ${ruck}` : n.startsWith(ruck + ' - ') ? n.slice(ruck.length + 3) : n;
-    return `<button class="try-opt${isPlain ? ' plain' : ''}" data-try="${n}">${label}` +
+    const text    = isPlain ? `Just ${ruck}` : n.startsWith(ruck + ' - ') ? n.slice(ruck.length + 3) : n;
+    return `<button class="try-opt${isPlain ? ' plain' : ''}${n === picked ? ' on' : ''}" data-try="${n}">${text}` +
            (isPlain ? '<small>no combo</small>' : '') + `</button>`;
   }).join('');
 }
@@ -3603,37 +3658,29 @@ function pickTry(name) {
   // Through the strip's own path, so possession, owner and saving behave the same.
   subtypeIdx = i;
   pickSubtype(name);
-  tryPickerDetails();
+  if (!tryDetailsWanted()) { closeTryPicker(); return; }
+  tryPickerStep(null);
 }
 
-// Step three: side, channel and scorer. Every tap saves straight away and a
-// second tap on the same tile clears it, so Done, Skip or a tap outside all
-// keep whatever has been set — nothing here is ever lost by closing.
-const TRY_NUMBERS = Array.from({ length: 16 }, (_, k) => String(k + 1));
-
-function tryPickerDetails() {
-  const a = annotations[tryIdx];
-  if (!a) { closeTryPicker(); return; }
-  const t = a.tags || {};
-  document.getElementById('tryBackBtn').style.visibility = 'hidden';
-  document.getElementById('tryDoneBtn').style.display = '';
-  document.getElementById('trySkipBtn').style.display = 'none';
-  document.getElementById('tryTitle').innerHTML =
-    `${escapeHtml(a.name === 'Other' ? 'Try' : a.name)}<small>Details — all optional</small>`;
+// The right-hand pane: only the details switched on in Setup. The tiles redraw
+// on every tap; the number box is never redrawn while in use, so typing keeps
+// the keyboard.
+function renderTryDetails() {
+  const pane = document.getElementById('tryDetailPane');
+  const a    = annotations[tryIdx];
+  if (!a || !tryDetailsWanted()) { pane.innerHTML = ''; return; }
+  const t    = a.tags || {};
   const tile = (key, v, label) =>
     `<button class="try-tag${t[key] === v ? ' on' : ''}" data-tag="${key}" data-val="${v}">${label || v}</button>`;
-  const other = t.player && !TRY_NUMBERS.includes(t.player) ? t.player : '';
-  const grid = document.getElementById('tryGrid');
-  grid.classList.add('details');
-  grid.innerHTML =
-    `<div><div class="try-sec-label">Side</div><div class="try-row" style="--n:2">` +
-      TR.DETAIL_SIDES.map(v => tile('side', v, v.charAt(0).toUpperCase() + v.slice(1))).join('') + `</div></div>` +
-    `<div><div class="try-sec-label">Channel</div><div class="try-row" style="--n:4">` +
-      TR.DETAIL_CHANNELS.map(v => tile('ch', v)).join('') + `</div></div>` +
-    `<div><div class="try-sec-label">Scorer — ${escapeHtml(teamName(a.possessionOwner))}</div><div class="try-row nums">` +
-      TRY_NUMBERS.map(v => tile('player', v)).join('') + `</div>` +
-      `<div class="try-row" style="--n:1;margin-top:8px"><input class="try-other-num" id="tryOtherNum" inputmode="numeric" ` +
-      `maxlength="3" placeholder="Other number" value="${escapeHtml(other)}"></div></div>`;
+  const secs = [];
+  if (tryDetailOn.side) secs.push(`<div class="try-sec"><div class="try-pane-label">Side</div><div class="try-row" style="--n:2">` +
+    TR.DETAIL_SIDES.map(v => tile('side', v, v.charAt(0).toUpperCase() + v.slice(1))).join('') + `</div></div>`);
+  if (tryDetailOn.ch) secs.push(`<div class="try-sec"><div class="try-pane-label">Channel</div><div class="try-row" style="--n:4">` +
+    TR.DETAIL_CHANNELS.map(v => tile('ch', v)).join('') + `</div></div>`);
+  if (tryDetailOn.player) secs.push(`<div class="try-sec"><div class="try-pane-label">Scorer — ${escapeHtml(teamName(a.possessionOwner))}</div>` +
+    `<input class="try-num" id="tryNum" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3" ` +
+    `autocomplete="off" placeholder="#" aria-label="Try scorer's number" value="${escapeHtml(t.player || '')}"></div>`);
+  pane.innerHTML = secs.join('');
 }
 
 function setTryTag(key, val) {
@@ -3643,20 +3690,16 @@ function setTryTag(key, val) {
   if (!val || a.tags[key] === val) delete a.tags[key]; else a.tags[key] = val;
   updateUI();
   saveSession();
-  // Redraw so the tile states, and the "other number" box, follow the change.
-  tryPickerDetails();
 }
 
 // Closing without a pick leaves the try as "Other" — the same as ignoring the strip.
 function closeTryPicker() {
-  tryIdx = null;
+  tryIdx = null; tryRuck = null;
+  if (document.activeElement && document.activeElement.id === 'tryNum') document.activeElement.blur();
   document.getElementById('tryOverlay').classList.remove('open');
-  document.getElementById('tryGrid').classList.remove('details');
-  document.getElementById('tryDoneBtn').style.display = 'none';
-  document.getElementById('trySkipBtn').style.display = '';
 }
 
-// ── Strike move strip ──────────────────────────────────────────
+
 let moveIdx = null, moveTimer = null;
 
 // 19 moves take longer to scan than the sub-type strip's 7, so the timeout
@@ -3971,26 +4014,36 @@ window.addEventListener('DOMContentLoaded', () => {
   wrap.innerHTML = pitchSVG();
   document.getElementById('uploadTouchesInput').checked = uploadTouches;
   document.getElementById('tryPopupInput').checked = tryPopup;
+  TRY_DETAIL_KEYS.forEach(k => {
+    document.getElementById({ side: 'tryDetSideInput', ch: 'tryDetChInput', player: 'tryDetPlayerInput' }[k]).checked = tryDetailOn[k];
+  });
   document.getElementById('tryGrid').addEventListener('click', ev => {
     const r = ev.target.closest('[data-ruck]');
     if (r) { tryPickerStep(r.dataset.ruck); return; }
     const t = ev.target.closest('[data-try]');
-    if (t) { pickTry(t.dataset.try); return; }
-    const g = ev.target.closest('[data-tag]');
-    if (g) setTryTag(g.dataset.tag, g.dataset.val);
+    if (t) pickTry(t.dataset.try);
   });
-  // A number past the grid is typed; it saves as you type, without a redraw
-  // that would steal the keyboard.
-  document.getElementById('tryGrid').addEventListener('input', ev => {
-    if (ev.target.id !== 'tryOtherNum') return;
-    ev.target.value = ev.target.value.replace(/\D+/g, '');
+  const detailPane = document.getElementById('tryDetailPane');
+  detailPane.addEventListener('click', ev => {
+    const g = ev.target.closest('[data-tag]');
+    if (!g) return;
+    setTryTag(g.dataset.tag, g.dataset.val);
+    renderTryDetails();
+  });
+  // Digits only, saved as you type — no redraw, so the keyboard stays up.
+  detailPane.addEventListener('input', ev => {
+    if (ev.target.id !== 'tryNum') return;
+    ev.target.value = ev.target.value.replace(/\D+/g, '').slice(0, 3);
     const a = annotations[tryIdx];
     if (!a) return;
     a.tags = { ...(a.tags || {}) };
     if (ev.target.value) a.tags.player = ev.target.value; else delete a.tags.player;
-    document.querySelectorAll('#tryGrid [data-tag="player"]').forEach(b => b.classList.remove('on'));
     updateUI();
     saveSession();
+  });
+  // Enter on the number pad is "done".
+  detailPane.addEventListener('keydown', ev => {
+    if (ev.target.id === 'tryNum' && ev.key === 'Enter') closeTryPicker();
   });
   resolveLayout();
   // The best layout depends on the space available, so it is re-decided whenever
