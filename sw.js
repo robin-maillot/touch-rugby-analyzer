@@ -5,7 +5,7 @@
 // YouTube) always go straight to the network so live data is never stale.
 //
 // Bump CACHE_VERSION whenever shell assets change to force a refresh.
-const CACHE_VERSION = 'trl-shell-v33';
+const CACHE_VERSION = 'trl-shell-v34';
 
 const SHELL = [
   'index.html',
@@ -38,7 +38,10 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_VERSION)
       // Tolerate individual asset failures so one missing file doesn't abort install.
-      .then((cache) => Promise.allSettled(SHELL.map((url) => cache.add(url))))
+      // cache:'reload' skips the browser's HTTP cache: GitHub Pages serves with
+      // max-age=600, so a plain add() in the minutes after a deploy could fill
+      // the brand-new cache with the previous deploy's scripts.
+      .then((cache) => Promise.allSettled(SHELL.map((url) => cache.add(new Request(url, { cache: 'reload' })))))
       .then(() => self.skipWaiting())
   );
 });
@@ -82,7 +85,28 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Static assets (js, icons): cache-first, refresh in the background.
+  // Scripts: network-first, like pages. A page and the shared js it calls change
+  // together, so serving a fresh page with a cached script breaks it — the page
+  // calls functions the old script doesn't have, on the first load after every
+  // deploy. 'no-cache' revalidates with the server (a cheap 304 when nothing
+  // changed) instead of trusting the HTTP cache. Offline, the cached copy is
+  // used, which matches the cached page it's paired with.
+  if (url.pathname.endsWith('.js')) {
+    event.respondWith(
+      fetch(req, { cache: 'no-cache' })
+        .then((res) => {
+          if (res && res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE_VERSION).then((c) => c.put(req, copy));
+          }
+          return res;
+        })
+        .catch(() => caches.match(req).then((hit) => hit || Response.error()))
+    );
+    return;
+  }
+
+  // Other static assets (icons, manifest): cache-first, refresh in the background.
   event.respondWith(
     caches.match(req).then((hit) => {
       const network = fetch(req)
