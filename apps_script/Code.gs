@@ -1121,14 +1121,21 @@ function clearLiveRow(sheetName) {
 
 // ── Update Name/Comment on a specific row ──────────────────────
 // Strike Move is derived, never taken at face value: a Try's move is its Name,
-// and an event that no longer ends an attack (6 Again, Penalty Defence) must
-// carry no move at all. Mirrors TR.strikeMoveOf in js/events.js — keep the two
-// in step.
+// and an event that can't carry a move (Game Event, To Review, an untagged
+// Touch) must have none. Mirrors TR.strikeMoveOf / TR.countsAsAttempt in
+// js/events.js exactly — test.js checks the two against each other over every
+// type and name, so a change to one without the other fails the build.
+//
+// Every move-bearing type keeps its stored move: Turnover (6 Again included),
+// Penalty Attack and Penalty Defence. A move was called in each, and in each it
+// did not score. A Touch keeps one only when it was tagged with one.
+var MOVE_BEARING_TYPES = ['Try', 'Turnover', 'Penalty Attack', 'Penalty Defence'];
+
 function deriveStrikeMove(type, name, stored) {
   if (type === 'Try') return name || '';
-  var endsAttack = (type === 'Penalty Attack') ||
-                   (type === 'Turnover' && name !== '6 Again');
-  return endsAttack ? (stored || '') : '';
+  if (MOVE_BEARING_TYPES.indexOf(type) >= 0) return stored || '';
+  if (type === 'Touch') return stored || '';
+  return '';
 }
 
 function updateRow(sheetName, time, name, comment, strikeMove, detail) {

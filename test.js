@@ -1622,6 +1622,45 @@ test('partial tags', () => {
   assert.equal(TR.detailLabel('pos:1,2'), '');
 });
 
+// ── Server copy of the strike-move rule ───────────────────────
+// Code.gs can't load js/events.js, so it carries its own deriveStrikeMove for
+// the inline-edit path. It drifted once — 6 Again, Penalty Defence and tagged
+// touches lost their move on every edit — so the two are checked against each
+// other over every type and name rather than by a few hand-picked cases.
+console.log('Code.gs deriveStrikeMove');
+{
+  const gs   = fs.readFileSync('apps_script/Code.gs', 'utf8');
+  const grab = (start, end) => gs.slice(gs.indexOf(start), gs.indexOf(end, gs.indexOf(start)));
+  const src  = grab('var MOVE_BEARING_TYPES', 'function updateRow(');
+  const gsCtx = vm.createContext({});
+  vm.runInContext(src, gsCtx);
+  const derive = gsCtx.deriveStrikeMove;
+
+  test('its move-bearing types match the client', () =>
+    assert.deepEqual([...vm.runInContext('MOVE_BEARING_TYPES', gsCtx)], [...TR.MOVE_BEARING_TYPES]));
+
+  const cases = [];
+  for (const type of [...Object.keys(TR.MENU), 'Touch']) {
+    const names = type === 'Touch' ? ['Touch 1', 'Touch 4'] : (TR.MENU[type].length ? TR.MENU[type] : ['']);
+    for (const name of names) for (const stored of ['', '32 - Cut']) cases.push([type, name, stored]);
+  }
+  test(`agrees with TR.strikeMoveOf on all ${cases.length} combinations`, () => {
+    const off = cases.filter(([t, n, m]) => derive(t, n, m) !== TR.strikeMoveOf(t, n, m))
+      .map(([t, n, m]) => `${t}/${n}/${m || '∅'}: server "${derive(t, n, m)}" client "${TR.strikeMoveOf(t, n, m)}"`);
+    assert.deepEqual(off, []);
+  });
+  test('keeps the move on the events it used to wipe', () => {
+    assert.equal(derive('Turnover', '6 Again', 'Scoop'), 'Scoop');
+    assert.equal(derive('Penalty Defence', 'Offside', 'Scoop'), 'Scoop');
+    assert.equal(derive('Touch', 'Touch 3', 'Scoop'), 'Scoop');
+  });
+  test('still clears it where none belongs', () => {
+    assert.equal(derive('Game Event', 'Game Start', 'Scoop'), '');
+    assert.equal(derive('To Review', '', 'Scoop'), '');
+    assert.equal(derive('Try', '33 - Cut', 'Scoop'), '33 - Cut');
+  });
+}
+
 // ─────────────────────────────────────────────────────────────
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
