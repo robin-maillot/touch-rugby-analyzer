@@ -1428,8 +1428,8 @@
     <div class="edit-tags" id="editTagsWrap" style="display:none">
       <span class="edit-subtype-wrap"><select id="editSide" class="edit-subtype" aria-label="Side" onchange="applyTryTag('side', this.value)"></select></span>
       <span class="edit-subtype-wrap"><select id="editCh" class="edit-subtype" aria-label="Channel" onchange="applyTryTag('ch', this.value)"></select></span>
-      <input id="editPlayer" class="edit-subtype" aria-label="Scorer number" placeholder="Scorer #"
-             inputmode="numeric" maxlength="3" oninput="applyTryTag('player', this.value)">
+      <input id="editPlayer" class="edit-subtype" aria-label="Scorer number" placeholder="Scorer #" type="text"
+             inputmode="numeric" pattern="[0-9]*" maxlength="3" data-digits autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" oninput="applyTryTag('player', this.value)">
     </div>
     <div style="padding:16px 16px 4px">
       <div style="font-size:0.7rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px">Comment</div>
@@ -3722,8 +3722,8 @@ function renderTryDetails() {
   if (tryDetailOn.ch) secs.push(`<div class="try-sec"><div class="try-pane-label">Channel</div><div class="try-row" style="--n:4">` +
     TR.DETAIL_CHANNELS.map(v => tile('ch', v)).join('') + `</div></div>`);
   if (tryDetailOn.player) secs.push(`<div class="try-sec"><div class="try-pane-label">Scorer — ${escapeHtml(teamName(a.possessionOwner))}</div>` +
-    `<input class="try-num" id="tryNum" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3" ` +
-    `autocomplete="off" placeholder="#" aria-label="Try scorer's number" value="${escapeHtml(t.player || '')}"></div>`);
+    `<input class="try-num" id="tryNum" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3" data-digits autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" ` +
+    `placeholder="#" aria-label="Try scorer's number" value="${escapeHtml(t.player || '')}"></div>`);
   pane.innerHTML = secs.join('');
 }
 
@@ -4060,6 +4060,28 @@ window.addEventListener('DOMContentLoaded', () => {
   wrap.innerHTML = pitchSVG();
   document.getElementById('uploadTouchesInput').checked = uploadTouches;
   document.getElementById('tryPopupInput').checked = tryPopup;
+  // Digits-only boxes (the scorer's number). An iPad has no digits-only keypad
+  // — inputmode="numeric" still opens the full keyboard on its numbers page —
+  // so anything else is refused before it lands: a typed letter or symbol, a
+  // paste, an autocorrect or a QuickType suggestion. The input handlers strip
+  // non-digits as well, for any path that slips past beforeinput.
+  document.addEventListener('beforeinput', ev => {
+    const el = ev.target;
+    if (!el || !el.hasAttribute || !el.hasAttribute('data-digits')) return;
+    if (!ev.inputType || !ev.inputType.startsWith('insert')) return;   // deleting is always fine
+    const text = ev.data != null ? ev.data
+      : ev.dataTransfer ? ev.dataTransfer.getData('text/plain') : '';
+    if (!/\D/.test(text || '')) return;
+    // Mixed text (a paste, a suggestion): keep its digits, drop the rest, and
+    // still respect maxlength — rather than refusing the whole insertion.
+    ev.preventDefault();
+    const start = el.selectionStart ?? el.value.length, end = el.selectionEnd ?? start;
+    const room  = (el.maxLength > 0 ? el.maxLength : Infinity) - (el.value.length - (end - start));
+    const keep  = String(text || '').replace(/\D+/g, '').slice(0, Math.max(0, room));
+    if (!keep) return;
+    el.setRangeText(keep, start, end, 'end');
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  });
   TRY_DETAIL_KEYS.forEach(k => {
     document.getElementById({ side: 'tryDetSideInput', ch: 'tryDetChInput', player: 'tryDetPlayerInput' }[k]).checked = tryDetailOn[k];
   });
