@@ -1170,6 +1170,19 @@
     .cleg i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; flex-shrink: 0; }
     .cnote { font-size: 0.62rem; color: var(--text-dim); padding: 2px 16px 10px; }
 
+    /* Try scorers: one column per team, tries grouped by half. */
+    .scorers { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 4px 16px 18px; }
+    .scorers-team { font-size: 0.78rem; font-weight: 800; padding-bottom: 6px; border-bottom: 2px solid var(--c); margin-bottom: 6px; }
+    .scorers-half { font-size: 0.62rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); margin: 8px 0 4px; }
+    .scorers-list { display: flex; flex-wrap: wrap; gap: 5px; }
+    .scorer {
+      font-size: 0.8rem; font-weight: 800; padding: 3px 9px; border-radius: 99px;
+      background: var(--surface-2); border: 1px solid var(--border); font-variant-numeric: tabular-nums;
+    }
+    .scorer.unknown { color: var(--text-dim); font-weight: 600; }
+    .scorer small { font-weight: 600; color: var(--text-dim); margin-left: 3px; }
+    .scorers-none { font-size: 0.72rem; color: var(--text-dim); }
+
     .cchart { display: block; width: calc(100% - 20px); height: auto; margin: 2px 10px 8px; }
     .cgrid  { stroke: rgba(255,255,255,0.10); stroke-width: 1; }
     .cgrid-10 { stroke-dasharray: 3 3; stroke: rgba(255,255,255,0.16); }
@@ -2683,8 +2696,44 @@ function refreshStats() {
          <span><i class="k-avg"></i>avg T3 / T4</span>
        </div>`
     : '';
-  document.getElementById('statsBody').innerHTML = mapHtml + chartHtml + html;
+  document.getElementById('statsBody').innerHTML = mapHtml + chartHtml + html + scorersHTML(kL, kR, names, cols);
   renderMoves();
+}
+
+// Which half an event fell in: the number of Game Starts before it in the event
+// list. By position, not timestamp, so a try tagged in the same second as a
+// kick-off can't be counted into the wrong half.
+function halfOf(a) {
+  const i = annotations.indexOf(a);
+  return annotations.slice(0, i).filter(e => e.type === 'Game Event' && e.name === 'Game Start').length || 1;
+}
+const halfLabel = n => n === 1 ? '1st half' : n === 2 ? '2nd half' : n === 3 ? 'Extra time' : `Period ${n}`;
+
+// Who scored, per team and half, in the order the tries went in. A try with
+// no scorer recorded still shows — as "#?" — so the list always adds up to
+// the score. Anyone who scored more than once in a half reads as "#7 ×2".
+function scorersHTML(kL, kR, names, cols) {
+  const tries = annotations.filter(a => a.type === 'Try');
+  if (!tries.length) return '';
+  const column = key => {
+    const own = tries.filter(a => a.actionOwner === key);
+    const byHalf = new Map();
+    own.forEach(a => {
+      const h = halfOf(a);
+      if (!byHalf.has(h)) byHalf.set(h, new Map());
+      const who = (a.tags && a.tags.player) || '?';
+      const m = byHalf.get(h);
+      m.set(who, (m.get(who) || 0) + 1);
+    });
+    const halves = [...byHalf.keys()].sort((x, y) => x - y).map(h =>
+      `<div class="scorers-half">${halfLabel(h)}</div><div class="scorers-list">` +
+      [...byHalf.get(h)].map(([who, n]) =>
+        `<span class="scorer${who === '?' ? ' unknown' : ''}">#${escapeHtml(who)}${n > 1 ? `<small>×${n}</small>` : ''}</span>`).join('') +
+      `</div>`).join('');
+    return `<div><div class="scorers-team" style="--c:${cols[key]}">${escapeHtml(names[key])} · ${own.length}</div>` +
+      (halves || '<div class="scorers-none">No tries yet</div>') + `</div>`;
+  };
+  return `<div class="stats-section">Try scorers</div><div class="scorers">${column(kL)}${column(kR)}</div>`;
 }
 
 // The Stats sheet answers "who is winning"; this answers "what is working", so it
