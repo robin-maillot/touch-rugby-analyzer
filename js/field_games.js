@@ -52,6 +52,11 @@ TR.FieldGames = (function () {
       annotations: [],
       possession: 'Team 1',
       wallStart: null,
+      // Match-clock stoppages, as {from, to} in seconds on the same clock as
+      // event times; to is null while the stoppage is still running. Kept on
+      // the device only: events keep their real timestamps, so video links and
+      // the sheet are unaffected — only the match clock shown leaves these out.
+      pauses: [],
       teamsSwapped: false,
       creatorToken: null,
       meta: Object.assign({}, EMPTY_META, meta || {}),
@@ -68,6 +73,9 @@ TR.FieldGames = (function () {
     rec.status       = rec.status === 'finished' ? 'finished' : 'active';
     rec.revision     = typeof rec.revision === 'number' ? rec.revision : 0;
     rec.teamsSwapped = !!rec.teamsSwapped;
+    rec.pauses       = Array.isArray(rec.pauses)
+      ? rec.pauses.filter(p => p && typeof p.from === 'number' && (p.to == null || typeof p.to === 'number'))
+      : [];
     rec.meta         = Object.assign({}, EMPTY_META, rec.meta || {});
     rec.sync         = Object.assign({}, EMPTY_SYNC, rec.sync || {});
     if (typeof rec.createdAt !== 'number') rec.createdAt = rec.updatedAt || Date.now();
@@ -147,6 +155,19 @@ TR.FieldGames = (function () {
     return list().filter(o => o.id !== rec.id && sheetNameOf(o) === mine);
   }
 
+  // Seconds of [from, to] spent paused. A stoppage still running (to null) runs
+  // up to `now`. Overlaps are clipped, so a window that starts or ends inside a
+  // stoppage counts only its own share of it.
+  function pausedSeconds(pauses, from, to, now) {
+    let total = 0;
+    (pauses || []).forEach(p => {
+      const end = p.to == null ? now : p.to;
+      const a = Math.max(from, p.from), b = Math.min(to, end);
+      if (b > a) total += b - a;
+    });
+    return total;
+  }
+
   // Denormalized view for the picker tiles.
   function summarize(rec) {
     const a          = rec.annotations;
@@ -163,11 +184,13 @@ TR.FieldGames = (function () {
 
     // A running game's clock is still moving, so measure it against the wall
     // clock rather than the last tagged event (which would freeze between taps).
+    // Stoppages are left out, the same as on the annotator's own clock.
     let duration = 0;
     if (firstStart) {
-      duration = (running && rec.wallStart)
-        ? Math.max(0, (Date.now() - (rec.wallStart + firstStart.time * 1000)) / 1000)
-        : Math.max(0, (finished && lastEnd ? lastEnd.time : lastTime) - firstStart.time);
+      const end = (running && rec.wallStart)
+        ? (Date.now() - rec.wallStart) / 1000
+        : (finished && lastEnd ? lastEnd.time : lastTime);
+      duration = Math.max(0, end - firstStart.time - pausedSeconds(rec.pauses, firstStart.time, end, end));
     }
 
     return {
@@ -208,6 +231,6 @@ TR.FieldGames = (function () {
     INDEX_KEY, LEGACY_KEY, gameKey,
     ids, list, get, create, save, remove,
     isDirty, isUploaded, isSynced, markSynced, removeSynced,
-    collisions, summarize, migrateLegacy,
+    collisions, summarize, migrateLegacy, pausedSeconds,
   };
 })();

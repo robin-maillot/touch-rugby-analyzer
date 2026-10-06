@@ -1638,6 +1638,62 @@ test('no call when it cannot be told', () => {
   assert.equal(TR.inferTrySide(30, undefined), '');
 });
 
+console.log('TR.FieldGames.pausedSeconds');
+{
+  const ps = TR.FieldGames.pausedSeconds;
+  test('no stoppages', () => { assert.equal(ps([], 0, 100, 100), 0); assert.equal(ps(undefined, 0, 100, 100), 0); });
+  test('a finished stoppage inside the window', () => assert.equal(ps([{ from: 10, to: 40 }], 0, 100, 100), 30));
+  test('clipped to the window at both ends', () => {
+    assert.equal(ps([{ from: 10, to: 40 }], 20, 100, 100), 20);
+    assert.equal(ps([{ from: 10, to: 40 }], 0, 25, 100), 15);
+    assert.equal(ps([{ from: 10, to: 40 }], 50, 100, 100), 0);
+  });
+  test('one still running counts up to now', () => {
+    assert.equal(ps([{ from: 60, to: null }], 0, 90, 90), 30);
+    assert.equal(ps([{ from: 60, to: null }], 0, 120, 120), 60);
+  });
+  test('several add up', () => assert.equal(ps([{ from: 10, to: 20 }, { from: 50, to: 55 }, { from: 80, to: null }], 0, 100, 100), 35));
+  test('the clock window minus its stoppages is the match time', () => {
+    // kick-off at 5, a 30s injury stoppage, now 125 → 90s of match time
+    const pauses = [{ from: 40, to: 70 }];
+    assert.equal(125 - 5 - ps(pauses, 5, 125, 125), 90);
+  });
+}
+test('a record from an older build gets an empty pause list', () => {
+  const FGs = TR.FieldGames;
+  const rec = FGs.create({ team1: 'A' });
+  delete rec.pauses; FGs.save(rec);
+  assert.deepEqual([...FGs.get(rec.id).pauses], []);
+  FGs.remove(rec.id);
+});
+test('malformed pauses are dropped on load', () => {
+  const FGs = TR.FieldGames;
+  const rec = FGs.create({ team1: 'A' });
+  rec.pauses = [{ from: 1, to: 2 }, { from: 'x' }, null, { from: 5, to: null }];
+  FGs.save(rec);
+  assert.equal(FGs.get(rec.id).pauses.length, 2);
+  FGs.remove(rec.id);
+});
+
+// ── Every page's inline scripts compile ───────────────────────
+// A syntax error in a page's own <script> takes the whole page down, and
+// nothing above loads the pages — so compile each inline block (without
+// running it). Modules and data blocks are skipped.
+console.log('Inline page scripts');
+for (const page of fs.readdirSync('.').filter(f => f.endsWith('.html')).sort()) {
+  const html   = fs.readFileSync(page, 'utf8');
+  const blocks = [...html.matchAll(/<script(\s[^>]*)?>([\s\S]*?)<\/script>/gi)]
+    .filter(m => !/\bsrc\s*=/.test(m[1] || '') && !/type\s*=\s*["']?(module|application\/(ld\+)?json|text\/template)/i.test(m[1] || ''))
+    .map(m => m[2]).filter(code => code.trim());
+  if (!blocks.length) continue;
+  test(`${page} (${blocks.length} block${blocks.length === 1 ? '' : 's'})`, () => {
+    blocks.forEach((code, i) => {
+      try { new vm.Script(code, { filename: `${page}#script${i + 1}` }); }
+      catch (e) { throw new Error(`script ${i + 1}: ${e.message}`); }
+    });
+  });
+}
+
 // ── Server copy of the strike-move rule ───────────────────────
 // Code.gs can't load js/events.js, so it carries its own deriveStrikeMove for
 // the inline-edit path. It drifted once — 6 Again, Penalty Defence and tagged
