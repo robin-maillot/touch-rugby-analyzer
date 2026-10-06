@@ -23,7 +23,7 @@ const ctx = vm.createContext({
   window:         { location: { replace() {} } },
 });
 
-for (const f of ['js/config.js', 'js/utils.js', 'js/events.js', 'js/possession.js', 'js/consistency.js', 'js/player.js', 'js/field_games.js', 'js/strike_moves.js', 'js/playlists.js']) {
+for (const f of ['js/config.js', 'js/utils.js', 'js/events.js', 'js/possession.js', 'js/consistency.js', 'js/player.js', 'js/field_games.js', 'js/strike_moves.js', 'js/playlists.js', 'js/field_stats.js']) {
   vm.runInContext(fs.readFileSync(f, 'utf8'), ctx);
 }
 
@@ -1637,6 +1637,52 @@ test('no call when it cannot be told', () => {
   assert.equal(TR.inferTrySide(null, 30), '');
   assert.equal(TR.inferTrySide(30, undefined), '');
 });
+
+console.log('TR.FieldStats');
+{
+  const FS = TR.FieldStats;
+  const ev = (type, name, owner, x, y) => ({ type, name, possessionOwner: owner, actionOwner: owner, x: x ?? null, y: y ?? null });
+  const game = [
+    ev('Game Event', 'Game Start', 'Team 1'),
+    ev('Touch', 'Touch 1', 'Team 1', 50, 20), ev('Touch', 'Touch 2', 'Team 1', 40, 45),
+    ev('Touch', 'Touch 3', 'Team 1', 30, 70), ev('Touch', 'Touch 4', 'Team 1', 20, 90),
+    ev('Try', '32 - Cut', 'Team 1', 15, 100),
+    ev('Touch', 'Touch 1', 'Team 2', 50, 10), ev('Touch', 'Touch 2', 'Team 2', 70, 25),
+    ev('Turnover', 'Ball Down', 'Team 2', 80, 30),
+    ev('Game Event', 'Game End', 'Team 1'),
+  ];
+  test('one set per possession, positioned only', () => {
+    const sets = FS.possessionSets(game);
+    assert.equal(sets.length, 2);
+    assert.equal(sets[0].owner, 'Team 1'); assert.equal(sets[0].touches, 4); assert.equal(sets[0].endType, 'Try');
+    assert.equal(sets[0].startY, 20); assert.equal(sets[0].endY, 100); assert.equal(sets[0].maxY, 100);
+    assert.equal(sets[1].endType, 'Turnover'); assert.equal(sets[1].gain, 20);
+  });
+  test('a set with no positions is left out', () =>
+    assert.equal(FS.possessionSets([ev('Touch', 'Touch 1', 'Team 1'), ev('Try', 'Other', 'Team 1')]).length, 0));
+  test('per-team numbers', () => {
+    const { t1, t2, any } = FS.computeFieldStats(game);
+    assert.equal(any, true);
+    assert.equal(t1.sets, 1); assert.equal(t1.redSets, 1); assert.equal(t1.redTries, 1); assert.equal(t1.redConvPct, 100);
+    assert.equal(Math.round(t1.gainM), 56);                 // 80 y-units × 0.7
+    assert.deepEqual([...t1.channels], [50, 50, 0]);          // touches at x 30, 20 (left) and 50, 40 (middle)
+    assert.equal(t1.t3Pts.length, 1); assert.equal(t1.tryPts.length, 1);
+    assert.equal(t2.lostPts.length, 1); assert.equal(t2.redSets, 0); assert.equal(t2.redConvPct, null);
+  });
+  test('no positions at all → nothing to show', () =>
+    assert.equal(FS.computeFieldStats([ev('Touch', 'Touch 1', 'Team 1'), ev('Try', 'Other', 'Team 1')]).any, false));
+  test('outcomes', () => {
+    assert.equal(FS.outcomeOf({ endType: 'Turnover', endName: '6th Touch' }), '6th Touch');
+    assert.equal(FS.outcomeOf({ endType: 'Penalty Defence' }), 'Penalty');
+    assert.equal(FS.outcomeOf({ endType: 'Touch' }), null);
+  });
+  test('the drawing functions return markup', () => {
+    const { t1, sets } = FS.computeFieldStats(game);
+    assert.match(FS.fieldMapSVG(t1, '#3b82f6', 'A'), /<svg/);
+    assert.match(FS.outcomeBar(sets, 'A', '#3b82f6'), /cseg/);
+    assert.match(FS.territorySVG(sets, { 'Team 1': 'A', 'Team 2': 'B' }, { 'Team 1': '#3b82f6', 'Team 2': '#f59e0b' }), /<rect/);
+  });
+}
 
 // ── Server copy of the strike-move rule ───────────────────────
 // Code.gs can't load js/events.js, so it carries its own deriveStrikeMove for
