@@ -115,6 +115,15 @@
     .score-val  { font-size: 2.2rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
     #halfClock        { font-size: 2.2rem; font-weight: 700; line-height: 1; color: var(--text); font-variant-numeric: tabular-nums; }
     #totalClock       { font-size: 0.68rem; color: var(--text-muted); font-variant-numeric: tabular-nums; margin-top: 4px; }
+    /* Stopped clock: amber and pulsing, so a forgotten pause is hard to miss. */
+    body.clock-paused #halfClock  { color: var(--yellow); animation: clockPaused 1.4s ease-in-out infinite; }
+    body.clock-paused #totalClock { color: var(--yellow); }
+    @keyframes clockPaused { 50% { opacity: 0.45; } }
+    #pauseBtn.on { background: var(--yellow); border-color: var(--yellow); color: #17130a; }
+    .reset-game-btn {
+      width: 100%; min-height: 44px; border-radius: 10px; border: 1px solid var(--red);
+      background: var(--surface-2); color: var(--red); font-family: inherit; font-size: 0.82rem; font-weight: 700; cursor: pointer;
+    }
 
     /* ── Main content ───────────────────────────────────────────── */
     main {
@@ -1229,6 +1238,7 @@
     <button class="btn-icon btn-hdr-push" id="pushBtn"     onclick="pushToSheet()">⬆<span class="lbl"> Push</span></button>
     <button class="btn-icon btn-hdr-swap" id="swapBtn"     onclick="toggleSwap()">⇆<span class="lbl"> Swap</span></button>
     <button class="btn-icon btn-hdr-swap" id="rotateBtn"   onclick="rotatePitch()">⟳<span class="lbl"> Turn</span></button>
+    <button class="btn-icon" id="pauseBtn" onclick="togglePause()" style="display:none" title="Stop the match clock for a stoppage">⏸<span class="lbl"> Pause</span></button>
     <button class="btn-icon btn-hdr-override" id="overrideBtn" style="display:none" onclick="pushToSheet(true)">⚠ Override</button>
     <button class="btn-icon btn-hdr-stats" onclick="openStats()" title="View live stats">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="6" y1="20" x2="6" y2="13"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="18" y1="20" x2="18" y2="9"/></svg>
@@ -1315,6 +1325,9 @@
     <label class="v2-switch"><input type="checkbox" id="tryDetSideInput"   onchange="setTryDetail('side', this.checked)"><span>Open / blind side</span></label>
     <label class="v2-switch"><input type="checkbox" id="tryDetChInput"     onchange="setTryDetail('ch', this.checked)"><span>Channel — MM, ML, LW, W+</span></label>
     <label class="v2-switch"><input type="checkbox" id="tryDetPlayerInput" onchange="setTryDetail('player', this.checked)"><span>Try scorer's number</span></label>
+  </div>
+  <div>
+    <button class="reset-game-btn" onclick="resetGame()">⟲ Reset game — clear every event</button>
   </div>
   <div id="sheetPreview">fill metadata to generate tab name</div>
   <div id="sheetClashWarning" style="display:none;font-size:0.72rem;color:var(--orange);padding:2px 0"></div>
@@ -1614,6 +1627,7 @@ let loading      = false;   // suppresses saves while a game is being loaded
 let annotations  = [];
 let possession   = 'Team 1';
 let wallStart    = null;
+let pauses       = [];      // match-clock stoppages — see js/field_games.js
 // Per-game token, generated lazily on first push. Persisted with the session so
 // repeated pushes of the SAME game (created by this device) can overwrite the
 // existing tab without an admin override. Reset when a new game is started.
@@ -1651,6 +1665,7 @@ function saveSession(opts) {
   activeGame.annotations  = annotations;
   activeGame.possession   = possession;
   activeGame.wallStart    = wallStart;
+  activeGame.pauses       = pauses;
   activeGame.teamsSwapped = teamsSwapped;
   activeGame.creatorToken = creatorToken;
   activeGame.meta         = readMetaFields();
@@ -1785,6 +1800,7 @@ function loadGame(rec, isNew) {
   annotations  = rec.annotations;
   possession   = rec.possession;
   wallStart    = rec.wallStart;
+  pauses       = rec.pauses || [];
   creatorToken = rec.creatorToken;
 
   const m = rec.meta;
@@ -1867,6 +1883,65 @@ function nowSeconds() {
 function fmtClock(s) {
   const m = Math.floor(s / 60), sec = Math.floor(s % 60);
   return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+}
+
+// ── Pause ──────────────────────────────────────────────────────
+// Stops the match clock for a stoppage. Events keep their real timestamps —
+// tagging carries on as normal — and only the clocks shown (here, on the
+// picker tile and on the live scoreboard) leave the stoppage out.
+const isPaused = () => pauses.length > 0 && pauses[pauses.length - 1].to == null;
+// Seconds of match clock between two moments: the window, minus stoppages.
+const matchSeconds = (from, to, now) =>
+  Math.max(0, to - from - TR.FieldGames.pausedSeconds(pauses, from, to, now == null ? to : now));
+
+// Whether a half is under way — the only time the clock can be paused.
+function halfRunning() {
+  if (isFinished()) return false;
+  const ge = annotations.filter(a => a.name === 'Game Start' || a.name === 'Game End');
+  return !!(ge.length && ge[ge.length - 1].name === 'Game Start');
+}
+
+function togglePause() {
+  if (isPaused()) pauses[pauses.length - 1].to = nowSeconds();
+  else if (halfRunning()) pauses.push({ from: nowSeconds(), to: null });
+  else return;
+  updateUI();
+  saveSession();
+  if (liveMode) pushLiveUpdate();
+}
+
+// A half can't end, nor a game finish, with its clock still stopped.
+function endPause(at) {
+  if (isPaused()) pauses[pauses.length - 1].to = at;
+}
+
+// ── Reset ──────────────────────────────────────────────────────
+// Clears every event and the clock, as if the game had just been created —
+// keeping the teams, competition and video link, and the push token, so the
+// next push still overwrites this game's own tab rather than clashing with it.
+function resetGame() {
+  if (!activeGame) return;
+  const n = annotations.length;
+  if (!n && !wallStart) { alert('Nothing to reset — no events tagged yet.'); return; }
+  const uploaded = TR.FieldGames.isUploaded(activeGame);
+  const msg = `Reset this game?\n\nAll ${n} event${n === 1 ? '' : 's'} and the clock are cleared. ` +
+    `Teams, competition and video stay.\n\n` +
+    (uploaded ? 'The copy already in the sheet is kept until you push again.'
+              : 'Nothing has been uploaded, so this cannot be undone.');
+  if (!confirm(msg)) return;
+  if (!uploaded && n && !confirm(`Are you sure? ${n} event${n === 1 ? '' : 's'} will be lost.`)) return;
+  if (liveMode) stopLive();
+  annotations = [];
+  pauses      = [];
+  wallStart   = null;
+  armedPen    = null;
+  activeGame.status     = 'active';
+  activeGame.finishedAt = null;
+  closeTryPicker(); closeSubtype(); closeMoveStrip(); closeStats();
+  setPossession('Team 1');
+  document.body.classList.remove('game-finished');
+  updateUI();
+  saveSession();
 }
 
 function ordinal(n) {
@@ -1952,6 +2027,7 @@ function tagGameEvent(name) {
     const prevStart = [...annotations].reverse().find(a => a.type === 'Game Event' && a.name === 'Game Start');
     if (prevStart) setPossession(TR.otherTeam(prevStart.possessionOwner));
   }
+  if (name === 'Game End') endPause(nowSeconds());
   tag('Game Event', name, possession);
 }
 
@@ -2191,19 +2267,23 @@ function updateUI() {
   if (finished) {
     // Frozen: show what the final half and the whole game actually lasted,
     // rather than the break-from-the-whistle reading the live clock would give.
-    const halfDur  = (lastEnd && lastStart)  ? Math.max(0, lastEnd.time - lastStart.time)  : 0;
-    const totalDur = (lastEnd && firstStart) ? Math.max(0, lastEnd.time - firstStart.time) : 0;
+    const halfDur  = (lastEnd && lastStart)  ? matchSeconds(lastStart.time, lastEnd.time)  : 0;
+    const totalDur = (lastEnd && firstStart) ? matchSeconds(firstStart.time, lastEnd.time) : 0;
     document.getElementById('halfClock').textContent  = fmtClock(halfDur);
     document.getElementById('totalClock').textContent = 'Full time · Total ' + fmtClock(totalDur);
   } else {
     // On a break the half clock resets to 0 and counts the break from the whistle;
     // otherwise it tracks the current half from its kick-off.
+    // A break counts real time; a half leaves its stoppages out. Measured to
+    // now, like the ticker — not to the last event, which would flash the
+    // clock back on every redraw until the next tick.
+    const clockNow     = wallStart ? Math.max(lastTime, (Date.now() - wallStart) / 1000) : lastTime;
     const halfRef      = isOnBreak ? lastEnd : lastStart;
-    const halfElapsed  = halfRef    ? Math.max(0, lastTime - halfRef.time)    : 0;
-    const totalElapsed = firstStart ? Math.max(0, lastTime - firstStart.time) : 0;
+    const halfElapsed  = !halfRef ? 0 : isOnBreak ? Math.max(0, clockNow - halfRef.time) : matchSeconds(halfRef.time, clockNow, clockNow);
+    const totalElapsed = firstStart ? matchSeconds(firstStart.time, clockNow, clockNow) : 0;
     document.getElementById('halfClock').textContent  = fmtClock(halfElapsed);
     // Total line doubles as the phase indicator now the period label is gone.
-    const phase = !gameStarts.length ? '' : isOnBreak ? 'Break · ' : ordinal(gameStarts.length) + ' · ';
+    const phase = !gameStarts.length ? '' : isPaused() ? 'Paused · ' : isOnBreak ? 'Break · ' : ordinal(gameStarts.length) + ' · ';
     document.getElementById('totalClock').textContent = phase + 'Total ' + fmtClock(totalElapsed);
   }
 
@@ -2214,6 +2294,14 @@ function updateUI() {
   const gameRunning     = !!(lastGameEvent && lastGameEvent.name === 'Game Start');
   const gameBtn = document.getElementById('gameEventBtn');
   gameBtn.textContent = gameRunning ? 'End' : 'Start';
+  // Pause is only offered while a half is under way (or still paused).
+  const pauseBtn = document.getElementById('pauseBtn');
+  const stopped  = isPaused();
+  pauseBtn.style.display = stopped || (gameRunning && !finished) ? '' : 'none';
+  pauseBtn.classList.toggle('on', stopped);
+  pauseBtn.innerHTML = stopped ? '▶<span class="lbl"> Resume</span>' : '⏸<span class="lbl"> Pause</span>';
+  pauseBtn.title     = stopped ? 'Restart the match clock' : 'Stop the match clock for a stoppage';
+  document.body.classList.toggle('clock-paused', stopped);
   gameBtn.classList.toggle('running', gameRunning);
   document.body.classList.toggle('game-running', gameRunning && !finished);
   document.body.classList.toggle('game-finished', finished);
@@ -2338,14 +2426,16 @@ setInterval(() => {
   const lastStart = gameStarts[gameStarts.length - 1];
   const lastEnd   = gameEnds[gameEnds.length - 1];
   const isOnBreak = !!(lastEnd && lastEnd.time > lastStart.time);
-  const now            = Date.now();
-  const firstStartWall = wallStart + gameStarts[0].time * 1000;
+  // On the event clock (seconds since wallStart), so stoppages line up with it.
+  const now = (Date.now() - wallStart) / 1000;
   // During a break the half clock counts up from the Game End whistle (resetting
-  // to 0); otherwise it counts the current half from its Game Start.
-  const halfRefWall    = wallStart + (isOnBreak ? lastEnd.time : lastStart.time) * 1000;
-  const phase = isOnBreak ? 'Break · ' : ordinal(gameStarts.length) + ' · ';
-  document.getElementById('halfClock').textContent  = fmtClock(Math.max(0, (now - halfRefWall)  / 1000));
-  document.getElementById('totalClock').textContent = phase + 'Total ' + fmtClock(Math.max(0, (now - firstStartWall) / 1000));
+  // to 0) in real time; otherwise it counts the current half from its Game
+  // Start, less any stoppage — so while paused it stands still.
+  const half  = isOnBreak ? Math.max(0, now - lastEnd.time) : matchSeconds(lastStart.time, now, now);
+  const total = matchSeconds(gameStarts[0].time, now, now);
+  const phase = isPaused() ? 'Paused · ' : isOnBreak ? 'Break · ' : ordinal(gameStarts.length) + ' · ';
+  document.getElementById('halfClock').textContent  = fmtClock(half);
+  document.getElementById('totalClock').textContent = phase + 'Total ' + fmtClock(total);
 }, 1000);
 
 // ── Live mode ──────────────────────────────────────────────────
@@ -2390,8 +2480,9 @@ function pushLiveUpdate() {
   const score1 = annotations.filter(a => a.type === 'Try' && a.actionOwner === 'Team 1').length;
   const score2 = annotations.filter(a => a.type === 'Try' && a.actionOwner === 'Team 2').length;
   const gameStart     = annotations.find(a => a.name === 'Game Start');
-  const gameStartWall = gameStart ? wallStart + gameStart.time * 1000 : (wallStart || Date.now());
-  const timeSeconds   = Math.max(0, (Date.now() - gameStartWall) / 1000);
+  const nowEv         = wallStart ? (Date.now() - wallStart) / 1000 : 0;
+  // Match time, stoppages left out — the same clock the annotator shows.
+  const timeSeconds   = gameStart ? matchSeconds(gameStart.time, nowEv, nowEv) : 0;
   const { t1, t2 } = computeStats();
   // Event log surfaced on live.html: tries (for running score), penalties, and
   // half markers. Old `{scorer,time}` rows (no `type`) are still rendered as tries.
@@ -2552,8 +2643,9 @@ function refreshStats() {
   } else if (hasEnd) {
     statusHtml = 'Full time';
   } else {
-    const elapsed = gsWall ? Math.max(0, (Date.now() - gsWall) / 1000) : 0;
-    statusHtml = `<span class="dot-live"></span>In progress · ${fmtClock(elapsed)}`;
+    const nowEv   = wallStart ? (Date.now() - wallStart) / 1000 : 0;
+    const elapsed = gsAnnot && wallStart ? matchSeconds(gsAnnot.time, nowEv, nowEv) : 0;
+    statusHtml = `<span class="dot-live"></span>${isPaused() ? 'Paused' : 'In progress'} · ${fmtClock(elapsed)}`;
   }
   document.getElementById('statsStatus').innerHTML = statusHtml;
 
