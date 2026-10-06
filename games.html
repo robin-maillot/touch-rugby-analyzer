@@ -1643,7 +1643,8 @@ function fieldEvents(game) {
   return game.events.map(e => {
     const p = TR.detailPos(e.Detail, e.Comment);
     return { type: e.Type, name: e.Name, possessionOwner: key(e['Possession Owner']),
-             actionOwner: key(e['Action Owner']), x: p ? p.x : null, y: p ? p.y : null };
+             actionOwner: key(e['Action Owner']), x: p ? p.x : null, y: p ? p.y : null,
+             tags: e.Type === 'Try' ? TR.parseDetail(e.Detail) : null };
   });
 }
 
@@ -1669,6 +1670,26 @@ function closeFieldModal() {
 }
 
 function pickFieldHalf(h) { fieldHalf = h; renderFieldModal(); }
+
+// Tries by side (open / blind) and by channel, from the tags recorded on each
+// try. Shown whenever a try in this part of the game carries either tag; the
+// note says how many tries each bar is out of, so a 100% open over 2 tagged
+// tries reads as what it is.
+function tryTagsHTML(evs, names) {
+  const FS = TR.FieldStats;
+  const { t1, t2 } = FS.tryTagStats(evs);
+  if (!(t1.sideTagged + t2.sideTagged + t1.chTagged + t2.chTagged)) return '';
+  const of = (st) => `${st.tries} tr${st.tries === 1 ? 'y' : 'ies'}`;
+  const note = (k) => `tagged: ${names['Team 1']} ${t1[k]} of ${of(t1)} · ${names['Team 2']} ${t2[k]} of ${of(t2)}`;
+  return `<div class="field-sec">Tries — open or blind side</div>
+     ${FS.sideBar(t1, names['Team 1'], FIELD_COLORS['Team 1'])}
+     ${FS.sideBar(t2, names['Team 2'], FIELD_COLORS['Team 2'])}
+     <div class="cnote">${note('sideTagged')}</div>
+     <div class="field-sec">Tries — channel</div>
+     ${FS.channelTagBar(t1, names['Team 1'], FIELD_COLORS['Team 1'])}
+     ${FS.channelTagBar(t2, names['Team 2'], FIELD_COLORS['Team 2'])}
+     <div class="cnote">MM · ML · LW · W+ — ${note('chTagged')}</div>`;
+}
 
 function renderFieldModal() {
   const FS     = TR.FieldStats;
@@ -1731,6 +1752,7 @@ function renderFieldModal() {
      ${FS.channelBar(t1, names['Team 1'], FIELD_COLORS['Team 1'])}
      ${FS.channelBar(t2, names['Team 2'], FIELD_COLORS['Team 2'])}
      <div class="cnote">left · middle · right thirds, share of that team's touches</div>
+     ${tryTagsHTML(evs, names)}
      ${table}`;
 }
 
