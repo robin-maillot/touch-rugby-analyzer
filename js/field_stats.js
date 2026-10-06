@@ -108,18 +108,22 @@ TR.FieldStats = (() => {
   // the whole point of the map is to compare them. Touch 3 and touch 4 are told
   // apart by fill and by dash, never by hue, so the team colour stays free to
   // mean the team.
+  // Touch and try markers sit at 0.8 opacity, so where several land on the
+  // same spot the overlap shows as a deeper mark instead of one hiding another.
+  const POINT_OPACITY = 0.8;
+
   function fieldMapSVG(stat, color, name) {
     const vy = y => (100 - y) / 100 * MAP_LEN;
     const t3 = stat.t3Pts.map(p =>
-      `<circle cx="${p.x}" cy="${vy(p.y)}" r="2.6" fill="none" stroke="${color}" stroke-width="1.1"/>`).join('');
+      `<circle cx="${p.x}" cy="${vy(p.y)}" r="2.6" fill="none" stroke="${color}" stroke-width="1.1" opacity="${POINT_OPACITY}"/>`).join('');
     const t4 = stat.t4Pts.map(p =>
-      `<circle cx="${p.x}" cy="${vy(p.y)}" r="2.6" fill="${color}"/>`).join('');
+      `<circle cx="${p.x}" cy="${vy(p.y)}" r="2.6" fill="${color}" opacity="${POINT_OPACITY}"/>`).join('');
     const lost = stat.lostPts.map(p => {
       const d = 2.4;
       return `<path d="M${p.x - d} ${vy(p.y) - d}L${p.x + d} ${vy(p.y) + d}M${p.x + d} ${vy(p.y) - d}L${p.x - d} ${vy(p.y) + d}"
                stroke="var(--orange)" stroke-width="1.1" fill="none"/>`;
     }).join('');
-    const tries = stat.tryPts.map(p => `<circle cx="${p.x}" cy="${vy(p.y)}" r="3.4" fill="var(--green)"/>`).join('');
+    const tries = stat.tryPts.map(p => `<circle cx="${p.x}" cy="${vy(p.y)}" r="3.4" fill="var(--green)" opacity="${POINT_OPACITY}"/>`).join('');
 
     const avgLine = (m, n, dash) => !m ? '' :
       `<line x1="2" y1="${vy(m / Y_TO_M)}" x2="90" y2="${vy(m / Y_TO_M)}" stroke="${color}"

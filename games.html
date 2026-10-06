@@ -51,8 +51,8 @@
     #gameSubtitle { font-size: 0.78rem; color: #777; margin-top: 3px; }
     #gameTimingRow { display: flex; gap: 16px; margin-top: 8px; font-size: 0.78rem; color: #9ba6b9; flex-wrap: wrap; }
     #gameTimingRow .timing-val { color: #ccc; font-weight: 600; }
-    #viewEventsBtn, #compareHalvesBtn, #fieldViewBtn, #turnoverDistBtn, #downloadVideoBtn { text-decoration: none; background: none; border: 1px solid #3a3d4a; border-radius: 6px; padding: 4px 11px; font-size: 0.75rem; color: #aaa; cursor: pointer; white-space: nowrap; transition: border-color 0.12s, color 0.12s; }
-    #viewEventsBtn:hover, #compareHalvesBtn:hover, #fieldViewBtn:hover, #turnoverDistBtn:hover, #downloadVideoBtn:hover:not(:disabled) { border-color: var(--accent, #3b82f6); color: #fff; }
+    #viewEventsBtn, #compareHalvesBtn, #fieldViewBtn, #exportPageBtn, #turnoverDistBtn, #downloadVideoBtn { text-decoration: none; background: none; border: 1px solid #3a3d4a; border-radius: 6px; padding: 4px 11px; font-size: 0.75rem; color: #aaa; cursor: pointer; white-space: nowrap; transition: border-color 0.12s, color 0.12s; }
+    #viewEventsBtn:hover, #compareHalvesBtn:hover, #fieldViewBtn:hover, #exportPageBtn:hover, #turnoverDistBtn:hover, #downloadVideoBtn:hover:not(:disabled) { border-color: var(--accent, #3b82f6); color: #fff; }
     #downloadVideoBtn:disabled { opacity: 0.5; cursor: default; }
 
     #commentText { flex: 1; white-space: pre-wrap; color: #ccc; font-size: 0.85rem; line-height: 1.45; }
@@ -342,6 +342,7 @@
           <button id="fieldViewBtn" onclick="openFieldModal()" style="display:none" title="Field position, set outcomes and channels — for games tagged with touch locations">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="vertical-align:-1px"><rect x="5" y="2" width="14" height="20" rx="1.5"/><line x1="5" y1="12" x2="19" y2="12"/><line x1="5" y1="6" x2="19" y2="6" stroke-dasharray="2 2"/><line x1="5" y1="18" x2="19" y2="18" stroke-dasharray="2 2"/></svg>
             Field View</button>
+          <button id="exportPageBtn" onclick="exportGamePage()" title="Save this page as a JPG">⬇ Export JPG</button>
           <button id="downloadVideoBtn" onclick="downloadCurrentGameVideo()" style="display:none">⬇ Download Video</button>
           <a id="viewEventsBtn" href="game.html">View Events</a>
         </div>
@@ -420,7 +421,10 @@
   <div id="fieldCard" role="dialog" aria-modal="true" aria-labelledby="fieldTitle">
     <div class="compare-header">
       <span class="compare-title" id="fieldTitle">Field View</span>
-      <button class="compare-close" onclick="closeFieldModal()" aria-label="Close">✕</button>
+      <div class="compare-header-actions">
+        <button class="compare-export" id="exportFieldBtn" onclick="exportFieldView()">⬇ Export JPG</button>
+        <button class="compare-close" onclick="closeFieldModal()" aria-label="Close">✕</button>
+      </div>
     </div>
     <div id="fieldBody"></div>
   </div>
@@ -1695,55 +1699,77 @@ function closeCompareModal() {
   document.getElementById('compareOverlay').style.display = 'none';
 }
 
-async function exportCompareTable() {
+// ── JPG export ──────────────────────────────────────────────────
+// One routine for every export on the page. `relax` lifts the height and
+// scroll limits that would otherwise clip the capture to what's on screen;
+// `hide` takes the export/close buttons out of the picture. Everything is put
+// back afterwards, whatever happens.
+const fileSlug = s => String(s || '').toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+
+async function exportJPG({ target, name, relax = [], hide = [], button }) {
   if (!currentGame || typeof html2canvas !== 'function') return;
-  const card       = document.getElementById('compareCard');
-  const body       = document.getElementById('compareBody');
-  const scroll     = card.querySelector('.compare-scroll');
-  const exportBtn  = document.getElementById('exportCompareBtn');
-  const closeBtn   = card.querySelector('.compare-close');
-
-  // Relax height/scroll constraints so html2canvas captures the entire table.
-  const orig = {
-    cardMax:   card.style.maxHeight,
-    bodyOvfY:  body.style.overflowY,
-    scrollOvfX: scroll.style.overflowX,
-  };
-  card.style.maxHeight   = 'none';
-  body.style.overflowY   = 'visible';
-  scroll.style.overflowX = 'visible';
-  exportBtn.style.visibility = 'hidden';
-  closeBtn.style.visibility  = 'hidden';
-  const origText = exportBtn.textContent;
-
+  const saved = relax.map(([el, prop]) => [el, prop, el.style[prop]]);
+  relax.forEach(([el, prop, value]) => { el.style[prop] = value; });
+  hide.forEach(el => { el.style.visibility = 'hidden'; });
+  const label = button ? button.textContent : '';
+  if (button) { button.disabled = true; button.textContent = '⏳ Exporting…'; }
   try {
-    const canvas = await html2canvas(card, { backgroundColor: '#141925', scale: 2, useCORS: true });
-    const slug = s => String(s || '').toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    const canvas = await html2canvas(target, { backgroundColor: '#141925', scale: 2, useCORS: true });
     const { team1, team2 } = currentGame;
-    const filename = `${slug(team1) || 'team1'}-vs-${slug(team2) || 'team2'}-half-comparison.jpg`;
-    canvas.toBlob(blob => {
-      if (!blob) { alert('Export failed: could not encode image.'); return; }
+    const filename = `${fileSlug(team1) || 'team1'}-vs-${fileSlug(team2) || 'team2'}-${name}.jpg`;
+    await new Promise(done => canvas.toBlob(blob => {
+      if (!blob) { alert('Export failed: could not encode image.'); done(); return; }
       const url = URL.createObjectURL(blob);
       const a = Object.assign(document.createElement('a'), { href: url, download: filename });
       document.body.appendChild(a);
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-    }, 'image/jpeg', 0.95);
+      done();
+    }, 'image/jpeg', 0.95));
   } catch (err) {
     alert('Export failed: ' + err.message);
   } finally {
-    card.style.maxHeight   = orig.cardMax;
-    body.style.overflowY   = orig.bodyOvfY;
-    scroll.style.overflowX = orig.scrollOvfX;
-    exportBtn.style.visibility = '';
-    closeBtn.style.visibility  = '';
-    exportBtn.textContent = origText;
+    saved.forEach(([el, prop, value]) => { el.style[prop] = value; });
+    hide.forEach(el => { el.style.visibility = ''; });
+    if (button) { button.disabled = false; button.textContent = label; }
   }
 }
 
+function exportCompareTable() {
+  const card = document.getElementById('compareCard');
+  return exportJPG({
+    target: card, name: 'half-comparison',
+    relax: [[card, 'maxHeight', 'none'], [document.getElementById('compareBody'), 'overflowY', 'visible'],
+            [card.querySelector('.compare-scroll'), 'overflowX', 'visible']],
+    hide:  [document.getElementById('exportCompareBtn'), card.querySelector('.compare-close')],
+  });
+}
+
+// Field View: the whole card, every section, for the half being shown.
+function exportFieldView() {
+  const card = document.getElementById('fieldCard');
+  const half = fieldHalf === 'all' ? 'field-view' : `field-view-${ordinal(fieldHalf + 1)}-half`;
+  return exportJPG({
+    target: card, name: half,
+    relax: [[card, 'maxHeight', 'none'], [document.getElementById('fieldBody'), 'overflowY', 'visible']],
+    hide:  [document.getElementById('exportFieldBtn'), card.querySelector('.compare-close')],
+    button: document.getElementById('exportFieldBtn'),
+  });
+}
+
+// The main page: title, timings, every chart and the stat cards below them.
+function exportGamePage() {
+  const btn = document.getElementById('exportPageBtn');
+  return exportJPG({
+    target: document.getElementById('gameContent'), name: 'game-analysis',
+    hide: [...document.querySelectorAll('.game-title-actions')],
+    button: btn,
+  });
+}
+
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { closeCompareModal(); closeTurnoverModal(); }
+  if (e.key === 'Escape') { closeCompareModal(); closeTurnoverModal(); closeFieldModal(); }
 });
 
 function buildPeriodMetrics() {
