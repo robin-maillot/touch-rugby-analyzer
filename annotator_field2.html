@@ -346,6 +346,22 @@
       padding: 14px 16px 4px;
     }
 
+    /* The numbers panel: Scoring to Inside the 10m, folded by default. */
+    .stats-fold { margin: 10px 12px 4px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+    .stats-fold > summary {
+      list-style: none; cursor: pointer; display: flex; flex-direction: column; gap: 2px;
+      padding: 12px 40px 12px 14px; position: relative; -webkit-tap-highlight-color: transparent;
+    }
+    .stats-fold > summary::-webkit-details-marker { display: none; }
+    .stats-fold > summary::after {
+      content: '›'; position: absolute; right: 16px; top: 50%; transform: translateY(-50%) rotate(90deg);
+      font-size: 1.2rem; color: var(--text-muted); transition: transform .15s;
+    }
+    .stats-fold[open] > summary::after { transform: translateY(-50%) rotate(-90deg); }
+    .stats-fold > summary span  { font-size: 0.85rem; font-weight: 800; color: var(--text); }
+    .stats-fold > summary small { font-size: 0.65rem; color: var(--text-dim); }
+    .stats-fold[open] > summary { border-bottom: 1px solid var(--border); }
+
     /* individual stat row */
     .stat-row {
       padding: 10px 16px 11px;
@@ -2498,6 +2514,10 @@ function computeStats() {
   return { t1, t2 };
 }
 
+// Whether the numbers panel is open. The sheet redraws every 5s, so the state
+// lives here (and per device) rather than in the DOM, or it would snap shut.
+let statsFoldOpen = localStorage.getItem('fieldStatsFoldOpen') === '1';
+
 function openStats() {
   refreshStats();
   document.getElementById('statsOverlay').classList.add('open');
@@ -2606,7 +2626,7 @@ function refreshStats() {
     }] : []),
   ];
 
-  const html = sections.map(sec => {
+  const renderSection = sec => {
     const rowsHtml = sec.rows.map(({ label, n1, pct1, n2, pct2, r1, r2, hib }) => {
       // Value colours
       let c1 = '', c2 = '';
@@ -2657,7 +2677,19 @@ function refreshStats() {
       </div>`;
     }).join('');
     return `<div class="stats-section">${sec.label}</div>${rowsHtml}`;
-  }).join('');
+  };
+  // Scoring through Inside the 10m fold into one panel; anything after it
+  // (Drives, when tagged) stays out, and so do the charts and try scorers.
+  // A game tagged without positions has no Inside the 10m, so the split is
+  // "everything before Drives" rather than "after Inside the 10m".
+  const drives = sections.findIndex(sec => sec.label === 'Drives');
+  const cut    = drives >= 0 ? drives : sections.length;
+  const fold = sections.slice(0, cut), rest = sections.slice(cut);
+  const html =
+    `<details class="stats-fold" id="statsFold"${statsFoldOpen ? ' open' : ''}>` +
+      `<summary><span>Match numbers</span><small>${fold.map(sec => sec.label).join(' · ')}</small></summary>` +
+      fold.map(renderSection).join('') +
+    `</details>` + rest.map(renderSection).join('');
 
   // The map goes on top: it's the thing you read first and the numbers explain it.
   const sets  = field.any ? possessionSets() : [];
@@ -4109,6 +4141,12 @@ window.addEventListener('DOMContentLoaded', () => {
   wrap.innerHTML = pitchSVG();
   document.getElementById('uploadTouchesInput').checked = uploadTouches;
   document.getElementById('tryPopupInput').checked = tryPopup;
+  // 'toggle' doesn't bubble, so it's caught on the way down.
+  document.getElementById('statsBody').addEventListener('toggle', ev => {
+    if (ev.target.id !== 'statsFold') return;
+    statsFoldOpen = ev.target.open;
+    try { localStorage.setItem('fieldStatsFoldOpen', statsFoldOpen ? '1' : '0'); } catch (e) {}
+  }, true);
   // Digits-only boxes (the scorer's number). An iPad has no digits-only keypad
   // — inputmode="numeric" still opens the full keyboard on its numbers page —
   // so anything else is refused before it lands: a typed letter or symbol, a
