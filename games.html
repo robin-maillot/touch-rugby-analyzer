@@ -51,8 +51,8 @@
     #gameSubtitle { font-size: 0.78rem; color: #777; margin-top: 3px; }
     #gameTimingRow { display: flex; gap: 16px; margin-top: 8px; font-size: 0.78rem; color: #9ba6b9; flex-wrap: wrap; }
     #gameTimingRow .timing-val { color: #ccc; font-weight: 600; }
-    #viewEventsBtn, #compareHalvesBtn, #fieldViewBtn, #exportPageBtn, #turnoverDistBtn, #downloadVideoBtn { text-decoration: none; background: none; border: 1px solid #3a3d4a; border-radius: 6px; padding: 4px 11px; font-size: 0.75rem; color: #aaa; cursor: pointer; white-space: nowrap; transition: border-color 0.12s, color 0.12s; }
-    #viewEventsBtn:hover, #compareHalvesBtn:hover, #fieldViewBtn:hover, #exportPageBtn:hover, #turnoverDistBtn:hover, #downloadVideoBtn:hover:not(:disabled) { border-color: var(--accent, #3b82f6); color: #fff; }
+    #viewEventsBtn, #compareHalvesBtn, #fieldViewBtn, #possessionsBtn, #exportPageBtn, #turnoverDistBtn, #downloadVideoBtn { text-decoration: none; background: none; border: 1px solid #3a3d4a; border-radius: 6px; padding: 4px 11px; font-size: 0.75rem; color: #aaa; cursor: pointer; white-space: nowrap; transition: border-color 0.12s, color 0.12s; }
+    #viewEventsBtn:hover, #compareHalvesBtn:hover, #fieldViewBtn:hover, #possessionsBtn:hover, #exportPageBtn:hover, #turnoverDistBtn:hover, #downloadVideoBtn:hover:not(:disabled) { border-color: var(--accent, #3b82f6); color: #fff; }
     #downloadVideoBtn:disabled { opacity: 0.5; cursor: default; }
 
     #commentText { flex: 1; white-space: pre-wrap; color: #ccc; font-size: 0.85rem; line-height: 1.45; }
@@ -214,6 +214,42 @@
       #fieldBody .compare-table th, #fieldBody .compare-table td { padding-left: 6px; padding-right: 6px; }
       #fieldBody .compare-table .metric-name { white-space: normal; }
     }
+    /* ── Possessions Modal ──────────────────────────────────────── */
+    #possOverlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 200;
+      display: flex; align-items: center; justify-content: center;
+      padding: 16px; overflow-y: auto;
+    }
+    #possCard {
+      background: #141925; border: 1px solid #2b3242; border-radius: 12px;
+      max-width: 920px; width: 100%; max-height: 90dvh;
+      display: flex; flex-direction: column;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.6); flex-shrink: 0;
+    }
+    #possBody { overflow-y: auto; padding: 4px 0 16px; }
+    .pp-teams { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 4px 16px 0; }
+    .pp-team-name { text-align: center; font-size: 0.75rem; font-weight: 800; margin-bottom: 4px; }
+    .pp-pitch { display: block; width: 100%; max-width: 300px; margin: 0 auto; }
+    .pp-chart { display: block; width: 100%; height: auto; }
+    .pp-gain  { max-width: 560px; margin: 0 auto; padding: 0 16px; }
+    .pp-key { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px; font-size: 0.66rem; color: var(--text-muted); padding: 4px 16px 2px; }
+    .pp-key span { display: inline-flex; align-items: center; gap: 5px; }
+    .pp-legend { display: flex; justify-content: center; gap: 14px; font-size: 0.68rem; font-weight: 700; padding: 0 16px 2px; }
+    .pp-read { min-height: 64px; margin: 6px auto 0; max-width: 340px; font-size: 0.74rem; line-height: 1.45; color: var(--text); }
+    .pp-read .pp-hint { color: var(--text-dim); }
+    .pp-read .pp-steps { display: block; font-size: 0.68rem; color: var(--text-muted); margin-top: 2px; }
+    .pp-nav { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
+    .pp-nav button {
+      background: #1e2433; border: 1px solid #2b3242; color: #e9ecf3; border-radius: 6px;
+      min-width: 34px; height: 30px; font-size: 0.95rem; cursor: pointer; touch-action: manipulation;
+    }
+    .pp-nav button:disabled { opacity: 0.35; cursor: default; }
+    .pp-nav .pp-clear { margin-left: auto; font-size: 0.7rem; min-width: 0; padding: 0 10px; color: #9ba6b9; }
+    .pp-nav .pp-title { font-weight: 800; }
+    @media (max-width: 560px) {
+      .pp-teams { grid-template-columns: 1fr; }
+      .pp-pitch { max-width: 260px; }
+    }
     /* ── Turnover Distribution Modal ───────────────────────────── */
     #turnoverOverlay {
       position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 200;
@@ -342,6 +378,9 @@
           <button id="fieldViewBtn" onclick="openFieldModal()" style="display:none" title="Field position, set outcomes and channels — for games tagged with touch locations">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="vertical-align:-1px"><rect x="5" y="2" width="14" height="20" rx="1.5"/><line x1="5" y1="12" x2="19" y2="12"/><line x1="5" y1="6" x2="19" y2="6" stroke-dasharray="2 2"/><line x1="5" y1="18" x2="19" y2="18" stroke-dasharray="2 2"/></svg>
             Field View</button>
+          <button id="possessionsBtn" onclick="openPossModal()" style="display:none" title="Every set's path, metres gained per touch, and each set as a column — for games tagged with touch locations">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px"><circle cx="6" cy="19" r="2"/><path d="M7.5 17.5 L12 12 L10 7 L17 4"/><circle cx="18" cy="4" r="1.6" fill="currentColor"/></svg>
+            Possessions</button>
           <button id="exportPageBtn" onclick="exportGamePage()" title="Save this page as a JPG">⬇ Export JPG</button>
           <button id="downloadVideoBtn" onclick="downloadCurrentGameVideo()" style="display:none">⬇ Download Video</button>
           <a id="viewEventsBtn" href="game.html">View Events</a>
@@ -427,6 +466,19 @@
       </div>
     </div>
     <div id="fieldBody"></div>
+  </div>
+</div>
+
+<div id="possOverlay" onclick="if(event.target===this)closePossModal()" style="display:none">
+  <div id="possCard" role="dialog" aria-modal="true" aria-labelledby="possTitle">
+    <div class="compare-header">
+      <span class="compare-title" id="possTitle">Possessions</span>
+      <div class="compare-header-actions">
+        <button class="compare-export" id="exportPossBtn" onclick="exportPossessions()">⬇ Export JPG</button>
+        <button class="compare-close" onclick="closePossModal()" aria-label="Close">✕</button>
+      </div>
+    </div>
+    <div id="possBody"></div>
   </div>
 </div>
 
@@ -1171,7 +1223,10 @@ async function renderGame(events, team1, team2, subtitle, analyzable, meta) {
   const ends   = events.filter(e => e.Name === 'Game End').sort((a, b) => a.GameTime - b.GameTime);
 
   currentGame = { events, team1, team2, starts, ends, meta: meta || null };
-  document.getElementById('fieldViewBtn').style.display = fieldEvents(currentGame).some(e => e.type === 'Touch' && e.x != null) ? '' : 'none';
+  const hasTouchPositions = fieldEvents(currentGame).some(e => e.type === 'Touch' && e.x != null);
+  document.getElementById('fieldViewBtn').style.display   = hasTouchPositions ? '' : 'none';
+  document.getElementById('possessionsBtn').style.display = hasTouchPositions ? '' : 'none';
+  possPick = { 'Team 1': null, 'Team 2': null }; possFocus = null; possHalf = 'all';
 
   // Build half toggle buttons
   const toggleEl = document.getElementById('halfToggle');
@@ -1679,6 +1734,143 @@ function renderFieldModal() {
      ${table}`;
 }
 
+// ── Possessions Modal ──────────────────────────────────────────
+// Every set as a path (A), metres gained on each touch (B), and every set as a
+// column (C). Clicking a set's ending in A, or its column in C, picks it: its
+// path comes forward with the metres on each step. ← / → (or the ‹ › buttons)
+// then step through that team's sets.
+let possHalf  = 'all';
+let possPick  = { 'Team 1': null, 'Team 2': null };
+let possFocus = null;            // the team whose set ← / → move through
+
+function possSets() {
+  const all = TR.FieldStats.possessionPaths(fieldEvents(currentGame));
+  return possHalf === 'all' ? all : all.filter(s => s.half === possHalf + 1);
+}
+
+function openPossModal() {
+  if (!currentGame) return;
+  document.getElementById('possTitle').textContent = `${currentGame.team1} vs ${currentGame.team2} — Possessions`;
+  renderPossModal();
+  document.getElementById('possOverlay').style.display = 'flex';
+}
+function closePossModal() { document.getElementById('possOverlay').style.display = 'none'; }
+const possOpen = () => document.getElementById('possOverlay').style.display === 'flex';
+
+function pickPossHalf(h) {
+  possHalf = h; possPick = { 'Team 1': null, 'Team 2': null }; possFocus = null;
+  renderPossModal();
+}
+
+function pickPossSet(key, i) {
+  possPick[key] = possPick[key] === i ? null : i;
+  possFocus = possPick[key] == null ? null : key;
+  renderPossModal();
+}
+
+// Previous / next set for a team; stops at either end rather than wrapping, so
+// "next" never silently jumps back to the first set of the game.
+function stepPossSet(key, dir) {
+  const n = possSets().filter(s => s.owner === key).length;
+  const cur = possPick[key];
+  if (!n) return;
+  const next = cur == null ? (dir > 0 ? 0 : n - 1) : Math.max(0, Math.min(n - 1, cur + dir));
+  possPick[key] = next; possFocus = key;
+  renderPossModal();
+}
+
+function renderPossModal() {
+  // Redrawn on every pick; keep the scroll position, or clicking a column at
+  // the bottom would throw the panel back to the top each time.
+  const body  = document.getElementById('possBody');
+  const keep  = body.scrollTop;
+  drawPossModal();
+  body.scrollTop = keep;
+}
+
+function drawPossModal() {
+  const FS    = TR.FieldStats;
+  const all   = TR.FieldStats.possessionPaths(fieldEvents(currentGame));
+  const halves = [...new Set(all.map(s => s.half))].sort((a, b) => a - b);
+  const sets  = possSets();
+  const keys  = ['Team 1', 'Team 2'];
+  const names = { 'Team 1': currentGame.team1, 'Team 2': currentGame.team2 };
+  const mine  = key => sets.filter(s => s.owner === key);
+
+  const halfBtns = halves.length > 1
+    ? `<div class="field-halves">` +
+        [['all', 'Full Game'], ...halves.map(h => [h - 1, `${ordinal(h)} Half`])].map(([v, label]) =>
+          `<button class="half-btn${String(v) === String(possHalf) ? ' active' : ''}" onclick="pickPossHalf(${v === 'all' ? "'all'" : v})">${label}</button>`).join('') +
+      `</div>` : '';
+
+  const readout = key => {
+    const list = mine(key), i = possPick[key];
+    if (i == null || !list[i]) {
+      const typical = FS.typicalSet(list);
+      const t = typical.length > 1
+        ? ` Dashed: the typical set — touch ${typical[0].k} at ${(typical[0].y * FS.Y_TO_M).toFixed(0)}m to touch ${typical[typical.length - 1].k} at ${(typical[typical.length - 1].y * FS.Y_TO_M).toFixed(0)}m.` : '';
+      return `<div class="pp-nav"><button onclick="stepPossSet('${key}',-1)" aria-label="Last set">‹</button><button onclick="stepPossSet('${key}',1)" aria-label="First set">›</button></div>` +
+             `<span class="pp-hint">Click an ending — or a column below — to see that set. ${list.length} set${list.length === 1 ? '' : 's'}.${t}</span>`;
+    }
+    const d = FS.describeSet(list[i], i, list.length);
+    return `<div class="pp-nav">
+        <button onclick="stepPossSet('${key}',-1)" ${i === 0 ? 'disabled' : ''} aria-label="Previous set">‹</button>
+        <button onclick="stepPossSet('${key}',1)" ${i === list.length - 1 ? 'disabled' : ''} aria-label="Next set">›</button>
+        <span class="pp-title" style="color:${d.color}">${escapeHtml(d.title)}</span>
+        <button class="pp-clear" onclick="pickPossSet('${key}', ${i})">✕ clear</button>
+      </div>${escapeHtml(d.summary)}<span class="pp-steps">${d.steps.map(escapeHtml).join(' · ')}</span>`;
+  };
+
+  if (!sets.length) {
+    document.getElementById('possBody').innerHTML = halfBtns + `<div class="field-note">No positioned sets in this part of the game.</div>`;
+    return;
+  }
+  document.getElementById('possBody').innerHTML = halfBtns + FS.pathsKey() +
+    `<div class="field-sec">Paths — where each set went</div>
+     <div class="pp-teams">${keys.map(key => `<div data-team="${key}">
+        <div class="pp-team-name" style="color:${FIELD_COLORS[key]}">${escapeHtml(names[key])}</div>
+        ${FS.pathsSVG(mine(key), FIELD_COLORS[key], possPick[key])}
+        <div class="pp-read">${readout(key)}</div></div>`).join('')}</div>
+     <div class="field-sec">Metres gained on each touch</div>
+     <div class="pp-legend">${keys.map(k => `<span style="color:${FIELD_COLORS[k]}">■ ${escapeHtml(names[k])}</span>`).join('')}</div>
+     <div class="pp-gain">${FS.gainChartSVG(keys.map(k => ({ name: names[k], color: FIELD_COLORS[k], sets: mine(k) })))}</div>
+     <div class="cnote" style="text-align:center">bar = average metres from one touch to the next · dots = every set · under each: average sideways drift</div>
+     <div class="field-sec">Every set, in order</div>
+     <div class="pp-teams">${keys.map(key => `<div data-team="${key}">
+        <div class="pp-team-name" style="color:${FIELD_COLORS[key]}">${escapeHtml(names[key])}</div>
+        ${FS.setColumnsSVG(mine(key), FIELD_COLORS[key], possPick[key])}</div>`).join('')}</div>
+     <div class="cnote" style="text-align:center">bottom = where the set started · one segment per touch, later = darker · red = ground lost · marker on top = how it ended</div>`;
+}
+
+// Clicks on an ending (A) or a column (C) pick that set.
+document.addEventListener('click', ev => {
+  if (!possOpen()) return;
+  const hit = ev.target.closest('#possBody .pp-end, #possBody .pp-col');
+  if (!hit) return;
+  const team = hit.closest('[data-team]');
+  if (team) pickPossSet(team.dataset.team, +hit.dataset.set);
+});
+
+// ← / → step through the focused team's sets while the panel is open.
+document.addEventListener('keydown', ev => {
+  if (!possOpen() || (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight')) return;
+  if (ev.target && /^(INPUT|SELECT|TEXTAREA)$/.test(ev.target.tagName)) return;
+  const key = possFocus || (possPick['Team 1'] != null ? 'Team 1' : possPick['Team 2'] != null ? 'Team 2' : 'Team 1');
+  ev.preventDefault();
+  stepPossSet(key, ev.key === 'ArrowRight' ? 1 : -1);
+});
+
+function exportPossessions() {
+  const card = document.getElementById('possCard');
+  const half = possHalf === 'all' ? 'possessions' : `possessions-${ordinal(possHalf + 1)}-half`;
+  return exportJPG({
+    target: card, name: half,
+    relax: [[card, 'maxHeight', 'none'], [document.getElementById('possBody'), 'overflowY', 'visible']],
+    hide:  [document.getElementById('exportPossBtn'), card.querySelector('.compare-close'), ...card.querySelectorAll('.pp-nav button')],
+    button: document.getElementById('exportPossBtn'),
+  });
+}
+
 // ── Compare Halves Modal ────────────────────────────────────────
 function openCompareModal() {
   if (!currentGame) return;
@@ -1769,7 +1961,7 @@ function exportGamePage() {
 }
 
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { closeCompareModal(); closeTurnoverModal(); closeFieldModal(); }
+  if (e.key === 'Escape') { closeCompareModal(); closeTurnoverModal(); closeFieldModal(); closePossModal(); }
 });
 
 function buildPeriodMetrics() {

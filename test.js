@@ -1740,6 +1740,62 @@ console.log('TR.FieldStats');
   });
 }
 
+console.log('TR.FieldStats possession paths');
+{
+  const FS = TR.FieldStats;
+  const ev = (type, name, owner, x, y) => ({ type, name, possessionOwner: owner, actionOwner: owner, x: x ?? null, y: y ?? null });
+  const game = [
+    ev('Game Event', 'Game Start', 'Team 1'),
+    ev('Touch', 'Touch 1', 'Team 1', 50, 30), ev('Touch', 'Touch 2', 'Team 1', 40, 50),
+    ev('Turnover', 'Ball Down', 'Team 1', 30, 60),                     // lost at 30,60
+    ev('Turnover', 'Other', 'Team 2', 70, 45),                          // straight back, no touch
+    ev('Try', '33 - Cut', 'Team 1', 20, 100),                           // try from the turnover
+    ev('Touch', 'Touch 1', 'Team 2', 55, 60), ev('Penalty Defence', 'Offside', 'Team 2', 55, 65),
+    ev('Touch', 'Touch 1', 'Team 2', 50, 75), ev('Turnover', '6th Touch', 'Team 2', 45, 90),
+    ev('Game Event', 'Game End', 'Team 1'),
+  ];
+  const sets = FS.possessionPaths(game);
+  test('one path per possession', () => assert.deepEqual([...sets.map(s => s.owner)], ['Team 1', 'Team 2', 'Team 1', 'Team 2']));
+  test('kick-off starts on halfway', () => assert.deepEqual({ ...sets[0].steps[0] }, { k: 'start', how: 'tap', x: 50, y: 50 }));
+  test('a turnover hands over on the spot, seen from the other end', () =>
+    assert.deepEqual({ ...sets[1].steps[0] }, { k: 'start', how: 'won', x: 70, y: 40 }));
+  test('a try straight from a turnover still has a path', () => {
+    const s = sets[2];
+    assert.equal(s.outcome, 'Try');
+    assert.deepEqual([...s.steps.map(p => p.k)], ['start', 'end']);
+    assert.deepEqual([s.steps[0].x, s.steps[0].y], [30, 55]);           // mirror of 70,45
+  });
+  test('after a try the next set taps off on halfway', () => assert.equal(sets[3].steps[0].how, 'tap'));
+  test('a defensive penalty keeps the set going', () => {
+    const s = sets[3];
+    assert.equal(s.outcome, '6th Touch');
+    assert.deepEqual([...s.steps.map(p => p.k)], ['start', 1, 'pen', 1, 'end']);
+    assert.equal(FS.pathGains(s).map(g => g.label).join(' '), 'start→T1 T1→Pen Pen→T1 T1→end');
+  });
+  test('metres per step', () =>
+    assert.equal(JSON.stringify(FS.pathGains(sets[0]).map(g => [g.label, Math.round(g.m)])), JSON.stringify([['start→T1', -14], ['T1→T2', 14], ['T2→end', 7]])));
+  test('gain buckets only join consecutive touches', () => {
+    const b = FS.gainBuckets(sets);
+    assert.equal(b[0].label, '→T1'); assert.equal(b[0].n, 3);          // three sets reached a touch 1
+    assert.equal(b[1].n, 1); assert.equal(Math.round(b[1].mean), 14);  // T1→T2 once
+  });
+  test('the typical set needs 3 sets at a touch', () => {
+    assert.equal(FS.typicalSet(sets).length, 0);                       // only 2 sets reached touch 1
+    const three = FS.possessionPaths([...game, ev('Game Event', 'Game Start', 'Team 1'), ev('Touch', 'Touch 1', 'Team 1', 50, 40), ev('Try', 'Other', 'Team 1', 50, 100)]);
+    assert.deepEqual([...FS.typicalSet(three).map(p => p.k)], [1]);
+  });
+  test('a picked set reads back', () => {
+    const d = FS.describeSet(sets[2], 2, sets.length);
+    assert.equal(d.title, 'Try · 33 - Cut');
+    assert.match(d.summary, /won at 39m to 70m, \+31m straight from the turnover, no touch/);
+  });
+  test('drawing returns markup with clickable sets', () => {
+    assert.match(FS.pathsSVG(sets.filter(s => s.owner === 'Team 1'), '#3b82f6', 1), /data-set="1"/);
+    assert.match(FS.setColumnsSVG(sets, '#3b82f6', null), /pp-col/);
+    assert.match(FS.gainChartSVG([{ name: 'A', color: '#3b82f6', sets }]), /<rect/);
+  });
+}
+
 // ── Server copy of the strike-move rule ───────────────────────
 // Code.gs can't load js/events.js, so it carries its own deriveStrikeMove for
 // the inline-edit path. It drifted once — 6 Again, Penalty Defence and tagged

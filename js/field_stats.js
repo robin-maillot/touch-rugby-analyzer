@@ -257,9 +257,244 @@ TR.FieldStats = (() => {
       `<span><i style="background:${i.color}${i.opacity ? ';opacity:' + i.opacity : ''}"></i>${i.label}</span>`).join('') + `</div>`;
   }
 
+  // ══════════════════════════════════════════════════════════════
+  // Possessions as paths — where each set started, every touch it went
+  // through, and how it ended. Used by Game Analysis's Possessions panel.
+  // ══════════════════════════════════════════════════════════════
+
+  // Where the next set starts after each kind of ending. A turnover, a 6th
+  // touch or a penalty hands the ball over on the spot, so the new set starts
+  // there — seen from the other end, hence the mirror. After a try (and at
+  // kick-off) play restarts with a tap on halfway.
+  const handsOverOnTheSpot = e => e.type === 'Turnover' || e.type === 'Penalty Attack';
+
+  // One path per possession, in order: { owner, half, steps, end, outcome }.
+  // steps[] is { k, x, y, type, name } where k is 'start' (where the ball was
+  // won or tapped), a touch number, or 'end'; a set with nothing positioned
+  // is left out.
+  function possessionPaths(events) {
+    const sets = [];
+    let cur = null, half = 0, last = null;     // last: the set that just ended
+    for (const a of events) {
+      if (a.type === 'To Review') continue;
+      if (a.type === 'Game Event') {
+        if (a.name === 'Game Start') { half++; cur = null; last = { restart: true }; }
+        else if (a.name === 'Game End') { cur = null; last = null; }
+        continue;
+      }
+      if (!cur || cur.owner !== a.possessionOwner) {
+        cur = { owner: a.possessionOwner, half: half || 1, steps: [], end: null };
+        if (last && last.restart) {
+          cur.steps.push({ k: 'start', how: 'tap', x: 50, y: 50 });
+        } else if (last && last.end && handsOverOnTheSpot(last.end) && last.lastPt) {
+          cur.steps.push({ k: 'start', how: 'won', x: 100 - last.lastPt.x, y: 100 - last.lastPt.y });
+        }
+        sets.push(cur);
+      }
+      if (a.x != null) {
+        const n = a.type === 'Touch' ? parseInt(String(a.name).replace(/\D+/g, ''), 10) : NaN;
+        cur.steps.push({ k: a.type === 'Touch' && n ? n : 'end', type: a.type, name: a.name, x: a.x, y: a.y });
+        cur.lastPt = { x: a.x, y: a.y };
+      }
+      cur.end = { type: a.type, name: a.name };
+      // A defensive penalty or a 6 Again keeps the ball with the same team, so
+      // the set carries on; anything else that changes hands closes it.
+      last = a.type === 'Try' ? { restart: true } : cur;
+    }
+    // Only the last step ends the set. A positioned event before it — a
+    // defensive penalty, a 6 Again — was the set carrying on with a fresh
+    // count, so it's named for what it was rather than read as an ending.
+    sets.forEach(s => s.steps.forEach((p, i) => {
+      if (p.k === 'end' && i < s.steps.length - 1) p.k = p.type === 'Penalty Defence' ? 'pen' : p.name === '6 Again' ? 'again' : 'event';
+    }));
+    return sets
+      .filter(s => s.steps.some(p => p.k !== 'start'))
+      .map(s => Object.assign(s, { outcome: outcomeOf({ endType: s.end.type, endName: s.end.name }) || 'Other' }));
+  }
+
+  // Metres gained on each step of a set, in order: [{ from, to, label, m }].
+  function pathGains(set) {
+    const lab = k => typeof k === 'number' ? 'T' + k : ({ start: 'start', end: 'end', pen: 'Pen', again: '6A', event: '·' })[k] || k;
+    return set.steps.slice(1).map((p, i) => {
+      const q = set.steps[i];
+      return { from: q.k, to: p.k, label: `${lab(q.k)}→${lab(p.k)}`, m: (p.y - q.y) * Y_TO_M, dx: (p.x - q.x) * 0.5 };
+    });
+  }
+
+  // The steps B compares across sets: into touch 1 from wherever the set
+  // started, touch to touch up to 5, and from the last touch to the end.
+  const GAIN_BUCKETS = ['→T1', 'T1→T2', 'T2→T3', 'T3→T4', 'T4→T5', 'T5→end'];
+  function gainBuckets(sets) {
+    const out = GAIN_BUCKETS.map(label => ({ label, m: [], dx: [] }));
+    sets.forEach(s => pathGains(s).forEach(g => {
+      let i = -1;
+      if (typeof g.to === 'number' && g.to >= 1 && g.to <= 5) i = g.from === 'start' || g.to === 1 ? 0 : g.to - 1;
+      else if (g.to === 'end' && typeof g.from === 'number' && g.from >= 5) i = 5;
+      if (i < 0) return;
+      // Only consecutive touches count, so a 6 Again restart can't read as T4→T1.
+      if (i > 0 && i < 5 && g.from !== g.to - 1) return;
+      out[i].m.push(g.m); out[i].dx.push(g.dx);
+    }));
+    return out.map(b => ({ label: b.label, n: b.m.length, mean: mean(b.m), drift: mean(b.dx), values: b.m }));
+  }
+
+  // The typical set: the average position of each touch, 1 to 5, over the sets
+  // that reached it (at least 3, or the average would be one set's position).
+  function typicalSet(sets) {
+    return [1, 2, 3, 4, 5].map(n => {
+      const pts = sets.map(s => s.steps.find(p => p.k === n)).filter(Boolean);
+      return pts.length >= 3 ? { k: n, x: mean(pts.map(p => p.x)), y: mean(pts.map(p => p.y)), n: pts.length } : null;
+    }).filter(Boolean);
+  }
+
+  // ── Drawing ────────────────────────────────────────────────────
+  const OUTCOME_STYLE = {
+    'Try':       { color: '#22c55e', label: 'Try' },
+    'Turnover':  { color: '#f97316', label: 'Ball lost' },
+    '6th Touch': { color: '#93c5fd', label: '6th touch' },
+    'Penalty':   { color: '#ef4444', label: 'Penalty' },
+    'Other':     { color: '#9ba6b9', label: 'Ended' },
+  };
+  function endMarker(outcome, x, y, r) {
+    const c = (OUTCOME_STYLE[outcome] || OUTCOME_STYLE.Other).color;
+    if (outcome === 'Try')       return `<circle cx="${x}" cy="${y}" r="${r + 0.6}" fill="${c}"/>`;
+    if (outcome === 'Turnover')  return `<path d="M${x - r} ${y - r}L${x + r} ${y + r}M${x + r} ${y - r}L${x - r} ${y + r}" stroke="${c}" stroke-width="1.4"/>`;
+    if (outcome === '6th Touch') return `<path d="M${x} ${y - r}L${x + r} ${y + r}L${x - r} ${y + r}Z" fill="${c}"/>`;
+    if (outcome === 'Penalty')   return `<rect x="${x - r * 0.8}" y="${y - r * 0.8}" width="${r * 1.6}" height="${r * 1.6}" fill="${c}"/>`;
+    return `<circle cx="${x}" cy="${y}" r="${r * 0.7}" fill="${c}"/>`;
+  }
+  const pitchBase = vy => `<rect x="0" y="0" width="100" height="${MAP_LEN}" rx="1.5" fill="#12301f" stroke="rgba(255,255,255,0.14)"/>
+    <line x1="0" y1="${vy(100)}" x2="100" y2="${vy(100)}" stroke="rgba(255,255,255,0.6)" stroke-width="1.4"/>
+    <line x1="0" y1="${vy(50)}"  x2="100" y2="${vy(50)}"  stroke="rgba(255,255,255,0.22)" stroke-dasharray="3 3"/>
+    <line x1="0" y1="${vy(RED_ZONE)}" x2="100" y2="${vy(RED_ZONE)}" stroke="rgba(255,255,255,0.14)" stroke-dasharray="2 3"/>`;
+
+  // A metres label beside a step, pushed off the line along its normal so it
+  // never sits on the touch numbers at either end.
+  function gainLabel(a, b, m, vy) {
+    const ax = a.x, ay = vy(a.y), bx = b.x, by = vy(b.y);
+    const dx = bx - ax, dy = by - ay, len = Math.hypot(dx, dy) || 1;
+    let nx = -dy / len, ny = dx / len;
+    const mx = (ax + bx) / 2, my = (ay + by) / 2;
+    if ((mx + nx) > 50 === mx > 50) { nx = -nx; ny = -ny; }     // lean towards the middle of the pitch
+    const off = len < 10 ? 9 : 7;
+    return `<text x="${(mx + nx * off).toFixed(1)}" y="${(my + ny * off + 1.7).toFixed(1)}" text-anchor="middle" font-size="5" font-weight="800"
+      fill="${m >= 0 ? '#bbf7d0' : '#fecaca'}" stroke="#0b1a12" stroke-width="1.8" paint-order="stroke">${m >= 0 ? '+' : ''}${m.toFixed(0)}m</text>`;
+  }
+  const node = (p, color, label) => `<circle cx="${p.x}" cy="${p.vy}" r="3.4" fill="${color}" stroke="#fff" stroke-width="0.8"/>` +
+    `<text x="${p.x}" y="${p.vy + 1.6}" text-anchor="middle" font-size="4.3" font-weight="800" fill="#fff">${label}</text>`;
+
+  // A — every set faint, ◯ where it started, its ending as a marker that can be
+  // clicked (data-set = its index). With `pick`, that set is drawn on top with
+  // numbered touches and its metres; without, the typical set is.
+  function pathsSVG(sets, color, pick) {
+    const vy = y => (100 - y) / 100 * MAP_LEN;
+    const d  = s => s.steps.map((p, i) => `${i ? 'L' : 'M'}${p.x} ${vy(p.y)}`).join(' ');
+    const picked = pick != null ? sets[pick] : null;
+    let g = pitchBase(vy);
+    sets.forEach((s, i) => {
+      const dim = picked && i !== pick, a = s.steps[0];
+      g += `<g opacity="${dim ? 0.3 : 1}"><path d="${d(s)}" fill="none" stroke="${color}" stroke-width="0.8" stroke-opacity="${picked ? 0.14 : 0.22}" stroke-linejoin="round"/>` +
+           `<circle cx="${a.x}" cy="${vy(a.y)}" r="1.5" fill="none" stroke="#fff" stroke-opacity="0.5" stroke-width="0.6"/></g>`;
+    });
+    const hero = picked ? picked.steps : typicalSet(sets);
+    if (hero.length > 1 || picked) {
+      const hd = hero.map((p, i) => `${i ? 'L' : 'M'}${p.x} ${vy(p.y)}`).join(' ');
+      g += `<path d="${hd}" fill="none" stroke="#fff" stroke-width="2.8" stroke-opacity="0.95" stroke-linejoin="round"/>` +
+           `<path d="${hd}" fill="none" stroke="${color}" stroke-width="1.7" stroke-linejoin="round"${picked ? '' : ' stroke-dasharray="5 2"'}/>`;
+      hero.forEach((p, i) => { if (i) g += gainLabel(hero[i - 1], p, (p.y - hero[i - 1].y) * Y_TO_M, vy); });
+      hero.forEach(p => {
+        if (p.k === 'pen' || p.k === 'again') g += node({ x: p.x, vy: vy(p.y) }, '#475569', p.k === 'pen' ? 'P' : '6A');
+        if (typeof p.k === 'number') g += node({ x: p.x, vy: vy(p.y) }, color, p.k);
+        else if (p.k === 'start') g += `<circle cx="${p.x}" cy="${vy(p.y)}" r="2.6" fill="#0b1a12" stroke="#fff" stroke-width="1"/>`;
+      });
+    }
+    sets.forEach((s, i) => {
+      const z = s.steps[s.steps.length - 1], dim = picked && i !== pick;
+      g += `<g class="pp-end" data-set="${i}" style="cursor:pointer" opacity="${dim ? 0.4 : 1}">` +
+           `<circle cx="${z.x}" cy="${vy(z.y)}" r="5.5" fill="transparent"/>${endMarker(s.outcome, z.x, vy(z.y), i === pick ? 3.4 : 2.4)}</g>`;
+    });
+    return `<svg viewBox="-4 -4 108 ${MAP_LEN + 8}" preserveAspectRatio="xMidYMid meet" class="pp-pitch">${g}</svg>`;
+  }
+
+  // B — average metres gained on each step, one bar per team, every set as a dot.
+  function gainChartSVG(teams) {
+    const W = 470, H = 172, L = 34, R = 8, T = 16, B = 36, lo = -15, hi = 35;
+    const gw = (W - L - R) / GAIN_BUCKETS.length;
+    const yOf = v => T + (H - T - B) * (1 - (Math.max(lo, Math.min(hi, v)) - lo) / (hi - lo));
+    let g = [-10, 0, 10, 20, 30].map(v =>
+      `<line x1="${L}" y1="${yOf(v)}" x2="${W - R}" y2="${yOf(v)}" stroke="rgba(255,255,255,${v === 0 ? 0.35 : 0.08})"/>` +
+      `<text x="${L - 5}" y="${yOf(v) + 3}" text-anchor="end" font-size="8" fill="#6c7689">${v}m</text>`).join('');
+    teams.forEach((t, ti) => {
+      gainBuckets(t.sets).forEach((b, i) => {
+        if (!b.n) return;
+        const bw = gw * 0.3, x0 = L + gw * i + gw * 0.5 + (ti ? bw * 0.15 : -bw * 1.15);
+        g += `<g><title>${t.name} — ${b.label}: ${b.mean >= 0 ? '+' : ''}${b.mean.toFixed(1)}m on average over ${b.n} set${b.n === 1 ? '' : 's'}</title>` +
+             `<rect x="${x0}" y="${Math.min(yOf(b.mean), yOf(0))}" width="${bw}" height="${Math.abs(yOf(b.mean) - yOf(0))}" rx="2" fill="${t.color}" fill-opacity="0.85"/></g>`;
+        b.values.forEach((v, k) => { g += `<circle cx="${x0 + bw / 2 + ((k * 37) % 9 - 4) * 1.1}" cy="${yOf(v)}" r="1.4" fill="#fff" fill-opacity="0.45"/>`; });
+        g += `<text x="${x0 + bw / 2}" y="${yOf(Math.max(b.mean, 0)) - 4}" text-anchor="middle" font-size="8" font-weight="800" fill="${t.color}">${b.mean >= 0 ? '+' : ''}${b.mean.toFixed(0)}</text>`;
+        const arrow = Math.abs(b.drift) < 1.5 ? '↑' : b.drift < 0 ? '↖' : '↗';
+        g += `<text x="${x0 + bw / 2}" y="${H - B + 26}" text-anchor="middle" font-size="7" fill="${t.color}" fill-opacity="0.85">${arrow}${Math.abs(b.drift).toFixed(0)}m</text>`;
+      });
+    });
+    GAIN_BUCKETS.forEach((lab, i) => { g += `<text x="${L + gw * i + gw / 2}" y="${H - B + 13}" text-anchor="middle" font-size="8.5" font-weight="700" fill="#9ba6b9">${lab}</text>`; });
+    return `<svg viewBox="0 0 ${W} ${H}" class="pp-chart" role="img" aria-label="Average metres gained on each touch">${g}</svg>`;
+  }
+
+  // C — every set as a column, in order: from where it started up to its
+  // furthest point, one segment per step (later = darker), red for ground
+  // lost, the ending on top. Columns are clickable (data-set).
+  function setColumnsSVG(sets, color, pick) {
+    const W = 330, H = 122, L = 26, R = 6, T = 12, B = 6;
+    const step = (W - L - R) / Math.max(1, sets.length), bw = Math.max(3, Math.min(9, step - 2));
+    const yOf = m => T + (H - T - B) * (1 - Math.max(0, Math.min(70, m)) / 70);
+    let g = [[0, '0'], [35, '35m'], [70, '70m']].map(([m, l]) =>
+      `<line x1="${L}" y1="${yOf(m)}" x2="${W - R}" y2="${yOf(m)}" stroke="rgba(255,255,255,0.1)"/>` +
+      `<text x="${L - 4}" y="${yOf(m) + 3}" text-anchor="end" font-size="7.5" fill="#6c7689">${l}</text>`).join('') +
+      `<line x1="${L}" y1="${yOf(60)}" x2="${W - R}" y2="${yOf(60)}" stroke="rgba(255,255,255,0.18)" stroke-dasharray="3 3"/>`;
+    sets.forEach((s, i) => {
+      const x = L + step * i + (step - bw) / 2, dim = pick != null && i !== pick;
+      let col = '';
+      for (let k = 1; k < s.steps.length; k++) {
+        const a = s.steps[k - 1].y * Y_TO_M, b = s.steps[k].y * Y_TO_M;
+        const top = Math.min(yOf(a), yOf(b)), h = Math.max(1.2, Math.abs(yOf(b) - yOf(a)));
+        const op = [0.32, 0.45, 0.58, 0.72, 0.86, 1][Math.min(5, k - 1)];
+        col += `<rect x="${x}" y="${top}" width="${bw}" height="${h}" fill="${b >= a ? color : '#ef4444'}" fill-opacity="${b >= a ? op : 0.85}" stroke="#0b0e14" stroke-width="0.6"/>`;
+      }
+      const topY = Math.min(...s.steps.map(p => yOf(p.y * Y_TO_M)));
+      g += `<g class="pp-col" data-set="${i}" style="cursor:pointer" opacity="${dim ? 0.35 : 1}">` +
+           `<rect x="${x - 1}" y="${T - 8}" width="${bw + 2}" height="${H - T + 2}" fill="transparent"/>` +
+           (i === pick ? `<rect x="${x - 1.5}" y="${topY - 9}" width="${bw + 3}" height="${yOf(0) - topY + 10}" rx="2" fill="none" stroke="#fff" stroke-opacity="0.7"/>` : '') +
+           col + endMarker(s.outcome, x + bw / 2, topY - 5, 2.3) + `</g>`;
+    });
+    return `<svg viewBox="0 0 ${W} ${H}" class="pp-chart" role="img" aria-label="Every set as a column, in order">${g}</svg>`;
+  }
+
+  // The one-line read-out of a picked set.
+  function describeSet(s, i, total) {
+    const st = OUTCOME_STYLE[s.outcome] || OUTCOME_STYLE.Other;
+    const a = s.steps[0], z = s.steps[s.steps.length - 1];
+    const touches = s.steps.filter(p => typeof p.k === 'number').length;
+    const start = a.k === 'start' ? (a.how === 'tap' ? 'from the tap on halfway' : `won at ${(a.y * Y_TO_M).toFixed(0)}m`) : `from ${(a.y * Y_TO_M).toFixed(0)}m`;
+    const gain = (z.y - a.y) * Y_TO_M;
+    const move = s.end.type === 'Try' && s.end.name && s.end.name !== 'Other' ? ` · ${s.end.name}` : '';
+    const how = touches ? `over ${touches} touch${touches === 1 ? '' : 'es'}` : 'straight from the turnover, no touch';
+    return {
+      title: `${st.label}${move}`, color: st.color,
+      summary: `Set ${i + 1} of ${total}: ${start} to ${(z.y * Y_TO_M).toFixed(0)}m, ${gain >= 0 ? '+' : ''}${gain.toFixed(0)}m ${how}`,
+      steps: pathGains(s).map(g => `${g.label} ${g.m >= 0 ? '+' : ''}${g.m.toFixed(0)}m`),
+    };
+  }
+
+  const pathsKey = () => `<div class="pp-key">` +
+    ['Try', 'Turnover', '6th Touch', 'Penalty'].map(o =>
+      `<span><svg viewBox="-4 -4 8 8" width="10" height="10">${endMarker(o, 0, 0, 2.6)}</svg>${OUTCOME_STYLE[o].label}</span>`).join('') +
+    `<span><svg viewBox="-4 -4 8 8" width="10" height="10"><circle r="2.2" fill="none" stroke="#fff" stroke-opacity="0.7" stroke-width="0.8"/></svg>where it started</span></div>`;
+
   return {
     Y_TO_M, RED_ZONE, MAP_LEN, OUTCOMES, mean,
     possessionSets, computeFieldStats, outcomeOf,
     fieldMapSVG, fieldMapKey, outcomeBar, channelBar, territorySVG, chartLegend,
+    possessionPaths, pathGains, gainBuckets, typicalSet, GAIN_BUCKETS, OUTCOME_STYLE,
+    pathsSVG, gainChartSVG, setColumnsSVG, describeSet, pathsKey,
   };
 })();
