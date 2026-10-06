@@ -490,8 +490,56 @@ TR.FieldStats = (() => {
       `<span><svg viewBox="-4 -4 8 8" width="10" height="10">${endMarker(o, 0, 0, 2.6)}</svg>${OUTCOME_STYLE[o].label}</span>`).join('') +
     `<span><svg viewBox="-4 -4 8 8" width="10" height="10"><circle r="2.2" fill="none" stroke="#fff" stroke-opacity="0.7" stroke-width="0.8"/></svg>where it started</span></div>`;
 
+  // ── Tries by side and channel ─────────────────────────────────
+  // From the side:/ch: tags on each try (events carry them as `tags`, parsed
+  // from the Detail column). Untagged tries are counted, not dropped, so the
+  // shares are read against how many tries were actually tagged.
+  const SIDES    = ['open', 'blind'];
+  const CHANNELS = ['MM', 'ML', 'LW', 'W+'];
+
+  function tryTagStats(events) {
+    const forTeam = key => {
+      const tries = events.filter(a => a.type === 'Try' && a.actionOwner === key);
+      const side = Object.fromEntries(SIDES.map(k => [k, 0]));
+      const ch   = Object.fromEntries(CHANNELS.map(k => [k, 0]));
+      let sideTagged = 0, chTagged = 0;
+      tries.forEach(a => {
+        const t = a.tags || {};
+        if (side[t.side] != null) { side[t.side]++; sideTagged++; }
+        if (ch[t.ch]     != null) { ch[t.ch]++;     chTagged++; }
+      });
+      return { tries: tries.length, side, ch, sideTagged, chTagged };
+    };
+    return { t1: forTeam('Team 1'), t2: forTeam('Team 2') };
+  }
+
+  // One team's tagged tries as a single-hue bar: the parts are one team's
+  // whole, so they share its colour and are told apart by shade, gap and a
+  // direct label — the same treatment as the channel bar above.
+  function tagBar(counts, order, name, color, labels) {
+    const total = order.reduce((n, k) => n + counts[k], 0);
+    if (!total) return `<div class="cfig-row"><div class="cfig-name"><i style="background:${color}"></i>${name}</div>` +
+                       `<div class="cbar cbar-empty">no tries tagged</div><div class="cfig-val">0</div></div>`;
+    const shades = order.length === 2 ? [1, 0.55] : [1, 0.8, 0.6, 0.42];
+    const segs = order.filter(k => counts[k]).map(k => {
+      const i = order.indexOf(k), pct = counts[k] / total * 100, lab = (labels && labels[k]) || k;
+      return `<div class="cseg" style="width:${pct}%;background:${color};opacity:${shades[i]}"
+                title="${name} — ${counts[k]} of ${total} tagged tries ${lab}">${pct >= 16 ? `${lab} ${counts[k]}` : counts[k]}</div>`;
+    }).join('');
+    return `<div class="cfig-row">
+      <div class="cfig-name"><i style="background:${color}"></i>${name}</div>
+      <div class="cbar">${segs}</div>
+      <div class="cfig-val">${total}</div>
+    </div>`;
+  }
+
+  const SIDE_LABELS = { open: 'Open', blind: 'Blind' };
+  const sideBar    = (stat, name, color) => tagBar(stat.side, SIDES, name, color, SIDE_LABELS);
+  const channelTagBar = (stat, name, color) => tagBar(stat.ch, CHANNELS, name, color);
+
   return {
     Y_TO_M, RED_ZONE, MAP_LEN, OUTCOMES, mean,
+    tryTagStats, sideBar, channelTagBar, SIDES, CHANNELS,
     possessionSets, computeFieldStats, outcomeOf,
     fieldMapSVG, fieldMapKey, outcomeBar, channelBar, territorySVG, chartLegend,
     possessionPaths, pathGains, gainBuckets, typicalSet, GAIN_BUCKETS, OUTCOME_STYLE,

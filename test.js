@@ -1796,6 +1796,31 @@ console.log('TR.FieldStats possession paths');
   });
 }
 
+console.log('TR.FieldStats tries by side and channel');
+{
+  const FS = TR.FieldStats;
+  const tr = (owner, tags) => ({ type: 'Try', name: 'Other', possessionOwner: owner, actionOwner: owner, x: 50, y: 100, tags });
+  const evs = [
+    tr('Team 1', { side: 'open', ch: 'ML' }), tr('Team 1', { side: 'blind' }), tr('Team 1', {}),
+    tr('Team 2', { ch: 'W+' }), tr('Team 2', { side: 'open', ch: 'W+' }), tr('Team 2', { side: 'sideways', ch: 'XX' }),
+    { type: 'Touch', name: 'Touch 1', possessionOwner: 'Team 1', actionOwner: 'Team 1', x: 1, y: 1, tags: { side: 'open' } },
+  ];
+  const { t1, t2 } = FS.tryTagStats(evs);
+  test('counts each tag per team, only on tries', () => {
+    assert.equal(t1.tries, 3); assert.equal(t1.side.open, 1); assert.equal(t1.side.blind, 1); assert.equal(t1.ch.ML, 1);
+    assert.equal(t2.ch['W+'], 2); assert.equal(t2.side.open, 1);
+  });
+  test('untagged and unknown values are counted as untagged, not dropped', () => {
+    assert.equal(t1.sideTagged, 2); assert.equal(t1.chTagged, 1);
+    assert.equal(t2.tries, 3); assert.equal(t2.sideTagged, 1); assert.equal(t2.chTagged, 2);
+  });
+  test('bars label their parts, and say so when nothing was tagged', () => {
+    assert.match(FS.sideBar(t1, 'A', '#3b82f6'), /Open 1/);
+    assert.match(FS.channelTagBar(t2, 'B', '#f59e0b'), /W\+ 2/);
+    assert.match(FS.channelTagBar({ ch: { MM: 0, ML: 0, LW: 0, 'W+': 0 } }, 'C', '#000'), /no tries tagged/);
+  });
+}
+
 // ── Server copy of the strike-move rule ───────────────────────
 // Code.gs can't load js/events.js, so it carries its own deriveStrikeMove for
 // the inline-edit path. It drifted once — 6 Again, Penalty Defence and tagged

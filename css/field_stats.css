@@ -51,6 +51,7 @@
   text-shadow: 0 1px 2px rgba(0,0,0,0.45);
   overflow: hidden;
 }
+.cbar-empty { align-items: center; font-size: 0.62rem; color: var(--text-dim); padding-left: 4px; }
 .cleg {
   display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 2px 16px 6px;
   font-size: 0.64rem; color: var(--text-muted);
