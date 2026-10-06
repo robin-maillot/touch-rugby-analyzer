@@ -219,6 +219,13 @@ function parseHMS(str) {
   return neg ? -s : s;
 }
 
+// Seconds → "h:mm:ss", signed, the same shape the sheet's Time column uses.
+function fmtHMS(secs) {
+  const neg = secs < 0, t = Math.round(Math.abs(secs));
+  const h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), sec = t % 60;
+  return (neg ? '-' : '') + h + ':' + String(m).padStart(2, '0') + ':' + String(sec).padStart(2, '0');
+}
+
 async function loadFirstTime(btn, sheetName) {
   btn.disabled    = true;
   btn.textContent = '⏳';
@@ -231,10 +238,18 @@ async function loadFirstTime(btn, sheetName) {
     if (!rows || rows.length < 2) throw new Error('No events found');
     const timeIdx = rows[0].map(h => h.toLowerCase().trim()).indexOf('time');
     if (timeIdx < 0) throw new Error('No Time column found in sheet');
-    const timeStr = rows[1][timeIdx];
+    // The sheet keeps event times as they were tagged; the alignment lives in
+    // the game's Video Offset (videoTime = gameTime + offset). So the box shows
+    // the first event WITH the saved offset — the time last set here — and
+    // keeps the raw time to measure a new offset from. Showing the raw time
+    // made every saved offset look like it hadn't stuck.
+    const rawStr  = rows[1][timeIdx];
+    const rawSecs = parseHMS(rawStr);
+    const offset  = Number(result.meta && result.meta.videoOffset) || 0;
     const input = card.querySelector('.first-time-input');
-    input.value = timeStr;
-    input.dataset.original = timeStr;
+    input.value = isNaN(rawSecs) ? rawStr : fmtHMS(rawSecs + offset);
+    input.dataset.raw   = rawStr;
+    input.dataset.shown = input.value;
     btn.textContent = '✓ Loaded';
     btn.classList.add('loaded');
   } catch (err) {
@@ -263,20 +278,24 @@ async function submitYoutube(btn, sheetName) {
 
   const firstTimeInput = card.querySelector('.first-time-input');
   const newTimeStr  = firstTimeInput?.value.trim();
-  const origTimeStr = firstTimeInput?.dataset.original;
+  const rawTimeStr  = firstTimeInput?.dataset.raw;     // as stored in the sheet
+  const shownStr    = firstTimeInput?.dataset.shown;   // raw + the saved offset
   // offsetSeconds is only SENT when the user actually retimes the first event —
   // otherwise a plain URL update would clobber an existing offset. It may be
   // negative (video that starts after kickoff: set the first event to e.g. -15:00).
   let offsetSeconds;
-  if (newTimeStr && !origTimeStr) {
+  if (newTimeStr && !rawTimeStr) {
     alert('Press "Load time" first so the current first-event time is known, then edit it to set the offset.');
     return;
   }
-  if (newTimeStr && origTimeStr && newTimeStr !== origTimeStr) {
-    const newSecs  = parseHMS(newTimeStr);
-    const origSecs = parseHMS(origTimeStr);
-    if (isNaN(newSecs) || isNaN(origSecs)) { alert(`Invalid time format "${newTimeStr}" — use h:mm:ss or m:ss (leading - allowed).`); return; }
-    offsetSeconds = newSecs - origSecs;
+  // Unchanged from what was loaded → leave the saved offset alone. Changed →
+  // the offset is measured from the RAW time, so it replaces the old one
+  // rather than stacking on top of it.
+  if (newTimeStr && rawTimeStr && newTimeStr !== shownStr) {
+    const newSecs = parseHMS(newTimeStr);
+    const rawSecs = parseHMS(rawTimeStr);
+    if (isNaN(newSecs) || isNaN(rawSecs)) { alert(`Invalid time format "${newTimeStr}" — use h:mm:ss or m:ss (leading - allowed).`); return; }
+    offsetSeconds = newSecs - rawSecs;
   }
 
   btn.disabled = true;
@@ -292,6 +311,7 @@ async function submitYoutube(btn, sheetName) {
     });
     const result = await resp.json();
     if (!result.ok) throw new Error(result.error);
+    if (offsetSeconds != null && firstTimeInput) firstTimeInput.dataset.shown = newTimeStr;
     flashSuccess(btn, 'Update YT');
   } catch (err) {
     flashError(btn, 'Save YT', err.message);
