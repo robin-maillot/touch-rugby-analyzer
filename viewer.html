@@ -307,6 +307,13 @@
   .edit-select.dirty, .edit-input.dirty { border-color: #f97316; }
   .cell-move { display: block; font-size: 0.68rem; color: #7dd3fc; margin-top: 2px; }
   .edit-move { display: block; margin-top: 3px; font-size: 0.72rem; }
+  .edit-tags { display: flex; gap: 4px; margin-top: 3px; }
+  .edit-tags .edit-tag { font-size: 0.72rem; flex: 1 1 0; min-width: 64px; }
+  /* In edit mode the Name cell holds the name, the move and the try tags; the
+     table sizes columns to content, so without a floor the selects shrink to
+     a sliver showing a single character. */
+  td.col-name .edit-select { min-width: 140px; }
+  td.col-name .edit-tags .edit-tag { min-width: 68px; }
   #saveBtn { background: #f97316; color: #fff; border: none; border-radius: 6px; padding: 5px 12px; font-size: 0.78rem; font-weight: 600; cursor: pointer; display: none; }
   #saveBtn:hover { background: #ea6e00; }
   #saveBtn:disabled { opacity: 0.4; cursor: default; }
@@ -622,6 +629,39 @@ let activeEventSecs = null;
 let selectedGame = new URLSearchParams(location.search).get('game') || '';
 
 
+// ── Try tags: side and channel ──────────────────────────────────
+// Two small selects under a try's name, editing the side:/ch: tags in its
+// Detail cell. Any other tags in that cell — position, scorer, anything added
+// later — are carried through untouched.
+function tryTagEditor(row) {
+  const wrap = document.createElement('span');
+  wrap.className = 'edit-tags';
+  wrap.onclick = e => e.stopPropagation();
+  const tags = TR.parseDetail(row[colDetail]);
+  const make = (key, label, values, show, short) => {
+    const sel = document.createElement('select');
+    sel.className = 'edit-select edit-tag' + (pendingEdits.has(row) && 'detail' in pendingEdits.get(row) ? ' dirty' : '');
+    sel.setAttribute('aria-label', label);
+    [['', (short || label) + ' —'], ...values.map(v => [v, show(v)])].forEach(([v, text]) => {
+      const o = document.createElement('option');
+      o.value = v; o.textContent = text;
+      if (v === (tags[key] || '')) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.onchange = () => {
+      const next = TR.parseDetail(row[colDetail]);
+      if (sel.value) next[key] = sel.value; else delete next[key];
+      sel.classList.add('dirty');
+      markDirty(row, 'detail', TR.formatDetail(next));
+    };
+    return sel;
+  };
+  wrap.append(
+    make('side', 'Side', TR.DETAIL_SIDES, v => v.charAt(0).toUpperCase() + v.slice(1)),
+    make('ch', 'Channel', TR.DETAIL_CHANNELS, v => v, 'Ch'));
+  return wrap;
+}
+
 // ── Edit mode toggle ────────────────────────────────────────────
 function toggleEditMode() {
   editMode = !editMode;
@@ -652,6 +692,9 @@ function markDirty(row, field, value) {
   if (field === 'name')       row[colName]   = value;
   if (field === 'comment')    row[colComment] = value;
   if (field === 'strikeMove') row[colStrike]  = value;
+  // Detail is sent only when it was edited: update_rows adds a Detail column
+  // to a tab that predates it, which an unrelated comment fix shouldn't do.
+  if (field === 'detail' && colDetail >= 0) row[colDetail] = value;
   updateSaveBtn();
 }
 
@@ -716,7 +759,7 @@ let rowsPerPage  = 50;
 let activeFilters = {};
 
 // Column indices (resolved after headers load)
-let colTime = -1, colType = -1, colName = -1, colGame = -1, colComment = -1, colAction = -1, colStrike = -1;
+let colTime = -1, colType = -1, colName = -1, colGame = -1, colComment = -1, colAction = -1, colStrike = -1, colDetail = -1;
 // Metadata columns that carry the same value on every row of one game. With a
 // single game selected they say nothing per row, so the table drops them and
 // the header chip states them once instead.
@@ -881,6 +924,7 @@ function processRows(rows) {
   colComment = hli('comment');
   colAction  = hli('action owner');
   colStrike  = hli('strike move');
+  colDetail  = hli('detail');      // "key:value" tags — see TR.parseDetail
   colCompetition = hli('competition');
   colYear        = hli('year');
   colDivision    = hli('division');
@@ -1104,7 +1148,9 @@ function renderHeaders() {
     if (isPerGameCol(i)) return;
     // The strike move renders under the Name instead of taking a column of its
     // own. It stays in headers/allData so the filter and search still see it.
-    if (i === colStrike) return;
+    // Detail likewise: its try tags render under the Name, and its raw
+    // "pos:62,48; side:open" text means nothing as a column.
+    if (i === colStrike || i === colDetail) return;
     const th = document.createElement('th');
     th.textContent = h || '#';
     const slug = colSlug(h);
@@ -1141,7 +1187,7 @@ function renderRows(rows) {
       if (isPerGameCol(i)) return;
       // The strike move renders under the Name instead of taking a column of its
       // own. It stays in headers/allData so the filter and search still see it.
-      if (i === colStrike) return;
+      if (i === colStrike || i === colDetail) return;
       const td  = document.createElement('td');
       const col = (headers[i] || '').toLowerCase();
       const slug = colSlug(headers[i]);
@@ -1227,6 +1273,19 @@ function renderRows(rows) {
           m.className = 'cell-move';
           m.textContent = moveVal;
           td.appendChild(m);
+        }
+        // A try's side and channel (and scorer, when recorded), from Detail.
+        if (type === 'Try' && colDetail >= 0) {
+          if (isAdmin && editMode) td.appendChild(tryTagEditor(row));
+          else {
+            const label = TR.detailLabel(row[colDetail]);
+            if (label) {
+              const t = document.createElement('span');
+              t.className = 'cell-move cell-tags';
+              t.textContent = label;
+              td.appendChild(t);
+            }
+          }
         }
       } else if (col === 'comment' && isAdmin && editMode) {
         const input = document.createElement('input');
@@ -1450,6 +1509,14 @@ function updateNowPlaying(row) {
     const s = document.createElement('span');
     s.style.cssText = 'font-size:0.82rem;color:var(--text)';
     s.textContent = name;
+    info.appendChild(s);
+  }
+  const tagLabel = type === 'Try' && colDetail >= 0 ? TR.detailLabel(row[colDetail]) : '';
+  if (tagLabel) {
+    const s = document.createElement('span');
+    s.className = 'cell-tags';
+    s.style.cssText = 'font-size:0.72rem;color:#7dd3fc';
+    s.textContent = tagLabel;
     info.appendChild(s);
   }
   if (poss) {
