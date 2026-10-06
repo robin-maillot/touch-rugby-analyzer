@@ -1,0 +1,65 @@
+/* Field maps and charts — shared by the field annotator's Stats sheet and
+   Game Analysis's Field view. Markup comes from js/field_stats.js. */
+
+/* ── Field maps in the stats sheet ──────────────────────────
+   Both teams are drawn attacking upwards here, whichever ends they were
+   actually playing, because the map exists to compare them. ── */
+.fmap-row { display: flex; gap: 10px; padding: 4px 16px 2px; }
+.fmap { flex: 1 1 0; min-width: 0; }
+.fmap-name {
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+  font-size: 0.72rem; font-weight: 800; color: var(--text); margin-bottom: 4px;
+  white-space: nowrap; overflow: hidden;
+}
+.fmap svg { display: block; width: 100%; height: auto; border-radius: 6px; }
+.fmap-foot { font-size: 0.62rem; color: var(--text-dim); text-align: center; margin-top: 4px; }
+.fmap-key {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 10px;
+  font-size: 0.62rem; color: var(--text-dim); padding: 2px 0 6px;
+}
+.fmap-key span { display: inline-flex; align-items: center; gap: 4px; }
+.fmap-key i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.k-t3   { border: 1.5px solid var(--text-muted); }
+.k-t4   { background: var(--text-muted); }
+.k-x    { border-radius: 0 !important; background:
+          linear-gradient(45deg, transparent 42%, var(--orange) 42%, var(--orange) 58%, transparent 58%),
+          linear-gradient(-45deg, transparent 42%, var(--orange) 42%, var(--orange) 58%, transparent 58%); }
+.k-try  { background: var(--green); }
+.k-avg  { border-radius: 0 !important; height: 0 !important; width: 12px !important;
+          border-top: 2px dashed var(--text-muted); }
+
+/* ── Charts ─────────────────────────────────────────────────
+   Thin marks, recessive grid, a 2px surface gap between every stacked
+   segment, and a legend that is always present — so the split reads even
+   where two hues are hard to tell apart. ── */
+.cfig-row { display: flex; align-items: center; gap: 8px; padding: 3px 16px; }
+.cfig-name {
+  flex: 0 0 74px; display: flex; align-items: center; gap: 5px;
+  font-size: 0.7rem; font-weight: 700; color: var(--text);
+  white-space: nowrap; overflow: hidden;
+}
+.cfig-name i, .fmap-name i {
+  width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; display: inline-block;
+}
+.cfig-name span, .fmap-name span { overflow: hidden; text-overflow: ellipsis; }
+.cfig-val { flex: 0 0 auto; font-size: 0.68rem; color: var(--text-dim); font-variant-numeric: tabular-nums; min-width: 18px; text-align: right; }
+.cbar { flex: 1 1 auto; min-width: 0; display: flex; gap: 2px; height: 22px; }
+.cseg {
+  min-width: 3px; border-radius: 3px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.62rem; font-weight: 700; color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.45);
+  overflow: hidden;
+}
+.cleg {
+  display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 2px 16px 6px;
+  font-size: 0.64rem; color: var(--text-muted);
+}
+.cleg span { display: inline-flex; align-items: center; gap: 5px; }
+.cleg i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; flex-shrink: 0; }
+.cnote { font-size: 0.62rem; color: var(--text-dim); padding: 2px 16px 10px; }
+
+.cchart { display: block; width: calc(100% - 20px); height: auto; margin: 2px 10px 8px; }
+.cgrid  { stroke: rgba(255,255,255,0.10); stroke-width: 1; }
+.cgrid-10 { stroke-dasharray: 3 3; stroke: rgba(255,255,255,0.16); }
+.cax    { fill: var(--text-dim); font-size: 8px; font-weight: 600; }
