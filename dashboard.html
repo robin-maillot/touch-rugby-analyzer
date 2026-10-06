@@ -679,7 +679,6 @@ function renderStrikeMoves() {
       <div class="detail">${detail(m)}</div>
     </div>`;
 
-  tops.innerHTML =
   // topByTries ranks by volume, so it is deliberately NOT gated on rateKnown —
   // which means its rate can be a construction-guaranteed 100% and must be
   // marked here. topByRate already requires rateKnown, so its figure is sound.
