@@ -32,7 +32,8 @@ TR.FieldStats = (() => {
       if (a.type === 'To Review') continue;
       if (a.type === 'Game Event') {
         // A half boundary closes whatever was open; Ball Live belongs to the set.
-        if (a.name === 'Game Start' || a.name === 'Game End') { cur = null; }
+        // A Set Break (see eventsStartingIn) closes it too.
+        if (a.name === 'Game Start' || a.name === 'Game End' || a.name === SET_BREAK) { cur = null; }
         continue;
       }
       if (!cur || cur.owner !== a.possessionOwner) {
@@ -275,15 +276,16 @@ TR.FieldStats = (() => {
   function possessionPaths(events) {
     const sets = [];
     let cur = null, half = 0, last = null;     // last: the set that just ended
-    for (const a of events) {
+    for (let ei = 0; ei < events.length; ei++) {
+      const a = events[ei];
       if (a.type === 'To Review') continue;
       if (a.type === 'Game Event') {
         if (a.name === 'Game Start') { half++; cur = null; last = { restart: true }; }
-        else if (a.name === 'Game End') { cur = null; last = null; }
+        else if (a.name === 'Game End' || a.name === SET_BREAK) { cur = null; last = null; }
         continue;
       }
       if (!cur || cur.owner !== a.possessionOwner) {
-        cur = { owner: a.possessionOwner, half: half || 1, steps: [], end: null };
+        cur = { owner: a.possessionOwner, half: half || 1, steps: [], end: null, idx: [] };
         if (last && last.restart) {
           cur.steps.push({ k: 'start', how: 'tap', x: 50, y: 50 });
         } else if (last && last.end && handsOverOnTheSpot(last.end) && last.lastPt) {
@@ -291,6 +293,7 @@ TR.FieldStats = (() => {
         }
         sets.push(cur);
       }
+      cur.idx.push(ei);
       if (a.x != null) {
         const n = a.type === 'Touch' ? parseInt(String(a.name).replace(/\D+/g, ''), 10) : NaN;
         cur.steps.push({ k: a.type === 'Touch' && n ? n : 'end', type: a.type, name: a.name, x: a.x, y: a.y });
@@ -310,6 +313,47 @@ TR.FieldStats = (() => {
     return sets
       .filter(s => s.steps.some(p => p.k !== 'start'))
       .map(s => Object.assign(s, { outcome: outcomeOf({ endType: s.end.type, endName: s.end.name }) || 'Other' }));
+  }
+
+  // ── Where a set started ───────────────────────────────────────
+  // Split at the two 10m lines either side of halfway: before your own 10m
+  // (0–25m from your try line), between the 10m lines (25–45m), or past the
+  // opposition's 10m (45–70m). A set starts where it was won, or on halfway
+  // after a try, so a tap-off always counts as the middle.
+  const SET_BREAK = 'Set Break';      // a fence between sets, never shown or stored
+  const START_ZONES = [
+    { key: 'own', label: 'Own end',  sub: '0–25m',  lo: 0,  hi: 25 },
+    { key: 'mid', label: 'Middle',   sub: '25–45m', lo: 25, hi: 45 },
+    { key: 'opp', label: 'Opp end',  sub: '45–70m', lo: 45, hi: 71 },
+  ];
+  function startZone(set) {
+    const m = set.steps[0].y * Y_TO_M;
+    return (START_ZONES.find(z => m >= z.lo && m < z.hi) || START_ZONES[2]).key;
+  }
+
+  // The events of only those sets that started in `zone`, plus every game
+  // event, so halves and kick-offs still read the same. 'all' changes nothing.
+  // Possessions with nothing positioned have no start and are left out once a
+  // zone is picked — there's no way to place them.
+  //
+  // Dropping the sets in between would leave two of one team's sets side by
+  // side, and anything grouping by possession would read them as one; so each
+  // kept set is fenced off with a Set Break, which the groupers here honour.
+  function eventsStartingIn(events, zone) {
+    if (!zone || zone === 'all') return events;
+    const setOf = new Map();
+    possessionPaths(events).forEach((s, si) => { if (startZone(s) === zone) s.idx.forEach(i => setOf.set(i, si)); });
+    const out = [];
+    let lastSet = null;
+    events.forEach((a, i) => {
+      if (a.type === 'Game Event') { out.push(a); if (a.name === 'Game Start' || a.name === 'Game End') lastSet = null; return; }
+      if (!setOf.has(i)) return;
+      const si = setOf.get(i);
+      if (lastSet != null && si !== lastSet) out.push({ type: 'Game Event', name: SET_BREAK });
+      out.push(a);
+      lastSet = si;
+    });
+    return out;
   }
 
   // Metres gained on each step of a set, in order: [{ from, to, label, m }].
@@ -540,6 +584,7 @@ TR.FieldStats = (() => {
   return {
     Y_TO_M, RED_ZONE, MAP_LEN, OUTCOMES, mean,
     tryTagStats, sideBar, channelTagBar, SIDES, CHANNELS,
+    START_ZONES, startZone, eventsStartingIn,
     possessionSets, computeFieldStats, outcomeOf,
     fieldMapSVG, fieldMapKey, outcomeBar, channelBar, territorySVG, chartLegend,
     possessionPaths, pathGains, gainBuckets, typicalSet, GAIN_BUCKETS, OUTCOME_STYLE,
