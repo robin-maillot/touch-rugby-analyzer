@@ -14,10 +14,12 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="Touch Rugby">
   <script defer src="https://cloud.umami.is/script.js" data-website-id="cb7fd4f2-fcd5-44d7-a8e4-70e9068870bb" data-auto-track="false"></script>
-  <script src="https://cdn.jsdelivr.net/npm/vega@5/build/vega.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/vega-lite@5/build/vega-lite.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/vega-embed@6/build/vega-embed.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <!-- Charts are drawn after the page has loaded, so the chart libraries are
+       deferred: still run in order before DOMContentLoaded, but no longer hold
+       the page back from showing while ~270 KB downloads and parses. -->
+  <script defer src="https://cdn.jsdelivr.net/npm/vega@5/build/vega.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/vega-lite@5/build/vega-lite.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/vega-embed@6/build/vega-embed.min.js"></script>
   <link rel="stylesheet" href="css/theme.css">
   <link rel="stylesheet" href="css/field_stats.css">
 <style>
@@ -1952,8 +1954,29 @@ function closeCompareModal() {
 // back afterwards, whatever happens.
 const fileSlug = s => String(s || '').toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 
+// The capture library is only needed when someone exports, so it's fetched
+// then rather than on every visit. Loaded once; a failed load can be retried.
+const HTML2CANVAS_URL = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+let html2canvasLoading = null;
+function loadHtml2canvas() {
+  if (typeof html2canvas === 'function') return Promise.resolve();
+  return html2canvasLoading || (html2canvasLoading = new Promise((resolve, reject) => {
+    const el = Object.assign(document.createElement('script'), { src: HTML2CANVAS_URL, async: true });
+    el.onload  = () => resolve();
+    el.onerror = () => { html2canvasLoading = null; el.remove(); reject(new Error('could not load the export tool — check your connection')); };
+    document.head.appendChild(el);
+  }));
+}
+
 async function exportJPG({ target, name, relax = [], hide = [], button }) {
-  if (!currentGame || typeof html2canvas !== 'function') return;
+  if (!currentGame) return;
+  const label0 = button ? button.textContent : '';
+  if (typeof html2canvas !== 'function') {
+    if (button) { button.disabled = true; button.textContent = '⏳ Loading…'; }
+    try { await loadHtml2canvas(); }
+    catch (err) { alert('Export failed: ' + err.message); return; }
+    finally { if (button) { button.disabled = false; button.textContent = label0; } }
+  }
   const saved = relax.map(([el, prop]) => [el, prop, el.style[prop]]);
   relax.forEach(([el, prop, value]) => { el.style[prop] = value; });
   hide.forEach(el => { el.style.visibility = 'hidden'; });

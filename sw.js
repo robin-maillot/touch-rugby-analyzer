@@ -5,7 +5,7 @@
 // YouTube) always go straight to the network so live data is never stale.
 //
 // Bump CACHE_VERSION whenever shell assets change to force a refresh.
-const CACHE_VERSION = 'trl-shell-v44';
+const CACHE_VERSION = 'trl-shell-v45';
 
 const SHELL = [
   'index.html',
@@ -70,15 +70,25 @@ self.addEventListener('fetch', (event) => {
     (req.headers.get('accept') || '').includes('text/html');
   if (isHTML) {
     event.respondWith(
-      fetch(req)
+      // 'no-cache': GitHub Pages serves pages with max-age=600, so a plain
+      // fetch could hand back the browser's copy of a page for up to ten minutes
+      // after a deploy. Revalidating costs one cheap 304 when nothing changed.
+      // A navigation can't be refetched with options as-is (its redirect mode
+      // is 'manual'), so it's rebuilt from its URL; a redirect it meets — e.g.
+      // the bare repo URL gaining its trailing slash — is passed back as one.
+      fetch(new Request(req.url, { cache: 'no-cache', credentials: 'same-origin', redirect: 'follow' }))
         .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE_VERSION).then((c) => c.put(req, copy));
+          if (res.redirected) return Response.redirect(res.url, 302);
+          if (res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE_VERSION).then((c) => c.put(req, copy));
+          }
           return res;
         })
-        // Offline fallback: cached page, then app shell, then a synthetic
-        // response — respondWith() throws if it ever resolves to undefined.
-        .catch(() => caches.match(req)
+        // Offline fallback: cached page (ignoring ?game=… and the like), then the
+        // app shell, then a synthetic response — respondWith() throws if it ever
+        // resolves to undefined.
+        .catch(() => caches.match(req, { ignoreSearch: true })
           .then((hit) => hit || caches.match('index.html'))
           .then((hit) => hit || new Response(
             '<h1>Offline</h1><p>No cached copy of this page is available.</p>',
