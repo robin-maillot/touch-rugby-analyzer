@@ -1885,7 +1885,8 @@ console.log('Code.gs cache helpers');
       base64Decode: str => [...Buffer.from(str, 'base64')],
     },
   });
-  vm.runInContext(src + '; this.cacheGet = cacheGet; this.cachePut = cachePut;', ctx);
+  const selfTestSrc = gs.slice(gs.indexOf('function cacheSelfTest()'), gs.indexOf('function doGet('));
+  vm.runInContext(src + selfTestSrc + '; this.cacheGet = cacheGet; this.cachePut = cachePut; this.cacheSelfTest = cacheSelfTest;', ctx);
   const { cacheGet, cachePut } = ctx;
 
   test('a small value is stored as is', () => {
@@ -1909,6 +1910,11 @@ console.log('Code.gs cache helpers');
     const n = +store.get('noisy').split(':')[1];
     store.delete('noisy#' + (n - 1));
     assert.equal(cacheGet('noisy'), null);
+  });
+  test('the deploy self-test passes on a working cache', () => {
+    const r = ctx.cacheSelfTest();
+    assert.equal(r.small, true); assert.equal(r.large, true); assert.ok(r.largeKB > 100);
+    assert.ok(store.get('selftest:big').startsWith('gz:'));
   });
   test('unicode survives the round trip', () => {
     const v = JSON.stringify({ team: 'Côte d’Ivoire — Équipe', rows: Array.from({ length: 4000 }, () => ['é', 'ü', '—']) });

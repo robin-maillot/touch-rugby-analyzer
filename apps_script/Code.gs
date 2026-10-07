@@ -449,8 +449,32 @@ function rawJson(str) {
 }
 
 // ── GET — list sheets or fetch rows from a tab ─────────────────
+// Which code a deployment is actually running. The web app keeps serving the
+// version last deployed, whatever is saved in the editor, and the responses
+// look the same either way — so bump this with every Apps Script change and
+// check it with ?action=build after deploying.
+const BUILD = '2026-10-07 compressed-cache';
+
+// Writes and reads back a small and a large (compressed) entry through the
+// cache helpers, so a deploy can be checked end to end without logs.
+function cacheSelfTest() {
+  const t0 = Date.now(), tag = String(t0);
+  const big = JSON.stringify({ tag, rows: Array.from({ length: 6000 }, (_, i) => ['00:01:23', 'Team 1', 'Touch', 'Touch ' + (i % 5 + 1), 'pos:41,58']) });
+  cachePut('selftest:small', tag, 60);
+  cachePut('selftest:big', big, 60);
+  const small = cacheGet('selftest:small') === tag;
+  const large = cacheGet('selftest:big') === big;
+  return { small, large, largeKB: Math.round(big.length / 1024), ms: Date.now() - t0 };
+}
+
 function doGet(e) {
   try {
+    // action=build → which code this deployment runs, and whether its cache
+    // works. Public and cheap; reveals nothing about any game.
+    if (e.parameter.action === 'build') {
+      return json({ ok: true, build: BUILD, cache: cacheSelfTest() });
+    }
+
     // action=live → current live game states. PUBLIC endpoint: no secret
     // required and no group filtering, so the live scoreboard is shareable to
     // spectators without a login. Handled before the auth gate below.
