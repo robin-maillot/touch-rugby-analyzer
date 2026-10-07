@@ -14,9 +14,12 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="Touch Rugby">
   <script defer src="https://cloud.umami.is/script.js" data-website-id="cb7fd4f2-fcd5-44d7-a8e4-70e9068870bb" data-auto-track="false"></script>
-  <script src="https://cdn.jsdelivr.net/npm/vega@5/build/vega.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/vega-lite@5/build/vega-lite.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/vega-embed@6/build/vega-embed.min.js"></script>
+  <!-- Charts are drawn after the page has loaded, so the chart libraries are
+       deferred: still run in order before DOMContentLoaded, but no longer hold
+       the page back from showing while ~270 KB downloads and parses. -->
+  <script defer src="https://cdn.jsdelivr.net/npm/vega@5/build/vega.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/vega-lite@5/build/vega-lite.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/vega-embed@6/build/vega-embed.min.js"></script>
   <link rel="stylesheet" href="css/theme.css">
 <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
