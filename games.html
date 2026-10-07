@@ -200,6 +200,11 @@
     }
     #fieldBody { overflow-y: auto; padding: 4px 0 16px; }
     .field-halves { display: flex; gap: 6px; padding: 10px 16px 2px; flex-wrap: wrap; }
+    .zone-row { display: flex; gap: 6px; padding: 6px 16px 2px; flex-wrap: wrap; align-items: center; }
+    .zone-row .zone-lab { font-size: 0.66rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); margin-right: 2px; }
+    .zone-row .half-btn small { color: #6c7689; margin-left: 4px; font-size: 0.68rem; }
+    .zone-row .half-btn.active small { color: inherit; opacity: 0.8; }
+    .zone-row .half-btn:disabled { opacity: 0.4; cursor: default; }
     .field-sec { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); padding: 14px 16px 4px; }
     .field-maps { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 4px 16px 2px; max-width: 420px; margin: 0 auto; }
     #fieldBody .compare-scroll { padding-top: 4px; }
@@ -1226,7 +1231,7 @@ async function renderGame(events, team1, team2, subtitle, analyzable, meta) {
   const hasTouchPositions = fieldEvents(currentGame).some(e => e.type === 'Touch' && e.x != null);
   document.getElementById('fieldViewBtn').style.display   = hasTouchPositions ? '' : 'none';
   document.getElementById('possessionsBtn').style.display = hasTouchPositions ? '' : 'none';
-  possPick = { 'Team 1': null, 'Team 2': null }; possFocus = null; possHalf = 'all';
+  possPick = { 'Team 1': null, 'Team 2': null }; possFocus = null; possHalf = 'all'; startZone = 'all';
 
   // Build half toggle buttons
   const toggleEl = document.getElementById('halfToggle');
@@ -1630,6 +1635,20 @@ function closeTurnoverModal() {
 // uploaded with their positions (field annotator v2 with "upload the individual
 // touches" on). Offered only when at least one touch carries a position.
 const FIELD_COLORS = { 'Team 1': '#3b82f6', 'Team 2': '#f59e0b' };
+
+// Where the sets in view started — shared by Field View and Possessions, so a
+// filter picked in one is still on when the other is opened.
+let startZone = 'all';
+function zoneFilterHTML(sets, onPick) {
+  const FS = TR.FieldStats;
+  const n = { all: sets.length };
+  FS.START_ZONES.forEach(z => { n[z.key] = sets.filter(s => FS.startZone(s) === z.key).length; });
+  return `<div class="zone-row"><span class="zone-lab">Started</span>` +
+    [{ key: 'all', label: 'Anywhere' }, ...FS.START_ZONES].map(z =>
+      `<button class="half-btn${startZone === z.key ? ' active' : ''}" onclick="${onPick}('${z.key}')"` +
+      `${z.sub ? ` title="Sets that started ${z.sub} from their own try line"` : ''}${!n[z.key] && z.key !== 'all' && startZone !== z.key ? ' disabled' : ''}>` +
+      `${z.label}${z.sub ? ` <small>${z.sub}</small>` : ''} <small>${n[z.key]}</small></button>`).join('') + `</div>`;
+}
 // Team names go into markup here, so they're escaped.
 const escapeHtml = v => String(v == null ? '' : v).replace(/[&<>"']/g, c =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -1670,6 +1689,7 @@ function closeFieldModal() {
 }
 
 function pickFieldHalf(h) { fieldHalf = h; renderFieldModal(); }
+function pickFieldZone(z) { startZone = z; renderFieldModal(); }
 
 // Tries by side (open / blind) and by channel, from the tags recorded on each
 // try. Shown whenever a try in this part of the game carries either tag; the
@@ -1696,7 +1716,9 @@ function renderFieldModal() {
   const all    = fieldEvents(currentGame);
   const halves = fieldHalves(all);
   if (fieldHalf !== 'all' && !halves[fieldHalf]) fieldHalf = 'all';
-  const evs    = fieldHalf === 'all' ? all : halves[fieldHalf];
+  const halfEvs = fieldHalf === 'all' ? all : halves[fieldHalf];
+  const zoneRow = zoneFilterHTML(FS.possessionPaths(halfEvs), 'pickFieldZone');
+  const evs    = FS.eventsStartingIn(halfEvs, startZone);
   const names  = { 'Team 1': escapeHtml(currentGame.team1), 'Team 2': escapeHtml(currentGame.team2) };
   const { t1, t2, sets, any } = FS.computeFieldStats(evs);
 
@@ -1707,7 +1729,7 @@ function renderFieldModal() {
       `</div>`
     : '';
   if (!any) {
-    document.getElementById('fieldBody').innerHTML = halfBtns + `<div class="field-note">No positioned events in this part of the game.</div>`;
+    document.getElementById('fieldBody').innerHTML = halfBtns + zoneRow + `<div class="field-note">No positioned sets ${startZone === 'all' ? 'in this part of the game' : 'started there'}.</div>`;
     return;
   }
 
@@ -1737,7 +1759,7 @@ function renderFieldModal() {
       return `<tr class="row-b"><td class="metric-name">${r[0]}</td><td class="val-cell ${c1}">${r[1]}</td><td class="val-cell ${c2}">${r[2]}</td></tr>`;
     }).join('') + `</tbody></table></div>`;
 
-  document.getElementById('fieldBody').innerHTML = halfBtns +
+  document.getElementById('fieldBody').innerHTML = halfBtns + zoneRow +
     `<div class="field-sec">Where they play</div>
      <div class="field-maps">${FS.fieldMapSVG(t1, FIELD_COLORS['Team 1'], names['Team 1'])}${FS.fieldMapSVG(t2, FIELD_COLORS['Team 2'], names['Team 2'])}</div>
      ${FS.fieldMapKey()}
@@ -1765,9 +1787,18 @@ let possHalf  = 'all';
 let possPick  = { 'Team 1': null, 'Team 2': null };
 let possFocus = null;            // the team whose set ← / → move through
 
-function possSets() {
+// The sets in the chosen half, before the start-zone filter (the chips count these).
+function possHalfSets() {
   const all = TR.FieldStats.possessionPaths(fieldEvents(currentGame));
   return possHalf === 'all' ? all : all.filter(s => s.half === possHalf + 1);
+}
+function possSets() {
+  const sets = possHalfSets();
+  return startZone === 'all' ? sets : sets.filter(s => TR.FieldStats.startZone(s) === startZone);
+}
+function pickPossZone(z) {
+  startZone = z; possPick = { 'Team 1': null, 'Team 2': null }; possFocus = null;
+  renderPossModal();
 }
 
 function openPossModal() {
@@ -1843,11 +1874,12 @@ function drawPossModal() {
       </div>${escapeHtml(d.summary)}<span class="pp-steps">${d.steps.map(escapeHtml).join(' · ')}</span>`;
   };
 
+  const zoneRow = zoneFilterHTML(possHalfSets(), 'pickPossZone');
   if (!sets.length) {
-    document.getElementById('possBody').innerHTML = halfBtns + `<div class="field-note">No positioned sets in this part of the game.</div>`;
+    document.getElementById('possBody').innerHTML = halfBtns + zoneRow + `<div class="field-note">No positioned sets ${startZone === 'all' ? 'in this part of the game' : 'started there'}.</div>`;
     return;
   }
-  document.getElementById('possBody').innerHTML = halfBtns + FS.pathsKey() +
+  document.getElementById('possBody').innerHTML = halfBtns + zoneRow + FS.pathsKey() +
     `<div class="field-sec">Paths — where each set went</div>
      <div class="pp-teams">${keys.map(key => `<div data-team="${key}">
         <div class="pp-team-name" style="color:${FIELD_COLORS[key]}">${escapeHtml(names[key])}</div>
@@ -1884,7 +1916,7 @@ document.addEventListener('keydown', ev => {
 
 function exportPossessions() {
   const card = document.getElementById('possCard');
-  const half = possHalf === 'all' ? 'possessions' : `possessions-${ordinal(possHalf + 1)}-half`;
+  const half = (possHalf === 'all' ? 'possessions' : `possessions-${ordinal(possHalf + 1)}-half`) + (startZone === 'all' ? '' : `-from-${startZone}-end`.replace('-mid-end', '-middle'));
   return exportJPG({
     target: card, name: half,
     relax: [[card, 'maxHeight', 'none'], [document.getElementById('possBody'), 'overflowY', 'visible']],
@@ -1963,7 +1995,7 @@ function exportCompareTable() {
 // Field View: the whole card, every section, for the half being shown.
 function exportFieldView() {
   const card = document.getElementById('fieldCard');
-  const half = fieldHalf === 'all' ? 'field-view' : `field-view-${ordinal(fieldHalf + 1)}-half`;
+  const half = (fieldHalf === 'all' ? 'field-view' : `field-view-${ordinal(fieldHalf + 1)}-half`) + (startZone === 'all' ? '' : `-from-${startZone}-end`.replace('-mid-end', '-middle'));
   return exportJPG({
     target: card, name: half,
     relax: [[card, 'maxHeight', 'none'], [document.getElementById('fieldBody'), 'overflowY', 'visible']],

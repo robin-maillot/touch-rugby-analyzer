@@ -1821,6 +1821,43 @@ console.log('TR.FieldStats tries by side and channel');
   });
 }
 
+console.log('TR.FieldStats start zones');
+{
+  const FS = TR.FieldStats;
+  const ev = (type, name, owner, x, y) => ({ type, name, possessionOwner: owner, actionOwner: owner, x: x ?? null, y: y ?? null });
+  const game = [
+    ev('Game Event', 'Game Start', 'Team 1'),
+    ev('Touch', 'Touch 1', 'Team 1', 50, 60), ev('Turnover', 'Ball Down', 'Team 1', 40, 80),   // tap on halfway → middle
+    ev('Touch', 'Touch 1', 'Team 2', 50, 30), ev('Turnover', 'Ball Down', 'Team 2', 60, 40),   // won at 100-80=20 → 14m, own end
+    ev('Touch', 'Touch 1', 'Team 1', 50, 70), ev('Try', 'Other', 'Team 1', 50, 100),           // won at 100-40=60 → 42m, middle
+    ev('Touch', 'Touch 1', 'Team 2', 50, 60), ev('Turnover', 'Ball Down', 'Team 2', 50, 20),   // tap → middle
+    ev('Touch', 'Touch 1', 'Team 1', 50, 85), ev('Try', 'Other', 'Team 1', 50, 100),           // won at 100-20=80 → 56m, opp end
+    ev('Game Event', 'Game End', 'Team 1'),
+  ];
+  const sets = FS.possessionPaths(game);
+  test('each set is placed by where it started', () =>
+    assert.equal(sets.map(FS.startZone).join(' '), 'mid own mid mid opp'));
+  test('the 10m lines are the boundaries', () => {
+    const at = m => FS.startZone({ steps: [{ y: m / FS.Y_TO_M }] });
+    assert.equal(at(0), 'own'); assert.equal(at(24.9), 'own'); assert.equal(at(25), 'mid');
+    assert.equal(at(44.9), 'mid'); assert.equal(at(45), 'opp'); assert.equal(at(70), 'opp');
+  });
+  test('filtering keeps only those sets, and every game event', () => {
+    const opp = FS.eventsStartingIn(game, 'opp');
+    assert.equal(opp.filter(e => e.type === 'Game Event').length, 2);
+    assert.equal(opp.filter(e => e.type !== 'Game Event').length, 2);           // the last set's touch + try
+    assert.equal(FS.eventsStartingIn(game, 'all'), game);
+    assert.equal(FS.computeFieldStats(FS.eventsStartingIn(game, 'own')).t2.sets, 1);
+  });
+  test('two of one team\'s sets left side by side stay two sets', () => {
+    const mid = FS.eventsStartingIn(game, 'mid');                                // sets 1, 3 and 4
+    const t1 = FS.computeFieldStats(mid).t1;
+    assert.equal(t1.sets, 2);                                                    // sets 1 and 3 are both Team 1
+    assert.equal(FS.possessionSets(mid).length, 3);
+    assert.equal(mid.filter(e => e.name === 'Set Break').length, 2);
+  });
+}
+
 // ── Server copy of the strike-move rule ───────────────────────
 // Code.gs can't load js/events.js, so it carries its own deriveStrikeMove for
 // the inline-edit path. It drifted once — 6 Again, Penalty Defence and tagged
