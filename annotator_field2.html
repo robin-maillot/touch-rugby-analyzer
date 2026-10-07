@@ -575,6 +575,31 @@
     .edit-comment:focus { border-color: var(--accent); }
     .edit-comment::placeholder { color: #444; }
     .edit-footer { display: flex; gap: 10px; margin: 4px 16px 16px; }
+    .edit-sec { padding: 12px 16px 4px; }
+    .edit-sec-label { font-size: 0.7rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px; }
+    .edit-opts { display: flex; flex-wrap: wrap; gap: 6px; }
+    .edit-opt {
+      min-height: 38px; padding: 6px 12px; border-radius: 99px; border: 1px solid var(--border);
+      background: var(--surface-2); color: var(--text); font-family: inherit; font-size: 0.8rem; font-weight: 600; cursor: pointer;
+    }
+    .edit-opt.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+    /* The change list scrolls inside the sheet, so the comment and footer stay put. */
+    .edit-change {
+      max-height: 210px; overflow-y: auto; overscroll-behavior: contain;
+      border: 1px solid var(--border); border-radius: 12px; background: var(--bg);
+    }
+    .edit-change-group { position: sticky; top: 0; background: var(--surface-2); padding: 6px 12px; font-size: 0.66rem;
+      font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); border-bottom: 1px solid var(--border); }
+    .edit-change-item {
+      display: flex; align-items: center; gap: 8px; width: 100%; min-height: 40px; padding: 8px 12px;
+      background: none; border: none; border-bottom: 1px solid var(--border-light); color: var(--text);
+      font-family: inherit; font-size: 0.84rem; text-align: left; cursor: pointer;
+    }
+    .edit-change-item:active { background: var(--surface-2); }
+    .edit-change-item .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+    .edit-change-item.current { color: var(--text-dim); cursor: default; }
+    .edit-change-item.current::after { content: 'current'; margin-left: auto; font-size: 0.68rem; color: var(--text-dim); }
+    body.game-finished .edit-change-item.game-ev { display: none; }
     .edit-footer .stats-close-btn { margin: 0; width: auto; flex: 1; }
     .edit-btn-save { background: var(--accent); color: #fff; border-color: var(--accent); }
     .edit-btn-save:active { filter: brightness(0.88); background: var(--accent); }
@@ -964,8 +989,8 @@
     /* ── Pins ── */
     .pin       { cursor: default; }
     .pin-dot   { stroke: rgba(255,255,255,0.92); stroke-width: 0.7; }
-    .pin-txt   { fill: #fff; font-size: 4.6px; font-weight: 800; text-anchor: middle; pointer-events: none; }
-    .pin-txt.sm { font-size: 3.4px; }
+    .pin-txt   { fill: #fff; font-size: 3.9px; font-weight: 800; text-anchor: middle; pointer-events: none; }
+    .pin-txt.sm { font-size: 2.9px; }
     /* Only the newest pin is live: tapping it is the "lost the ball here"
        gesture, and letting older pins take taps would make that ambiguous. */
     .pin.live  { cursor: pointer; }
@@ -1400,13 +1425,15 @@
       <div style="font-size:0.7rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Edit Event</div>
       <div class="edit-head-row">
         <div id="editCurrentLabel" style="font-size:1rem;font-weight:600"></div>
-        <span class="edit-subtype-wrap" id="editSubtypeWrap">
-          <select id="editSubtype" class="edit-subtype" aria-label="Sub-type" onchange="applySubtype()"></select>
-        </span>
         <span class="edit-subtype-wrap" id="editMoveWrap" style="display:none">
           <select id="editMove" class="edit-subtype" aria-label="Strike move" onchange="applyStrikeMove()"></select>
         </span>
       </div>
+    </div>
+    <!-- Every option for this kind of event, one tap each. -->
+    <div class="edit-sec" id="editOptionsWrap" style="display:none">
+      <div class="edit-sec-label" id="editOptionsLabel">Options</div>
+      <div class="edit-opts" id="editOptions"></div>
     </div>
     <!-- A try's details: the same tags the try picker's last step sets. -->
     <div class="edit-tags" id="editTagsWrap" style="display:none">
@@ -1419,20 +1446,10 @@
       <div style="font-size:0.7rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px">Comment</div>
       <textarea id="editComment" class="edit-comment" rows="2" placeholder="Add a note (optional)…"></textarea>
     </div>
-    <div style="padding:12px 16px 4px">
-      <div style="font-size:0.7rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px">Change type</div>
-      <div class="event-grid two-col">
-        <button class="evt-btn btn-try1"    onclick="applyEdit('Try','Other')">Try</button>
-        <button class="evt-btn btn-turn"    onclick="applyEdit('Turnover','Other')">Turnover</button>
-        <button class="evt-btn btn-pen-atk" onclick="applyEdit('Penalty Attack','Other')">Pen Attack</button>
-        <button class="evt-btn btn-turn"    onclick="applyEdit('Turnover','6th Touch')">6th Touch</button>
-        <button class="evt-btn btn-pen-def" onclick="applyEdit('Penalty Defence','Other')">Pen Defence</button>
-        <button class="evt-btn btn-turn"    style="opacity:0.65" onclick="applyEdit('Turnover','6 Again')">6 Again</button>
-        <button class="evt-btn btn-game     edit-adv" onclick="applyEdit('Game Event','Ball Live')">Ball Live</button>
-        <button class="evt-btn btn-review"  onclick="applyEdit('To Review','To Review')">To Review</button>
-        <button class="evt-btn btn-game     edit-adv" onclick="applyEdit('Game Event','Game Start')">Game Start</button>
-        <button class="evt-btn btn-game     edit-adv" onclick="applyEdit('Game Event','Game End')">Game End</button>
-      </div>
+    <!-- Retyping is the rarer edit, so it's a scrollable list rather than a wall of buttons. -->
+    <div class="edit-sec">
+      <div class="edit-sec-label">Change to a different action</div>
+      <div class="edit-change" id="editChangeList"></div>
     </div>
     <div class="edit-footer">
       <button class="stats-close-btn" onclick="deleteEvent()" style="color:var(--red)">Delete</button>
@@ -2023,6 +2040,8 @@ function openEdit(index) {
   renderSubtypeMenu(a);
   renderMoveSelect(a);
   renderTryTags(a);
+  renderChangeList(a);
+  document.getElementById('editChangeList').scrollTop = 0;
   // '?' is the placeholder marker To Review events carry — show a blank box so
   // the annotator can type a real note over it.
   document.getElementById('editComment').value = (a.comment && a.comment !== '?') ? a.comment : '';
@@ -2056,10 +2075,14 @@ function applyEdit(type, name) {
   a.name = name;
   commitCommentField(a);
   a.actionOwner = TR.inferActionOwner(a.possessionOwner, type, name);
+  replayPossessionFrom(editingIndex + 1);
+  // Stay open on the new action, so its options — a try's move, a turnover's
+  // kind — can be picked straight away.
+  document.getElementById('editCurrentLabel').textContent = eventBaseLabel(a) + ' · ' + fmtClock(a.time);
+  renderSubtypeMenu(a);
   renderMoveSelect(a);
   renderTryTags(a);
-  replayPossessionFrom(editingIndex + 1);
-  closeEdit();
+  renderChangeList(a);
   updateUI();
   saveSession();
 }
@@ -2069,34 +2092,57 @@ function applyEdit(type, name) {
 // spell their detail out in the name itself, and each already has its own
 // button in the grid below.
 function renderSubtypeMenu(a) {
-  const wrap = document.getElementById('editSubtypeWrap');
-  const sel  = document.getElementById('editSubtype');
+  const wrap = document.getElementById('editOptionsWrap');
   const opts = SUBTYPE_TYPES.includes(a.type) ? (TR.MENU[a.type] || []).slice() : [];
   // Keep a name the canonical menu doesn't know rather than silently dropping it.
   if (a.name && opts.length && !opts.includes(a.name)) opts.unshift(a.name);
   wrap.style.display = opts.length ? '' : 'none';
-  sel.innerHTML = opts.map(o => `<option value="${o}"${o === a.name ? ' selected' : ''}>${o}</option>`).join('');
-  markSubtypeState();
-}
-
-function markSubtypeState() {
-  const sel = document.getElementById('editSubtype');
-  sel.classList.toggle('set', !!sel.value && sel.value !== 'Other');
+  if (!opts.length) return;
+  const q = { 'Try': 'Which move?', 'Turnover': 'What happened?', 'Penalty Attack': 'What for?', 'Penalty Defence': 'What for?' }[a.type] || 'Options';
+  document.getElementById('editOptionsLabel').textContent = `${EVENT_LABELS[a.type] || a.type} — ${q}`;
+  document.getElementById('editOptions').innerHTML = opts.map(o =>
+    `<button class="edit-opt${o === a.name ? ' on' : ''}" data-opt="${escapeHtml(o)}">${escapeHtml(o)}</button>`).join('');
 }
 
 // Applies straight away rather than waiting on Save, so the pick can't be lost
-// by dismissing the sheet — same as the type buttons. The sheet stays open so a
-// comment can still be added on top.
-function applySubtype() {
+// by dismissing the sheet — and the sheet stays open so a comment can still be
+// added on top.
+function applySubtype(name) {
   if (editingIndex === null) return;
   const a = annotations[editingIndex];
-  a.name = document.getElementById('editSubtype').value;
+  a.name = name;
   a.actionOwner = TR.inferActionOwner(a.possessionOwner, a.type, a.name);
   replayPossessionFrom(editingIndex + 1);
+  renderSubtypeMenu(a);
   renderMoveSelect(a);
-  markSubtypeState();
+  renderChangeList(a);
   updateUI();
   saveSession();
+}
+
+// Every other action this event could be instead, grouped by type: a try, any
+// kind of turnover, either penalty with its reason, or a game event. A try's
+// move is picked from its options after the change, so it's listed once.
+const CHANGE_GROUPS = [
+  { type: 'Try',             label: 'Try',         names: ['Other'], color: '#22c55e' },
+  { type: 'Turnover',        label: 'Turnover',    names: null,      color: '#f97316' },
+  { type: 'Penalty Attack',  label: 'Pen Attack',  names: null,      color: '#ef4444' },
+  { type: 'Penalty Defence', label: 'Pen Defence', names: null,      color: '#b91c1c' },
+  { type: 'To Review',       label: 'To Review',   names: ['To Review'], color: '#7c3aed' },
+  { type: 'Game Event',      label: 'Game event',  names: ['Ball Live', 'Game Start', 'Game End'], color: '#3b82f6' },
+];
+
+function renderChangeList(a) {
+  document.getElementById('editChangeList').innerHTML = CHANGE_GROUPS.map(g => {
+    const names = g.names || (TR.MENU[g.type] || []);
+    return `<div class="edit-change-group">${g.label}</div>` + names.map(n => {
+      const current = a.type === g.type && (g.type === 'Try' ? true : a.name === n);
+      const label = g.type === 'Try' ? 'Try' : g.type === 'To Review' ? 'To Review' : g.type === 'Game Event' ? n : `${g.label} · ${n}`;
+      return `<button class="edit-change-item${current ? ' current' : ''}${g.type === 'Game Event' ? ' game-ev' : ''}"` +
+             ` data-type="${escapeHtml(g.type)}" data-name="${escapeHtml(n)}"${current ? ' disabled' : ''}>` +
+             `<span class="dot" style="background:${g.color}"></span>${escapeHtml(label)}</button>`;
+    }).join('');
+  }).join('');
 }
 
 // Only a try carries details. Kept on the event if it's retyped away from a try
@@ -3139,7 +3185,7 @@ const PITCH_LEN  = 140;                       // try line to try line
 // bigger band is a much easier tap at speed than a true-to-scale sliver.
 const PITCH_BAND = 18;
 const M          = PITCH_LEN / 70;            // drawing units per metre
-const PIN_R      = 5.2;
+const PIN_R      = 4.3;
 const PEN_KINDS  = ['Penalty Attack', 'Penalty Defence', '6 Again'];
 const TEAM_COLOR = { 'Team 1': '#3b82f6', 'Team 2': '#f59e0b' };
 
@@ -3374,9 +3420,9 @@ function pinSVG(a, active, live) {
   const { vx, vy } = toView(a.x, a.y, runsDown(a.possessionOwner));
   const label = pinLabel(a);
   return `<g class="pin pin-${pinKind(a)}${active ? '' : ' stale'}${live ? ' live' : ''}" data-idx="${annotations.indexOf(a)}">` +
-    (live ? `<circle class="pin-ring" cx="${vx}" cy="${vy}" r="${PIN_R + 2.2}"/>` : '') +
+    (live ? `<circle class="pin-ring" cx="${vx}" cy="${vy}" r="${PIN_R + 1.9}"/>` : '') +
     `<circle class="pin-dot" cx="${vx}" cy="${vy}" r="${PIN_R}" fill="${pinFill(a)}"/>` +
-    `<text class="pin-txt${label.length > 1 ? ' sm' : ''}" x="${vx}" y="${vy + (label.length > 1 ? 1.2 : 1.7)}">${label}</text></g>`;
+    `<text class="pin-txt${label.length > 1 ? ' sm' : ''}" x="${vx}" y="${vy + (label.length > 1 ? 1.0 : 1.4)}">${label}</text></g>`;
 }
 
 function renderPitch() {
@@ -3410,7 +3456,7 @@ function renderPitch() {
   const restartSVG = restart
     ? (() => { const { vx, vy } = toView(restart.x, restart.y, runsDown(possession));
         return `<g class="pin pin-restart"><circle class="pin-dot" cx="${vx}" cy="${vy}" r="${PIN_R}" stroke="${attacking}"/>` +
-               `<text class="pin-txt" x="${vx}" y="${vy + 1.7}">0</text></g>`; })()
+               `<text class="pin-txt" x="${vx}" y="${vy + 1.4}">0</text></g>`; })()
     : '';
 
   layer.innerHTML = prev.map(a => pinSVG(a, !cur.length && !restart, false)).join('') +
@@ -3961,6 +4007,14 @@ window.addEventListener('DOMContentLoaded', () => {
   wrap.innerHTML = pitchSVG();
   document.getElementById('uploadTouchesInput').checked = uploadTouches;
   document.getElementById('tryPopupInput').checked = tryPopup;
+  document.getElementById('editOptions').addEventListener('click', ev => {
+    const b = ev.target.closest('[data-opt]');
+    if (b) applySubtype(b.dataset.opt);
+  });
+  document.getElementById('editChangeList').addEventListener('click', ev => {
+    const b = ev.target.closest('[data-type]');
+    if (b && !b.disabled) applyEdit(b.dataset.type, b.dataset.name);
+  });
   // 'toggle' doesn't bubble, so it's caught on the way down.
   document.getElementById('statsBody').addEventListener('toggle', ev => {
     if (ev.target.id !== 'statsFold') return;
