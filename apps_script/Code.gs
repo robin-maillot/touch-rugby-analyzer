@@ -286,17 +286,56 @@ function canOverrideGame(auth, sheetName) {
 }
 
 // ── Cache helpers ───────────────────────────────────────────────
-const CACHE_TTL = 300; // seconds (5 min)
+const CACHE_TTL = 300; // seconds (5 min) — the default, for unversioned entries
+// Entries whose key carries the data version (list / all / one game) can never
+// be served stale — any write moves the version, so the old key just goes
+// unread — and so can live much longer. Fewer cold rebuilds of action=all,
+// which reads every game tab, is most of the point.
+const VERSIONED_TTL = 3600;  // 1 hour
+
+// CacheService takes at most 100 KB per entry. action=all is ~1 MB of JSON, so
+// it was never cached and every request rebuilt it from every tab (20-40s).
+// Large values are gzipped and base64'd (~1 MB → ~65 KB), and if that still
+// doesn't fit, split across numbered keys written and read in one call each.
+const CACHE_ENTRY_MAX = 95000;
+const GZ_PREFIX = 'gz:';
+const CHUNK_PREFIX = 'chunks:';
 
 function cacheGet(key) {
-  try { return CacheService.getScriptCache().get(key); } catch(e) { return null; }
+  try {
+    const cache = CacheService.getScriptCache();
+    let v = cache.get(key);
+    if (v == null) return null;
+    if (v.indexOf(CHUNK_PREFIX) === 0) {
+      const n = parseInt(v.slice(CHUNK_PREFIX.length), 10);
+      const keys = []; for (let i = 0; i < n; i++) keys.push(key + '#' + i);
+      const parts = cache.getAll(keys);
+      if (keys.some(k => parts[k] == null)) return null;      // a chunk aged out — rebuild
+      v = keys.map(k => parts[k]).join('');
+    }
+    if (v.indexOf(GZ_PREFIX) === 0) {
+      const bytes = Utilities.base64Decode(v.slice(GZ_PREFIX.length));
+      return Utilities.ungzip(Utilities.newBlob(bytes, 'application/x-gzip')).getDataAsString('UTF-8');
+    }
+    return v;
+  } catch (e) { return null; }
 }
 
-function cachePut(key, str) {
+function cachePut(key, str, ttl) {
   try {
-    // CacheService limit is 100 KB per entry
-    if (str && str.length < 95000) CacheService.getScriptCache().put(key, str, CACHE_TTL);
-  } catch(e) {}
+    if (!str) return;
+    const cache = CacheService.getScriptCache();
+    const life  = ttl || CACHE_TTL;
+    if (str.length < CACHE_ENTRY_MAX) { cache.put(key, str, life); return; }
+    const gz = GZ_PREFIX + Utilities.base64Encode(Utilities.gzip(Utilities.newBlob(str, 'application/json', 'v.json')).getBytes());
+    if (gz.length < CACHE_ENTRY_MAX) { cache.put(key, gz, life); return; }
+    const parts = {};
+    let n = 0;
+    for (let i = 0; i < gz.length; i += CACHE_ENTRY_MAX) parts[key + '#' + (n++)] = gz.slice(i, i + CACHE_ENTRY_MAX);
+    if (n > 20) return;                                         // ~1.9 MB compressed: don't flood the cache
+    cache.putAll(parts, life);
+    cache.put(key, CHUNK_PREFIX + n, life);                     // header last, so a reader never sees a half-written set
+  } catch (e) {}
 }
 
 // ── Tab ownership tokens ───────────────────────────────────────
@@ -521,7 +560,7 @@ function doGet(e) {
         .filter(([_, m]) => canSeeGame(auth, m))
         .map(([name, m]) => ({ name, ...m }));
       const result  = JSON.stringify({ ok: true, version, sheets });
-      cachePut(key, result);
+      cachePut(key, result, VERSIONED_TTL);
       return rawJson(result);
     }
 
@@ -559,7 +598,7 @@ function doGet(e) {
       }
 
       const result = JSON.stringify({ ok: true, version, rows: allRows });
-      cachePut(key, result);
+      cachePut(key, result, VERSIONED_TTL);
       return rawJson(result);
     }
 
@@ -567,6 +606,12 @@ function doGet(e) {
     if (!sheetName) {
       return json({ ok: false, error: 'Missing sheetName parameter' });
     }
+
+    // One game — cached like list/all, by version and caller group, so only a
+    // response this group was already allowed to see is ever served from it.
+    const gameKey = 'game:' + sheetName + cacheKeySuffix;
+    const gameHit = cacheGet(gameKey);
+    if (gameHit) return rawJson(gameHit);
 
     const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(sheetName);
     if (!sheet) {
@@ -580,7 +625,9 @@ function doGet(e) {
     if (!canSeeGame(auth, meta[sheetName])) {
       return json({ ok: false, error: `Tab "${sheetName}" not found.` });
     }
-    return json({ ok: true, version, rows: values, meta: meta[sheetName] || {} });
+    const gameResult = JSON.stringify({ ok: true, version, rows: values, meta: meta[sheetName] || {} });
+    cachePut(gameKey, gameResult, VERSIONED_TTL);
+    return rawJson(gameResult);
 
   } catch (err) {
     return json({ ok: false, error: err.toString() });

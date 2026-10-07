@@ -1858,6 +1858,64 @@ console.log('TR.FieldStats start zones');
   });
 }
 
+// ── Code.gs cache: gzip + chunking ────────────────────────────
+// Apps Script can't run here, so CacheService and Utilities are stood in for
+// with a Map and Node's zlib — enough to prove a value too big for one entry
+// comes back byte-for-byte, whichever path it took.
+console.log('Code.gs cache helpers');
+{
+  const zlib = require('zlib');
+  const gs   = fs.readFileSync('apps_script/Code.gs', 'utf8');
+  const src  = gs.slice(gs.indexOf('// ── Cache helpers'), gs.indexOf('// ── Tab ownership tokens'));
+  const store = new Map(), puts = [];
+  const cache = {
+    get: k => (store.has(k) ? store.get(k) : null),
+    getAll: ks => Object.fromEntries(ks.filter(k => store.has(k)).map(k => [k, store.get(k)])),
+    put: (k, v) => { if (v.length > 100000) throw new Error('entry too big'); store.set(k, v); puts.push(k); },
+    putAll: o => Object.entries(o).forEach(([k, v]) => cache.put(k, v)),
+  };
+  const blob = bytes => ({ getBytes: () => bytes, getDataAsString: () => Buffer.from(bytes).toString('utf8') });
+  const ctx = vm.createContext({
+    CacheService: { getScriptCache: () => cache },
+    Utilities: {
+      newBlob: (data) => blob(typeof data === 'string' ? Buffer.from(data, 'utf8') : Buffer.from(data)),
+      gzip: b => blob(zlib.gzipSync(Buffer.from(b.getBytes()))),
+      ungzip: b => blob(zlib.gunzipSync(Buffer.from(b.getBytes()))),
+      base64Encode: bytes => Buffer.from(bytes).toString('base64'),
+      base64Decode: str => [...Buffer.from(str, 'base64')],
+    },
+  });
+  vm.runInContext(src + '; this.cacheGet = cacheGet; this.cachePut = cachePut;', ctx);
+  const { cacheGet, cachePut } = ctx;
+
+  test('a small value is stored as is', () => {
+    cachePut('small', '{"ok":true}'); assert.equal(store.get('small'), '{"ok":true}'); assert.equal(cacheGet('small'), '{"ok":true}');
+  });
+  test('a 1 MB feed that compresses well fits one gzipped entry', () => {
+    const rows = Array.from({ length: 8000 }, (_, i) => ['0:01:23', 'Team 1', 'Touch', 'Touch ' + (i % 5 + 1), '', '', 'Team 1', '', 'pos:41,58', '2026_m35_euros_england_south-africa', 'England', 'South Africa', 'Euros', '2026', 'M35']);
+    const big = JSON.stringify({ ok: true, version: 7, rows });
+    assert.ok(big.length > 900000);
+    cachePut('all', big);
+    assert.ok(store.get('all').startsWith('gz:'));
+    assert.equal(cacheGet('all'), big);
+  });
+  test('something that won\'t compress enough is split across chunks', () => {
+    let seed = 1; const noise = Array.from({ length: 200000 }, () => String.fromCharCode(33 + ((seed = seed * 16807 % 2147483647) % 90))).join('');
+    cachePut('noisy', noise);
+    assert.match(store.get('noisy'), /^chunks:\d+$/);
+    assert.equal(cacheGet('noisy'), noise);
+  });
+  test('a missing chunk reads as a miss, not as broken data', () => {
+    const n = +store.get('noisy').split(':')[1];
+    store.delete('noisy#' + (n - 1));
+    assert.equal(cacheGet('noisy'), null);
+  });
+  test('unicode survives the round trip', () => {
+    const v = JSON.stringify({ team: 'Côte d’Ivoire — Équipe', rows: Array.from({ length: 4000 }, () => ['é', 'ü', '—']) });
+    cachePut('uni', v); assert.equal(cacheGet('uni'), v);
+  });
+}
+
 // ── Server copy of the strike-move rule ───────────────────────
 // Code.gs can't load js/events.js, so it carries its own deriveStrikeMove for
 // the inline-edit path. It drifted once — 6 Again, Penalty Defence and tagged
