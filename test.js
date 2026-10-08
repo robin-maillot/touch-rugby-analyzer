@@ -1922,6 +1922,105 @@ console.log('Code.gs cache helpers');
   });
 }
 
+// ── Code.gs per-game cache, end to end ────────────────────────
+// The whole of Code.gs against fake spreadsheets, properties and cache, to
+// show what each request costs: how many tabs it actually reads.
+console.log('Code.gs per-game cache');
+{
+  const zlib = require('zlib');
+  const gs = fs.readFileSync('apps_script/Code.gs', 'utf8');
+  let reads = [];
+  const mkSheet = (name, rows) => ({
+    rows, getName: () => name,
+    getDataRange: () => ({ getDisplayValues: () => { reads.push(name); return rows.map(r => r.slice()); } }),
+    getLastRow: () => rows.length,
+  });
+  const H = ['Time','Possession Owner','Type','Name','To Review','Comment','Action Owner','Strike Move','Detail'];
+  const games = {
+    gA: mkSheet('gA', [H, ['0:01','Team 1','Try','32','','','Team 1','32','pos:1,2'], ['0:02','Team 2','Turnover','Other','','','Team 2','','']]),
+    gB: mkSheet('gB', [H, ['0:05','Team 1','Touch','Touch 1','','','Team 1','','pos:3,4']]),
+    gC: mkSheet('gC', [H, ['0:09','Team 2','Try','21','','','Team 2','21','']]),
+  };
+  const control = {
+    _groups:   mkSheet('_groups',   [['Group','Secret','Role'], ['', 'adm', 'admin'], ['fra', 'staff1', 'staff']]),
+    _metadata: mkSheet('_metadata', [['Sheet Name','Team 1','Team 2','Competition','Year','Division','Groups'],
+                                     ['gA','France','England','Euros','2026','MO','fra'], ['gB','Wales','Italy','Euros','2026','MO',''], ['gC','Spain','Japan','Euros','2026','MO','fra']]),
+  };
+  const book = sheets => ({ getSheetByName: n => sheets[n] || null, getSheets: () => Object.values(sheets) });
+  const store = new Map(), props = new Map();
+  const blob = bytes => ({ getBytes: () => bytes, getDataAsString: () => Buffer.from(bytes).toString('utf8') });
+  const ctx = vm.createContext({
+    SpreadsheetApp: { openById: id => id === vm.runInContext('SHEET_ID', ctx) ? book(games) : book(control), flush() {} },
+    PropertiesService: { getScriptProperties: () => ({
+      getProperty: k => (props.has(k) ? props.get(k) : null), setProperty: (k, v) => props.set(k, String(v)),
+      deleteProperty: k => props.delete(k), getProperties: () => Object.fromEntries(props) }) },
+    CacheService: { getScriptCache: () => ({
+      get: k => (store.has(k) ? store.get(k) : null),
+      getAll: ks => Object.fromEntries(ks.filter(k => store.has(k)).map(k => [k, store.get(k)])),
+      put: (k, v) => { if (v.length > 100000) throw new Error('too big'); store.set(k, v); },
+      putAll: o => Object.entries(o).forEach(([k, v]) => store.set(k, v)),
+      remove: k => store.delete(k) }) },
+    Utilities: {
+      newBlob: d => blob(typeof d === 'string' ? Buffer.from(d, 'utf8') : Buffer.from(d)),
+      gzip: b => blob(zlib.gzipSync(Buffer.from(b.getBytes()))), ungzip: b => blob(zlib.gunzipSync(Buffer.from(b.getBytes()))),
+      base64Encode: b => Buffer.from(b).toString('base64'), base64Decode: s => [...Buffer.from(s, 'base64')],
+    },
+    DriveApp: { getFileById: () => ({ getLastUpdated: () => new Date(1000) }) },
+    ContentService: { MimeType: { JSON: 'json' }, createTextOutput: str => ({ str, setMimeType() { return this; } }) },
+  });
+  vm.runInContext(gs, ctx);
+  const get = params => JSON.parse(vm.runInContext('doGet', ctx)({ parameter: params }).str);
+  const push = name => { vm.runInContext('bumpGameRev', ctx)(name); vm.runInContext('cacheClear', ctx)(); };
+
+  test('the all-games feed is the same shape as before', () => {
+    reads = [];
+    const r = get({ secret: 'adm', action: 'all' });
+    assert.equal(r.ok, true);
+    assert.deepEqual([...r.rows[0]].slice(-9), ['Game','Team 1','Team 2','Competition','Year','Division','Video Name','Analyzable','ID']);
+    assert.equal(r.rows.length, 1 + 4);
+    assert.deepEqual([...r.rows[1]].slice(0, 4), ['0:01','Team 1','Try','32']);
+    assert.equal(r.rows[1][9], 'gA'); assert.equal(r.rows[1][10], 'France');
+    assert.deepEqual(reads.filter(n => n.startsWith('g')).sort(), ['gA', 'gB', 'gC']);
+  });
+  test('asked again, nothing is read', () => {
+    reads = []; get({ secret: 'adm', action: 'all' }); assert.deepEqual(reads, []);
+  });
+  test('after a push to one game, only that game is read again', () => {
+    games.gB.rows.push(['0:06','Team 1','Try','33','','','Team 1','33','']);
+    push('gB');
+    reads = [];
+    const r = get({ secret: 'adm', action: 'all' });
+    assert.deepEqual(reads.filter(n => n.startsWith('g')), ['gB']);
+    assert.equal(r.rows.length, 1 + 5);
+    assert.ok(r.rows.some(row => row[3] === '33' && row[9] === 'gB'));
+  });
+  test('a group sees only its games, and its first read uses the cached blocks', () => {
+    reads = [];
+    const r = get({ secret: 'staff1', action: 'all' });
+    assert.deepEqual([...new Set(r.rows.slice(1).map(row => row[9]))].sort(), ['gA', 'gC']);
+    assert.deepEqual(reads.filter(n => n.startsWith('g')), []);
+  });
+  test('one game: cached by its own revision, with the current version', () => {
+    reads = []; get({ secret: 'adm', sheetName: 'gA' });
+    reads = []; const a2 = get({ secret: 'adm', sheetName: 'gA' });
+    assert.deepEqual(reads.filter(n => n.startsWith('g')), []);
+    push('gC');                                                   // a write elsewhere
+    reads = []; const a3 = get({ secret: 'adm', sheetName: 'gA' });
+    assert.deepEqual(reads.filter(n => n.startsWith('g')), []);   // gA's rows survive it
+    assert.notEqual(a3.version, a2.version);                      // but the version is current
+    assert.equal(a3.version, get({ secret: 'adm', action: 'version' }).version);
+    assert.equal(a3.meta.team1, 'France'); assert.equal(a3.rows.length, 3);
+  });
+  test('a group cannot read a game it isn\'t in, cached or not', () => {
+    assert.equal(get({ secret: 'staff1', sheetName: 'gB' }).ok, false);
+    assert.equal(get({ secret: 'staff1', sheetName: 'gA' }).ok, true);
+  });
+  test('?action=build answers without a secret', () => {
+    const b = get({ action: 'build' });
+    assert.match(b.build, /per-game-cache/); assert.equal(b.cache.small, true); assert.equal(b.cache.large, true);
+  });
+}
+
 // ── Server copy of the strike-move rule ───────────────────────
 // Code.gs can't load js/events.js, so it carries its own deriveStrikeMove for
 // the inline-edit path. It drifted once — 6 Again, Penalty Defence and tagged
