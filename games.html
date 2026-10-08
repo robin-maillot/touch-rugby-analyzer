@@ -203,6 +203,9 @@
     #fieldBody { overflow-y: auto; padding: 4px 0 16px; }
     .field-halves { display: flex; gap: 6px; padding: 10px 16px 2px; flex-wrap: wrap; }
     .zone-row { display: flex; gap: 6px; padding: 6px 16px 2px; flex-wrap: wrap; align-items: center; }
+    .mirror-tick { display: flex; align-items: center; gap: 7px; padding: 6px 16px 2px; font-size: 0.74rem; color: var(--text-muted); cursor: pointer; }
+    .mirror-tick input { width: 16px; height: 16px; accent-color: var(--accent); }
+    .mirror-tick small { color: #6c7689; }
     .zone-row .zone-lab { font-size: 0.66rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); margin-right: 2px; }
     .zone-row .half-btn small { color: #6c7689; margin-left: 4px; font-size: 0.68rem; }
     .zone-row .half-btn.active small { color: inherit; opacity: 0.8; }
@@ -1637,14 +1640,30 @@ let fieldHalf = 'all';
 // The game's rows in the shape js/field_stats.js reads. Owners were renamed to
 // team names on load, so they're mapped back to Team 1 / Team 2. Positions come
 // from Detail ("pos:62,48"), or from Comment ("@62,48") on older games.
-function fieldEvents(game) {
+// "Mirror alternate halves" — shared by Field View and Possessions, per device.
+let mirrorHalves = (() => { try { return localStorage.getItem('trl2_mirrorHalves') === '1'; } catch (e) { return false; } })();
+function setMirrorHalves(on) {
+  mirrorHalves = !!on;
+  try { localStorage.setItem('trl2_mirrorHalves', on ? '1' : '0'); } catch (e) {}
+  if (document.getElementById('fieldOverlay').style.display === 'flex') renderFieldModal();
+  if (document.getElementById('possOverlay').style.display === 'flex') renderPossModal();
+}
+// The tick, only for a game with more than one half.
+function mirrorTickHTML() {
+  if (TR.FieldStats.halfCount(fieldEvents(currentGame, true)) < 2) return '';
+  return `<label class="mirror-tick" title="Positions are recorded from the side of the team with the ball, so a team's left is the other touchline once ends change. Mirroring every other half puts them on the same real touchlines.">` +
+    `<input type="checkbox" ${mirrorHalves ? 'checked' : ''} onchange="setMirrorHalves(this.checked)"> Mirror alternate halves <small>teams change ends</small></label>`;
+}
+
+function fieldEvents(game, raw) {
   const key = name => name === game.team1 ? 'Team 1' : name === game.team2 ? 'Team 2' : name;
-  return game.events.map(e => {
+  const evs = game.events.map(e => {
     const p = TR.detailPos(e.Detail, e.Comment);
     return { type: e.Type, name: e.Name, possessionOwner: key(e['Possession Owner']),
              actionOwner: key(e['Action Owner']), x: p ? p.x : null, y: p ? p.y : null,
              tags: e.Type === 'Try' ? TR.parseDetail(e.Detail) : null };
   });
+  return mirrorHalves && !raw ? TR.FieldStats.mirrorAlternateHalves(evs) : evs;
 }
 
 // Split at each Game Start, in sheet order — the same halves the page uses.
@@ -1739,7 +1758,7 @@ function renderFieldModal() {
       return `<tr class="row-b"><td class="metric-name">${r[0]}</td><td class="val-cell ${c1}">${r[1]}</td><td class="val-cell ${c2}">${r[2]}</td></tr>`;
     }).join('') + `</tbody></table></div>`;
 
-  document.getElementById('fieldBody').innerHTML = halfBtns + zoneRow +
+  document.getElementById('fieldBody').innerHTML = halfBtns + zoneRow + mirrorTickHTML() +
     `<div class="field-sec">Where they play</div>
      <div class="field-maps">${FS.fieldMapSVG(t1, FIELD_COLORS['Team 1'], names['Team 1'])}${FS.fieldMapSVG(t2, FIELD_COLORS['Team 2'], names['Team 2'])}</div>
      ${FS.fieldMapKey()}
@@ -1843,7 +1862,7 @@ function drawPossModal() {
     document.getElementById('possBody').innerHTML = halfBtns + zoneRow + `<div class="field-note">No positioned sets ${startZone === 'all' ? 'in this part of the game' : 'started there'}.</div>`;
     return;
   }
-  document.getElementById('possBody').innerHTML = halfBtns + zoneRow + FS.pathsKey() +
+  document.getElementById('possBody').innerHTML = halfBtns + zoneRow + mirrorTickHTML() + FS.pathsKey() +
     `<div class="field-sec">Paths — where each set went</div>
      <div class="pp-teams">${keys.map(key => `<div data-team="${key}">
         <div class="pp-team-name" style="color:${FIELD_COLORS[key]}">${escapeHtml(names[key])}</div>

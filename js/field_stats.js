@@ -315,6 +315,23 @@ TR.FieldStats = (() => {
       .map(s => Object.assign(s, { outcome: outcomeOf({ endType: s.end.type, endName: s.end.name }) || 'Other' }));
   }
 
+  // ── Teams changing ends ───────────────────────────────────────
+  // Positions are stored from the side of the team that had the ball — x = 0
+  // is its left as it attacks — so they compare like for like across halves.
+  // Teams change ends at each half, though, so a team's left in the 2nd half
+  // is the other physical touchline. Mirroring every other half (the 2nd, the
+  // 4th…) puts all of them back on the same real touchlines: a wing that's
+  // always on the grandstand side lines up instead of splitting in two.
+  // Only x moves; metres, start zones and open / blind don't depend on it.
+  function mirrorAlternateHalves(events) {
+    let half = 0;
+    return events.map(a => {
+      if (a.type === 'Game Event' && a.name === 'Game Start') half++;
+      return half % 2 === 0 && half > 0 && a.x != null ? Object.assign({}, a, { x: 100 - a.x }) : a;
+    });
+  }
+  const halfCount = events => events.filter(a => a.type === 'Game Event' && a.name === 'Game Start').length;
+
   // ── Where a set started ───────────────────────────────────────
   // Split at the two 10m lines either side of halfway: before your own 10m
   // (0–25m from your try line), between the 10m lines (25–45m), or past the
@@ -610,7 +627,7 @@ TR.FieldStats = (() => {
   return {
     Y_TO_M, RED_ZONE, MAP_LEN, OUTCOMES, mean,
     tryTagStats, sideBar, channelTagBar, SIDES, CHANNELS,
-    START_ZONES, startZone, eventsStartingIn,
+    START_ZONES, startZone, eventsStartingIn, mirrorAlternateHalves, halfCount,
     possessionSets, computeFieldStats, outcomeOf,
     fieldMapSVG, fieldMapKey, outcomeBar, channelBar, territorySVG, chartLegend,
     possessionPaths, pathGains, gainBuckets, typicalSet, GAIN_BUCKETS, OUTCOME_STYLE,
