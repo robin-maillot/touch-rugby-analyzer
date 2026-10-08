@@ -1825,6 +1825,29 @@ console.log('TR.FieldStats tries by side and channel');
   });
 }
 
+console.log('TR.FieldStats mirror alternate halves');
+{
+  const FS = TR.FieldStats;
+  const ev = (type, name, x, y) => ({ type, name, possessionOwner: 'Team 1', actionOwner: 'Team 1', x: x ?? null, y: y ?? null });
+  const game = [
+    ev('Game Event', 'Game Start'), ev('Touch', 'Touch 1', 20, 30), ev('Game Event', 'Game End'),
+    ev('Game Event', 'Game Start'), ev('Touch', 'Touch 1', 20, 30), ev('Try', 'Other', 10, 100), ev('Game Event', 'Game End'),
+    ev('Game Event', 'Game Start'), ev('Touch', 'Touch 1', 20, 30),
+  ];
+  const m = FS.mirrorAlternateHalves(game);
+  test('only the 2nd (and 4th…) half flips, and only left-right', () => {
+    assert.deepEqual(m.filter(e => e.x != null).map(e => [e.x, e.y]), [[20, 30], [80, 30], [90, 100], [20, 30]]);
+  });
+  test('the original events are left untouched', () => assert.equal(game[4].x, 20));
+  test('events without a position stay without one', () => assert.equal(m[0].x, null));
+  test('counts halves', () => { assert.equal(FS.halfCount(game), 3); assert.equal(FS.halfCount([]), 0); });
+  test('channels follow the mirror', () => {
+    const plain = FS.computeFieldStats(game).t1.channels, mir = FS.computeFieldStats(m).t1.channels;
+    assert.deepEqual([...plain], [100, 0, 0]);          // three touches at x 20 → all left
+    assert.deepEqual([...mir], [67, 0, 33]);             // the 2nd-half one moves right
+  });
+}
+
 console.log('TR.FieldStats start zones');
 {
   const FS = TR.FieldStats;

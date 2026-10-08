@@ -357,6 +357,9 @@
     }
 
     /* The numbers panel: Scoring to Inside the 10m, folded by default. */
+    .mirror-tick { display: flex; align-items: center; gap: 8px; margin: 10px 16px 0; font-size: 0.76rem; color: var(--text-muted); cursor: pointer; }
+    .mirror-tick input { width: 18px; height: 18px; accent-color: var(--accent); }
+    .mirror-tick small { color: var(--text-dim); }
     .stats-fold { margin: 10px 12px 4px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
     .stats-fold > summary {
       list-style: none; cursor: pointer; display: flex; flex-direction: column; gap: 2px;
@@ -2833,7 +2836,7 @@ function refreshStats() {
     : '';
   // Tries by side and by channel, from the tags each try carries.
   const FS = TR.FieldStats;
-  const tagStats = FS.tryTagStats(annotations);
+  const tagStats = FS.tryTagStats(statsEvents());
   const tagOf = k => (k === 'Team 1' ? tagStats.t1 : tagStats.t2);
   const anyTags = [tagStats.t1, tagStats.t2].some(t => t.sideTagged || t.chTagged);
   const tagNote = k => `tagged: ${names[kL]} ${tagOf(kL)[k]} of ${tagOf(kL).tries} · ${names[kR]} ${tagOf(kR)[k]} of ${tagOf(kR).tries}`;
@@ -2855,7 +2858,7 @@ function refreshStats() {
 
   // Every set as a path, metres on each touch, every set as a column — the
   // same three views as Game Analysis's Possessions panel.
-  const paths = FS.possessionPaths(annotations);
+  const paths = FS.possessionPaths(statsEvents());
   const mineP = key => paths.filter(s2 => s2.owner === key);
   [kL, kR].forEach(k => { if (statsPick[k] != null && !mineP(k)[statsPick[k]]) statsPick[k] = null; });
   const possFold = paths.length
@@ -2879,7 +2882,11 @@ function refreshStats() {
       `</details>`
     : '';
 
-  document.getElementById('statsBody').innerHTML = fieldFold + possFold + html + scorersHTML(kL, kR, names, cols);
+  const mirrorTick = (fieldFold || possFold) && FS.halfCount(annotations) > 1
+    ? `<label class="mirror-tick" title="Positions are recorded from the side of the team with the ball, so a team's left is the other touchline once ends change. Mirroring every other half puts them on the same real touchlines.">` +
+      `<input type="checkbox" ${mirrorHalves ? 'checked' : ''} onchange="setMirrorHalves(this.checked)"> Mirror alternate halves <small>teams change ends</small></label>`
+    : '';
+  document.getElementById('statsBody').innerHTML = mirrorTick + fieldFold + possFold + html + scorersHTML(kL, kR, names, cols);
   renderMoves();
 }
 
@@ -4063,8 +4070,17 @@ const Y_TO_M   = FS.Y_TO_M;                    // one y unit, in metres
 const RED_ZONE = FS.RED_ZONE;                  // inside the opposition 10m line
 const OUTCOMES = FS.OUTCOMES;
 const mean     = FS.mean;
-const possessionSets    = () => FS.possessionSets(annotations);
-const computeFieldStats = () => FS.computeFieldStats(annotations);
+// "Mirror alternate halves" on the Stats sheet (per device): every other half's
+// positions flipped left-right, so the halves line up on the real touchlines.
+let mirrorHalves = localStorage.getItem('fieldMirrorHalves') === '1';
+function setMirrorHalves(on) {
+  mirrorHalves = !!on;
+  try { localStorage.setItem('fieldMirrorHalves', on ? '1' : '0'); } catch (e) {}
+  refreshStats();
+}
+const statsEvents = () => mirrorHalves ? FS.mirrorAlternateHalves(annotations) : annotations;
+const possessionSets    = () => FS.possessionSets(statsEvents());
+const computeFieldStats = () => FS.computeFieldStats(statsEvents());
 const fieldMapSVG  = (stat, key, name) => FS.fieldMapSVG(stat, TEAM_COLOR[key], name);
 const outcomeOf    = FS.outcomeOf;
 const outcomeBar   = FS.outcomeBar;
