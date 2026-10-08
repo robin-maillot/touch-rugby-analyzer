@@ -234,29 +234,7 @@
       box-shadow: 0 8px 40px rgba(0,0,0,0.6); flex-shrink: 0;
     }
     #possBody { overflow-y: auto; padding: 4px 0 16px; }
-    .pp-teams { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 4px 16px 0; }
-    .pp-team-name { text-align: center; font-size: 0.75rem; font-weight: 800; margin-bottom: 4px; }
-    .pp-pitch { display: block; width: 100%; max-width: 300px; margin: 0 auto; }
-    .pp-chart { display: block; width: 100%; height: auto; }
-    .pp-gain  { max-width: 560px; margin: 0 auto; padding: 0 16px; }
-    .pp-key { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px; font-size: 0.66rem; color: var(--text-muted); padding: 4px 16px 2px; }
-    .pp-key span { display: inline-flex; align-items: center; gap: 5px; }
-    .pp-legend { display: flex; justify-content: center; gap: 14px; font-size: 0.68rem; font-weight: 700; padding: 0 16px 2px; }
-    .pp-read { min-height: 64px; margin: 6px auto 0; max-width: 340px; font-size: 0.74rem; line-height: 1.45; color: var(--text); }
-    .pp-read .pp-hint { color: var(--text-dim); }
-    .pp-read .pp-steps { display: block; font-size: 0.68rem; color: var(--text-muted); margin-top: 2px; }
-    .pp-nav { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
-    .pp-nav button {
-      background: #1e2433; border: 1px solid #2b3242; color: #e9ecf3; border-radius: 6px;
-      min-width: 34px; height: 30px; font-size: 0.95rem; cursor: pointer; touch-action: manipulation;
-    }
-    .pp-nav button:disabled { opacity: 0.35; cursor: default; }
-    .pp-nav .pp-clear { margin-left: auto; font-size: 0.7rem; min-width: 0; padding: 0 10px; color: #9ba6b9; }
-    .pp-nav .pp-title { font-weight: 800; }
-    @media (max-width: 560px) {
-      .pp-teams { grid-template-columns: 1fr; }
-      .pp-pitch { max-width: 260px; }
-    }
+    /* Paths, metres per touch and set columns: css/field_stats.css. */
     /* ── Turnover Distribution Modal ───────────────────────────── */
     #turnoverOverlay {
       position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 200;
@@ -1858,23 +1836,7 @@ function drawPossModal() {
           `<button class="half-btn${String(v) === String(possHalf) ? ' active' : ''}" onclick="pickPossHalf(${v === 'all' ? "'all'" : v})">${label}</button>`).join('') +
       `</div>` : '';
 
-  const readout = key => {
-    const list = mine(key), i = possPick[key];
-    if (i == null || !list[i]) {
-      const typical = FS.typicalSet(list);
-      const t = typical.length > 1
-        ? ` Dashed: the typical set — touch ${typical[0].k} at ${(typical[0].y * FS.Y_TO_M).toFixed(0)}m to touch ${typical[typical.length - 1].k} at ${(typical[typical.length - 1].y * FS.Y_TO_M).toFixed(0)}m.` : '';
-      return `<div class="pp-nav"><button onclick="stepPossSet('${key}',-1)" aria-label="Last set">‹</button><button onclick="stepPossSet('${key}',1)" aria-label="First set">›</button></div>` +
-             `<span class="pp-hint">Click an ending — or a column below — to see that set. ${list.length} set${list.length === 1 ? '' : 's'}.${t}</span>`;
-    }
-    const d = FS.describeSet(list[i], i, list.length);
-    return `<div class="pp-nav">
-        <button onclick="stepPossSet('${key}',-1)" ${i === 0 ? 'disabled' : ''} aria-label="Previous set">‹</button>
-        <button onclick="stepPossSet('${key}',1)" ${i === list.length - 1 ? 'disabled' : ''} aria-label="Next set">›</button>
-        <span class="pp-title" style="color:${d.color}">${escapeHtml(d.title)}</span>
-        <button class="pp-clear" onclick="pickPossSet('${key}', ${i})">✕ clear</button>
-      </div>${escapeHtml(d.summary)}<span class="pp-steps">${d.steps.map(escapeHtml).join(' · ')}</span>`;
-  };
+  const readout = key => FS.pathsReadout(mine(key), possPick[key], key, { step: 'stepPossSet', pick: 'pickPossSet' });
 
   const zoneRow = zoneFilterHTML(possHalfSets(), 'pickPossZone');
   if (!sets.length) {

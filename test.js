@@ -1789,6 +1789,10 @@ console.log('TR.FieldStats possession paths');
     assert.equal(d.title, 'Try · 33 - Cut');
     assert.match(d.summary, /won at 39m to 70m, \+31m straight from the turnover, no touch/);
   });
+  test('a no-touch try off the tap says so', () => {
+    const tapTry = FS.possessionPaths([ev('Game Event', 'Game Start', 'Team 1'), ev('Try', 'Other', 'Team 1', 50, 100)]);
+    assert.match(FS.describeSet(tapTry[0], 0, 1).summary, /straight from the tap, no touch/);
+  });
   test('drawing returns markup with clickable sets', () => {
     assert.match(FS.pathsSVG(sets.filter(s => s.owner === 'Team 1'), '#3b82f6', 1), /data-set="1"/);
     assert.match(FS.setColumnsSVG(sets, '#3b82f6', null), /pp-col/);
