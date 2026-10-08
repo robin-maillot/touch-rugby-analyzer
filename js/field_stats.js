@@ -521,12 +521,38 @@ TR.FieldStats = (() => {
     const start = a.k === 'start' ? (a.how === 'tap' ? 'from the tap on halfway' : `won at ${(a.y * Y_TO_M).toFixed(0)}m`) : `from ${(a.y * Y_TO_M).toFixed(0)}m`;
     const gain = (z.y - a.y) * Y_TO_M;
     const move = s.end.type === 'Try' && s.end.name && s.end.name !== 'Other' ? ` · ${s.end.name}` : '';
-    const how = touches ? `over ${touches} touch${touches === 1 ? '' : 'es'}` : 'straight from the turnover, no touch';
+    const how = touches ? `over ${touches} touch${touches === 1 ? '' : 'es'}`
+      : a.k === 'start' && a.how === 'tap' ? 'straight from the tap, no touch' : 'straight from the turnover, no touch';
     return {
       title: `${st.label}${move}`, color: st.color,
       summary: `Set ${i + 1} of ${total}: ${start} to ${(z.y * Y_TO_M).toFixed(0)}m, ${gain >= 0 ? '+' : ''}${gain.toFixed(0)}m ${how}`,
       steps: pathGains(s).map(g => `${g.label} ${g.m >= 0 ? '+' : ''}${g.m.toFixed(0)}m`),
     };
+  }
+
+  const escHtml = v => String(v == null ? '' : v).replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  // The line under each team's paths pitch: a hint and the typical set when
+  // nothing is picked; the picked set's outcome, start-to-end metres and each
+  // step's gain when one is, with ‹ › to step and ✕ to clear. `on` names the
+  // page's handlers — on.step(team, ±1) and on.pick(team, index).
+  function pathsReadout(list, i, team, on) {
+    const nav = (prev, next) =>
+      `<button onclick="${on.step}('${team}',-1)" ${prev ? '' : 'disabled'} aria-label="Previous set">‹</button>` +
+      `<button onclick="${on.step}('${team}',1)" ${next ? '' : 'disabled'} aria-label="Next set">›</button>`;
+    if (i == null || !list[i]) {
+      const typical = typicalSet(list);
+      const t = typical.length > 1
+        ? ` Dashed: the typical set — touch ${typical[0].k} at ${(typical[0].y * Y_TO_M).toFixed(0)}m to touch ${typical[typical.length - 1].k} at ${(typical[typical.length - 1].y * Y_TO_M).toFixed(0)}m.` : '';
+      return `<div class="pp-nav">${nav(list.length, list.length)}</div>` +
+             `<span class="pp-hint">Tap an ending — or a column below — to see that set. ${list.length} set${list.length === 1 ? '' : 's'}.${t}</span>`;
+    }
+    const d = describeSet(list[i], i, list.length);
+    return `<div class="pp-nav">${nav(i > 0, i < list.length - 1)}
+        <span class="pp-title" style="color:${d.color}">${escHtml(d.title)}</span>
+        <button class="pp-clear" onclick="${on.pick}('${team}', ${i})">✕ clear</button>
+      </div>${escHtml(d.summary)}<span class="pp-steps">${d.steps.map(escHtml).join(' · ')}</span>`;
   }
 
   const pathsKey = () => `<div class="pp-key">` +
@@ -588,6 +614,6 @@ TR.FieldStats = (() => {
     possessionSets, computeFieldStats, outcomeOf,
     fieldMapSVG, fieldMapKey, outcomeBar, channelBar, territorySVG, chartLegend,
     possessionPaths, pathGains, gainBuckets, typicalSet, GAIN_BUCKETS, OUTCOME_STYLE,
-    pathsSVG, gainChartSVG, setColumnsSVG, describeSet, pathsKey,
+    pathsSVG, gainChartSVG, setColumnsSVG, describeSet, pathsKey, pathsReadout,
   };
 })();

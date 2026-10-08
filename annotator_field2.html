@@ -2593,9 +2593,32 @@ function computeStats() {
   return { t1, t2 };
 }
 
-// Whether the numbers panel is open. The sheet redraws every 5s, so the state
-// lives here (and per device) rather than in the DOM, or it would snap shut.
-let statsFoldOpen = localStorage.getItem('fieldStatsFoldOpen') === '1';
+// Which of the sheet's folding panels are open. The sheet redraws every 5s, so
+// the state lives here (and per device) rather than in the DOM, or a panel
+// would snap shut under you. Field starts open — its charts were always on
+// show — the others closed.
+const STATS_FOLDS = {
+  statsFieldFold: { key: 'fieldStatsFieldOpen', dflt: true },
+  statsPossFold:  { key: 'fieldStatsPossOpen',  dflt: false },
+  statsFold:      { key: 'fieldStatsFoldOpen',  dflt: false },
+};
+const statsFoldOpenState = {};
+Object.entries(STATS_FOLDS).forEach(([id, f]) => {
+  let v = null; try { v = localStorage.getItem(f.key); } catch (e) {}
+  statsFoldOpenState[id] = v == null ? f.dflt : v === '1';
+});
+const foldAttr = id => statsFoldOpenState[id] ? ' open' : '';
+
+// The Possessions panel's picked set, per team; ‹ › step through that team's sets.
+let statsPick = { 'Team 1': null, 'Team 2': null };
+function statsPickSet(team, i) { statsPick[team] = statsPick[team] === i ? null : i; refreshStats(); }
+function statsStepSet(team, dir) {
+  const n = TR.FieldStats.possessionPaths(annotations).filter(s => s.owner === team).length;
+  if (!n) return;
+  const cur = statsPick[team];
+  statsPick[team] = cur == null ? (dir > 0 ? 0 : n - 1) : Math.max(0, Math.min(n - 1, cur + dir));
+  refreshStats();
+}
 
 function openStats() {
   refreshStats();
@@ -2766,7 +2789,7 @@ function refreshStats() {
   const cut    = drives >= 0 ? drives : sections.length;
   const fold = sections.slice(0, cut), rest = sections.slice(cut);
   const html =
-    `<details class="stats-fold" id="statsFold"${statsFoldOpen ? ' open' : ''}>` +
+    `<details class="stats-fold" id="statsFold"${foldAttr('statsFold')}>` +
       `<summary><span>Match numbers</span><small>${fold.map(sec => sec.label).join(' · ')}</small></summary>` +
       fold.map(renderSection).join('') +
     `</details>` + rest.map(renderSection).join('');
@@ -2808,7 +2831,55 @@ function refreshStats() {
          <span><i class="k-avg"></i>avg T3 / T4</span>
        </div>`
     : '';
-  document.getElementById('statsBody').innerHTML = mapHtml + chartHtml + html + scorersHTML(kL, kR, names, cols);
+  // Tries by side and by channel, from the tags each try carries.
+  const FS = TR.FieldStats;
+  const tagStats = FS.tryTagStats(annotations);
+  const tagOf = k => (k === 'Team 1' ? tagStats.t1 : tagStats.t2);
+  const anyTags = [tagStats.t1, tagStats.t2].some(t => t.sideTagged || t.chTagged);
+  const tagNote = k => `tagged: ${names[kL]} ${tagOf(kL)[k]} of ${tagOf(kL).tries} · ${names[kR]} ${tagOf(kR)[k]} of ${tagOf(kR).tries}`;
+  const tagsHtml = anyTags ? `
+    <div class="stats-section">Tries — open or blind side</div>
+    ${FS.sideBar(tagOf(kL), names[kL], cols[kL])}
+    ${FS.sideBar(tagOf(kR), names[kR], cols[kR])}
+    <div class="cnote">${tagNote('sideTagged')}</div>
+    <div class="stats-section">Tries — channel</div>
+    ${FS.channelTagBar(tagOf(kL), names[kL], cols[kL])}
+    ${FS.channelTagBar(tagOf(kR), names[kR], cols[kR])}
+    <div class="cnote">MM · ML · LW · W+ — ${tagNote('chTagged')}</div>` : '';
+
+  const fieldFold = (field.any || anyTags)
+    ? `<details class="stats-fold" id="statsFieldFold"${foldAttr('statsFieldFold')}>` +
+        `<summary><span>Field</span><small>Where they play · How sets end · How far · Channels${anyTags ? ' · Tries by side & channel' : ''}</small></summary>` +
+        mapHtml + chartHtml + tagsHtml + `</details>`
+    : '';
+
+  // Every set as a path, metres on each touch, every set as a column — the
+  // same three views as Game Analysis's Possessions panel.
+  const paths = FS.possessionPaths(annotations);
+  const mineP = key => paths.filter(s2 => s2.owner === key);
+  [kL, kR].forEach(k => { if (statsPick[k] != null && !mineP(k)[statsPick[k]]) statsPick[k] = null; });
+  const possFold = paths.length
+    ? `<details class="stats-fold" id="statsPossFold"${foldAttr('statsPossFold')}>` +
+        `<summary><span>Possessions</span><small>Paths · Metres on each touch · Every set in order</small></summary>` +
+        FS.pathsKey() +
+        `<div class="stats-section">Paths — where each set went</div>
+         <div class="pp-teams">${[kL, kR].map(k => `<div data-team="${k}">
+            <div class="pp-team-name" style="color:${cols[k]}">${escapeHtml(names[k])}</div>
+            ${FS.pathsSVG(mineP(k), cols[k], statsPick[k])}
+            <div class="pp-read">${FS.pathsReadout(mineP(k), statsPick[k], k, { step: 'statsStepSet', pick: 'statsPickSet' })}</div></div>`).join('')}</div>
+         <div class="stats-section">Metres gained on each touch</div>
+         <div class="pp-legend">${[kL, kR].map(k => `<span style="color:${cols[k]}">■ ${escapeHtml(names[k])}</span>`).join('')}</div>
+         <div class="pp-gain">${FS.gainChartSVG([kL, kR].map(k => ({ name: names[k], color: cols[k], sets: mineP(k) })))}</div>
+         <div class="cnote" style="text-align:center">bar = average metres from one touch to the next · dots = every set · under each: average sideways drift</div>
+         <div class="stats-section">Every set, in order</div>
+         <div class="pp-teams">${[kL, kR].map(k => `<div data-team="${k}">
+            <div class="pp-team-name" style="color:${cols[k]}">${escapeHtml(names[k])}</div>
+            ${FS.setColumnsSVG(mineP(k), cols[k], statsPick[k])}</div>`).join('')}</div>
+         <div class="cnote" style="text-align:center">bottom = where the set started · one segment per touch, later = darker · red = ground lost · marker on top = how it ended</div>` +
+      `</details>`
+    : '';
+
+  document.getElementById('statsBody').innerHTML = fieldFold + possFold + html + scorersHTML(kL, kR, names, cols);
   renderMoves();
 }
 
@@ -4017,10 +4088,17 @@ window.addEventListener('DOMContentLoaded', () => {
   });
   // 'toggle' doesn't bubble, so it's caught on the way down.
   document.getElementById('statsBody').addEventListener('toggle', ev => {
-    if (ev.target.id !== 'statsFold') return;
-    statsFoldOpen = ev.target.open;
-    try { localStorage.setItem('fieldStatsFoldOpen', statsFoldOpen ? '1' : '0'); } catch (e) {}
+    const f = STATS_FOLDS[ev.target.id];
+    if (!f) return;
+    statsFoldOpenState[ev.target.id] = ev.target.open;
+    try { localStorage.setItem(f.key, ev.target.open ? '1' : '0'); } catch (e) {}
   }, true);
+  document.getElementById('statsBody').addEventListener('click', ev => {
+    const hit = ev.target.closest('#statsBody .pp-end, #statsBody .pp-col');
+    if (!hit) return;
+    const team = hit.closest('[data-team]');
+    if (team) statsPickSet(team.dataset.team, +hit.dataset.set);
+  });
   // Digits-only boxes (the scorer's number). An iPad has no digits-only keypad
   // — inputmode="numeric" still opens the full keyboard on its numbers page —
   // so anything else is refused before it lands: a typed letter or symbol, a
