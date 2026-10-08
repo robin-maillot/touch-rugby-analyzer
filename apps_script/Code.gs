@@ -304,7 +304,14 @@ const CHUNK_PREFIX = 'chunks:';
 function cacheGet(key) {
   try {
     const cache = CacheService.getScriptCache();
-    let v = cache.get(key);
+    return cacheDecode(cache, key, cache.get(key));
+  } catch (e) { return null; }
+}
+
+// A stored value back to the string that was put: as is, gunzipped, or its
+// chunks fetched and joined first. null when anything is missing.
+function cacheDecode(cache, key, v) {
+  try {
     if (v == null) return null;
     if (v.indexOf(CHUNK_PREFIX) === 0) {
       const n = parseInt(v.slice(CHUNK_PREFIX.length), 10);
@@ -319,6 +326,56 @@ function cacheGet(key) {
     }
     return v;
   } catch (e) { return null; }
+}
+
+// Many keys in one round trip — the per-game blocks of action=all.
+function cacheGetMany(keys) {
+  const out = {};
+  if (!keys.length) return out;
+  try {
+    const cache = CacheService.getScriptCache();
+    const raw = cache.getAll(keys);
+    keys.forEach(k => { const v = cacheDecode(cache, k, raw[k]); if (v != null) out[k] = v; });
+  } catch (e) {}
+  return out;
+}
+
+// ── Per-game revisions ─────────────────────────────────────────
+// The data version moves on every write anywhere, which is right for clients
+// deciding whether to refetch — but it made every cached game stale when any
+// one game changed, so the first read after a push rebuilt all of them. Each
+// game now also has its own revision, bumped only when that game's rows
+// change, and its cached rows are keyed by that: a push re-reads one tab.
+const REV_PREFIX = 'rev:';
+// Keyed by revision, so these can't go stale; the cache's own maximum.
+const BLOCK_TTL = 21600;   // 6 hours
+
+function bumpGameRev(sheetName) {
+  if (!sheetName) return;
+  try {
+    const props = PropertiesService.getScriptProperties();
+    props.setProperty(REV_PREFIX + sheetName, nextStamp(props.getProperty(REV_PREFIX + sheetName)));
+  } catch (e) {}
+}
+
+function gameRevs() {
+  const out = {};
+  try {
+    const all = PropertiesService.getScriptProperties().getProperties();
+    Object.keys(all).forEach(k => { if (k.indexOf(REV_PREFIX) === 0) out[k.slice(REV_PREFIX.length)] = all[k]; });
+  } catch (e) {}
+  return out;
+}
+
+// _metadata, cached by data version: every metadata write bumps the version,
+// so this can't go stale, and the many reads between writes skip the sheet.
+function getMetadataCached(version) {
+  const key = 'meta:v' + version;
+  const hit = cacheGet(key);
+  if (hit) { try { return JSON.parse(hit); } catch (e) {} }
+  const meta = getMetadata();
+  cachePut(key, JSON.stringify(meta), VERSIONED_TTL);
+  return meta;
 }
 
 function cachePut(key, str, ttl) {
@@ -376,9 +433,17 @@ function cacheClear() {
 // and cause clients to skip refetches and serve stale localStorage caches.
 const VERSION_PROP = 'sheetVersion';
 
+// Always moves forward, even for two writes in the same millisecond — a
+// version that didn't change would let a client miss the second write.
+function nextStamp(prev) {
+  const p = Number(prev) || 0;
+  return String(Math.max(Date.now(), p + 1));
+}
+
 function bumpVersion() {
   try {
-    PropertiesService.getScriptProperties().setProperty(VERSION_PROP, String(Date.now()));
+    const props = PropertiesService.getScriptProperties();
+    props.setProperty(VERSION_PROP, nextStamp(props.getProperty(VERSION_PROP)));
   } catch (e) {}
 }
 
@@ -440,6 +505,7 @@ function onMetadataEdit(e) {
 function onGameDataEdit(e) {
   try {
     if (!e || !e.range) return;
+    bumpGameRev(e.range.getSheet().getName());
     cacheClear();
   } catch (err) {}
 }
@@ -453,7 +519,7 @@ function rawJson(str) {
 // version last deployed, whatever is saved in the editor, and the responses
 // look the same either way — so bump this with every Apps Script change and
 // check it with ?action=build after deploying.
-const BUILD = '2026-10-07 compressed-cache';
+const BUILD = '2026-10-08 per-game-cache';
 
 // Writes and reads back a small and a large (compressed) entry through the
 // cache helpers, so a deploy can be checked end to end without logs.
@@ -595,7 +661,7 @@ function doGet(e) {
       if (hit) return rawJson(hit);
 
       const version = getSheetVersion();
-      const meta    = getMetadata();
+      const meta    = getMetadataCached(version);
       const ss     = SpreadsheetApp.openById(SHEET_ID);
       const allowed = new Set(Object.keys(meta).filter(name => canSeeGame(auth, meta[name])));
       const sheets = ss.getSheets().filter(s => allowed.has(s.getName()));
@@ -604,21 +670,30 @@ function doGet(e) {
       // Always emit a canonical header regardless of each sheet's column order
       allRows.push([...HEADERS, 'Game', ...META_COLS]);
 
+      // Each game's rows, mapped to HEADERS, cached by that game's revision —
+      // so only games changed since they were cached are read from the sheet.
+      const revs = gameRevs();
+      const blockKey = name => 'blk:' + name + ':r' + (revs[name] || '0');
+      const cached = cacheGetMany(sheets.map(sh => blockKey(sh.getName())));
+
       for (const sheet of sheets) {
-        const values = sheet.getDataRange().getDisplayValues();
-        if (values.length < 2) continue;
-
-        // Map each canonical header to its index in this sheet (by name, case-insensitive)
-        const sheetHeaders = values[0].map(h => h.trim().toLowerCase());
-        const colIndices   = HEADERS.map(h => sheetHeaders.indexOf(h.toLowerCase()));
-
         const name = sheet.getName();
-        const m    = meta[name] || {};
+        let block = null;
+        if (cached[blockKey(name)] != null) { try { block = JSON.parse(cached[blockKey(name)]); } catch (e) {} }
+        if (!block) {
+          const values = sheet.getDataRange().getDisplayValues();
+          // Map each canonical header to its index in this sheet (by name, case-insensitive)
+          const sheetHeaders = values.length ? values[0].map(h => h.trim().toLowerCase()) : [];
+          const colIndices   = HEADERS.map(h => sheetHeaders.indexOf(h.toLowerCase()));
+          block = values.slice(1).map(row => colIndices.map(c => c >= 0 ? row[c] : ''));
+          cachePut(blockKey(name), JSON.stringify(block), BLOCK_TTL);
+        }
+        if (!block.length) continue;
+        // Game details come from _metadata at read time, so a renamed team or
+        // a new competition never needs the rows re-read.
+        const m = meta[name] || {};
         const metaValues = [m.team1 || '', m.team2 || '', m.competition || '', m.year || '', m.division || '', m.video || '', m.analyzable || '', m.id || ''];
-        values.slice(1).forEach(row => {
-          const mapped = colIndices.map(i => i >= 0 ? row[i] : '');
-          allRows.push([...mapped, name, ...metaValues]);
-        });
+        block.forEach(row => allRows.push([...row, name, ...metaValues]));
       }
 
       const result = JSON.stringify({ ok: true, version, rows: allRows });
@@ -631,27 +706,27 @@ function doGet(e) {
       return json({ ok: false, error: 'Missing sheetName parameter' });
     }
 
-    // One game — cached like list/all, by version and caller group, so only a
-    // response this group was already allowed to see is ever served from it.
-    const gameKey = 'game:' + sheetName + cacheKeySuffix;
-    const gameHit = cacheGet(gameKey);
-    if (gameHit) return rawJson(gameHit);
-
-    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(sheetName);
-    if (!sheet) {
-      return json({ ok: false, error: `Tab "${sheetName}" not found.` });
-    }
-
-    // getDisplayValues avoids Date-object conversion on time-formatted cells
+    // One game. Who may see it is checked against _metadata (cached by data
+    // version) on every request; its rows are cached by the game's own
+    // revision, so a push to another game doesn't throw them away. The
+    // response is put together each time so its `version` is always current —
+    // clients compare it to decide whether their copy is up to date.
     const version = getSheetVersion();   // capture BEFORE reading data
-    const values  = sheet.getDataRange().getDisplayValues();
-    const meta    = getMetadata();
+    const meta    = getMetadataCached(version);
     if (!canSeeGame(auth, meta[sheetName])) {
       return json({ ok: false, error: `Tab "${sheetName}" not found.` });
     }
-    const gameResult = JSON.stringify({ ok: true, version, rows: values, meta: meta[sheetName] || {} });
-    cachePut(gameKey, gameResult, VERSIONED_TTL);
-    return rawJson(gameResult);
+    const sheetKey = 'sheet:' + sheetName + ':r' + (gameRevs()[sheetName] || '0');
+    let rowsJson = cacheGet(sheetKey);
+    if (rowsJson == null) {
+      const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(sheetName);
+      if (!sheet) return json({ ok: false, error: `Tab "${sheetName}" not found.` });
+      // getDisplayValues avoids Date-object conversion on time-formatted cells
+      rowsJson = JSON.stringify(sheet.getDataRange().getDisplayValues());
+      cachePut(sheetKey, rowsJson, BLOCK_TTL);
+    }
+    return rawJson('{"ok":true,"version":' + JSON.stringify(version) + ',"rows":' + rowsJson +
+                   ',"meta":' + JSON.stringify(meta[sheetName] || {}) + '}');
 
   } catch (err) {
     return json({ ok: false, error: err.toString() });
@@ -755,7 +830,7 @@ function doPost(e) {
       if (!isAdminSecret(data.secret)) return json({ ok: false, error: 'Admin access required.' });
       let updated = 0;
       for (const change of (data.changes || [])) {
-        if (updateRow(change.sheetName, change.time, change.name, change.comment, change.strikeMove, change.detail)) updated++;
+        if (updateRow(change.sheetName, change.time, change.name, change.comment, change.strikeMove, change.detail)) { updated++; bumpGameRev(change.sheetName); }
       }
       cacheClear();
       return json({ ok: true, updated });
@@ -867,6 +942,7 @@ function doPost(e) {
       if (!sheet) return json({ ok: false, error: 'Sheet not found.' });
       if (ss.getSheets().length <= 1) return json({ ok: false, error: 'Cannot delete the only tab in the spreadsheet.' });
       ss.deleteSheet(sheet);
+      bumpGameRev(name);
       setCreatorToken(name, ''); // drop leftover ownership token
       clearLiveRow(name);        // finalise any stray live row (no-op if absent)
       cacheClear();
@@ -930,6 +1006,7 @@ function doPost(e) {
       newSheet.getRange(newSheet.getLastRow() + 1, 1, rows.length, rows[0].length)
               .setValues(rows);
     }
+    bumpGameRev(data.sheetName);
 
     // Stamp the caller's group onto the new metadata row (non-admin writes only).
     const metaToWrite = data.meta || {};
