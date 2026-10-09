@@ -2064,9 +2064,17 @@ console.log('Code.gs per-game cache');
     assert.equal(get({ secret: 'staff1', sheetName: 'gB' }).ok, false);
     assert.equal(get({ secret: 'staff1', sheetName: 'gA' }).ok, true);
   });
+  test('list: cached until fresh=1, which re-reads _metadata', () => {
+    get({ secret: 'adm', action: 'list' });
+    reads = []; get({ secret: 'adm', action: 'list' });
+    assert.ok(!reads.includes('_metadata'));
+    reads = []; const f = get({ secret: 'adm', action: 'list', fresh: '1' });
+    assert.ok(reads.includes('_metadata'));
+    assert.equal(f.ok, true); assert.ok(f.sheets.length > 0);
+  });
   test('?action=build answers without a secret', () => {
     const b = get({ action: 'build' });
-    assert.match(b.build, /per-game-cache/); assert.equal(b.cache.small, true); assert.equal(b.cache.large, true);
+    assert.match(b.build, /list-fresh/); assert.equal(b.cache.small, true); assert.equal(b.cache.large, true);
   });
 }
 
