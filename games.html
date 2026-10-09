@@ -2263,7 +2263,7 @@ async function exportPDF() {
     }
     // Running head and page numbers, now the page count is known.
     const { team1, team2 } = currentGame;
-    const sub = (document.getElementById('gameSubtitle').textContent || '').trim();
+    const sub = ((document.getElementById('gameSubtitle') || {}).textContent || '').trim();
     const n = doc.getNumberOfPages();
     for (let i = 1; i <= n; i++) {
       doc.setPage(i);
