@@ -366,6 +366,11 @@
     .zone-chip small { color: var(--text-dim); margin-left: 3px; }
     .zone-chip.on { border-color: var(--accent); color: var(--text); background: var(--accent-soft); }
     .zone-chip:disabled { opacity: 0.4; cursor: default; }
+    .ending-select {
+      min-height: 34px; padding: 4px 10px; border-radius: 10px; border: 1px solid var(--border);
+      background: var(--surface-2); color: var(--text-muted); font-family: inherit; font-size: 0.78rem; font-weight: 600; max-width: 100%;
+    }
+    .ending-select.on { border-color: var(--accent); color: var(--text); }
     .mirror-tick { display: flex; align-items: center; gap: 8px; margin: 10px 16px 0; font-size: 0.76rem; color: var(--text-muted); cursor: pointer; }
     .mirror-tick input { width: 18px; height: 18px; accent-color: var(--accent); }
     .mirror-tick small { color: var(--text-dim); }
@@ -2909,16 +2914,25 @@ function refreshStats() {
     : '';
   const allPaths = FS.possessionPaths(mirroredEvents());
   const zoneRow = allPaths.length ? (() => {
-    const n = { all: allPaths.length };
-    FS.START_ZONES.forEach(z => { n[z.key] = allPaths.filter(s2 => FS.startZone(s2) === z.key).length; });
+    // Each filter counts the sets that pass the other one.
+    const byEnding = allPaths.filter(s2 => FS.setMatches(s2, 'all', statsEnding));
+    const byZone   = allPaths.filter(s2 => FS.setMatches(s2, statsZone, 'all'));
+    const n = { all: byEnding.length };
+    FS.START_ZONES.forEach(z => { n[z.key] = byEnding.filter(s2 => FS.startZone(s2) === z.key).length; });
+    const e = {};
+    FS.SET_ENDINGS.forEach(o => { e[o.key] = o.key === 'all' ? byZone.length : byZone.filter(s2 => s2.outcome === o.key).length; });
     return `<div class="zone-row"><span class="zone-lab">Started</span>` +
       [{ key: 'all', label: 'Anywhere' }, ...FS.START_ZONES].map(z =>
         `<button class="zone-chip${statsZone === z.key ? ' on' : ''}" onclick="setStatsZone('${z.key}')"` +
         `${z.sub ? ` title="Sets that started ${z.sub} from their own try line"` : ''}${!n[z.key] && z.key !== 'all' && statsZone !== z.key ? ' disabled' : ''}>` +
-        `${z.label}${z.sub ? ` <small>${z.sub}</small>` : ''} <small>${n[z.key]}</small></button>`).join('') + `</div>`;
+        `${z.label}${z.sub ? ` <small>${z.sub}</small>` : ''} <small>${n[z.key]}</small></button>`).join('') + `</div>` +
+      `<div class="zone-row"><span class="zone-lab">Ended in</span>` +
+      `<select class="ending-select${statsEnding !== 'all' ? ' on' : ''}" onchange="setStatsEnding(this.value)" aria-label="Filter by how the set ended">` +
+      FS.SET_ENDINGS.map(o => `<option value="${o.key}"${statsEnding === o.key ? ' selected' : ''}${!e[o.key] && o.key !== 'all' && statsEnding !== o.key ? ' disabled' : ''}>${o.label} (${e[o.key]})</option>`).join('') +
+      `</select></div>`;
   })() : '';
-  const zoneNote = statsZone !== 'all' && !fieldFold && !possFold
-    ? `<div class="cnote" style="padding-top:8px">No sets started there — pick another zone, or Anywhere.</div>` : '';
+  const zoneNote = filtersOn() && !fieldFold && !possFold
+    ? `<div class="cnote" style="padding-top:8px">No sets match these filters — widen one of them.</div>` : '';
   document.getElementById('statsBody').innerHTML = zoneRow + mirrorTick + zoneNote + fieldFold + possFold + html + scorersHTML(kL, kR, names, cols);
   renderMoves();
 }
@@ -4116,6 +4130,14 @@ function setMirrorHalves(on) {
 // panels and the field-position numbers; Scoring, Possession and Discipline
 // stay whole-game.
 let statsZone = localStorage.getItem('fieldStatsZone') || 'all';
+// "Ended in" — Try / Completed (6th touch) / Penalty / Error — alongside it.
+let statsEnding = localStorage.getItem('fieldStatsEnding') || 'all';
+function setStatsEnding(v) {
+  statsEnding = v;
+  statsPick = { 'Team 1': null, 'Team 2': null };
+  try { localStorage.setItem('fieldStatsEnding', v); } catch (e) {}
+  refreshStats();
+}
 function setStatsZone(z) {
   statsZone = z;
   statsPick = { 'Team 1': null, 'Team 2': null };
@@ -4123,13 +4145,12 @@ function setStatsZone(z) {
   refreshStats();
 }
 const mirroredEvents = () => mirrorHalves ? FS.mirrorAlternateHalves(annotations) : annotations;
-// Event-based views keep only the sets that started in the zone…
-const statsEvents = () => FS.eventsStartingIn(mirroredEvents(), statsZone);
+const filtersOn = () => statsZone !== 'all' || statsEnding !== 'all';
+// Event-based views keep only the sets that pass both filters…
+const statsEvents = () => filtersOn()
+  ? FS.eventsOfSets(mirroredEvents(), s => FS.setMatches(s, statsZone, statsEnding)) : mirroredEvents();
 // …and path views filter whole sets, so each keeps the point it started from.
-const statsPaths = () => {
-  const all = FS.possessionPaths(mirroredEvents());
-  return statsZone === 'all' ? all : all.filter(s => FS.startZone(s) === statsZone);
-};
+const statsPaths = () => FS.possessionPaths(mirroredEvents()).filter(s => FS.setMatches(s, statsZone, statsEnding));
 const possessionSets    = () => FS.possessionSets(statsEvents());
 const computeFieldStats = () => FS.computeFieldStats(statsEvents());
 const fieldMapSVG  = (stat, key, name) => FS.fieldMapSVG(stat, TEAM_COLOR[key], name);

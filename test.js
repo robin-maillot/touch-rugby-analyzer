@@ -1889,6 +1889,15 @@ console.log('TR.FieldStats start zones');
     assert.equal(FS.eventsStartingIn(game, 'all'), game);
     assert.equal(FS.computeFieldStats(FS.eventsStartingIn(game, 'own')).t2.sets, 1);
   });
+  test('filter by how sets ended, alone and with a start zone', () => {
+    const keepTries = FS.eventsOfSets(game, st => FS.setMatches(st, 'all', 'Try'));
+    assert.equal(FS.possessionSets(keepTries).length, 2);                   // sets 3 and 5 scored
+    assert.equal(FS.possessionSets(FS.eventsOfSets(game, st => FS.setMatches(st, 'mid', 'Try'))).length, 1);
+    assert.equal(FS.possessionSets(FS.eventsOfSets(game, st => FS.setMatches(st, 'all', 'Turnover'))).length, 3);
+    assert.equal(FS.possessionSets(FS.eventsOfSets(game, st => FS.setMatches(st, 'opp', 'Turnover'))).length, 0);
+  });
+  test('the endings offered', () =>
+    assert.equal(FS.SET_ENDINGS.map(o => o.key).join(','), 'all,Try,6th Touch,Penalty,Turnover'));
   test('two of one team\'s sets left side by side stay two sets', () => {
     const mid = FS.eventsStartingIn(game, 'mid');                                // sets 1, 3 and 4
     const t1 = FS.computeFieldStats(mid).t1;
