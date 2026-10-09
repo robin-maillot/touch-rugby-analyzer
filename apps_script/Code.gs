@@ -519,7 +519,7 @@ function rawJson(str) {
 // version last deployed, whatever is saved in the editor, and the responses
 // look the same either way — so bump this with every Apps Script change and
 // check it with ?action=build after deploying.
-const BUILD = '2026-10-08 per-game-cache';
+const BUILD = '2026-10-09 list-fresh';
 
 // Writes and reads back a small and a large (compressed) entry through the
 // cache helpers, so a deploy can be checked end to end without logs.
@@ -641,7 +641,9 @@ function doGet(e) {
     // action=list → sheet names + metadata for each game
     if (e.parameter.action === 'list') {
       const key = 'list' + cacheKeySuffix;
-      const hit = cacheGet(key);
+      // fresh=1 (the picker's refresh button) reads _metadata even on a hit,
+      // so a hand edit shows up without waiting on the version to move.
+      const hit = e.parameter.fresh ? null : cacheGet(key);
       if (hit) return rawJson(hit);
 
       const version = getSheetVersion();
