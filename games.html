@@ -58,8 +58,8 @@
     #gameSubtitle { font-size: 0.78rem; color: #777; margin-top: 3px; }
     #gameTimingRow { display: flex; gap: 16px; margin-top: 8px; font-size: 0.78rem; color: #9ba6b9; flex-wrap: wrap; }
     #gameTimingRow .timing-val { color: #ccc; font-weight: 600; }
-    #viewEventsBtn, #compareHalvesBtn, #fieldViewBtn, #possessionsBtn, #exportPageBtn, #exportAllBtn, #turnoverDistBtn, #downloadVideoBtn { text-decoration: none; background: none; border: 1px solid #3a3d4a; border-radius: 6px; padding: 4px 11px; font-size: 0.75rem; color: #aaa; cursor: pointer; white-space: nowrap; transition: border-color 0.12s, color 0.12s; }
-    #viewEventsBtn:hover, #compareHalvesBtn:hover, #fieldViewBtn:hover, #possessionsBtn:hover, #exportPageBtn:hover, #exportAllBtn:hover, #exportAllBtn:disabled, #turnoverDistBtn:hover, #downloadVideoBtn:hover:not(:disabled) { border-color: var(--accent, #3b82f6); color: #fff; }
+    #viewEventsBtn, #compareHalvesBtn, #fieldViewBtn, #possessionsBtn, #exportPageBtn, #exportAllBtn, #exportPdfBtn, #turnoverDistBtn, #downloadVideoBtn { text-decoration: none; background: none; border: 1px solid #3a3d4a; border-radius: 6px; padding: 4px 11px; font-size: 0.75rem; color: #aaa; cursor: pointer; white-space: nowrap; transition: border-color 0.12s, color 0.12s; }
+    #viewEventsBtn:hover, #compareHalvesBtn:hover, #fieldViewBtn:hover, #possessionsBtn:hover, #exportPageBtn:hover, #exportAllBtn:hover, #exportPdfBtn:hover, #exportAllBtn:disabled, #turnoverDistBtn:hover, #downloadVideoBtn:hover:not(:disabled) { border-color: var(--accent, #3b82f6); color: #fff; }
     #downloadVideoBtn:disabled { opacity: 0.5; cursor: default; }
 
     #commentText { flex: 1; white-space: pre-wrap; color: #ccc; font-size: 0.85rem; line-height: 1.45; }
@@ -382,6 +382,7 @@
             Possessions</button>
           <button id="exportPageBtn" onclick="exportGamePage()" title="Save this page as a JPG">⬇ Export JPG</button>
           <button id="exportAllBtn" onclick="exportAll()" title="One JPG with this page, Compare Halves, Field View and Possessions">⬇ Export all</button>
+          <button id="exportPdfBtn" onclick="exportPDF()" title="The same report as a PDF on A4 pages — much smaller than the JPG">⬇ Export PDF</button>
           <button id="downloadVideoBtn" onclick="downloadCurrentGameVideo()" style="display:none">⬇ Download Video</button>
           <a id="viewEventsBtn" href="game.html">View Events</a>
         </div>
@@ -2018,11 +2019,13 @@ async function ensureHtml2canvas(button) {
 
 // Captures one element, with its limits lifted and its buttons hidden, and
 // puts everything back afterwards whatever happens.
-async function captureCanvas({ target, relax = [], hide = [] }, scale = 2) {
+// `onLaidOut` runs with the limits lifted, before the capture — for measuring.
+async function captureCanvas({ target, relax = [], hide = [] }, scale = 2, onLaidOut) {
   const saved = relax.map(([el, prop]) => [el, prop, el.style[prop]]);
   relax.forEach(([el, prop, value]) => { el.style[prop] = value; });
   hide.forEach(el => { el.style.visibility = 'hidden'; });
   try {
+    if (onLaidOut) onLaidOut(target);
     return await html2canvas(target, { backgroundColor: '#141925', scale, useCORS: true });
   } finally {
     saved.forEach(([el, prop, value]) => { el.style[prop] = value; });
@@ -2100,15 +2103,21 @@ function exportGamePage() { return exportJPG(gamePageExportSpec()); }
 // top to bottom, centred, at a resolution that keeps the whole image under
 // iPad Safari's canvas limit (~16.7M pixels), past which it draws nothing.
 const EXPORT_MAX_PIXELS = 16e6, EXPORT_GAP = 24;
-async function exportAll() {
-  if (!currentGame) return;
-  const btn = document.getElementById('exportAllBtn');
-  if (!(await ensureHtml2canvas(btn))) return;
+// The report's parts, each only when this game has it.
+function reportParts() {
   const shown = id => document.getElementById(id).style.display !== 'none';
   const parts = [{ spec: gamePageExportSpec, label: 'Game analysis' }];
   if (shown('compareHalvesBtn')) parts.push({ spec: compareExportSpec, label: 'Compare Halves', open: openCompareModal, close: closeCompareModal });
   if (shown('fieldViewBtn'))     parts.push({ spec: fieldExportSpec,   label: 'Field View',     open: openFieldModal,   close: closeFieldModal });
   if (shown('possessionsBtn'))   parts.push({ spec: possExportSpec,    label: 'Possessions',    open: openPossModal,    close: closePossModal });
+  return parts;
+}
+
+async function exportAll() {
+  if (!currentGame) return;
+  const btn = document.getElementById('exportAllBtn');
+  if (!(await ensureHtml2canvas(btn))) return;
+  const parts = reportParts();
 
   const cover = Object.assign(document.createElement('div'), { className: 'export-cover', textContent: 'Exporting…' });
   document.body.appendChild(cover);
@@ -2117,7 +2126,6 @@ async function exportAll() {
   const canvases = [];
   try {
     // Measure every part first (limits lifted), so one scale fits them all.
-    let area = 0;
     for (const p of parts) {
       if (p.open) p.open();
       const { target, relax = [] } = p.spec();
@@ -2148,6 +2156,122 @@ async function exportAll() {
       y += c.height + Math.round(EXPORT_GAP * scale);
     });
     await saveCanvas(out, 'full-report');
+  } catch (err) {
+    alert('Export failed: ' + err.message);
+  } finally {
+    cover.remove();
+    btn.disabled = false; btn.textContent = label;
+  }
+}
+
+// ── PDF report ──────────────────────────────────────────────────
+// The same parts as Export all, on A4 pages: a fraction of the size of the
+// one tall JPG, and something that prints. One scale for every part, so text
+// is the same size throughout and narrower parts sit centred. A part taller
+// than a page is cut between its blocks (never through a chart or a table
+// row) where one falls in the lower part of the page; a part that fits in
+// what's left of a page follows on it rather than starting a new one.
+const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+let jspdfLoading = null;
+function loadJsPDF() {
+  if (window.jspdf && window.jspdf.jsPDF) return Promise.resolve();
+  return jspdfLoading || (jspdfLoading = new Promise((resolve, reject) => {
+    const el = Object.assign(document.createElement('script'), { src: JSPDF_URL, async: true });
+    el.onload  = () => resolve();
+    el.onerror = () => { jspdfLoading = null; el.remove(); reject(new Error('could not load the PDF tool — check your connection')); };
+    document.head.appendChild(el);
+  }));
+}
+
+// Where a capture can be cut: the bottom edge of every block that spans
+// (nearly) its full width — nothing sits beside one, so nothing is sliced. In
+// CSS px from the target's top.
+function safeBreaks(target) {
+  const box = target.getBoundingClientRect(), ys = new Set();
+  const walk = (el, depth) => {
+    for (const c of el.children) {
+      const r = c.getBoundingClientRect();
+      if (!r.height) continue;
+      if (r.width >= box.width * 0.9) ys.add(Math.round(r.bottom - box.top));
+      if (depth < 6) walk(c, depth + 1);
+    }
+  };
+  walk(target, 0);
+  return [...ys].sort((a, b) => a - b);
+}
+
+const PDF_PAGE = { w: 210, h: 297, margin: 10, head: 9 };   // mm, A4 portrait
+async function exportPDF() {
+  if (!currentGame) return;
+  const btn = document.getElementById('exportPdfBtn');
+  if (!(await ensureHtml2canvas(btn))) return;
+  const label = btn.textContent;
+  btn.disabled = true; btn.textContent = '⏳ Loading…';
+  try { await loadJsPDF(); }
+  catch (err) { alert('Export failed: ' + err.message); btn.disabled = false; btn.textContent = label; return; }
+
+  const parts = reportParts();
+  const cover = Object.assign(document.createElement('div'), { className: 'export-cover', textContent: 'Exporting…' });
+  document.body.appendChild(cover);
+  btn.textContent = '⏳ Exporting…';
+  try {
+    const shots = [];
+    for (const [i, p] of parts.entries()) {
+      cover.textContent = `Exporting ${i + 1} / ${parts.length} — ${p.label}…`;
+      if (p.open) p.open();
+      try {
+        const shot = {};
+        shot.canvas = await captureCanvas(p.spec(), 2, t => {
+          shot.w = t.scrollWidth; shot.h = t.scrollHeight; shot.breaks = safeBreaks(t);
+        });
+        shots.push(shot);
+      } finally { if (p.close) p.close(); }
+    }
+    cover.textContent = 'Building the PDF…';
+    await new Promise(r => setTimeout(r, 0));
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true });
+    const P = PDF_PAGE, contentW = P.w - 2 * P.margin, top = P.margin + P.head, contentH = P.h - top - P.margin;
+    const mmPerPx = contentW / Math.max(...shots.map(s => s.w));
+    const pageH = contentH / mmPerPx;                 // CSS px that fit on one page
+    const gap = 6 / mmPerPx;
+    const paint = () => { doc.setFillColor(11, 14, 20); doc.rect(0, 0, P.w, P.h, 'F'); };
+    paint();
+    let used = 0;                                     // CSS px already on this page
+    const newPage = () => { doc.addPage(); paint(); used = 0; };
+    for (const s of shots) {
+      if (used > 0 && s.h > pageH - used - gap) newPage();
+      else if (used > 0) used += gap;
+      const k = s.canvas.width / s.w;                 // canvas px per CSS px
+      let y = 0;
+      while (y < s.h - 1) {
+        const room = pageH - used;
+        let cut = s.h;
+        if (s.h - y > room) {
+          const ok = s.breaks.filter(b => b > y + room * 0.45 && b <= y + room);
+          cut = ok.length ? ok[ok.length - 1] : y + room;
+        }
+        const slice = document.createElement('canvas');
+        slice.width = s.canvas.width; slice.height = Math.max(1, Math.round((cut - y) * k));
+        slice.getContext('2d').drawImage(s.canvas, 0, Math.round(y * k), slice.width, slice.height, 0, 0, slice.width, slice.height);
+        const wMm = s.w * mmPerPx, hMm = (cut - y) * mmPerPx;
+        doc.addImage(slice.toDataURL('image/jpeg', 0.82), 'JPEG', P.margin + (contentW - wMm) / 2, top + used * mmPerPx, wMm, hMm, undefined, 'FAST');
+        used += cut - y; y = cut;
+        if (y < s.h - 1) newPage();
+      }
+    }
+    // Running head and page numbers, now the page count is known.
+    const { team1, team2 } = currentGame;
+    const sub = ((document.getElementById('gameSubtitle') || {}).textContent || '').trim();
+    const n = doc.getNumberOfPages();
+    for (let i = 1; i <= n; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8.5); doc.setTextColor(155, 166, 185);
+      doc.text(`${team1} vs ${team2}${sub ? ' · ' + sub : ''}`, P.margin, P.margin + 4);
+      doc.text(`${i} / ${n}`, P.w - P.margin, P.margin + 4, { align: 'right' });
+    }
+    doc.save(`${fileSlug(team1) || 'team1'}-vs-${fileSlug(team2) || 'team2'}-report.pdf`);
   } catch (err) {
     alert('Export failed: ' + err.message);
   } finally {
