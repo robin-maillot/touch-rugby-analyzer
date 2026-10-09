@@ -273,6 +273,10 @@
     margin-bottom:6px;font-size:.8rem;cursor:pointer}
   .glist button.on{border-color:var(--accent);background:#16233c}
   .glist .gs{display:block;font-size:.66rem;color:var(--dim);margin-top:2px}
+  .grefresh{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 2px 8px;font-size:.72rem;color:var(--dim)}
+  .grefresh.warn{color:#f59e0b}
+  .grefresh button{background:none;border:1px solid var(--border,#2b3242);color:var(--dim);border-radius:6px;padding:4px 10px;font-size:.72rem;cursor:pointer;touch-action:manipulation}
+  .grefresh button.busy{opacity:.5;pointer-events:none}
 
   /* Filter sheet category rows: a .glist button with the selection summary
      pulled onto the same line as the title, and a chevron at the end. The
@@ -548,7 +552,7 @@ let plSaving=false;
 const NARROW_AT=12;
 
 const LS={get(k){try{return JSON.parse(localStorage.getItem('trl2_'+k))}catch(e){return null}},
-          set(k,v){try{localStorage.setItem('trl2_'+k,JSON.stringify(v))}catch(e){}}};
+          set(k,v){try{localStorage.setItem('trl2_'+k,JSON.stringify(v));return true}catch(e){return false}}};
 function $(id){return document.getElementById(id)}
 // Restored and painted here rather than in restore(), which waits on the data
 // fetch: the window is a local setting and shouldn't show a stale label until
@@ -562,47 +566,68 @@ function toSecs(t){const p=String(t||'').trim().split(':').map(Number);
   return p.length===3?p[0]*3600+p[1]*60+p[2]:p.length===2?p[0]*60+p[1]:0}
 
 // ── Load ──────────────────────────────────────────────────────
+// Saved copies paint first; refreshData() then brings them up to date.
+let allVersion=null, dataInFlight=null, dataFetchedAt=0, dataNote='';
 (async function(){
   const ca=LS.get('all'), cl=LS.get('list');
   if(cl) buildMeta(cl.sheets);
-  if(ca){ ingest(ca.rows); restore(); }
-  try{
-    // action=all is ~590KB and takes 10-30s, because the server's cache tops
-    // out at 95KB and so has never once held it — every request re-reads all 33
-    // game sheets. games/dashboard/analytics/viewer all sidestep that with the
-    // 35-byte version check; this page was the one that didn't, and it is the
-    // phone page people open most. Ask what the spreadsheet's version is first
-    // and skip the big fetch entirely when both caches were built from it.
-    let fresh=false;
-    if(ca&&cl&&ca.version!=null&&cl.version!=null){
-      try{
-        const vr=await (await fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&action=version`)).json();
-        fresh = vr.ok && vr.version===ca.version && vr.version===cl.version;
-      }catch(e){}   // version unreachable → fall through and fetch properly
-    }
-    if(!fresh){
-      const [a,l]=await Promise.all([
-        fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&action=all`),
-        fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&action=list`)]);
-      const [ar,lr]=await Promise.all([a.json(),l.json()]);
-      if(ar.ok){LS.set('all',ar); ingest(ar.rows);}
-      if(lr.ok){LS.set('list',lr); buildMeta(lr.sheets); if(picked) paintGame();}
-    }
-    try{ PL=await TR.playlists.load(TR.secret()); plLoadError=null; }
-    catch(e){ PL=[]; plLoadError=e.message; }
-    // A warm cache runs restore() — and so applyHash() — above, before this
-    // resolves. A #playlists deep link has therefore already rendered plList()
-    // against PL=[] and plLoadError=null: the "No playlists yet" empty state,
-    // which is simply wrong for the repeat visitor who is the normal phone
-    // case. Nothing else repaints it (the second restore() returns early on
-    // `picked`), so the sheet is repainted here if it is still the one open.
-    // Covers the failed-load message too, which otherwise never reaches an
-    // already-open sheet either.
-    if(sheetKind==='playlists'&&!plEdit){ $('sheetBody').innerHTML=playlistSheet(); paintPlHead(); }
-  }catch(e){ if(!ca) $('empty').textContent='Could not load events: '+e.message; }
+  if(ca){ ingest(ca.rows); allVersion=ca.version; restore(); }
+  await refreshData();
+  try{ PL=await TR.playlists.load(TR.secret()); plLoadError=null; }
+  catch(e){ PL=[]; plLoadError=e.message; }
+  // A warm cache runs restore() — and so applyHash() — above, before this
+  // resolves. A #playlists deep link has therefore already rendered plList()
+  // against PL=[] and plLoadError=null: the "No playlists yet" empty state,
+  // which is simply wrong for the repeat visitor who is the normal phone
+  // case. Nothing else repaints it (the second restore() returns early on
+  // `picked`), so the sheet is repainted here if it is still the one open.
+  // Covers the failed-load message too, which otherwise never reaches an
+  // already-open sheet either.
+  if(sheetKind==='playlists'&&!plEdit){ $('sheetBody').innerHTML=playlistSheet(); paintPlHead(); }
   restore();
   if(!picked) openSheet('game');
 })();
+
+// The game list (~20 KB) is fetched every time — it's what says whether the
+// events changed, and it puts a new game in the picker without waiting on
+// them. The events (action=all, ~1.4 MB) only when the list's version differs
+// from the saved copy's. Re-run when the page comes back into view: a phone
+// home-screen app resumes without reloading, so the load above alone left the
+// picker showing whatever it had the last time the app was opened.
+function refreshData(opts={}){
+  if(dataInFlight) return dataInFlight;
+  const api=q=>fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&${q}`,{cache:'no-store'}).then(r=>r.json());
+  dataNote='Refreshing…'; paintGameSheet();
+  dataInFlight=(async()=>{
+    try{
+      const lr=await api('action=list'+(opts.manual?'&fresh=1':''));
+      if(!lr.ok) throw new Error(lr.error||'could not load the game list');
+      LS.set('list',lr); buildMeta(lr.sheets); paintGameSheet();
+      if(lr.version!==allVersion||!rows.length){
+        const ar=await api('action=all');
+        if(!ar.ok) throw new Error(ar.error||'could not load the events');
+        ingest(ar.rows); allVersion=ar.version;
+        // A copy that no longer fits must not linger: it's what the next
+        // visit would paint, games missing and all.
+        if(!LS.set('all',ar)) try{localStorage.removeItem('trl2_all')}catch(e){}
+      }
+      if(picked) paintGame();
+      else if($('empty')) $('empty').textContent='Pick a game to see its events.';
+      dataFetchedAt=Date.now(); dataNote='';
+    }catch(e){
+      dataNote=rows.length?'Couldn’t refresh — showing saved games':'Could not load events: '+e.message;
+      if(!rows.length&&$('empty')) $('empty').textContent=dataNote;
+    }finally{
+      dataInFlight=null; paintGameSheet();
+    }
+  })();
+  return dataInFlight;
+}
+function paintGameSheet(){ if(sheetKind==='game'&&$('sheet').classList.contains('open')) $('sheetBody').innerHTML=gameSheet(); }
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible'&&Date.now()-dataFetchedAt>30000) refreshData();
+});
+window.addEventListener('pageshow',e=>{ if(e.persisted) refreshData(); });
 
 // ?game= wins, else the last game this device looked at. On a phone you come
 // back to the same match rather than re-picking it every time. '' means "all
@@ -1698,19 +1723,25 @@ async function addTo(id){
   if(countEl) countEl.textContent=`Added ${n} to ${name}`;
 }
 
+// Newest first, as on Game Analysis. A game in the list whose events haven't
+// arrived yet is still shown, so a new one appears as soon as the list does.
 function gameSheet(){
-  const keys=[...new Set(rows.map(r=>r.game))].filter(Boolean)
-    .sort((a,b)=>(order[a]??999)-(order[b]??999));
-  if(!keys.length)return '<div class="empty">No games loaded yet.</div>';
+  const n={}; rows.forEach(r=>{ if(r.game) n[r.game]=(n[r.game]||0)+1; });
+  const keys=[...new Set([...Object.keys(meta),...Object.keys(n)])]
+    .sort((a,b)=>(order[b]??-1)-(order[a]??-1));
+  const busy=!!dataInFlight;
+  const bar=`<div class="grefresh${dataNote&&!busy?' warn':''}"><span>${esc(dataNote||(keys.length+' games'))}</span>
+      <button type="button" class="${busy?'busy':''}" onclick="refreshData({manual:true})" aria-label="Refresh the game list">↻ Refresh</button></div>`;
+  if(!keys.length)return bar+'<div class="empty">No games loaded yet.</div>';
   const allBtn=`<button class="${picked&&game===''?'on':''}" data-game="">
       All games
       <span class="gs">${rows.length} events</span>
     </button>`;
-  return '<div class="glist">'+allBtn+keys.map(k=>{
+  return bar+'<div class="glist">'+allBtn+keys.map(k=>{
     const m=meta[k]||{}, has=!!TR.player.providerFor(m);
     return `<button class="${k===game?'on':''}" data-game="${esc(k)}">
       ${esc(labels[k]||k)}
-      <span class="gs">${has?'▶ video':'no video'} · ${rows.filter(r=>r.game===k).length} events</span>
+      <span class="gs">${has?'▶ video':'no video'} · ${n[k]?n[k]+' events':busy?'loading events…':'no events'}</span>
     </button>`}).join('')+'</div>';
 }
 
