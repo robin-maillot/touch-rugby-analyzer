@@ -38,6 +38,7 @@
     .list-refresh:hover { color: #e6e9ef; border-color: #3b82f6; }
     .list-refresh.busy { animation: spin 0.8s linear infinite; pointer-events: none; }
     #status.warn { color: #f59e0b; }
+    .export-cover { position: fixed; inset: 0; z-index: 10000; background: #0d1117; color: #9ba6b9; display: flex; align-items: center; justify-content: center; font-size: 0.95rem; }
 
     main { padding: 20px 24px; max-width: 960px; margin: 0 auto; }
 
@@ -57,8 +58,8 @@
     #gameSubtitle { font-size: 0.78rem; color: #777; margin-top: 3px; }
     #gameTimingRow { display: flex; gap: 16px; margin-top: 8px; font-size: 0.78rem; color: #9ba6b9; flex-wrap: wrap; }
     #gameTimingRow .timing-val { color: #ccc; font-weight: 600; }
-    #viewEventsBtn, #compareHalvesBtn, #fieldViewBtn, #possessionsBtn, #exportPageBtn, #turnoverDistBtn, #downloadVideoBtn { text-decoration: none; background: none; border: 1px solid #3a3d4a; border-radius: 6px; padding: 4px 11px; font-size: 0.75rem; color: #aaa; cursor: pointer; white-space: nowrap; transition: border-color 0.12s, color 0.12s; }
-    #viewEventsBtn:hover, #compareHalvesBtn:hover, #fieldViewBtn:hover, #possessionsBtn:hover, #exportPageBtn:hover, #turnoverDistBtn:hover, #downloadVideoBtn:hover:not(:disabled) { border-color: var(--accent, #3b82f6); color: #fff; }
+    #viewEventsBtn, #compareHalvesBtn, #fieldViewBtn, #possessionsBtn, #exportPageBtn, #exportAllBtn, #turnoverDistBtn, #downloadVideoBtn { text-decoration: none; background: none; border: 1px solid #3a3d4a; border-radius: 6px; padding: 4px 11px; font-size: 0.75rem; color: #aaa; cursor: pointer; white-space: nowrap; transition: border-color 0.12s, color 0.12s; }
+    #viewEventsBtn:hover, #compareHalvesBtn:hover, #fieldViewBtn:hover, #possessionsBtn:hover, #exportPageBtn:hover, #exportAllBtn:hover, #exportAllBtn:disabled, #turnoverDistBtn:hover, #downloadVideoBtn:hover:not(:disabled) { border-color: var(--accent, #3b82f6); color: #fff; }
     #downloadVideoBtn:disabled { opacity: 0.5; cursor: default; }
 
     #commentText { flex: 1; white-space: pre-wrap; color: #ccc; font-size: 0.85rem; line-height: 1.45; }
@@ -380,6 +381,7 @@
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px"><circle cx="6" cy="19" r="2"/><path d="M7.5 17.5 L12 12 L10 7 L17 4"/><circle cx="18" cy="4" r="1.6" fill="currentColor"/></svg>
             Possessions</button>
           <button id="exportPageBtn" onclick="exportGamePage()" title="Save this page as a JPG">⬇ Export JPG</button>
+          <button id="exportAllBtn" onclick="exportAll()" title="One JPG with this page, Compare Halves, Field View and Possessions">⬇ Export all</button>
           <button id="downloadVideoBtn" onclick="downloadCurrentGameVideo()" style="display:none">⬇ Download Video</button>
           <a id="viewEventsBtn" href="game.html">View Events</a>
         </div>
@@ -1952,16 +1954,17 @@ document.addEventListener('keydown', ev => {
   stepPossSet(key, ev.key === 'ArrowRight' ? 1 : -1);
 });
 
-function exportPossessions() {
+function possExportSpec() {
   const card = document.getElementById('possCard');
   const half = (possHalf === 'all' ? 'possessions' : `possessions-${ordinal(possHalf + 1)}-half`) + (startZone === 'all' ? '' : `-from-${startZone}-end`.replace('-mid-end', '-middle')) + (setEnding === 'all' ? '' : '-' + setEnding.toLowerCase().replace(/\s+/g, '-'));
-  return exportJPG({
+  return {
     target: card, name: half,
     relax: [[card, 'maxHeight', 'none'], [document.getElementById('possBody'), 'overflowY', 'visible']],
     hide:  [document.getElementById('exportPossBtn'), card.querySelector('.compare-close'), ...card.querySelectorAll('.pp-nav button')],
     button: document.getElementById('exportPossBtn'),
-  });
+  };
 }
+function exportPossessions() { return exportJPG(possExportSpec()); }
 
 // ── Compare Halves Modal ────────────────────────────────────────
 function openCompareModal() {
@@ -2004,73 +2007,153 @@ function loadHtml2canvas() {
   }));
 }
 
-async function exportJPG({ target, name, relax = [], hide = [], button }) {
-  if (!currentGame) return;
+async function ensureHtml2canvas(button) {
+  if (typeof html2canvas === 'function') return true;
   const label0 = button ? button.textContent : '';
-  if (typeof html2canvas !== 'function') {
-    if (button) { button.disabled = true; button.textContent = '⏳ Loading…'; }
-    try { await loadHtml2canvas(); }
-    catch (err) { alert('Export failed: ' + err.message); return; }
-    finally { if (button) { button.disabled = false; button.textContent = label0; } }
-  }
+  if (button) { button.disabled = true; button.textContent = '⏳ Loading…'; }
+  try { await loadHtml2canvas(); return true; }
+  catch (err) { alert('Export failed: ' + err.message); return false; }
+  finally { if (button) { button.disabled = false; button.textContent = label0; } }
+}
+
+// Captures one element, with its limits lifted and its buttons hidden, and
+// puts everything back afterwards whatever happens.
+async function captureCanvas({ target, relax = [], hide = [] }, scale = 2) {
   const saved = relax.map(([el, prop]) => [el, prop, el.style[prop]]);
   relax.forEach(([el, prop, value]) => { el.style[prop] = value; });
   hide.forEach(el => { el.style.visibility = 'hidden'; });
-  const label = button ? button.textContent : '';
-  if (button) { button.disabled = true; button.textContent = '⏳ Exporting…'; }
   try {
-    const canvas = await html2canvas(target, { backgroundColor: '#141925', scale: 2, useCORS: true });
-    const { team1, team2 } = currentGame;
-    const filename = `${fileSlug(team1) || 'team1'}-vs-${fileSlug(team2) || 'team2'}-${name}.jpg`;
-    await new Promise(done => canvas.toBlob(blob => {
-      if (!blob) { alert('Export failed: could not encode image.'); done(); return; }
-      const url = URL.createObjectURL(blob);
-      const a = Object.assign(document.createElement('a'), { href: url, download: filename });
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-      done();
-    }, 'image/jpeg', 0.95));
-  } catch (err) {
-    alert('Export failed: ' + err.message);
+    return await html2canvas(target, { backgroundColor: '#141925', scale, useCORS: true });
   } finally {
     saved.forEach(([el, prop, value]) => { el.style[prop] = value; });
     hide.forEach(el => { el.style.visibility = ''; });
+  }
+}
+
+function saveCanvas(canvas, name) {
+  const { team1, team2 } = currentGame;
+  const filename = `${fileSlug(team1) || 'team1'}-vs-${fileSlug(team2) || 'team2'}-${name}.jpg`;
+  return new Promise(done => canvas.toBlob(blob => {
+    if (!blob) { alert('Export failed: could not encode image.'); done(); return; }
+    const url = URL.createObjectURL(blob);
+    const a = Object.assign(document.createElement('a'), { href: url, download: filename });
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    done();
+  }, 'image/jpeg', 0.95));
+}
+
+async function exportJPG({ target, name, relax = [], hide = [], button }) {
+  if (!currentGame) return;
+  if (!(await ensureHtml2canvas(button))) return;
+  const label = button ? button.textContent : '';
+  if (button) { button.disabled = true; button.textContent = '⏳ Exporting…'; }
+  try {
+    await saveCanvas(await captureCanvas({ target, relax, hide }), name);
+  } catch (err) {
+    alert('Export failed: ' + err.message);
+  } finally {
     if (button) { button.disabled = false; button.textContent = label; }
   }
 }
 
-function exportCompareTable() {
+function compareExportSpec() {
   const card = document.getElementById('compareCard');
-  return exportJPG({
+  return {
     target: card, name: 'half-comparison',
     relax: [[card, 'maxHeight', 'none'], [document.getElementById('compareBody'), 'overflowY', 'visible'],
             [card.querySelector('.compare-scroll'), 'overflowX', 'visible']],
     hide:  [document.getElementById('exportCompareBtn'), card.querySelector('.compare-close')],
-  });
+  };
 }
+function exportCompareTable() { return exportJPG(compareExportSpec()); }
 
 // Field View: the whole card, every section, for the half being shown.
-function exportFieldView() {
+function fieldExportSpec() {
   const card = document.getElementById('fieldCard');
   const half = (fieldHalf === 'all' ? 'field-view' : `field-view-${ordinal(fieldHalf + 1)}-half`) + (startZone === 'all' ? '' : `-from-${startZone}-end`.replace('-mid-end', '-middle')) + (setEnding === 'all' ? '' : '-' + setEnding.toLowerCase().replace(/\s+/g, '-'));
-  return exportJPG({
+  return {
     target: card, name: half,
     relax: [[card, 'maxHeight', 'none'], [document.getElementById('fieldBody'), 'overflowY', 'visible']],
     hide:  [document.getElementById('exportFieldBtn'), card.querySelector('.compare-close')],
     button: document.getElementById('exportFieldBtn'),
-  });
+  };
 }
+function exportFieldView() { return exportJPG(fieldExportSpec()); }
 
 // The main page: title, timings, every chart and the stat cards below them.
-function exportGamePage() {
-  const btn = document.getElementById('exportPageBtn');
-  return exportJPG({
+function gamePageExportSpec() {
+  return {
     target: document.getElementById('gameContent'), name: 'game-analysis',
     hide: [...document.querySelectorAll('.game-title-actions')],
-    button: btn,
-  });
+    button: document.getElementById('exportPageBtn'),
+  };
+}
+function exportGamePage() { return exportJPG(gamePageExportSpec()); }
+
+// Everything in one JPG: this page, then Compare Halves, Field View and
+// Possessions — each only when the game has it, and the last two with the
+// half / start / ending filters currently picked. Each pop-up is opened
+// behind a cover just long enough to capture it. The parts are stacked
+// top to bottom, centred, at a resolution that keeps the whole image under
+// iPad Safari's canvas limit (~16.7M pixels), past which it draws nothing.
+const EXPORT_MAX_PIXELS = 16e6, EXPORT_GAP = 24;
+async function exportAll() {
+  if (!currentGame) return;
+  const btn = document.getElementById('exportAllBtn');
+  if (!(await ensureHtml2canvas(btn))) return;
+  const shown = id => document.getElementById(id).style.display !== 'none';
+  const parts = [{ spec: gamePageExportSpec, label: 'Game analysis' }];
+  if (shown('compareHalvesBtn')) parts.push({ spec: compareExportSpec, label: 'Compare Halves', open: openCompareModal, close: closeCompareModal });
+  if (shown('fieldViewBtn'))     parts.push({ spec: fieldExportSpec,   label: 'Field View',     open: openFieldModal,   close: closeFieldModal });
+  if (shown('possessionsBtn'))   parts.push({ spec: possExportSpec,    label: 'Possessions',    open: openPossModal,    close: closePossModal });
+
+  const cover = Object.assign(document.createElement('div'), { className: 'export-cover', textContent: 'Exporting…' });
+  document.body.appendChild(cover);
+  const label = btn.textContent;
+  btn.disabled = true; btn.textContent = '⏳ Exporting…';
+  const canvases = [];
+  try {
+    // Measure every part first (limits lifted), so one scale fits them all.
+    let area = 0;
+    for (const p of parts) {
+      if (p.open) p.open();
+      const { target, relax = [] } = p.spec();
+      const saved = relax.map(([el, prop]) => [el, prop, el.style[prop]]);
+      relax.forEach(([el, prop, value]) => { el.style[prop] = value; });
+      p.w = target.scrollWidth; p.h = target.scrollHeight;
+      saved.forEach(([el, prop, value]) => { el.style[prop] = value; });
+      if (p.close) p.close();
+    }
+    const W = Math.max(...parts.map(p => p.w));
+    const H = parts.reduce((n, p) => n + p.h, 0) + EXPORT_GAP * (parts.length - 1);
+    const scale = Math.min(2, Math.sqrt(EXPORT_MAX_PIXELS / (W * H)));
+    for (const [i, p] of parts.entries()) {
+      cover.textContent = `Exporting ${i + 1} / ${parts.length} — ${p.label}…`;
+      if (p.open) p.open();
+      try { canvases.push(await captureCanvas(p.spec(), scale)); }
+      finally { if (p.close) p.close(); }
+    }
+    const out = document.createElement('canvas');
+    out.width  = Math.max(...canvases.map(c => c.width));
+    out.height = canvases.reduce((n, c) => n + c.height, 0) + Math.round(EXPORT_GAP * scale) * (canvases.length - 1);
+    const ctx = out.getContext('2d');
+    ctx.fillStyle = '#0b0e14';
+    ctx.fillRect(0, 0, out.width, out.height);
+    let y = 0;
+    canvases.forEach(c => {
+      ctx.drawImage(c, Math.round((out.width - c.width) / 2), y);
+      y += c.height + Math.round(EXPORT_GAP * scale);
+    });
+    await saveCanvas(out, 'full-report');
+  } catch (err) {
+    alert('Export failed: ' + err.message);
+  } finally {
+    cover.remove();
+    btn.disabled = false; btn.textContent = label;
+  }
 }
 
 document.addEventListener('keydown', e => {
