@@ -600,17 +600,6 @@ const LS = {
   set(k, v) { try { localStorage.setItem('trl2_' + k, JSON.stringify(v)); } catch {} },
 };
 
-// Spreadsheet version (last-modified ms) used to skip refetches when nothing changed.
-let _liveVersion = null;
-async function getLiveVersion() {
-  if (_liveVersion !== null) return _liveVersion;
-  try {
-    const resp = await fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&action=version`);
-    const res  = await resp.json();
-    if (res.ok) _liveVersion = res.version;
-  } catch {}
-  return _liveVersion;
-}
 
 const FILTERABLE  = ['Type', 'Name', 'Strike Move', 'Action Owner', 'Division', 'Competition'];
 const HIDDEN_COLS = new Set(['Team 1', 'Team 2', 'Video Name', 'To Review', 'Youtube Link', 'Possession Owner', 'Analyzable']);
@@ -730,7 +719,6 @@ async function saveEdits() {
     // Bust the localStorage cache and refetch so a reload starts from
     // server-of-record state, not the pre-save snapshot.
     try { localStorage.removeItem('trl2_all'); localStorage.removeItem('trl2_list'); } catch {}
-    _liveVersion = null;
     fetchAll();
     btn.textContent = `✓ Saved ${result.updated}`;
     setTimeout(() => { btn.disabled = false; updateSaveBtn(); }, 2000);
@@ -840,27 +828,24 @@ async function fetchAll() {
   }
 
   try {
-    // Skip the full refetch if the spreadsheet hasn't changed since both caches were built.
-    if (cachedAll?.version != null && cachedList?.version != null) {
-      const live = await getLiveVersion();
-      if (live != null && live === cachedAll.version && live === cachedList.version) return;
-    }
-
+    // have= turns the version check and the fetch into one round trip: the
+    // server answers { unchanged: true } for a copy that's current.
+    const have = c => c?.version != null ? `&have=${TR.enc(String(c.version))}` : '';
     const [allResp, listResp] = await Promise.all([
-      fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&action=all`),
-      fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&action=list`),
+      fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&action=all${have(cachedAll)}`),
+      fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&action=list${have(cachedList)}`),
     ]);
     const [allResult, listResult] = await Promise.all([allResp.json(), listResp.json()]);
 
     if (!allResult.ok) throw new Error(allResult.error);
-    LS.set('all', allResult);
+    if (!allResult.unchanged) LS.set('all', allResult);
 
-    if (listResult.ok) {
+    if (listResult.ok && !listResult.unchanged) {
       LS.set('list', listResult);
       buildGameMetaMap(listResult.sheets);
     }
 
-    processRows(allResult.rows);
+    if (!allResult.unchanged) processRows(allResult.rows);
   } catch (err) {
     document.getElementById('loadingMsg').style.display = 'none';
     const el = document.getElementById('errorMsg');

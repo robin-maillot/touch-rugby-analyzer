@@ -521,16 +521,6 @@ const LS = {
   set(k, v) { try { localStorage.setItem('trl2_' + k, JSON.stringify(v)); } catch {} },
 };
 
-let _liveVersion = null;
-async function getLiveVersion() {
-  if (_liveVersion !== null) return _liveVersion;
-  try {
-    const resp = await fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&action=version`);
-    const res  = await resp.json();
-    if (res.ok) _liveVersion = res.version;
-  } catch {}
-  return _liveVersion;
-}
 
 // ── State ────────────────────────────────────────────────────
 let ALL_EVENTS = [];   // flat array of event objects: { time, type, name, owner, actionOwner, game, team1, team2, comp, year, division, analyzable }
@@ -549,13 +539,13 @@ async function init() {
   if (cached) applyData(cached);
 
   try {
-    if (cached?.version != null) {
-      const live = await getLiveVersion();
-      if (live != null && live === cached.version) return;
-    }
-    const resp   = await fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&action=all`);
+    // have= turns the version check and the fetch into one round trip: the server
+    // answers { unchanged: true } when our copy is current, else the full data.
+    const have   = cached?.version != null ? `&have=${TR.enc(String(cached.version))}` : '';
+    const resp   = await fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&action=all${have}`);
     const result = await resp.json();
     if (!result.ok) throw new Error(result.error);
+    if (result.unchanged) return;
     LS.set('all', result);
     applyData(result);
   } catch (err) {

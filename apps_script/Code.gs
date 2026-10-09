@@ -378,6 +378,17 @@ function getMetadataCached(version) {
   return meta;
 }
 
+// Several entries at once: the ones that fit go in one putAll call, the rest
+// (rare — a game over ~95 KB) through cachePut's gzip / chunk path.
+function cachePutMany(map, ttl) {
+  const small = {};
+  Object.keys(map).forEach(k => {
+    const v = map[k];
+    if (v && v.length < CACHE_ENTRY_MAX) small[k] = v; else cachePut(k, v, ttl);
+  });
+  try { if (Object.keys(small).length) CacheService.getScriptCache().putAll(small, ttl || CACHE_TTL); } catch (e) {}
+}
+
 function cachePut(key, str, ttl) {
   try {
     if (!str) return;
@@ -392,6 +403,107 @@ function cachePut(key, str, ttl) {
     if (n > 20) return;                                         // ~1.9 MB compressed: don't flood the cache
     cache.putAll(parts, life);
     cache.put(key, CHUNK_PREFIX + n, life);                     // header last, so a reader never sees a half-written set
+  } catch (e) {}
+}
+
+// ── Game rows: cache, then snapshot, then the sheet ────────────
+// CacheService keeps an entry 6 hours at most, and new games tend to land after
+// a quiet spell — so the first read after a push often found every game's rows
+// gone and re-read all the tabs (20-40 s). The snapshot is a Drive file holding
+// every game's rows with the revision they were read at; it doesn't expire, so
+// a cold rebuild reads it once and then only the games whose revision moved.
+// An entry is used only when its revision matches, so it can't go stale for a
+// write made through this script. A hand edit to a game tab needs the
+// onGameDataEdit trigger (which bumps the revision), as the clients do already;
+// an admin's action=all&fresh=1 re-reads every tab and rewrites the snapshot.
+const SNAPSHOT_PROP = 'snapshotFileId';
+const SNAPSHOT_NAME = 'touch-rugby-analyzer cache snapshot (safe to delete).txt';
+
+function snapshotFile() {
+  const id = PropertiesService.getScriptProperties().getProperty(SNAPSHOT_PROP);
+  if (id) { try { const f = DriveApp.getFileById(id); if (!f.isTrashed()) return f; } catch (e) {} }
+  return null;
+}
+
+// { [sheetName]: { rev, rows } } — {} when there's none or it can't be read.
+function readSnapshot() {
+  try {
+    const f = snapshotFile();
+    const s = f && f.getBlob().getDataAsString();
+    if (!s) return {};
+    const str = Utilities.ungzip(Utilities.newBlob(Utilities.base64Decode(s), 'application/x-gzip')).getDataAsString('UTF-8');
+    return JSON.parse(str).games || {};
+  } catch (e) { return {}; }
+}
+
+function writeSnapshot(games) {
+  try {
+    const str = JSON.stringify({ games });
+    const content = Utilities.base64Encode(Utilities.gzip(Utilities.newBlob(str, 'application/json', 's.json')).getBytes());
+    const f = snapshotFile();
+    if (f) { f.setContent(content); return; }
+    const created = DriveApp.createFile(SNAPSHOT_NAME, content, 'text/plain');
+    PropertiesService.getScriptProperties().setProperty(SNAPSHOT_PROP, created.getId());
+  } catch (e) {}
+}
+
+// A tab's display values → its rows in HEADERS order (by name, case-insensitive).
+function blockFromValues(values) {
+  const sheetHeaders = values.length ? values[0].map(h => String(h).trim().toLowerCase()) : [];
+  const colIndices   = HEADERS.map(h => sheetHeaders.indexOf(h.toLowerCase()));
+  return values.slice(1).map(row => colIndices.map(c => c >= 0 ? row[c] : ''));
+}
+
+const blockKey = (name, revs) => 'blk:' + name + ':r' + (revs[name] || '0');
+
+// Every given game's rows, from the cache where it has them, else the
+// snapshot where its revision matches, else the tab itself. Whatever had to
+// come from further down goes back into the cache, and the snapshot is
+// rewritten when it was missing or behind on any game. `allNames` (every game
+// in _metadata) lets it drop games that have since been deleted.
+function gameBlocks(sheets, allNames, fresh) {
+  const revs = gameRevs();
+  const out = {};
+  const cached = fresh ? {} : cacheGetMany(sheets.map(sh => blockKey(sh.getName(), revs)));
+  sheets.forEach(sh => {
+    const v = cached[blockKey(sh.getName(), revs)];
+    if (v != null) { try { out[sh.getName()] = JSON.parse(v); } catch (e) {} }
+  });
+  const missing = sheets.filter(sh => !out[sh.getName()]);
+  if (!missing.length) return out;
+
+  const snap = readSnapshot();
+  const toCache = {};
+  missing.forEach(sh => {
+    const name = sh.getName(), rev = revs[name] || '0', s = snap[name];
+    out[name] = (!fresh && s && s.rev === rev) ? s.rows : blockFromValues(sh.getDataRange().getDisplayValues());
+    toCache[blockKey(name, revs)] = JSON.stringify(out[name]);
+  });
+  cachePutMany(toCache, BLOCK_TTL);
+
+  let behind = false;
+  Object.keys(out).forEach(name => {
+    const rev = revs[name] || '0';
+    if (!snap[name] || snap[name].rev !== rev) { snap[name] = { rev, rows: out[name] }; behind = true; }
+  });
+  Object.keys(snap).forEach(name => { if (!allNames.has(name)) { delete snap[name]; behind = true; } });
+  if (behind) writeSnapshot(snap);
+  return out;
+}
+
+// Straight after a write to one game: put its rows in the cache under the new
+// revision, both shapes (action=all's block and the one-game read), so the
+// first reader afterwards doesn't have to open the tab.
+function warmGame(sheetName, sheet) {
+  try {
+    sheet = sheet || SpreadsheetApp.openById(SHEET_ID).getSheetByName(sheetName);
+    if (!sheet) return;
+    const values = sheet.getDataRange().getDisplayValues();
+    const rev = PropertiesService.getScriptProperties().getProperty(REV_PREFIX + sheetName) || '0';
+    const map = {};
+    map['sheet:' + sheetName + ':r' + rev] = JSON.stringify(values);
+    map['blk:' + sheetName + ':r' + rev]   = JSON.stringify(blockFromValues(values));
+    cachePutMany(map, BLOCK_TTL);
   } catch (e) {}
 }
 
@@ -519,7 +631,7 @@ function rawJson(str) {
 // version last deployed, whatever is saved in the editor, and the responses
 // look the same either way — so bump this with every Apps Script change and
 // check it with ?action=build after deploying.
-const BUILD = '2026-10-09 list-fresh';
+const BUILD = '2026-10-09 snapshot';
 
 // Writes and reads back a small and a large (compressed) entry through the
 // cache helpers, so a deploy can be checked end to end without logs.
@@ -638,6 +750,15 @@ function doGet(e) {
     // (version bumps on cacheClear) and group A never sees group B's cached payload.
     const cacheKeySuffix = ':v' + getSheetVersion() + ':' + (auth.role === 'admin' ? '*admin' : (auth.group || '*nogroup'));
 
+    // have=<version>: the client's copy is from this version, so answer
+    // "unchanged" instead of the data — the version check and the fetch in one
+    // round trip. Any other version gets the full response as before.
+    const have = e.parameter.have;
+    if (have && !e.parameter.fresh && String(have) === String(getSheetVersion()) &&
+        (e.parameter.action === 'all' || e.parameter.action === 'list' || (!e.parameter.action && e.parameter.sheetName))) {
+      return json({ ok: true, version: getSheetVersion(), unchanged: true });
+    }
+
     // action=list → sheet names + metadata for each game
     if (e.parameter.action === 'list') {
       const key = 'list' + cacheKeySuffix;
@@ -659,7 +780,7 @@ function doGet(e) {
     // action=all → every row from every game sheet listed in _metadata, metadata columns appended
     if (e.parameter.action === 'all') {
       const key = 'all' + cacheKeySuffix;
-      const hit = cacheGet(key);
+      const hit = e.parameter.fresh && auth.role === 'admin' ? null : cacheGet(key);
       if (hit) return rawJson(hit);
 
       const version = getSheetVersion();
@@ -672,24 +793,13 @@ function doGet(e) {
       // Always emit a canonical header regardless of each sheet's column order
       allRows.push([...HEADERS, 'Game', ...META_COLS]);
 
-      // Each game's rows, mapped to HEADERS, cached by that game's revision —
-      // so only games changed since they were cached are read from the sheet.
-      const revs = gameRevs();
-      const blockKey = name => 'blk:' + name + ':r' + (revs[name] || '0');
-      const cached = cacheGetMany(sheets.map(sh => blockKey(sh.getName())));
+      // Each game's rows, mapped to HEADERS — see gameBlocks for where they
+      // come from. fresh=1 (admins) re-reads every tab.
+      const blocks = gameBlocks(sheets, new Set(Object.keys(meta)), !!e.parameter.fresh && auth.role === 'admin');
 
       for (const sheet of sheets) {
         const name = sheet.getName();
-        let block = null;
-        if (cached[blockKey(name)] != null) { try { block = JSON.parse(cached[blockKey(name)]); } catch (e) {} }
-        if (!block) {
-          const values = sheet.getDataRange().getDisplayValues();
-          // Map each canonical header to its index in this sheet (by name, case-insensitive)
-          const sheetHeaders = values.length ? values[0].map(h => h.trim().toLowerCase()) : [];
-          const colIndices   = HEADERS.map(h => sheetHeaders.indexOf(h.toLowerCase()));
-          block = values.slice(1).map(row => colIndices.map(c => c >= 0 ? row[c] : ''));
-          cachePut(blockKey(name), JSON.stringify(block), BLOCK_TTL);
-        }
+        const block = blocks[name] || [];
         if (!block.length) continue;
         // Game details come from _metadata at read time, so a renamed team or
         // a new competition never needs the rows re-read.
@@ -834,6 +944,7 @@ function doPost(e) {
       for (const change of (data.changes || [])) {
         if (updateRow(change.sheetName, change.time, change.name, change.comment, change.strikeMove, change.detail)) { updated++; bumpGameRev(change.sheetName); }
       }
+      [...new Set((data.changes || []).map(c => c.sheetName))].forEach(n => warmGame(n));
       cacheClear();
       return json({ ok: true, updated });
     }
@@ -1009,6 +1120,7 @@ function doPost(e) {
               .setValues(rows);
     }
     bumpGameRev(data.sheetName);
+    warmGame(data.sheetName, newSheet);
 
     // Stamp the caller's group onto the new metadata row (non-admin writes only).
     const metaToWrite = data.meta || {};

@@ -1995,8 +1995,14 @@ console.log('Code.gs per-game cache');
     _metadata: mkSheet('_metadata', [['Sheet Name','Team 1','Team 2','Competition','Year','Division','Groups'],
                                      ['gA','France','England','Euros','2026','MO','fra'], ['gB','Wales','Italy','Euros','2026','MO',''], ['gC','Spain','Japan','Euros','2026','MO','fra']]),
   };
-  const book = sheets => ({ getSheetByName: n => sheets[n] || null, getSheets: () => Object.values(sheets) });
-  const store = new Map(), props = new Map();
+  const book = sheets => ({ getSheetByName: n => sheets[n] || null, getSheets: () => Object.values(sheets),
+    deleteSheet: sh => { delete sheets[sh.getName()]; },
+    insertSheet: n => { const sh = mkSheet(n, []); sh.appendRow = r => sh.rows.push(r.slice());
+      sh.getRange = () => ({ setValues: v => v.forEach(r => sh.rows.push(r.map(String))) }); sheets[n] = sh; return sh; } });
+  const store = new Map(), props = new Map(), drive = new Map();
+  let snapWrites = 0;
+  const mkFile = (id, content) => ({ content, getId: () => id, isTrashed: () => false, getLastUpdated: () => new Date(1000),
+    getBlob() { return { getDataAsString: () => this.content }; }, setContent(c) { this.content = c; snapWrites++; } });
   const blob = bytes => ({ getBytes: () => bytes, getDataAsString: () => Buffer.from(bytes).toString('utf8') });
   const ctx = vm.createContext({
     SpreadsheetApp: { openById: id => id === vm.runInContext('SHEET_ID', ctx) ? book(games) : book(control), flush() {} },
@@ -2014,7 +2020,10 @@ console.log('Code.gs per-game cache');
       gzip: b => blob(zlib.gzipSync(Buffer.from(b.getBytes()))), ungzip: b => blob(zlib.gunzipSync(Buffer.from(b.getBytes()))),
       base64Encode: b => Buffer.from(b).toString('base64'), base64Decode: s => [...Buffer.from(s, 'base64')],
     },
-    DriveApp: { getFileById: () => ({ getLastUpdated: () => new Date(1000) }) },
+    DriveApp: {
+      getFileById: id => drive.has(id) ? drive.get(id) : ({ getLastUpdated: () => new Date(1000) }),
+      createFile: (name, content) => { const id = 'f' + (drive.size + 1); drive.set(id, mkFile(id, content)); snapWrites++; return drive.get(id); },
+    },
     ContentService: { MimeType: { JSON: 'json' }, createTextOutput: str => ({ str, setMimeType() { return this; } }) },
   });
   vm.runInContext(gs, ctx);
@@ -2072,9 +2081,53 @@ console.log('Code.gs per-game cache');
     assert.ok(reads.includes('_metadata'));
     assert.equal(f.ok, true); assert.ok(f.sheets.length > 0);
   });
+  test('with the cache emptied (6 h later), the snapshot means no tab is read', () => {
+    get({ secret: 'adm', action: 'all' });                        // make sure the snapshot is current
+    const before = get({ secret: 'adm', action: 'all' });
+    store.clear(); push('gC'); games.gC.rows.push(['0:10','Team 1','Touch','Touch 1','','','Team 1','','']);
+    vm.runInContext('bumpGameRev', ctx)('gC'); vm.runInContext('cacheClear', ctx)();
+    store.clear();
+    reads = []; const r = get({ secret: 'adm', action: 'all' });
+    assert.deepEqual(reads.filter(n => n.startsWith('g')), ['gC']);   // only the game that changed
+    assert.equal(r.rows.length, before.rows.length + 1);
+    store.clear();
+    reads = []; get({ secret: 'adm', action: 'all' });
+    assert.deepEqual(reads.filter(n => n.startsWith('g')), []);       // and now the snapshot has gC too
+  });
+  test('a snapshot entry from an older revision is never served', () => {
+    games.gA.rows.push(['0:11','Team 2','Try','23','','','Team 2','23','']);
+    push('gA'); store.clear();
+    reads = []; const r = get({ secret: 'adm', action: 'all' });
+    assert.deepEqual(reads.filter(n => n.startsWith('g')), ['gA']);
+    assert.ok(r.rows.some(row => row[0] === '0:11' && row[9] === 'gA'));
+  });
+  test('admin fresh=1 re-reads every tab; others can\'t force it', () => {
+    reads = []; get({ secret: 'adm', action: 'all', fresh: '1' });
+    assert.deepEqual(reads.filter(n => n.startsWith('g')).sort(), ['gA', 'gB', 'gC']);
+    reads = []; get({ secret: 'staff1', action: 'all', fresh: '1' });
+    assert.ok(reads.filter(n => n.startsWith('g')).length === 0);
+  });
+  test('have=<current version> answers unchanged, without the data', () => {
+    const v = get({ secret: 'adm', action: 'version' }).version;
+    for (const p of [{ action: 'all' }, { action: 'list' }, { sheetName: 'gA' }]) {
+      const r = get({ secret: 'adm', have: String(v), ...p });
+      assert.equal(r.unchanged, true); assert.equal(r.version, v); assert.equal(r.rows, undefined);
+    }
+    const stale = get({ secret: 'adm', have: String(v - 1), action: 'all' });
+    assert.equal(stale.unchanged, undefined); assert.ok(stale.rows.length > 1);
+    assert.equal(get({ secret: 'nope', have: String(v), action: 'all' }).ok, false);   // still needs a secret
+  });
+  test('a push puts the new game\'s rows in the cache straight away', () => {
+    const doPost = vm.runInContext('doPost', ctx);
+    const rows = [['0:01','Team 1','Try','32','','','Team 1','32','']];
+    const res = JSON.parse(doPost({ postData: { contents: JSON.stringify({ secret: 'adm', sheetName: 'gD', rows, creatorToken: 't' }) } }).str);
+    assert.equal(res.ok, true, JSON.stringify(res));
+    const rev = props.get('rev:gD');
+    assert.ok(store.has('blk:gD:r' + rev) && store.has('sheet:gD:r' + rev));
+  });
   test('?action=build answers without a secret', () => {
     const b = get({ action: 'build' });
-    assert.match(b.build, /list-fresh/); assert.equal(b.cache.small, true); assert.equal(b.cache.large, true);
+    assert.match(b.build, /snapshot/); assert.equal(b.cache.small, true); assert.equal(b.cache.large, true);
   });
 }
 
