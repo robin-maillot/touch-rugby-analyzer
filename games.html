@@ -58,8 +58,8 @@
     #gameSubtitle { font-size: 0.78rem; color: #777; margin-top: 3px; }
     #gameTimingRow { display: flex; gap: 16px; margin-top: 8px; font-size: 0.78rem; color: #9ba6b9; flex-wrap: wrap; }
     #gameTimingRow .timing-val { color: #ccc; font-weight: 600; }
-    #viewEventsBtn, #compareHalvesBtn, #fieldViewBtn, #possessionsBtn, #exportPageBtn, #exportAllBtn, #exportPdfBtn, #turnoverDistBtn, #downloadVideoBtn { text-decoration: none; background: none; border: 1px solid #3a3d4a; border-radius: 6px; padding: 4px 11px; font-size: 0.75rem; color: #aaa; cursor: pointer; white-space: nowrap; transition: border-color 0.12s, color 0.12s; }
-    #viewEventsBtn:hover, #compareHalvesBtn:hover, #fieldViewBtn:hover, #possessionsBtn:hover, #exportPageBtn:hover, #exportAllBtn:hover, #exportPdfBtn:hover, #exportAllBtn:disabled, #turnoverDistBtn:hover, #downloadVideoBtn:hover:not(:disabled) { border-color: var(--accent, #3b82f6); color: #fff; }
+    #viewEventsBtn, #compareHalvesBtn, #fieldViewBtn, #possessionsBtn, #replayBtn, #exportPageBtn, #exportAllBtn, #exportPdfBtn, #turnoverDistBtn, #downloadVideoBtn { text-decoration: none; background: none; border: 1px solid #3a3d4a; border-radius: 6px; padding: 4px 11px; font-size: 0.75rem; color: #aaa; cursor: pointer; white-space: nowrap; transition: border-color 0.12s, color 0.12s; }
+    #viewEventsBtn:hover, #compareHalvesBtn:hover, #fieldViewBtn:hover, #possessionsBtn:hover, #replayBtn:hover, #exportPageBtn:hover, #exportAllBtn:hover, #exportPdfBtn:hover, #exportAllBtn:disabled, #turnoverDistBtn:hover, #downloadVideoBtn:hover:not(:disabled) { border-color: var(--accent, #3b82f6); color: #fff; }
     #downloadVideoBtn:disabled { opacity: 0.5; cursor: default; }
 
     #commentText { flex: 1; white-space: pre-wrap; color: #ccc; font-size: 0.85rem; line-height: 1.45; }
@@ -352,6 +352,7 @@
     <a href="games.html" class="active">Games</a>
     <a href="dashboard.html" id="dashboardLink" style="display:none">Dashboard</a>
     <a href="game.html" id="eventsLink">Events</a>
+    <a href="replay.html">Replay</a>
     <a href="analytics.html">Analytics</a>
     <a href="annotator.html" id="annotatorLink" style="display:none">Annotator</a>
   </nav>
@@ -380,6 +381,7 @@
           <button id="possessionsBtn" onclick="openPossModal()" style="display:none" title="Every set's path, metres gained per touch, and each set as a column — for games tagged with touch locations">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px"><circle cx="6" cy="19" r="2"/><path d="M7.5 17.5 L12 12 L10 7 L17 4"/><circle cx="18" cy="4" r="1.6" fill="currentColor"/></svg>
             Possessions</button>
+          <a id="replayBtn" href="replay.html" style="display:none" title="Watch this game's sets play out on the field">▶ Replay</a>
           <button id="exportPageBtn" onclick="exportGamePage()" title="Save this page as a JPG">⬇ Export JPG</button>
           <button id="exportAllBtn" onclick="exportAll()" title="One JPG with this page, Compare Halves, Field View and Possessions">⬇ Export all</button>
           <button id="exportPdfBtn" onclick="exportPDF()" title="The same report as a PDF on A4 pages — much smaller than the JPG">⬇ Export PDF</button>
@@ -1235,6 +1237,9 @@ async function renderGame(events, team1, team2, subtitle, analyzable, meta) {
   const hasTouchPositions = fieldEvents(currentGame).some(e => e.type === 'Touch' && e.x != null);
   document.getElementById('fieldViewBtn').style.display   = hasTouchPositions ? '' : 'none';
   document.getElementById('possessionsBtn').style.display = hasTouchPositions ? '' : 'none';
+  const replayBtn = document.getElementById('replayBtn');
+  replayBtn.style.display = hasTouchPositions ? '' : 'none';
+  replayBtn.href = `replay.html?game=${TR.enc(document.getElementById('gameSelect').value)}`;
   possPick = { 'Team 1': null, 'Team 2': null }; possFocus = null; possHalf = 'all'; startZone = 'all'; setEnding = 'all';
 
   // Build half toggle buttons

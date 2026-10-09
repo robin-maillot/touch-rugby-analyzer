@@ -23,7 +23,7 @@ const ctx = vm.createContext({
   window:         { location: { replace() {} } },
 });
 
-for (const f of ['js/config.js', 'js/utils.js', 'js/events.js', 'js/possession.js', 'js/consistency.js', 'js/player.js', 'js/field_games.js', 'js/strike_moves.js', 'js/playlists.js', 'js/field_stats.js']) {
+for (const f of ['js/config.js', 'js/utils.js', 'js/events.js', 'js/possession.js', 'js/consistency.js', 'js/player.js', 'js/field_games.js', 'js/strike_moves.js', 'js/playlists.js', 'js/field_stats.js', 'js/replay.js']) {
   vm.runInContext(fs.readFileSync(f, 'utf8'), ctx);
 }
 
@@ -2167,6 +2167,61 @@ console.log('Code.gs deriveStrikeMove');
     assert.equal(derive('Game Event', 'Game Start', 'Scoop'), '');
     assert.equal(derive('To Review', '', 'Scoop'), '');
     assert.equal(derive('Try', '33 - Cut', 'Scoop'), '33 - Cut');
+  });
+}
+
+// ── TR.Replay ─────────────────────────────────────────────────
+console.log('TR.Replay');
+{
+  const R = TR.Replay;
+  const ev = (t, type, name, owner, x, y, actor) => ({ t: R.toSecs(t), type, name, owner, actor: actor || owner, x, y });
+  const evs = [
+    ev('0:00', 'Game Event', 'Game Start', 'Team 1', null, null),
+    ev('0:02', 'Touch', 'Touch 1', 'Team 1', 50, 20), ev('0:06', 'Touch', 'Touch 2', 'Team 1', 40, 40),
+    ev('0:10', 'Try', '33 - Scoop', 'Team 1', 30, 100),
+    ev('0:30', 'Touch', 'Touch 1', 'Team 2', 50, 30), ev('0:34', 'Turnover', 'Ball Down', 'Team 2', 60, 35),
+    ev('0:36', 'Touch', 'Touch 1', 'Team 1', 20, 70), ev('0:40', 'Turnover', '6th Touch', 'Team 1', 25, 80),
+    ev('20:00', 'Game Event', 'Game End', 'Team 1', null, null),
+    ev('25:00', 'Game Event', 'Game Start', 'Team 2', null, null),
+    ev('25:03', 'Touch', 'Touch 1', 'Team 2', 50, 25), ev('25:09', 'Penalty Attack', 'Forward Pass', 'Team 2', 55, 40),
+  ];
+  const tl = R.buildTimeline(evs);
+  test('sets split on possession and halves, with how each ended', () => {
+    assert.deepEqual(tl.sets.map(s => s.owner + ':' + s.outcome.key).join(' '), 'Team 1:try Team 2:error Team 1:sixth Team 2:pen');
+    assert.deepEqual(tl.sets.map(s => s.half).join(''), '1112');
+    assert.equal(tl.start, 0); assert.equal(tl.end, 25 * 60 + 9);
+  });
+  test('the ball glides between steps by their times', () => {
+    const b = R.ballAt(tl.sets[0], 4);                             // halfway from 0:02 to 0:06
+    assert.equal(b.x, 45); assert.equal(b.y, 30); assert.equal(b.step, 0); assert.equal(b.done, false);
+    const end = R.ballAt(tl.sets[0], 11);
+    assert.equal(end.y, 100); assert.equal(end.done, true);
+  });
+  test('touch count, score and half at a moment', () => {
+    assert.equal(R.touchAt(tl.sets[0], 7), 2);
+    assert.deepEqual({ ...R.scoreAt(tl, 9) }, { 'Team 1': 0, 'Team 2': 0 });
+    assert.deepEqual({ ...R.scoreAt(tl, 10) }, { 'Team 1': 1, 'Team 2': 0 });
+    assert.equal(R.halfAt(tl, 60), 1); assert.equal(R.halfAt(tl, 25 * 60 + 5), 2);
+  });
+  test('a six-again starts the count again', () => {
+    const set = { events: [ev('1:00', 'Touch', 'Touch 4', 'Team 1', 1, 1), ev('1:02', 'Turnover', '6 Again', 'Team 1', 1, 1),
+                           ev('1:05', 'Touch', 'Touch 1', 'Team 1', 1, 1)] };
+    assert.equal(R.touchAt(set, 61), 4); assert.equal(R.touchAt(set, 63), 0); assert.equal(R.touchAt(set, 66), 1);
+  });
+  test('the set at a moment, including the rest after one ends', () => {
+    assert.equal(R.setIndexAt(tl, 1), -1);
+    assert.equal(R.setIndexAt(tl, 20), 0);                           // after the try, before the restart
+    assert.equal(R.setIndexAt(tl, 31), 1);
+  });
+  test('dead time is skipped, short gaps are not', () => {
+    assert.equal(R.skipDead(tl, 15), 29);                           // 20 s after the try → just before the restart
+    assert.equal(R.skipDead(tl, 35), 35);                           // a 2 s change of hands plays out
+    assert.equal(R.skipDead(tl, 600), 25 * 60 + 2);                 // half time
+    assert.equal(R.skipDead(tl, 5), 5);                             // in play
+  });
+  test('Team 2 is drawn attacking down the screen', () => {
+    assert.deepEqual({ ...R.screenPos('Team 2', 20, 80) }, { x: 80, y: 20 });
+    assert.deepEqual({ ...R.screenPos('Team 1', 20, 80) }, { x: 20, y: 80 });
   });
 }
 
