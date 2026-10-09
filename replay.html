@@ -274,6 +274,7 @@ function setSVG(set) {
   const nodes = set.steps.map((s, i) => {
     if (i > ball.step) return '';
     const p = pts[i], m = /Touch (\d)/.exec(s.name || '');
+    if (s.origin) return `<circle cx="${p.x}" cy="${vy(p.y)}" r="2.3" fill="#0b0e14" stroke="${color}" stroke-width="1"/>`;
     return `<circle cx="${p.x}" cy="${vy(p.y)}" r="2.3" fill="${color}" stroke="#0b0e14" stroke-width="0.5"/>` +
       (m ? `<text x="${p.x}" y="${vy(p.y) + 1.4}" text-anchor="middle" font-size="3.2" font-weight="700" fill="#0b0e14">${m[1]}</text>` : '');
   }).join('');
