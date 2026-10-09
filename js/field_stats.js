@@ -368,8 +368,27 @@ TR.FieldStats = (() => {
   // kept set is fenced off with a Set Break, which the groupers here honour.
   function eventsStartingIn(events, zone) {
     if (!zone || zone === 'all') return events;
+    return eventsOfSets(events, s => startZone(s) === zone);
+  }
+
+  // How a set ended, as the filters offer it. 'Completed' is a set that ran to
+  // its 6th touch; 'Error' one that lost the ball any other way.
+  const SET_ENDINGS = [
+    { key: 'all',       label: 'Any ending' },
+    { key: 'Try',       label: 'Try' },
+    { key: '6th Touch', label: 'Completed (6th touch)' },
+    { key: 'Penalty',   label: 'Penalty' },
+    { key: 'Turnover',  label: 'Error (ball lost)' },
+  ];
+  // One test for both filters, so a page asks for the sets it wants once.
+  const setMatches = (s, zone, ending) =>
+    (!zone || zone === 'all' || startZone(s) === zone) && (!ending || ending === 'all' || s.outcome === ending);
+
+  // The events of the sets that pass `keep`, plus every game event, with each
+  // kept set fenced by a Set Break (see below). Shared by both filters.
+  function eventsOfSets(events, keep) {
     const setOf = new Map();
-    possessionPaths(events).forEach((s, si) => { if (startZone(s) === zone) s.idx.forEach(i => setOf.set(i, si)); });
+    possessionPaths(events).forEach((s, si) => { if (keep(s)) s.idx.forEach(i => setOf.set(i, si)); });
     const out = [];
     let lastSet = null;
     events.forEach((a, i) => {
@@ -638,6 +657,7 @@ TR.FieldStats = (() => {
     Y_TO_M, RED_ZONE, OPP_15, PAST_HALF_10, MAP_LEN, OUTCOMES, mean,
     tryTagStats, sideBar, channelTagBar, SIDES, CHANNELS,
     START_ZONES, startZone, eventsStartingIn, mirrorAlternateHalves, halfCount,
+    SET_ENDINGS, setMatches, eventsOfSets,
     possessionSets, computeFieldStats, outcomeOf,
     fieldMapSVG, fieldMapKey, outcomeBar, channelBar, territorySVG, chartLegend,
     possessionPaths, pathGains, gainBuckets, typicalSet, GAIN_BUCKETS, OUTCOME_STYLE,
