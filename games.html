@@ -1734,6 +1734,7 @@ function renderFieldModal() {
 
   // Field position and Inside the 10m — the same rows as the live Stats sheet.
   const m   = v => v.toFixed(0) + 'm';
+  const pctOf = (n, d) => d ? Math.round(n / d * 100) + '%' : '—';
   const sgn = v => (v >= 0 ? '+' : '') + v.toFixed(0) + 'm';
   const rows = [
     ['Field position'],
@@ -1742,6 +1743,13 @@ function renderFieldModal() {
     ['Avg end of set',      m(t1.endM),    m(t2.endM),    t1.endM,    t2.endM,    true],
     ['Territory',           t1.territory.toFixed(0) + '%', t2.territory.toFixed(0) + '%', t1.territory, t2.territory, true],
     ['Touches per set',     t1.touchesPer.toFixed(1), t2.touchesPer.toFixed(1), t1.touchesPer, t2.touchesPer, null],
+    ['Total touches',       String(t1.touches), String(t2.touches), t1.touches, t2.touches, null],
+    ['Touches in opp. 15m', String(t1.touches15), String(t2.touches15), t1.touches15, t2.touches15, true],
+    ['Where sets finished'],
+    ['Past opp. 10m (45m+)', `${t1.endPast10} / ${t1.sets} · ${pctOf(t1.endPast10, t1.sets)}`, `${t2.endPast10} / ${t2.sets} · ${pctOf(t2.endPast10, t2.sets)}`,
+                             t1.sets ? t1.endPast10 / t1.sets : 0, t2.sets ? t2.endPast10 / t2.sets : 0, true],
+    ['Past opp. 15m (55m+)', `${t1.endPast15} / ${t1.sets} · ${pctOf(t1.endPast15, t1.sets)}`, `${t2.endPast15} / ${t2.sets} · ${pctOf(t2.endPast15, t2.sets)}`,
+                             t1.sets ? t1.endPast15 / t1.sets : 0, t2.sets ? t2.endPast15 / t2.sets : 0, true],
     ['Inside the 10m'],
     ['Sets that got there', `${t1.redSets} / ${t1.sets} · ${Math.round(t1.redPct)}%`, `${t2.redSets} / ${t2.sets} · ${Math.round(t2.redPct)}%`, t1.redPct, t2.redPct, true],
     ['Converted to a try',  `${t1.redTries} / ${t1.redSets}` + (t1.redConvPct == null ? '' : ` · ${Math.round(t1.redConvPct)}%`),

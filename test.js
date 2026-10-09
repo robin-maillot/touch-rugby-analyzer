@@ -1725,6 +1725,19 @@ console.log('TR.FieldStats');
     assert.equal(t1.t3Pts.length, 1); assert.equal(t1.tryPts.length, 1);
     assert.equal(t2.lostPts.length, 1); assert.equal(t2.redSets, 0); assert.equal(t2.redConvPct, null);
   });
+  test('touches, touches in the opposition 15m, sets ending past the 10m / 15m', () => {
+    const { t1, t2 } = FS.computeFieldStats(game);
+    // Team 1: touches at y 20, 45, 70, 90 → 90 is past 55m/70×100; the set ends in a try at 100
+    assert.equal(t1.touches, 4); assert.equal(t1.touches15, 1);
+    assert.equal(t1.endPast10, 1); assert.equal(t1.endPast15, 1);
+    // Team 2: touches at y 15, 25, set ends at 30 → short of both lines
+    assert.equal(t2.touches, 2); assert.equal(t2.touches15, 0);
+    assert.equal(t2.endPast10, 0); assert.equal(t2.endPast15, 0);
+  });
+  test('the lines sit at 45m and 55m from a team\'s own try line', () => {
+    assert.equal(Math.round(FS.PAST_HALF_10 * FS.Y_TO_M), 45);
+    assert.equal(Math.round(FS.OPP_15 * FS.Y_TO_M), 55);
+  });
   test('no positions at all → nothing to show', () =>
     assert.equal(FS.computeFieldStats([ev('Touch', 'Touch 1', 'Team 1'), ev('Try', 'Other', 'Team 1')]).any, false));
   test('outcomes', () => {

@@ -357,6 +357,15 @@
     }
 
     /* The numbers panel: Scoring to Inside the 10m, folded by default. */
+    .zone-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 10px 16px 0; }
+    .zone-row .zone-lab { font-size: 0.66rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); margin-right: 2px; }
+    .zone-chip {
+      min-height: 34px; padding: 4px 11px; border-radius: 99px; border: 1px solid var(--border);
+      background: var(--surface-2); color: var(--text-muted); font-family: inherit; font-size: 0.74rem; font-weight: 600; cursor: pointer;
+    }
+    .zone-chip small { color: var(--text-dim); margin-left: 3px; }
+    .zone-chip.on { border-color: var(--accent); color: var(--text); background: var(--accent-soft); }
+    .zone-chip:disabled { opacity: 0.4; cursor: default; }
     .mirror-tick { display: flex; align-items: center; gap: 8px; margin: 10px 16px 0; font-size: 0.76rem; color: var(--text-muted); cursor: pointer; }
     .mirror-tick input { width: 18px; height: 18px; accent-color: var(--accent); }
     .mirror-tick small { color: var(--text-dim); }
@@ -2616,7 +2625,7 @@ const foldAttr = id => statsFoldOpenState[id] ? ' open' : '';
 let statsPick = { 'Team 1': null, 'Team 2': null };
 function statsPickSet(team, i) { statsPick[team] = statsPick[team] === i ? null : i; refreshStats(); }
 function statsStepSet(team, dir) {
-  const n = TR.FieldStats.possessionPaths(annotations).filter(s => s.owner === team).length;
+  const n = statsPaths().filter(s => s.owner === team).length;
   if (!n) return;
   const cur = statsPick[team];
   statsPick[team] = cur == null ? (dir > 0 ? 0 : n - 1) : Math.max(0, Math.min(n - 1, cur + dir));
@@ -2713,6 +2722,8 @@ function refreshStats() {
         { label: 'Avg end of set',      n1: fL.endM.toFixed(0) + 'm',    pct1: null, n2: fR.endM.toFixed(0) + 'm',    pct2: null, r1: fL.endM,     r2: fR.endM,     hib: true },
         { label: 'Territory',           n1: fL.territory.toFixed(0) + '%', pct1: null, n2: fR.territory.toFixed(0) + '%', pct2: null, r1: fL.territory, r2: fR.territory, hib: true },
         { label: 'Touches per set',     n1: fL.touchesPer.toFixed(1),    pct1: null, n2: fR.touchesPer.toFixed(1),    pct2: null, r1: fL.touchesPer, r2: fR.touchesPer, hib: null },
+        { label: 'Total touches',       n1: String(fL.touches),          pct1: null, n2: String(fR.touches),          pct2: null, r1: fL.touches,    r2: fR.touches,    hib: null },
+        { label: 'Touches in opp. 15m', n1: String(fL.touches15),        pct1: null, n2: String(fR.touches15),        pct2: null, r1: fL.touches15,  r2: fR.touches15,  hib: true },
       ],
     }, {
       label: 'Inside the 10m',
@@ -2721,6 +2732,16 @@ function refreshStats() {
         { label: 'Converted to a try',  n1: fL.redTries + ' / ' + fL.redSets, pct1: fL.redConvPct == null ? null : Math.round(fL.redConvPct),
                                         n2: fR.redTries + ' / ' + fR.redSets, pct2: fR.redConvPct == null ? null : Math.round(fR.redConvPct),
                                         r1: fL.redTries, r2: fR.redTries, hib: true },
+      ],
+    }, {
+      // Where a set finished — its last position — rather than the furthest
+      // it got, which is what Inside the 10m counts.
+      label: 'Where sets finished',
+      rows: [
+        { label: 'Past opp. 10m (45m+)', n1: fL.endPast10 + ' / ' + fL.sets, pct1: fL.sets ? Math.round(fL.endPast10 / fL.sets * 100) : null,
+                                         n2: fR.endPast10 + ' / ' + fR.sets, pct2: fR.sets ? Math.round(fR.endPast10 / fR.sets * 100) : null, r1: fL.endPast10, r2: fR.endPast10, hib: true },
+        { label: 'Past opp. 15m (55m+)', n1: fL.endPast15 + ' / ' + fL.sets, pct1: fL.sets ? Math.round(fL.endPast15 / fL.sets * 100) : null,
+                                         n2: fR.endPast15 + ' / ' + fR.sets, pct2: fR.sets ? Math.round(fR.endPast15 / fR.sets * 100) : null, r1: fL.endPast15, r2: fR.endPast15, hib: true },
       ],
     }] : []),
     ...(hasDrives ? [{
@@ -2858,7 +2879,7 @@ function refreshStats() {
 
   // Every set as a path, metres on each touch, every set as a column — the
   // same three views as Game Analysis's Possessions panel.
-  const paths = FS.possessionPaths(statsEvents());
+  const paths = statsPaths();
   const mineP = key => paths.filter(s2 => s2.owner === key);
   [kL, kR].forEach(k => { if (statsPick[k] != null && !mineP(k)[statsPick[k]]) statsPick[k] = null; });
   const possFold = paths.length
@@ -2886,7 +2907,19 @@ function refreshStats() {
     ? `<label class="mirror-tick" title="Positions are recorded from the side of the team with the ball, so a team's left is the other touchline once ends change. Mirroring every other half puts them on the same real touchlines.">` +
       `<input type="checkbox" ${mirrorHalves ? 'checked' : ''} onchange="setMirrorHalves(this.checked)"> Mirror alternate halves <small>teams change ends</small></label>`
     : '';
-  document.getElementById('statsBody').innerHTML = mirrorTick + fieldFold + possFold + html + scorersHTML(kL, kR, names, cols);
+  const allPaths = FS.possessionPaths(mirroredEvents());
+  const zoneRow = allPaths.length ? (() => {
+    const n = { all: allPaths.length };
+    FS.START_ZONES.forEach(z => { n[z.key] = allPaths.filter(s2 => FS.startZone(s2) === z.key).length; });
+    return `<div class="zone-row"><span class="zone-lab">Started</span>` +
+      [{ key: 'all', label: 'Anywhere' }, ...FS.START_ZONES].map(z =>
+        `<button class="zone-chip${statsZone === z.key ? ' on' : ''}" onclick="setStatsZone('${z.key}')"` +
+        `${z.sub ? ` title="Sets that started ${z.sub} from their own try line"` : ''}${!n[z.key] && z.key !== 'all' && statsZone !== z.key ? ' disabled' : ''}>` +
+        `${z.label}${z.sub ? ` <small>${z.sub}</small>` : ''} <small>${n[z.key]}</small></button>`).join('') + `</div>`;
+  })() : '';
+  const zoneNote = statsZone !== 'all' && !fieldFold && !possFold
+    ? `<div class="cnote" style="padding-top:8px">No sets started there — pick another zone, or Anywhere.</div>` : '';
+  document.getElementById('statsBody').innerHTML = zoneRow + mirrorTick + zoneNote + fieldFold + possFold + html + scorersHTML(kL, kR, names, cols);
   renderMoves();
 }
 
@@ -4078,7 +4111,25 @@ function setMirrorHalves(on) {
   try { localStorage.setItem('fieldMirrorHalves', on ? '1' : '0'); } catch (e) {}
   refreshStats();
 }
-const statsEvents = () => mirrorHalves ? FS.mirrorAlternateHalves(annotations) : annotations;
+// "Started" filter on the Stats sheet (per device) — Anywhere / Own end /
+// Middle / Opp end, as on Game Analysis. Applies to the Field and Possessions
+// panels and the field-position numbers; Scoring, Possession and Discipline
+// stay whole-game.
+let statsZone = localStorage.getItem('fieldStatsZone') || 'all';
+function setStatsZone(z) {
+  statsZone = z;
+  statsPick = { 'Team 1': null, 'Team 2': null };
+  try { localStorage.setItem('fieldStatsZone', z); } catch (e) {}
+  refreshStats();
+}
+const mirroredEvents = () => mirrorHalves ? FS.mirrorAlternateHalves(annotations) : annotations;
+// Event-based views keep only the sets that started in the zone…
+const statsEvents = () => FS.eventsStartingIn(mirroredEvents(), statsZone);
+// …and path views filter whole sets, so each keeps the point it started from.
+const statsPaths = () => {
+  const all = FS.possessionPaths(mirroredEvents());
+  return statsZone === 'all' ? all : all.filter(s => FS.startZone(s) === statsZone);
+};
 const possessionSets    = () => FS.possessionSets(statsEvents());
 const computeFieldStats = () => FS.computeFieldStats(statsEvents());
 const fieldMapSVG  = (stat, key, name) => FS.fieldMapSVG(stat, TEAM_COLOR[key], name);

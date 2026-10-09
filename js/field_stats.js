@@ -18,6 +18,11 @@
 TR.FieldStats = (() => {
   const Y_TO_M   = 0.7;                       // one y unit, in metres
   const RED_ZONE = 100 - (10 / 70 * 100);     // inside the opposition 10m line
+  // The opposition's 15m: within 15m of the try line a team is attacking.
+  const OPP_15   = 100 - (15 / 70 * 100);     // 55m from a team's own line
+  // Past the opposition's 10m line on the far side of halfway — the 10m line
+  // either side of the halfway line, not the one near their try line.
+  const PAST_HALF_10 = (35 + 10) / 70 * 100;  // 45m from a team's own line
   const MAP_LEN  = 140;                       // drawing units, try line to try line (70m × 2)
 
   const mean = arr => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
@@ -83,6 +88,11 @@ TR.FieldStats = (() => {
         redPct:      mine.length ? red.length / mine.length * 100 : 0,
         redTries:    redTries.length,
         redConvPct:  red.length ? redTries.length / red.length * 100 : null,
+        touches:     events.filter(a => a.type === 'Touch' && a.possessionOwner === key).length,
+        touches15:   myTouches.filter(a => a.y >= OPP_15).length,
+        // Where the set finished, not the furthest it got (that's redSets).
+        endPast10:   mine.filter(s => s.endY >= PAST_HALF_10).length,
+        endPast15:   mine.filter(s => s.endY >= OPP_15).length,
         channels:    chan.map(c => Math.round(c / chanTotal * 100)),
         touchPts:    myTouches.map(a => ({ x: a.x, y: a.y })),
         // The third and fourth touch are where a set is decided — the shape is
@@ -625,7 +635,7 @@ TR.FieldStats = (() => {
   const channelTagBar = (stat, name, color) => tagBar(stat.ch, CHANNELS, name, color);
 
   return {
-    Y_TO_M, RED_ZONE, MAP_LEN, OUTCOMES, mean,
+    Y_TO_M, RED_ZONE, OPP_15, PAST_HALF_10, MAP_LEN, OUTCOMES, mean,
     tryTagStats, sideBar, channelTagBar, SIDES, CHANNELS,
     START_ZONES, startZone, eventsStartingIn, mirrorAlternateHalves, halfCount,
     possessionSets, computeFieldStats, outcomeOf,
