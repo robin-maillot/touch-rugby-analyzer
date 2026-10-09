@@ -2193,7 +2193,7 @@ console.log('TR.Replay');
   });
   test('the ball glides between steps by their times', () => {
     const b = R.ballAt(tl.sets[0], 4);                             // halfway from 0:02 to 0:06
-    assert.equal(b.x, 45); assert.equal(b.y, 30); assert.equal(b.step, 0); assert.equal(b.done, false);
+    assert.equal(b.x, 45); assert.equal(b.y, 30); assert.equal(b.step, 1); assert.equal(b.done, false);
     const end = R.ballAt(tl.sets[0], 11);
     assert.equal(end.y, 100); assert.equal(end.done, true);
   });
@@ -2209,15 +2209,25 @@ console.log('TR.Replay');
     assert.equal(R.touchAt(set, 61), 4); assert.equal(R.touchAt(set, 63), 0); assert.equal(R.touchAt(set, 66), 1);
   });
   test('the set at a moment, including the rest after one ends', () => {
-    assert.equal(R.setIndexAt(tl, 1), -1);
+    assert.equal(R.setIndexAt(tl, -1), -1);
+    assert.equal(R.setIndexAt(tl, 1), 0);                            // the kick-off tap
     assert.equal(R.setIndexAt(tl, 20), 0);                           // after the try, before the restart
     assert.equal(R.setIndexAt(tl, 31), 1);
   });
   test('dead time is skipped, short gaps are not', () => {
-    assert.equal(R.skipDead(tl, 15), 29);                           // 20 s after the try → just before the restart
+    assert.equal(R.skipDead(tl, 15), 27);                           // 20 s after the try → just before the restart tap
     assert.equal(R.skipDead(tl, 35), 35);                           // a 2 s change of hands plays out
-    assert.equal(R.skipDead(tl, 600), 25 * 60 + 2);                 // half time
+    assert.equal(R.skipDead(tl, 600), 25 * 60);                     // half time → just before the second-half tap
     assert.equal(R.skipDead(tl, 5), 5);                             // in play
+  });
+  test('a set starts where the ball changed hands', () => {
+    const [kick, afterTry, afterError] = tl.sets;
+    assert.deepEqual([kick.steps[0].x, kick.steps[0].y, kick.steps[0].origin], [50, 50, 'tap']);
+    assert.deepEqual([afterTry.steps[0].x, afterTry.steps[0].y, afterTry.steps[0].t], [50, 50, 28]);
+    // Team 2 lost it at (60, 35) in their direction → (40, 65) in Team 1's, at the moment it was lost
+    assert.deepEqual([afterError.steps[0].x, afterError.steps[0].y, afterError.steps[0].t], [40, 65, 34]);
+    const s2 = tl.sets[3];                                           // after half time: the tap again
+    assert.equal(s2.steps[0].origin, 'tap'); assert.equal(s2.steps[0].t, 25 * 60 + 1);
   });
   test('Team 2 is drawn attacking down the screen', () => {
     assert.deepEqual({ ...R.screenPos('Team 2', 20, 80) }, { x: 80, y: 20 });

@@ -16,6 +16,10 @@ TR.Replay = (() => {
     return p.length === 3 ? p[0] * 3600 + p[1] * 60 + p[2] : p.length === 2 ? p[0] * 60 + p[1] : null;
   }
 
+  // Seconds before a set's first touch that its origin is placed, at most:
+  // the tap is taken just before, a rollball after a turnover a little sooner.
+  const TAP_LEAD = 2, TURNOVER_LEAD = 3;
+
   // How a set ended, from its last event.
   function outcomeOf(last) {
     if (!last) return { key: 'none', label: '' };
@@ -51,11 +55,35 @@ TR.Replay = (() => {
       if (e.x != null && e.y != null) cur.steps.push(e);
     }
     const kept = sets.filter(s => s.steps.length);
+    kept.forEach(s => { s.outcome = outcomeOf(s.events[s.events.length - 1]); });
+    // Each set starts where the ball changed hands, not at its first tagged
+    // touch: from the spot of the turnover or penalty that ended the set
+    // before (turned round into this team's direction of attack), or from the
+    // centre of halfway — the tap that starts each half and restarts after a
+    // try. The origin is drawn but isn't an event of the set.
+    kept.forEach((s, n) => {
+      const prev = kept[n - 1];
+      let origin;
+      if (prev && prev.half === s.half && prev.outcome.key !== 'try') {
+        const lastEv = prev.events[prev.events.length - 1];
+        const p = lastEv.x != null && lastEv.y != null ? lastEv : prev.steps[prev.steps.length - 1];
+        // At the turnover, or a few seconds before the first touch if play
+        // stopped in between — the stoppage is then dead time, and skipped.
+        origin = { t: Math.min(s.steps[0].t, Math.max(lastEv.t, s.steps[0].t - TURNOVER_LEAD)),
+                   x: 100 - p.x, y: 100 - p.y, origin: 'turnover' };
+      } else {
+        const hv = halves[s.half - 1];
+        const from = prev && prev.half === s.half ? prev.events[prev.events.length - 1].t : (hv ? hv.start : s.steps[0].t);
+        origin = { t: Math.min(s.steps[0].t, Math.max(from, s.steps[0].t - TAP_LEAD)), x: 50, y: 50, origin: 'tap' };
+      }
+      origin.type = 'Origin';
+      origin.name = origin.origin === 'tap' ? 'Tap on halfway' : 'Turnover spot';
+      s.steps.unshift(origin);
+    });
     kept.forEach((s, n) => {
       s.n = n;
       s.start = s.steps[0].t;
       s.end = s.steps[s.steps.length - 1].t;
-      s.outcome = outcomeOf(s.events[s.events.length - 1]);
     });
     const start = halves.length ? halves[0].start : (kept[0] ? kept[0].start : 0);
     const lastHalf = halves[halves.length - 1];
