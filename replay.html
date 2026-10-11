@@ -288,6 +288,24 @@ function setSVG(set) {
     ${touchBadge(set, ball, b, color)}`;
 }
 
+// The set after this one, whole and at half opacity under the current set,
+// so you can see where play is going next.
+function nextSetSVG(set) {
+  if (!set) return '';
+  const color = COLOR[set.owner] || '#fff';
+  const pts = set.steps.map(s => R.screenPos(set.owner, s.x, s.y));
+  const poly = pts.map(p => `${p.x.toFixed(2)},${vy(p.y).toFixed(2)}`).join(' ');
+  const nodes = set.steps.map((s, i) => {
+    const p = pts[i], m = /Touch (\d)/.exec(s.name || '');
+    if (s.origin) return `<circle cx="${p.x}" cy="${vy(p.y)}" r="2.1" fill="#0b0e14" stroke="${color}" stroke-width="0.9"/>`;
+    return `<circle cx="${p.x}" cy="${vy(p.y)}" r="2.1" fill="${color}"/>` +
+      (m ? `<text x="${p.x}" y="${vy(p.y) + 1.3}" text-anchor="middle" font-size="3" font-weight="700" fill="#0b0e14">${m[1]}</text>` : '');
+  }).join('');
+  return `<g opacity="0.5" aria-label="Next set">
+    <polyline points="${poly}" fill="none" stroke="${color}" stroke-width="1.1" stroke-linejoin="round"/>
+    ${nodes}${endMarker(set.outcome.key, pts[pts.length - 1], color)}</g>`;
+}
+
 // The touch count beside the ball, for as long as the set is live. It sits on
 // the side of the ball away from the nearer touchline, so it never leaves the
 // field.
@@ -318,7 +336,7 @@ function render() {
   if (!tl) return;
   const idx = R.setIndexAt(tl, T), set = tl.sets[Math.max(0, idx)];
   const svg = document.getElementById('field');
-  svg.innerHTML = fieldSVG() + scoreSVG() + (set && idx >= 0 ? setSVG(set) : '');
+  svg.innerHTML = fieldSVG() + scoreSVG() + nextSetSVG(tl.sets[idx + 1]) + (set && idx >= 0 ? setSVG(set) : '');
 
   const sc = R.scoreAt(tl, T);
   document.getElementById('score').textContent = `${sc['Team 1']} – ${sc['Team 2']}`;
