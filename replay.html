@@ -105,7 +105,7 @@
   <div id="stage" class="stage" style="display:none">
     <div class="pitch">
       <div class="attack-key"><span id="keyUp"></span><span id="keyDown"></span></div>
-      <svg id="field" viewBox="-4 -18 108 176" preserveAspectRatio="xMidYMid meet" aria-label="Field replay"></svg>
+      <svg id="field" viewBox="-4 -32 108 190" preserveAspectRatio="xMidYMid meet" aria-label="Field replay"></svg>
     </div>
     <div class="panel">
       <div class="card">
@@ -284,14 +284,41 @@ function setSVG(set) {
   return `<polyline points="${poly(pts)}" fill="none" stroke="${color}" stroke-opacity="0.22" stroke-width="1" stroke-dasharray="2 1.5"/>
     <polyline points="${poly(played)}" fill="none" stroke="${color}" stroke-width="1.4" stroke-linejoin="round"/>
     ${nodes}${end}
-    ${ball.done && set.outcome.key !== 'none' ? '' : `<circle cx="${b.x}" cy="${vy(b.y)}" r="3" fill="#fff" stroke="${color}" stroke-width="1.4"/>`}`;
+    ${ball.done && set.outcome.key !== 'none' ? '' : `<circle cx="${b.x}" cy="${vy(b.y)}" r="3" fill="#fff" stroke="${color}" stroke-width="1.4"/>`}
+    ${touchBadge(set, ball, b, color)}`;
+}
+
+// The touch count beside the ball, for as long as the set is live. It sits on
+// the side of the ball away from the nearer touchline, so it never leaves the
+// field.
+function touchBadge(set, ball, b, color) {
+  const n = R.touchAt(set, T);
+  if (!n || ball.done) return '';
+  const x = b.x + (b.x > 80 ? -6.5 : 6.5), y = vy(b.y) - 5.5;
+  return `<g aria-label="Touch ${n}"><circle cx="${x}" cy="${y}" r="3.6" fill="${color}" stroke="#0b0e14" stroke-width="0.6"/>
+    <text x="${x}" y="${y + 1.6}" text-anchor="middle" font-size="4.6" font-weight="800" fill="#0b0e14">${n}</text></g>`;
+}
+
+// The scoreboard strip above the field: the score in team colours, and the
+// half and clock on the right.
+function scoreSVG() {
+  const sc = R.scoreAt(tl, T), h = R.halfAt(tl, T);
+  const half = h ? (h === 1 ? '1st' : h === 2 ? '2nd' : h + 'th') + ' · ' : '';
+  // Long team names shrink to keep clear of the clock.
+  const chars = `${teamName('Team 1')} ${sc['Team 1']} – ${sc['Team 2']} ${teamName('Team 2')}`.length;
+  const size = Math.min(5, 5 * 26 / chars).toFixed(2);
+  return `<rect x="0" y="-31" width="100" height="11" rx="2" fill="rgba(11,14,20,0.85)" stroke="rgba(255,255,255,0.12)" stroke-width="0.4"/>
+    <text x="3" y="-23.6" font-size="${size}" font-weight="700">
+      <tspan fill="${COLOR['Team 1']}">${esc(teamName('Team 1'))} ${sc['Team 1']}</tspan><tspan fill="rgba(255,255,255,0.55)"> – </tspan><tspan fill="${COLOR['Team 2']}">${sc['Team 2']} ${esc(teamName('Team 2'))}</tspan>
+    </text>
+    <text x="97" y="-23.6" text-anchor="end" font-size="3.8" fill="rgba(255,255,255,0.7)">${half}${mmss(T)}</text>`;
 }
 
 function render() {
   if (!tl) return;
   const idx = R.setIndexAt(tl, T), set = tl.sets[Math.max(0, idx)];
   const svg = document.getElementById('field');
-  svg.innerHTML = fieldSVG() + (set && idx >= 0 ? setSVG(set) : '');
+  svg.innerHTML = fieldSVG() + scoreSVG() + (set && idx >= 0 ? setSVG(set) : '');
 
   const sc = R.scoreAt(tl, T);
   document.getElementById('score').textContent = `${sc['Team 1']} – ${sc['Team 2']}`;
