@@ -42,13 +42,15 @@ TR.FieldStats = (() => {
         continue;
       }
       if (!cur || cur.owner !== a.possessionOwner) {
-        cur = { owner: a.possessionOwner, touches: 0, pts: [], endType: null, endName: null };
+        cur = { owner: a.possessionOwner, touches: 0, pts: [], endType: null, endName: null, count: 0, endCount: 0 };
         sets.push(cur);
       }
       if (a.type === 'Touch') cur.touches++;
       if (a.x != null) cur.pts.push({ x: a.x, y: a.y });
       cur.endType = a.type;
       cur.endName = a.name;
+      cur.endCount = cur.count;                      // the touch count the last event came on
+      cur.count = TR.nextTouchCount(cur.count, a.type, a.name);
     }
     return sets.filter(s => s.pts.length).map(s => {
       const ys = s.pts.map(p => p.y);
@@ -177,12 +179,15 @@ TR.FieldStats = (() => {
   const OUTCOMES = [
     { key: 'Try',       label: 'Try',       color: '#16a34a' },
     { key: 'Turnover',  label: 'Turnover',  color: '#ea580c' },
-    { key: '6th Touch', label: '6th touch', color: '#3b82f6' },
+    { key: '6th Touch', label: 'Completed', color: '#3b82f6' },
     { key: 'Penalty',   label: 'Penalty',   color: '#ef4444' },
   ];
 
+  // An attacking penalty after the 5th touch counts as a completed set — the
+  // ball changes hands there anyway (TR.isLatePenaltyEnd).
   function outcomeOf(set) {
     if (set.endType === 'Try')      return 'Try';
+    if (set.endType === 'Penalty Attack' && set.endCount >= TR.LATE_PENALTY_TOUCH) return '6th Touch';
     if (set.endType === 'Penalty Attack' || set.endType === 'Penalty Defence') return 'Penalty';
     if (set.endType === 'Turnover') return set.endName === '6th Touch' ? '6th Touch' : 'Turnover';
     return null;
@@ -295,7 +300,7 @@ TR.FieldStats = (() => {
         continue;
       }
       if (!cur || cur.owner !== a.possessionOwner) {
-        cur = { owner: a.possessionOwner, half: half || 1, steps: [], end: null, idx: [] };
+        cur = { owner: a.possessionOwner, half: half || 1, steps: [], end: null, idx: [], count: 0, endCount: 0 };
         if (last && last.restart) {
           cur.steps.push({ k: 'start', how: 'tap', x: 50, y: 50 });
         } else if (last && last.end && handsOverOnTheSpot(last.end) && last.lastPt) {
@@ -310,6 +315,8 @@ TR.FieldStats = (() => {
         cur.lastPt = { x: a.x, y: a.y };
       }
       cur.end = { type: a.type, name: a.name };
+      cur.endCount = cur.count;
+      cur.count = TR.nextTouchCount(cur.count, a.type, a.name);
       // A defensive penalty or a 6 Again keeps the ball with the same team, so
       // the set carries on; anything else that changes hands closes it.
       last = a.type === 'Try' ? { restart: true } : cur;
@@ -322,7 +329,7 @@ TR.FieldStats = (() => {
     }));
     return sets
       .filter(s => s.steps.some(p => p.k !== 'start'))
-      .map(s => Object.assign(s, { outcome: outcomeOf({ endType: s.end.type, endName: s.end.name }) || 'Other' }));
+      .map(s => Object.assign(s, { outcome: outcomeOf({ endType: s.end.type, endName: s.end.name, endCount: s.endCount }) || 'Other' }));
   }
 
   // ── Teams changing ends ───────────────────────────────────────
@@ -332,7 +339,7 @@ TR.FieldStats = (() => {
   // is the other physical touchline. Mirroring every other half (the 2nd, the
   // 4th…) puts all of them back on the same real touchlines: a wing that's
   // always on the grandstand side lines up instead of splitting in two.
-  // Only x moves; metres, start zones and open / blind don't depend on it.
+  // Only x moves; metres, start zones and open / short side don't depend on it.
   function mirrorAlternateHalves(events) {
     let half = 0;
     return events.map(a => {
@@ -376,7 +383,7 @@ TR.FieldStats = (() => {
   const SET_ENDINGS = [
     { key: 'all',       label: 'Any ending' },
     { key: 'Try',       label: 'Try' },
-    { key: '6th Touch', label: 'Completed (6th touch)' },
+    { key: '6th Touch', label: 'Completed (6th touch, or a penalty after the 5th)' },
     { key: 'Penalty',   label: 'Penalty' },
     { key: 'Turnover',  label: 'Error (ball lost)' },
   ];
@@ -441,7 +448,7 @@ TR.FieldStats = (() => {
   const OUTCOME_STYLE = {
     'Try':       { color: '#22c55e', label: 'Try' },
     'Turnover':  { color: '#f97316', label: 'Ball lost' },
-    '6th Touch': { color: '#93c5fd', label: '6th touch' },
+    '6th Touch': { color: '#93c5fd', label: 'Completed' },
     'Penalty':   { color: '#ef4444', label: 'Penalty' },
     'Other':     { color: '#9ba6b9', label: 'Ended' },
   };
@@ -610,7 +617,8 @@ TR.FieldStats = (() => {
   // From the side:/ch: tags on each try (events carry them as `tags`, parsed
   // from the Detail column). Untagged tries are counted, not dropped, so the
   // shares are read against how many tries were actually tagged.
-  const SIDES    = ['open', 'blind'];
+  // Tries through MM count as middle, not open or short side (TR.effectiveSide).
+  const SIDES    = ['open', 'blind', 'middle'];
   const CHANNELS = ['MM', 'ML', 'LW', 'W+'];
 
   function tryTagStats(events) {
@@ -621,7 +629,8 @@ TR.FieldStats = (() => {
       let sideTagged = 0, chTagged = 0;
       tries.forEach(a => {
         const t = a.tags || {};
-        if (side[t.side] != null) { side[t.side]++; sideTagged++; }
+        const sd = TR.effectiveSide(t);
+        if (side[sd] != null) { side[sd]++; sideTagged++; }
         if (ch[t.ch]     != null) { ch[t.ch]++;     chTagged++; }
       });
       return { tries: tries.length, side, ch, sideTagged, chTagged };
@@ -649,7 +658,7 @@ TR.FieldStats = (() => {
     </div>`;
   }
 
-  const SIDE_LABELS = { open: 'Open', blind: 'Blind' };
+  const SIDE_LABELS = TR.SIDE_LABELS;
   const sideBar    = (stat, name, color) => tagBar(stat.side, SIDES, name, color, SIDE_LABELS);
   const channelTagBar = (stat, name, color) => tagBar(stat.ch, CHANNELS, name, color);
 

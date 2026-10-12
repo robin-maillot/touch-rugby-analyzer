@@ -640,14 +640,21 @@ function tryTagEditor(row) {
     sel.onchange = () => {
       const next = TR.parseDetail(row[colDetail]);
       if (sel.value) next[key] = sel.value; else delete next[key];
+      // A try through MM is in the middle — neither open nor short side.
+      if (key === 'ch') {
+        const mid = sel.value === TR.MIDDLE_CHANNEL;
+        if (mid) { delete next.side; sideSel.value = ''; }
+        sideSel.disabled = mid;
+      }
       sel.classList.add('dirty');
       markDirty(row, 'detail', TR.formatDetail(next));
     };
     return sel;
   };
-  wrap.append(
-    make('side', 'Side', TR.DETAIL_SIDES, v => v.charAt(0).toUpperCase() + v.slice(1)),
-    make('ch', 'Channel', TR.DETAIL_CHANNELS, v => v, 'Ch'));
+  const sideSel = make('side', 'Side', TR.DETAIL_SIDES, TR.sideLabel);
+  sideSel.disabled = tags.ch === TR.MIDDLE_CHANNEL;
+  sideSel.title = 'A try through MM is in the middle — no side';
+  wrap.append(sideSel, make('ch', 'Channel', TR.DETAIL_CHANNELS, v => v, 'Ch'));
   return wrap;
 }
 

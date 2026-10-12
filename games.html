@@ -445,7 +445,7 @@
   </div>
 </main>
 
-<div id="statPopover" onmouseenter="hoverHoldPopover()" onmouseleave="hidePopover()"></div>
+<div id="statPopover" onmouseenter="hoverHoldPopover()" onmouseleave="window.hidePopover()"></div>
 
 <div id="turnoverOverlay" onclick="if(event.target===this)closeTurnoverModal()" style="display:none">
   <div id="turnoverCard">
@@ -843,6 +843,10 @@ function buildPossessionData(events, teamNames, meta) {
     rawEnd:     Math.max(...g.map(e => e.GameTime)),
     endType:    g[g.length - 1].Type,
     endEvent:   g[g.length - 1].Name,
+    // An attacking penalty after the 5th touch is a completed set (see
+    // TR.isLatePenaltyEnd): coloured, counted and labelled as one.
+    latePen:    TR.isLatePenaltyEnd(g),
+    completed:  TR.isCompletedSet(g),
     Link:       makeYtUrl(meta, g[g.length - 1]._raw),
   }));
 
@@ -863,12 +867,14 @@ function buildPossessionData(events, teamNames, meta) {
     const deadTime  = deadInSeg.reduce((s, d) => s + (d.end - d.start), 0);
     let cat;
     if      (p.endType  === 'Try')      cat = 'Try';
+    else if (p.latePen)                 cat = '6th Touch';
     else if (p.endType === 'Penalty' || p.endType === 'Penalty Attack' || p.endType === 'Penalty Defence') cat = 'Penalty';
     else if (p.endEvent === '6th Touch') cat = '6th Touch';
     else                                cat = 'Other';
     return { Team: p.Team, Start: start, End: p.rawEnd,
              Duration_Sec: Math.max(0, p.rawEnd - start - deadTime), End_Type: p.endType,
-             End_Event: p.endEvent, Color_Category: cat, Link: p.Link };
+             End_Event: p.latePen ? `${p.endEvent} (after the 5th touch — completed)` : p.endEvent,
+             Completed: p.completed, Color_Category: cat, Link: p.Link };
   });
 }
 
@@ -953,7 +959,7 @@ function buildMetrics(possessions, teamNames, events) {
   const rows = teamNames.map(team => {
     const g          = possessions.filter(p => p.Team === team);
     const tries      = g.filter(p => p.End_Type === 'Try').length;
-    const comps      = g.filter(p => p.End_Type === 'Try' || p.End_Event === '6th Touch').length;
+    const comps      = g.filter(p => p.Completed).length;
     const avg        = g.length ? g.reduce((s, p) => s + p.Duration_Sec, 0) / g.length : 0;
     const total      = g.reduce((s, p) => s + p.Duration_Sec, 0);
     const teamPens   = events.filter(e => (e.Type === 'Penalty' || e.Type === 'Penalty Attack' || e.Type === 'Penalty Defence') && e['Action Owner'] === team);
@@ -1058,6 +1064,7 @@ function possessionSpec(data, teamNames, rangeStart, rangeEnd) {
         field: 'Color_Category', type: 'nominal', title: 'Outcome',
         scale: { domain: ['Try', 'Penalty', '6th Touch', 'Other'],
                  range:  ['#00c853', '#f44336', '#ffd600', '#ff9800'] },
+        legend: { labelExpr: "datum.label === '6th Touch' ? 'Completed (6th touch)' : datum.label" },
       },
       tooltip: [
         { field: 'Start',        type: 'quantitative', format: '.0f', title: 'Start (s)' },
@@ -1728,7 +1735,7 @@ function pickFieldHalf(h) { fieldHalf = h; renderFieldModal(); }
 function pickFieldZone(z) { startZone = z; renderFieldModal(); }
 function pickFieldEnding(v) { setEnding = v; renderFieldModal(); }
 
-// Tries by side (open / blind) and by channel, from the tags recorded on each
+// Tries by side (open / short side / middle) and by channel, from the tags recorded on each
 // try. Shown whenever a try in this part of the game carries either tag; the
 // note says how many tries each bar is out of, so a 100% open over 2 tagged
 // tries reads as what it is.
@@ -1738,7 +1745,7 @@ function tryTagsHTML(evs, names) {
   if (!(t1.sideTagged + t2.sideTagged + t1.chTagged + t2.chTagged)) return '';
   const of = (st) => `${st.tries} tr${st.tries === 1 ? 'y' : 'ies'}`;
   const note = (k) => `tagged: ${names['Team 1']} ${t1[k]} of ${of(t1)} · ${names['Team 2']} ${t2[k]} of ${of(t2)}`;
-  return `<div class="field-sec">Tries — open or blind side</div>
+  return `<div class="field-sec">Tries — open side, short side or middle</div>
      ${FS.sideBar(t1, names['Team 1'], FIELD_COLORS['Team 1'])}
      ${FS.sideBar(t2, names['Team 2'], FIELD_COLORS['Team 2'])}
      <div class="cnote">${note('sideTagged')}</div>
