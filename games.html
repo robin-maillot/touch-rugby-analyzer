@@ -2175,21 +2175,45 @@ function loadJsPDF() {
   }));
 }
 
-// Where a capture can be cut: the bottom edge of every block that spans
-// (nearly) its full width — nothing sits beside one, so nothing is sliced. In
-// CSS px from the target's top.
+// Where a capture can be cut, in CSS px from the target's top, in two grades.
+// `sections`: just above the start of a section — a card on the main page, a
+// section heading in Field View and Possessions, a section row in a table —
+// the preferred place, so a section that doesn't fit moves to the next page
+// whole. `blocks`: the bottom edge of any block spanning (nearly) the full
+// width, so nothing beside it is sliced — but never a heading's, which would
+// leave the heading at the foot of one page and its content on the next.
+const PDF_SECTION_START = '.card, .field-sec, tr.section-row, .compare-header';
+const PDF_HEADING = '.card-label, .field-sec, tr.section-row, .pp-team-name, .pp-legend, .compare-header, thead, h1, h2, h3, h4';
+// What sits directly above an element — for a table's first row, its header.
+const pdfAbove = el => el.previousElementSibling ||
+  (el.parentElement && el.parentElement.tagName === 'TBODY' ? el.parentElement.previousElementSibling : null);
 function safeBreaks(target) {
-  const box = target.getBoundingClientRect(), ys = new Set();
+  const box = target.getBoundingClientRect(), sections = new Set(), blocks = new Set();
   const walk = (el, depth) => {
     for (const c of el.children) {
       const r = c.getBoundingClientRect();
       if (!r.height) continue;
-      if (r.width >= box.width * 0.9) ys.add(Math.round(r.bottom - box.top));
-      if (depth < 6) walk(c, depth + 1);
+      const wide = r.width >= box.width * 0.9;
+      // Not a section start that sits right under a heading (a table's first
+      // section row under its column headers): that would strand the heading.
+      const above = pdfAbove(c);
+      if (c.matches(PDF_SECTION_START) && r.top - box.top > 1 && !(above && above.matches(PDF_HEADING)))
+        sections.add(Math.round(r.top - box.top) - 2);
+      if (wide && !c.matches(PDF_HEADING)) blocks.add(Math.round(r.bottom - box.top));
+      if (depth < 7) walk(c, depth + 1);
     }
   };
   walk(target, 0);
-  return [...ys].sort((a, b) => a - b);
+  const sorted = set => [...set].sort((a, b) => a - b);
+  return { sections: sorted(sections), blocks: sorted(blocks) };
+}
+
+// Where to end the page that starts at y with `room` px to fill: before the
+// last section that starts in the lower 70% of the page, else after the last
+// block in its lower 55%, else (one block taller than a page) at the bottom.
+function pdfCut(breaks, y, room) {
+  const last = (list, from) => { const ok = list.filter(b => b > y + room * from && b <= y + room); return ok.length ? ok[ok.length - 1] : null; };
+  return last(breaks.sections, 0.3) ?? last(breaks.blocks, 0.45) ?? y + room;
 }
 
 const PDF_PAGE = { w: 210, h: 297, margin: 10, head: 9 };   // mm, A4 portrait
@@ -2240,10 +2264,7 @@ async function exportPDF() {
       while (y < s.h - 1) {
         const room = pageH - used;
         let cut = s.h;
-        if (s.h - y > room) {
-          const ok = s.breaks.filter(b => b > y + room * 0.45 && b <= y + room);
-          cut = ok.length ? ok[ok.length - 1] : y + room;
-        }
+        if (s.h - y > room) cut = pdfCut(s.breaks, y, room);
         const slice = document.createElement('canvas');
         slice.width = s.canvas.width; slice.height = Math.max(1, Math.round((cut - y) * k));
         slice.getContext('2d').drawImage(s.canvas, 0, Math.round(y * k), slice.width, slice.height, 0, 0, slice.width, slice.height);
