@@ -2170,6 +2170,27 @@ console.log('Code.gs deriveStrikeMove');
   });
 }
 
+// ── games.html PDF page breaks ────────────────────────────────
+console.log('PDF page breaks');
+{
+  const html = fs.readFileSync('games.html', 'utf8');
+  const src = html.slice(html.indexOf('function pdfCut('), html.indexOf('const PDF_PAGE'));
+  const pdfCut = vm.runInNewContext(src + '; pdfCut');
+  const br = { sections: [400, 900, 1500], blocks: [300, 650, 800, 1050, 1250] };
+  test('prefers the start of a section in the lower 70% of the page', () => {
+    assert.equal(pdfCut(br, 0, 1000), 900);                       // not the later block at 650/800
+  });
+  test('falls back to a block boundary when no section starts low enough', () => {
+    assert.equal(pdfCut({ sections: [100], blocks: [300, 650, 800] }, 0, 1000), 800);
+  });
+  test('ignores breaks too high on the page, and cuts at the bottom as a last resort', () => {
+    assert.equal(pdfCut({ sections: [200], blocks: [400] }, 0, 1000), 1000);
+  });
+  test('measures from where the page starts', () => {
+    assert.equal(pdfCut(br, 900, 1000), 1500);                    // 1500 is inside the lower 70% of 900–1900
+  });
+}
+
 // ── TR.Replay ─────────────────────────────────────────────────
 console.log('TR.Replay');
 {
