@@ -55,7 +55,13 @@ TR.Replay = (() => {
       if (e.x != null && e.y != null) cur.steps.push(e);
     }
     const kept = sets.filter(s => s.steps.length);
-    kept.forEach(s => { s.outcome = outcomeOf(s.events[s.events.length - 1]); });
+    kept.forEach(s => {
+      const last = s.events[s.events.length - 1];
+      // A penalty against the attack after the 5th touch is a completed set.
+      s.outcome = TR.isLatePenaltyEnd(s.events)
+        ? { key: 'sixth', label: 'Completed — penalty after the 5th touch (' + (last.name || '').toLowerCase() + ')' }
+        : outcomeOf(last);
+    });
     // Each set starts where the ball changed hands, not at its first tagged
     // touch: from the spot of the turnover or penalty that ended the set
     // before (turned round into this team's direction of attack), or from the

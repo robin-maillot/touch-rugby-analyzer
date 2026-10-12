@@ -118,7 +118,7 @@ TR.recordedMoveOf = (type, name, strikeMove) =>
 //
 //   pos:62,48            pitch position, x,y 0-100, attack-normalised
 //   player:7             the try scorer's shirt number
-//   side:open | blind    which side of the ruck the try went
+//   side:open | blind    which side of the ruck the try went (blind is shown as "short side")
 //   ch:MM | ML | LW | W+ the channel it was scored in
 //
 // "; " separates tags because a value may contain spaces; the first ":" ends
@@ -126,6 +126,14 @@ TR.recordedMoveOf = (type, name, strikeMove) =>
 // a stat added later never needs a new column or a reader change to be kept.
 TR.DETAIL_SIDES    = ['open', 'blind'];
 TR.DETAIL_CHANNELS = ['MM', 'ML', 'LW', 'W+'];
+// The blind side is called the short side; 'blind' stays the stored value so
+// every game already tagged still reads.
+TR.SIDE_LABELS = { open: 'Open', blind: 'Short side', middle: 'Middle' };
+TR.sideLabel = (v) => TR.SIDE_LABELS[v] || (v ? v.charAt(0).toUpperCase() + v.slice(1) : '');
+// A try through MM — between the two middles — is neither open nor short side:
+// it's in the middle, whatever side was recorded.
+TR.MIDDLE_CHANNEL = 'MM';
+TR.effectiveSide = (tags) => !tags ? '' : tags.ch === TR.MIDDLE_CHANNEL ? 'middle' : (tags.side || '');
 const DETAIL_ORDER = ['pos', 'player', 'side', 'ch'];
 
 TR.parseDetail = (str) => {
@@ -173,12 +181,14 @@ TR.stripLegacyPos = (comment) =>
   String(comment || '').replace(LEGACY_POS, '').trim();
 
 // A short human label for the try tags, e.g. "#7 · Open · ML". Position is left
-// out: it reads as a number pair, not as a fact about the try.
+// out: it reads as a number pair, not as a fact about the try. A try in MM
+// shows no side — the channel already says it was through the middle.
 TR.detailLabel = (detail) => {
   const d = typeof detail === 'string' ? TR.parseDetail(detail) : (detail || {});
+  const side = TR.effectiveSide(d);
   return [
     d.player ? '#' + d.player : '',
-    d.side ? d.side.charAt(0).toUpperCase() + d.side.slice(1) : '',
+    side && side !== 'middle' ? TR.sideLabel(side) : '',
     d.ch || '',
   ].filter(Boolean).join(' · ');
 };
@@ -186,7 +196,7 @@ TR.detailLabel = (detail) => {
 // Which side of the last ruck a try went, from where each was on the pitch.
 // Both x values are attack-normalised (0 = the attacking team's left touchline,
 // 100 = its right), and both belong to the scoring team's set, so they share a
-// frame. The blind side is the narrower one — between the ruck and its nearer
+// frame. The blind (short) side is the narrower one — between the ruck and its nearer
 // touchline — and anything across the ruck from it is open. Returns '' when it
 // can't be told: no ruck, a ruck dead centre (both sides equal), or a try
 // straight through the ruck's own line.
@@ -195,4 +205,35 @@ TR.inferTrySide = (ruckX, tryX) => {
   if (ruckX === 50 || tryX === ruckX) return '';
   const blindIsLeft = ruckX < 50;
   return (tryX < ruckX) === blindIsLeft ? 'blind' : 'open';
+};
+
+// ── Completed sets ──────────────────────────────────────────────
+// A set is completed when it ends in a try or on the 6th touch — and also when
+// it ends with a penalty against the attack after the 5th touch: the ball
+// changes hands there anyway, so it's a completed set, not a lost one.
+TR.LATE_PENALTY_TOUCH = 5;
+
+// The touch count after an event: the latest "Touch n", back to zero after a
+// six-again or a penalty in defence (both restart the count).
+TR.nextTouchCount = (count, type, name) => {
+  if (type === 'Touch') { const n = parseInt(String(name || '').replace(/\D+/g, ''), 10); return n || count + 1; }
+  if ((type === 'Turnover' && name === '6 Again') || type === 'Penalty Defence') return 0;
+  return count;
+};
+
+// True when one set's events (in order) end with an attacking penalty after the
+// 5th touch. Takes either event shape: { type, name } or { Type, Name }.
+TR.isLatePenaltyEnd = (evs) => {
+  if (!evs || !evs.length) return false;
+  const kind = e => [e.type != null ? e.type : e.Type, e.name != null ? e.name : e.Name];
+  let count = 0;
+  for (let i = 0; i < evs.length - 1; i++) { const [t, n] = kind(evs[i]); count = TR.nextTouchCount(count, t, n); }
+  return kind(evs[evs.length - 1])[0] === 'Penalty Attack' && count >= TR.LATE_PENALTY_TOUCH;
+};
+
+// Ended in a try, on the 6th touch, or with a penalty after the 5th.
+TR.isCompletedSet = (evs) => {
+  if (!evs || !evs.length) return false;
+  const last = evs[evs.length - 1], t = last.type != null ? last.type : last.Type, n = last.name != null ? last.name : last.Name;
+  return t === 'Try' || (t === 'Turnover' && n === '6th Touch') || TR.isLatePenaltyEnd(evs);
 };

@@ -1485,6 +1485,7 @@ function renderRanking() {
       rawStart: Math.min(...g.map(e => e._gt)),
       rawEnd: Math.max(...g.map(e => e._gt)),
       endEvent: g[g.length - 1].name,
+      latePen: TR.isLatePenaltyEnd(g),
     }));
     const sorted = [...events].sort((a, b) => a._gt - b._gt);
     const deadSlots = sorted.filter(e => e.name === 'Ball Live').map(bl => {
@@ -1494,7 +1495,7 @@ function renderRanking() {
     return raw.map((p, i) => {
       const start = i === 0 ? p.rawStart : (raw[i - 1].endEvent === 'Game End' ? p.rawStart : raw[i - 1].rawEnd);
       const dead = deadSlots.filter(d => d.start >= start && d.end <= p.rawEnd).reduce((s, d) => s + (d.end - d.start), 0);
-      return { team: p.Team, duration: Math.max(0, p.rawEnd - start - dead) };
+      return { team: p.Team, duration: Math.max(0, p.rawEnd - start - dead), latePen: p.latePen };
     }).filter(s => s.team);
   }
 
@@ -1513,8 +1514,8 @@ function renderRanking() {
       if (!teams.length) continue;
       addGameTime(gevs);
       const segs = possessionSegments(gevs, teams[0], teams[1]);
-      const possCount = {}, possTime = {};
-      segs.forEach(s => { possCount[s.team] = (possCount[s.team] || 0) + 1; possTime[s.team] = (possTime[s.team] || 0) + s.duration; });
+      const possCount = {}, possTime = {}, latePens = {};
+      segs.forEach(s => { possCount[s.team] = (possCount[s.team] || 0) + 1; possTime[s.team] = (possTime[s.team] || 0) + s.duration; if (s.latePen) latePens[s.team] = (latePens[s.team] || 0) + 1; });
       const meta = gevs[0];
 
       const cnt = (team, pred) => gevs.filter(e => e.actionOwner === team && pred(e)).length;
@@ -1525,13 +1526,16 @@ function renderRanking() {
           tries:     cnt(team, e => e.type === 'Try'),
           turnovers: cnt(team, e => e.type === 'Turnover'),
           sixth:     cnt(team, e => e.type === 'Turnover' && e.name === '6th Touch'),
+          // Sets ended by a penalty against the attack after the 5th touch:
+          // completed, not lost (TR.isLatePenaltyEnd).
+          latePen:   latePens[team] || 0,
           offPen:    cnt(team, e => e.type === 'Penalty Attack'),
           defPen:    cnt(team, e => e.type === 'Penalty Defence'),
           total:     gevs.filter(e => e.actionOwner === team).length,
           poss:      pc,
           possTime:  +(possTime[team] || 0).toFixed(1),
         };
-        s.completion = pc ? (s.tries + s.sixth) / pc : null;   // (tries + 6th touch) / possessions
+        s.completion = pc ? (s.tries + s.sixth + s.latePen) / pc : null;   // (tries + 6th touch + late penalties) / possessions
         stat[team] = s;
       });
 
@@ -1577,7 +1581,7 @@ function renderRanking() {
       { key: 'cnt_6th_touch', label: '6th Touch (count)' },
       { key: 'cnt_penalty_attack', label: 'Off penalties (count)' },
       { key: 'cnt_penalty_defence', label: 'Def penalties (count)' },
-      { key: 'completion_rate', label: 'Completion rate ((tries+6th)/poss)' },
+      { key: 'completion_rate', label: 'Completion rate ((tries+6th+penalty after 5th)/poss)' },
       { key: 'avg_poss_time', label: 'Avg possession time / set (s)' },
       { key: 'off_pen_per_poss', label: 'Off penalties / possession' },
       { key: 'def_pen_per_poss', label: 'Def penalties / opp possession' },

@@ -1618,8 +1618,20 @@ console.log('TR.detailLabel');
 test('labels the try tags', () => assert.equal(TR.detailLabel('pos:1,2; player:7; side:open; ch:ML'), '#7 · Open · ML'));
 test('partial tags', () => {
   assert.equal(TR.detailLabel('ch:W+'), 'W+');
-  assert.equal(TR.detailLabel('side:blind'), 'Blind');
+  assert.equal(TR.detailLabel('side:blind'), 'Short side');
   assert.equal(TR.detailLabel('pos:1,2'), '');
+});
+test('a try in MM shows no side — it was through the middle', () => {
+  assert.equal(TR.detailLabel('player:4; side:open; ch:MM'), '#4 · MM');
+  assert.equal(TR.effectiveSide({ side: 'blind', ch: 'MM' }), 'middle');
+  assert.equal(TR.effectiveSide({ side: 'blind', ch: 'LW' }), 'blind');
+  assert.equal(TR.sideLabel('blind'), 'Short side');
+});
+test('side stats count MM tries as middle, not open or short side', () => {
+  const tr = (side, ch) => ({ type: 'Try', actionOwner: 'Team 1', tags: { side, ch } });
+  const { t1 } = TR.FieldStats.tryTagStats([tr('open', 'W+'), tr('blind', 'ML'), tr('open', 'MM'), tr(undefined, 'MM')]);
+  assert.deepEqual({ ...t1.side }, { open: 1, blind: 1, middle: 2 });
+  assert.equal(t1.sideTagged, 4);
 });
 
 console.log('TR.inferTrySide');
@@ -2167,6 +2179,46 @@ console.log('Code.gs deriveStrikeMove');
     assert.equal(derive('Game Event', 'Game Start', 'Scoop'), '');
     assert.equal(derive('To Review', '', 'Scoop'), '');
     assert.equal(derive('Try', '33 - Cut', 'Scoop'), '33 - Cut');
+  });
+}
+
+// ── Completed sets: a penalty after the 5th touch ─────────────
+console.log('Completed sets');
+{
+  const t = (type, name) => ({ type, name });
+  const five = ['Touch 1', 'Touch 2', 'Touch 3', 'Touch 4', 'Touch 5'].map(n => t('Touch', n));
+  test('an attacking penalty after the 5th touch completes the set', () => {
+    const evs = [...five, t('Penalty Attack', 'Forward Pass')];
+    assert.equal(TR.isLatePenaltyEnd(evs), true); assert.equal(TR.isCompletedSet(evs), true);
+  });
+  test('one before the 5th touch is still a lost set', () => {
+    const evs = [...five.slice(0, 4), t('Penalty Attack', 'Forward Pass')];
+    assert.equal(TR.isLatePenaltyEnd(evs), false); assert.equal(TR.isCompletedSet(evs), false);
+  });
+  test('the count restarts after a six-again or a defensive penalty', () => {
+    assert.equal(TR.isLatePenaltyEnd([...five, t('Turnover', '6 Again'), t('Touch', 'Touch 1'), t('Penalty Attack', 'Touch and Pass')]), false);
+    assert.equal(TR.isLatePenaltyEnd([...five, t('Penalty Defence', 'Offside'), ...five, t('Penalty Attack', 'Other')]), true);
+  });
+  test('works on the { Type, Name } shape too, and keeps tries and 6th touches', () => {
+    assert.equal(TR.isLatePenaltyEnd([...five.map(e => ({ Type: e.type, Name: e.name })), { Type: 'Penalty Attack', Name: 'Forward Pass' }]), true);
+    assert.equal(TR.isCompletedSet([...five, t('Try', '33 - Scoop')]), true);
+    assert.equal(TR.isCompletedSet([...five, t('Turnover', '6th Touch')]), true);
+    assert.equal(TR.isCompletedSet([...five.slice(0, 2), t('Turnover', 'Bad Roll')]), false);
+  });
+  test('field stats and possession paths count it as completed', () => {
+    const FS = TR.FieldStats;
+    const pos = (type, name, y) => ({ type, name, possessionOwner: 'Team 1', actionOwner: 'Team 1', x: 50, y });
+    const evs = [{ type: 'Game Event', name: 'Game Start' }, ...[1, 2, 3, 4, 5].map(n => pos('Touch', 'Touch ' + n, n * 10)), pos('Penalty Attack', 'Forward Pass', 60)];
+    assert.equal(FS.outcomeOf(FS.possessionSets(evs)[0]), '6th Touch');
+    assert.equal(FS.possessionPaths(evs)[0].outcome, '6th Touch');
+    const early = [{ type: 'Game Event', name: 'Game Start' }, ...[1, 2].map(n => pos('Touch', 'Touch ' + n, n * 10)), pos('Penalty Attack', 'Forward Pass', 30)];
+    assert.equal(FS.possessionPaths(early)[0].outcome, 'Penalty');
+  });
+  test('the replay calls it a completed set', () => {
+    const R = TR.Replay;
+    const ev = (s, type, name, owner, y) => ({ t: s, type, name, owner, actor: owner, x: 50, y });
+    const tl = R.buildTimeline([ev(0, 'Game Event', 'Game Start', 'Team 1'), ...[1, 2, 3, 4, 5].map(n => ev(n * 3, 'Touch', 'Touch ' + n, 'Team 1', n * 10)), ev(17, 'Penalty Attack', 'Forward Pass', 'Team 1', 55)]);
+    assert.equal(tl.sets[0].outcome.key, 'sixth');
   });
 }
 

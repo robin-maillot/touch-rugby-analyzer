@@ -33,7 +33,7 @@ everything pressable sits in a rail beside it:
   French Flair finish in one tap; Other holds Scoop and Interception. It only
   offers names that already exist, so the stats read them exactly as before.
   **Skip** leaves the try as *Other*, as ignoring the strip does.
-- **Optional try details.** Tick any of *open / blind side*, *channel* and *try
+- **Optional try details.** Tick any of *open / short side*, *channel* and *try
   scorer's number* in ⚙ Setup and the try pop-up gains a second panel for them
   beside the move — see [What reaches the Google Sheet](#what-reaches-the-google-sheet).
 - **A small arrow on the ball** — the last touch, or the 0 tap-off — points at
@@ -286,7 +286,7 @@ stats don't need new columns:
 |---|---|
 | `pos:62,48` | pitch position, x,y 0–100, attack-normalised (every positioned event) |
 | `player:7` | a try's scorer, by shirt number |
-| `side:open` / `side:blind` | which side of the ruck the try went |
+| `side:open` / `side:blind` | which side of the ruck the try went — `blind` is shown as *Short side* |
 | `ch:MM` / `ML` / `LW` / `W+` | the channel the try was scored in |
 
 ```
@@ -304,14 +304,16 @@ are read and written in one place, `TR.parseDetail` / `TR.formatDetail` in
 **Try details** — side, channel and scorer — are each switched on in ⚙ Setup
 under *Try details to record* (per device). With any of them on, a try opens the
 pop-up split in two: the move on the left, the ticked details on the right (open
-/ blind, MM / ML / LW / W+, and a digits-only box for the scorer's number) —
+/ short side, MM / ML / LW / W+, and a digits-only box for the scorer's number) —
 stacked instead on a phone held upright. Every tap saves as it's made and **Done**
 (or Enter in the number box) closes it.
 
-**Open / blind is pre-selected** from the last ruck — the last touch of the set
-before the try. The blind side is the narrower one, between that ruck and its
-nearer touchline; a try landing there is marked *Blind*, one across the ruck
-*Open*, and the panel says *from the last ruck*. Tap the other side to change
+**Open / short side is pre-selected** from the last ruck — the last touch of the set
+before the try. The short side is the narrower one, between that ruck and its
+nearer touchline; a try landing there is marked *Short side*, one across the ruck
+*Open*, and the panel says *from the last ruck*. A try in **MM** — between the two
+middles — is neither: picking MM clears the side, and every stat counts it as
+*Middle*. Tap the other side to change
 it, or the same one to clear it. Nothing is guessed for a try with no touch
 before it (straight off the tap), a ruck dead centre, or a side already set.
 

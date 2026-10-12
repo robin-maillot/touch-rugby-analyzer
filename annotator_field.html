@@ -1923,7 +1923,8 @@ function computeStats() {
   const statFor = key => {
     const mine   = segs.filter(s => s.owner === key);
     const tries  = mine.filter(s => s.endType === 'Try').length;
-    const comps  = mine.filter(s => s.endType === 'Try' || s.endName === '6th Touch').length;
+    // A try, the 6th touch, or a penalty against the attack after the 5th.
+    const comps  = mine.filter(s => TR.isCompletedSet(s.events)).length;
     const penAtk = annotations.filter(a => a.type === 'Penalty Attack'  && a.actionOwner === key).length;
     const penDef = annotations.filter(a => a.type === 'Penalty Defence' && a.actionOwner === key).length;
     const driveGood = annotations.filter(a => a.type === 'Game Event' && a.name === 'Drive - Good' && a.actionOwner === key).length;
