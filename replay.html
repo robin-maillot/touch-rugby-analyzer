@@ -85,6 +85,27 @@
     .stage.with-video .video { display: block; grid-area: video; }
     .stage.with-video .panel { grid-area: panel; }
     #field circle[data-t], #field g[data-t] { cursor: pointer; }
+    #field.editing circle[data-drag] { cursor: grab; }
+    #field.editing.dragging, #field.editing.dragging * { cursor: grabbing; }
+    .edit-card { display: none; }
+    .edit-card.on { display: block; }
+    .edit-card h3 { font-size: 0.85rem; margin: 0 0 4px; }
+    .edit-card .sub { font-size: 0.74rem; color: var(--text-muted); margin-bottom: 8px; }
+    .edit-card .lab { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); margin: 10px 0 4px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+    .chips button { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; font-size: 0.74rem; cursor: pointer; touch-action: manipulation; }
+    .chips button.on { border-color: var(--accent); background: var(--accent-soft); color: #fff; }
+    .chips button:disabled { opacity: 0.45; cursor: not-allowed; }
+    .ruck-row { display: grid; grid-template-columns: 54px 1fr; gap: 6px; align-items: start; margin-bottom: 4px; }
+    .ruck-row > span { font-size: 0.72rem; color: var(--text-muted); padding-top: 6px; }
+    .edit-card input.num { width: 70px; background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; font-size: 0.8rem; }
+    .edit-foot { display: flex; gap: 6px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+    .edit-foot button { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: 8px; height: 34px; padding: 0 12px; font-size: 0.8rem; cursor: pointer; }
+    .edit-foot button.save { background: var(--accent-strong); border-color: var(--accent-strong); color: #fff; }
+    .edit-foot button:disabled { opacity: 0.45; cursor: not-allowed; }
+    .edit-msg { font-size: 0.74rem; color: var(--text-muted); }
+    .edit-msg.warn { color: var(--yellow); } .edit-msg.bad { color: var(--red); } .edit-msg.good { color: var(--green); }
+    .vid-toggle button#editBtn { margin-left: auto; }
     .steps li { cursor: pointer; }
     .steps li:hover { background: var(--surface-2); }
     .controls button, .speeds button { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: 8px; height: 42px; width: 100%; padding: 0; font-size: 1rem; cursor: pointer; touch-action: manipulation; }
@@ -134,6 +155,7 @@
     </div>
     <div class="video" id="videoBox"><div class="vid-msg">Loading the video…</div></div>
     <div class="panel">
+      <div class="card edit-card" id="editCard"></div>
       <div class="card">
         <div class="score">
           <div class="team"><i style="background:var(--t1)"></i><span id="name1"></span></div>
@@ -158,7 +180,8 @@
         </div>
         <div class="speeds" id="speeds"></div>
         <input type="range" class="scrub" id="scrub" min="0" max="1" step="0.1" value="0" oninput="seek(+this.value)" aria-label="Game time">
-        <div class="vid-toggle"><button id="videoBtn" onclick="toggleVideo()" disabled>📹 Video</button><span class="vid-note" id="videoNote">No video linked for this game</span></div>
+        <div class="vid-toggle"><button id="videoBtn" onclick="toggleVideo()" disabled>📹 Video</button><span class="vid-note" id="videoNote">No video linked for this game</span>
+          <button id="editBtn" onclick="toggleEdit()" hidden title="Admins: move points and edit tags">✏️ Edit</button></div>
         <div class="vid-sync" id="videoSync">Sync
           <button onclick="nudgeVideo(-1)" title="Show the video 1 s earlier">−1 s</button>
           <button onclick="nudgeVideo(-0.5)" title="Show the video ½ s earlier">−½</button>
@@ -196,7 +219,7 @@ const LS = {
 let byGame = {};          // game name → its events, from action=all
 let meta = {};            // game name → list entry
 let order = [];           // playable game names, newest first
-let game = null, tl = null, T = 0, playing = false, speed = 1, lastFrame = 0, lastSetIdx = -2;
+let game = null, tl = null, T = 0, playing = false, speed = 1, lastFrame = 0, lastSetIdx = -2, listDirty = false;
 try { speed = SPEEDS.includes(+localStorage.getItem('tr.replay.speed')) ? +localStorage.getItem('tr.replay.speed') : 1; } catch {}
 
 function ingest(rows) {
@@ -204,12 +227,18 @@ function ingest(rows) {
   if (!rows || rows.length < 2) return;
   const h = rows[0].map(x => String(x).trim().toLowerCase()), I = n => h.indexOf(n);
   const c = { t: I('time'), ty: I('type'), nm: I('name'), po: I('possession owner'), ao: I('action owner'),
-              cm: I('comment'), dt: I('detail'), g: I('game') };
+              cm: I('comment'), dt: I('detail'), sm: I('strike move'), g: I('game') };
   rows.slice(1).forEach(r => {
     const g = r[c.g]; if (!g) return;
-    const p = TR.detailPos(c.dt >= 0 ? r[c.dt] : '', c.cm >= 0 ? r[c.cm] : '');
-    (byGame[g] = byGame[g] || []).push({ t: R.toSecs(r[c.t]), type: (r[c.ty] || '').trim(), name: (r[c.nm] || '').trim(),
-      owner: (r[c.po] || '').trim(), actor: (r[c.ao] || '').trim(), x: p ? p.x : null, y: p ? p.y : null });
+    const raw = c.dt >= 0 ? (r[c.dt] || '') : '';
+    const p = TR.detailPos(raw, c.cm >= 0 ? r[c.cm] : '');
+    const list = byGame[g] = byGame[g] || [];
+    // `i` is the event's place in the game and `row` its sheet row (the feed
+    // keeps every row of the tab, in order, after the header) — both for edits.
+    list.push({ i: list.length, row: list.length + 2, timeStr: r[c.t] || '', t: R.toSecs(r[c.t]),
+      type: (r[c.ty] || '').trim(), name: (r[c.nm] || '').trim(),
+      owner: (r[c.po] || '').trim(), actor: (r[c.ao] || '').trim(), x: p ? p.x : null, y: p ? p.y : null,
+      detailRaw: raw, tags: TR.parseDetail(raw), move: c.sm >= 0 ? (r[c.sm] || '').trim() : '' });
   });
 }
 
@@ -266,6 +295,10 @@ function showEmpty(msg) {
 function teamName(k) { const m = meta[game] || {}; return (k === 'Team 1' ? m.team1 : m.team2) || k; }
 
 function pickGame(g) {
+  if (edits.size && g !== game && !confirm('Switch game? Your unsaved changes to this one will be lost.')) {
+    document.getElementById('gameSelect').value = game || ''; return;
+  }
+  edits.clear(); editSel = null;
   pause();
   if (!g || !byGame[g]) { game = null; unmountVideo(); history.replaceState(null, '', 'replay.html'); showEmpty('Pick a game to replay.'); return; }
   game = g;
@@ -282,6 +315,7 @@ function pickGame(g) {
   lastSetIdx = -2;
   T = tl.sets.length ? tl.sets[0].start : tl.start;
   render();
+  renderEditCard();
   mountVideo();
 }
 
@@ -315,13 +349,13 @@ function setSVG(set) {
   const nodes = set.steps.map((s, i) => {
     if (i > ball.step) return '';
     const p = pts[i], m = /Touch (\d)/.exec(s.name || '');
-    const hit = `<circle data-t="${s.t}" cx="${p.x}" cy="${vy(p.y)}" r="4.5" fill="transparent"><title>${esc(s.name || s.type)} · ${mmss(s.t)}</title></circle>`;
+    const hit = hitCircle(s, p, '');
     if (s.origin) return `<circle cx="${p.x}" cy="${vy(p.y)}" r="2.3" fill="#0b0e14" stroke="${color}" stroke-width="1"/>` + hit;
     return `<circle cx="${p.x}" cy="${vy(p.y)}" r="2.3" fill="${color}" stroke="#0b0e14" stroke-width="0.5"/>` +
       (m ? `<text x="${p.x}" y="${vy(p.y) + 1.4}" text-anchor="middle" font-size="3.2" font-weight="700" fill="#0b0e14" pointer-events="none">${m[1]}</text>` : '') + hit;
   }).join('');
   // Steps not reached yet: just a hit area each, so the faint path is clickable too.
-  const ahead = set.steps.map((s, i) => i <= ball.step ? '' : `<circle data-t="${s.t}" cx="${pts[i].x}" cy="${vy(pts[i].y)}" r="4.5" fill="transparent"><title>${esc(s.name || s.type)} · ${mmss(s.t)}</title></circle>`).join('');
+  const ahead = set.steps.map((s, i) => i <= ball.step ? '' : hitCircle(s, pts[i], '')).join('');
   const end = ball.done ? endMarker(set.outcome.key, pts[pts.length - 1], color) : '';
   return `<polyline points="${poly(pts)}" fill="none" stroke="${color}" stroke-opacity="0.22" stroke-width="1" stroke-dasharray="2 1.5"/>
     <polyline points="${poly(played)}" fill="none" stroke="${color}" stroke-width="1.4" stroke-linejoin="round"/>
@@ -329,6 +363,15 @@ function setSVG(set) {
     ${ball.done && set.outcome.key !== 'none' ? '' : `<circle cx="${b.x}" cy="${vy(b.y)}" r="3" fill="#fff" stroke="${color}" stroke-width="1.4" pointer-events="none"/>`}
     ${ahead}
     ${touchBadge(set, ball, b, color)}`;
+}
+
+// A step's tap target: seeks to it, and in edit mode selects its event. The
+// selected event gets a ring and is the one a drag moves.
+function hitCircle(s, p, prefix) {
+  const ev = s.origin || s.i == null ? '' : ` data-ev="${s.i}"`;
+  const sel = editOn && !s.origin && s.i === editSel;
+  return (sel ? `<circle cx="${p.x}" cy="${vy(p.y)}" r="4" fill="none" stroke="#facc15" stroke-width="1.1" pointer-events="none"/>` : '') +
+    `<circle data-t="${s.t}"${ev}${sel ? ' data-drag="1"' : ''} cx="${p.x}" cy="${vy(p.y)}" r="4.5" fill="transparent"><title>${prefix}${esc(s.name || s.type)} · ${mmss(s.t)}</title></circle>`;
 }
 
 // The set after this one, whole and at half opacity under the current set,
@@ -340,7 +383,7 @@ function nextSetSVG(set) {
   const poly = pts.map(p => `${p.x.toFixed(2)},${vy(p.y).toFixed(2)}`).join(' ');
   const nodes = set.steps.map((s, i) => {
     const p = pts[i], m = /Touch (\d)/.exec(s.name || '');
-    const hit = `<circle data-t="${s.t}" cx="${p.x}" cy="${vy(p.y)}" r="4.5" fill="transparent"><title>Next set · ${esc(s.name || s.type)} · ${mmss(s.t)}</title></circle>`;
+    const hit = hitCircle(s, p, 'Next set · ');
     if (s.origin) return `<circle cx="${p.x}" cy="${vy(p.y)}" r="2.1" fill="#0b0e14" stroke="${color}" stroke-width="0.9"/>` + hit;
     return `<circle cx="${p.x}" cy="${vy(p.y)}" r="2.1" fill="${color}"/>` +
       (m ? `<text x="${p.x}" y="${vy(p.y) + 1.3}" text-anchor="middle" font-size="3" font-weight="700" fill="#0b0e14" pointer-events="none">${m[1]}</text>` : '') + hit;
@@ -399,9 +442,10 @@ function render() {
   oc.className = 'outcome ' + (ball.done ? set.outcome.key : '');
   oc.textContent = ball.done ? set.outcome.label : (n ? `Touch ${n}` : 'Set starts');
   // The set's steps, the one just reached highlighted.
-  if (idx !== lastSetIdx) {
+  if (idx !== lastSetIdx || listDirty) {
+    listDirty = false;
     document.getElementById('steps').innerHTML = set.steps.map((s, i) =>
-      `<li data-i="${i}" data-t="${s.t}" title="Jump to ${esc(s.name || s.type)}"><span class="t">${mmss(s.t)}</span><span>${esc(s.name || s.type)}</span><span class="m">${Math.round(s.y * 0.7)} m</span></li>`).join('');
+      `<li data-i="${i}" data-t="${s.t}"${s.origin || s.i == null ? '' : ` data-ev="${s.i}"`} title="Jump to ${esc(s.name || s.type)}"><span class="t">${mmss(s.t)}</span><span>${esc(s.name || s.type)}</span><span class="m">${Math.round(s.y * 0.7)} m</span></li>`).join('');
     lastSetIdx = idx;
   }
   document.querySelectorAll('#steps li').forEach(li => {
@@ -584,12 +628,160 @@ document.addEventListener('keydown', e => {
 });
 // Tap a touch — on the field or in the list — to jump to it.
 document.getElementById('field').addEventListener('click', e => {
-  const n = e.target.closest('[data-t]'); if (n) seek(+n.dataset.t);
+  if (dragMoved) { dragMoved = false; return; }                 // the end of a drag isn't a tap
+  const n = e.target.closest('[data-t]'); if (!n) return;
+  seek(+n.dataset.t);
+  if (editOn && n.dataset.ev != null) selectEvent(+n.dataset.ev);
 });
 document.getElementById('steps').addEventListener('click', e => {
-  const n = e.target.closest('[data-t]'); if (n) seek(+n.dataset.t);
+  const n = e.target.closest('[data-t]'); if (!n) return;
+  seek(+n.dataset.t);
+  if (editOn && n.dataset.ev != null) selectEvent(+n.dataset.ev);
 });
 document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+
+// ── Editing (admins) ───────────────────────────────────────────
+// Move an event's point by dragging it; for a try pick its move (ruck, then
+// combo), side, channel and scorer; for a touch, turnover or penalty in attack
+// the strike move it belonged to. Changes collect here and go to the sheet in
+// one update_rows call. The server finds each row by its sheet row number,
+// checked against the Time, Type and Name it had (Time alone isn't unique);
+// a server without that (no 'row-match' cap) can only be trusted with events
+// whose time is unique in the game.
+const isAdmin = TR.role() === 'admin';
+let editOn = false, editSel = null, serverCaps = null, saving = false, editMsg = { text: '', kind: '' };
+const edits = new Map();                 // event index → its values as last saved
+const TRY_RUCKS = ['32', '23', '21', '33', 'French Flair'];
+const ruckOf = n => TRY_RUCKS.find(r => n === r || n.startsWith(r + ' - ')) || 'Other';
+const tryTree = () => {
+  const t = new Map([...TRY_RUCKS, 'Other'].map(r => [r, []]));
+  (TR.MENU['Try'] || []).forEach(n => t.get(ruckOf(n)).push(n));
+  return t;
+};
+const evAt = i => (byGame[game] || [])[i];
+const timeShared = e => (byGame[game] || []).some(o => o !== e && o.timeStr === e.timeStr);
+const canSaveEvent = e => (serverCaps || []).includes('row-match') || !timeShared(e);
+
+async function toggleEdit() {
+  if (!isAdmin) return;
+  if (editOn && edits.size && !confirm('Leave edit mode? Your unsaved changes are kept until you leave the page or save them.')) return;
+  editOn = !editOn;
+  document.getElementById('editBtn').classList.toggle('on', editOn);
+  document.getElementById('field').classList.toggle('editing', editOn);
+  if (editOn) {
+    pause();
+    if (!serverCaps) {
+      try { const b = await (await fetch(`${TR.APPS_SCRIPT_URL}?action=build`)).json(); serverCaps = b.caps || []; } catch { serverCaps = []; }
+    }
+  }
+  renderEditCard(); render();
+}
+function selectEvent(i) { editSel = i; editMsg = { text: '', kind: '' }; renderEditCard(); render(); }
+
+// Record a change to an event and redraw. `patch`: name, move, tags (merged), x / y.
+function editEvent(i, patch) {
+  const e = evAt(i); if (!e) return;
+  if (!edits.has(i)) edits.set(i, { name: e.name, move: e.move, detailRaw: e.detailRaw, x: e.x, y: e.y, tags: { ...e.tags } });
+  if ('name' in patch) e.name = patch.name;
+  if ('move' in patch) e.move = patch.move;
+  if (patch.tags) { e.tags = { ...e.tags, ...patch.tags }; Object.keys(e.tags).forEach(k => { if (!e.tags[k]) delete e.tags[k]; }); }
+  if ('x' in patch) { e.x = patch.x; e.y = patch.y; }
+  if (e.x != null) e.tags.pos = `${+e.x.toFixed(1)},${+e.y.toFixed(1)}`;
+  e.detailRaw = TR.formatDetail(e.tags);
+  const o = edits.get(i);
+  if (o.name === e.name && o.move === e.move && o.detailRaw === e.detailRaw) edits.delete(i);   // back where it started
+  tl = R.buildTimeline(byGame[game]); listDirty = true;
+  render(); renderEditCard();
+}
+function undoEvent(i) {
+  const o = edits.get(i), e = evAt(i); if (!o || !e) return;
+  Object.assign(e, { name: o.name, move: o.move, detailRaw: o.detailRaw, x: o.x, y: o.y, tags: { ...o.tags } });
+  edits.delete(i); tl = R.buildTimeline(byGame[game]); listDirty = true; render(); renderEditCard();
+}
+
+function renderEditCard() {
+  const card = document.getElementById('editCard');
+  card.classList.toggle('on', editOn);
+  if (!editOn) { card.innerHTML = ''; return; }
+  const e = editSel != null ? evAt(editSel) : null;
+  const chip = (on, label, call, dis) => `<button class="${on ? 'on' : ''}" ${dis ? 'disabled' : ''} onclick="${call}">${esc(label)}</button>`;
+  let body = '';
+  if (!e) body = `<h3>Edit</h3><div class="sub">Tap a touch on the field or in the list to edit it.</div>`;
+  else {
+    const changed = edits.has(e.i);
+    body = `<h3>${esc(e.type)} · ${esc(e.name)} <span style="color:var(--text-dim);font-weight:400">· ${esc(e.timeStr)} · ${esc(teamName(e.owner))}</span></h3>` +
+      (e.x != null ? `<div class="sub">Drag the ringed point on the field to move it — now ${Math.round(e.y * 0.7)} m, ${Math.round(e.x)}% across.</div>` : `<div class="sub">No position recorded for this event.</div>`);
+    if (!canSaveEvent(e)) body += `<div class="edit-msg warn">Another event has the same time (${esc(e.timeStr)}). Deploy the latest Apps Script before editing this one, or the wrong row could change.</div>`;
+    if (e.type === 'Try') {
+      const cur = ruckOf(e.name);
+      body += `<div class="lab">Move — ruck, then combo</div>` + [...tryTree()].map(([ruck, names]) =>
+        `<div class="ruck-row"><span>${esc(ruck)}</span><div class="chips">` +
+        names.map(n => chip(n === e.name, n === ruck ? ruck : n.replace(ruck + ' - ', ''), `editEvent(${e.i},{name:${JSON.stringify(n).replace(/"/g, '&quot;')}})`)).join('') +
+        `</div></div>`).join('');
+      const mid = e.tags.ch === TR.MIDDLE_CHANNEL;
+      body += `<div class="lab">Side</div><div class="chips">` + (mid ? chip(true, 'Middle — scored in MM', '', true)
+        : TR.DETAIL_SIDES.map(v => chip(e.tags.side === v, TR.sideLabel(v), `editEvent(${e.i},{tags:{side:${e.tags.side === v ? "''" : `'${v}'`}}})`)).join('')) + `</div>`;
+      body += `<div class="lab">Channel</div><div class="chips">` + TR.DETAIL_CHANNELS.map(v =>
+        chip(e.tags.ch === v, v, `editEvent(${e.i},{tags:{ch:${e.tags.ch === v ? "''" : `'${v}'`}${v === TR.MIDDLE_CHANNEL && e.tags.ch !== v ? ",side:''" : ''}}})`)).join('') + `</div>`;
+      body += `<div class="lab">Scorer</div><input class="num" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3" value="${esc(e.tags.player || '')}"
+        onchange="editEvent(${e.i},{tags:{player:this.value.replace(/\D+/g,'')}})" aria-label="Try scorer's number" placeholder="#">`;
+    } else if (TR.STRIKE_MOVE_TYPES.includes(e.type) || e.type === 'Touch') {
+      body += `<div class="lab">Strike move</div><div class="chips">` + chip(!e.move, 'None', `editEvent(${e.i},{move:''})`) +
+        TR.STRIKE_MOVES.map(m => chip(e.move === m, m, `editEvent(${e.i},{move:${JSON.stringify(m).replace(/"/g, '&quot;')}})`)).join('') + `</div>`;
+    }
+    body += `<div class="edit-foot">${changed ? `<button onclick="undoEvent(${e.i})">Undo this event</button>` : ''}</div>`;
+  }
+  const n = edits.size, blocked = [...edits.keys()].some(i => !canSaveEvent(evAt(i)));
+  body += `<div class="edit-foot"><button class="save" onclick="saveEdits()" ${!n || saving || blocked ? 'disabled' : ''}>${saving ? 'Saving…' : `Save to sheet${n ? ` (${n})` : ''}`}</button>` +
+    `<span class="edit-msg ${editMsg.kind}">${esc(editMsg.text || (n ? `${n} event${n === 1 ? '' : 's'} changed, not saved yet` : ''))}</span></div>`;
+  card.innerHTML = body;
+}
+
+async function saveEdits() {
+  if (!edits.size || saving) return;
+  const changes = [...edits.entries()].map(([i, o]) => {
+    const e = evAt(i);
+    const c = { sheetName: game, time: e.timeStr, row: e.row, matchType: e.type, matchName: o.name };
+    if (e.name !== o.name) c.name = e.name;
+    if (e.move !== o.move) c.strikeMove = e.move;
+    if (e.detailRaw !== o.detailRaw) c.detail = e.detailRaw;
+    return c;
+  });
+  saving = true; editMsg = { text: '', kind: '' }; renderEditCard();
+  try {
+    const res = await TR.postJson(TR.APPS_SCRIPT_URL, { secret: TR.secret(), action: 'update_rows', changes }, { retries: 1 });
+    if (!res.ok) throw new Error(res.error || 'the sheet refused the change');
+    const all = res.updated === changes.length;
+    editMsg = all ? { text: `Saved ${res.updated} change${res.updated === 1 ? '' : 's'} to the sheet`, kind: 'good' }
+                  : { text: `Saved ${res.updated} of ${changes.length} — the rest no longer match the sheet; reload the game`, kind: 'bad' };
+    edits.clear();
+  } catch (err) {
+    editMsg = { text: 'Not saved: ' + err.message, kind: 'bad' };
+  } finally { saving = false; renderEditCard(); }
+}
+window.addEventListener('beforeunload', e => { if (edits.size) { e.preventDefault(); e.returnValue = ''; } });
+
+// Dragging the selected point. Screen units → the owner's attack frame.
+let dragging = false, dragMoved = false;
+const fieldEl = document.getElementById('field');
+fieldEl.addEventListener('pointerdown', e => {
+  if (!editOn || !e.target.closest('[data-drag]')) return;
+  dragging = true; dragMoved = false; fieldEl.setPointerCapture(e.pointerId); fieldEl.classList.add('dragging'); e.preventDefault();
+});
+fieldEl.addEventListener('pointermove', e => {
+  if (!dragging) return;
+  const ev = evAt(editSel); if (!ev) return;
+  const p = fieldEl.createSVGPoint(); p.x = e.clientX; p.y = e.clientY;
+  const q = p.matrixTransform(fieldEl.getScreenCTM().inverse());
+  const sx = Math.max(0, Math.min(100, q.x)), sy = Math.max(0, Math.min(100, 100 - q.y / LEN * 100));
+  const d = R.screenPos(ev.owner, sx, sy);                       // the 180° turn is its own inverse
+  dragMoved = true;
+  editEvent(editSel, { x: d.x, y: d.y });
+});
+const endDrag = () => { if (!dragging) return; dragging = false; fieldEl.classList.remove('dragging'); };
+fieldEl.addEventListener('pointerup', endDrag);
+fieldEl.addEventListener('pointercancel', endDrag);
+if (isAdmin) document.getElementById('editBtn').hidden = false;
 
 renderSpeeds();
 load();

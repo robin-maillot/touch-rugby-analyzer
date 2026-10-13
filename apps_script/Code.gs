@@ -631,7 +631,7 @@ function rawJson(str) {
 // version last deployed, whatever is saved in the editor, and the responses
 // look the same either way — so bump this with every Apps Script change and
 // check it with ?action=build after deploying.
-const BUILD = '2026-10-09 snapshot';
+const BUILD = '2026-10-13 row-match';
 
 // Writes and reads back a small and a large (compressed) entry through the
 // cache helpers, so a deploy can be checked end to end without logs.
@@ -650,7 +650,8 @@ function doGet(e) {
     // action=build → which code this deployment runs, and whether its cache
     // works. Public and cheap; reveals nothing about any game.
     if (e.parameter.action === 'build') {
-      return json({ ok: true, build: BUILD, cache: cacheSelfTest() });
+      // caps: what this build can do, for clients that need to know first.
+      return json({ ok: true, build: BUILD, caps: ['row-match'], cache: cacheSelfTest() });
     }
 
     // action=live → current live game states. PUBLIC endpoint: no secret
@@ -942,7 +943,9 @@ function doPost(e) {
       if (!isAdminSecret(data.secret)) return json({ ok: false, error: 'Admin access required.' });
       let updated = 0;
       for (const change of (data.changes || [])) {
-        if (updateRow(change.sheetName, change.time, change.name, change.comment, change.strikeMove, change.detail)) { updated++; bumpGameRev(change.sheetName); }
+        const match = (change.row != null || change.matchType != null || change.matchName != null)
+          ? { row: Number(change.row) || 0, type: change.matchType, name: change.matchName } : null;
+        if (updateRow(change.sheetName, change.time, change.name, change.comment, change.strikeMove, change.detail, match)) { updated++; bumpGameRev(change.sheetName); }
       }
       [...new Set((data.changes || []).map(c => c.sheetName))].forEach(n => warmGame(n));
       cacheClear();
@@ -1400,7 +1403,13 @@ function deriveStrikeMove(type, name, stored) {
   return '';
 }
 
-function updateRow(sheetName, time, name, comment, strikeMove, detail) {
+// `match` (optional) pins the row: { row, type, name } — the sheet row number
+// the caller read it at, and the Type / Name it had then. Time alone isn't
+// unique (a touch and a 6 Again in the same second), so with `match` the row
+// at that number is used only if it still has that time, type and name, else
+// the first row that does; nothing is written when none does. Without it, the
+// first row with that time, as before.
+function updateRow(sheetName, time, name, comment, strikeMove, detail, match) {
   const ss    = SpreadsheetApp.openById(SHEET_ID);
   const sheet = ss.getSheetByName(sheetName);
   if (!sheet) return false;
@@ -1421,24 +1430,28 @@ function updateRow(sheetName, time, name, comment, strikeMove, detail) {
     sheet.getRange(1, detailIdx + 1).setValue('Detail');
   }
 
-  for (let i = 1; i < values.length; i++) {
-    if (String(values[i][timeIdx]) === String(time)) {
-      if (nameIdx    >= 0 && name    !== undefined) sheet.getRange(i + 1, nameIdx    + 1).setValue(name);
-      if (commentIdx >= 0 && comment !== undefined) sheet.getRange(i + 1, commentIdx + 1).setValue(comment);
-      if (detailIdx  >= 0 && detail  !== undefined) sheet.getRange(i + 1, detailIdx  + 1).setValue(detail);
-      // Re-derive whenever the Name or the Strike Move itself was part of this
-      // edit, so correcting a Try's Name repairs its move and turning a
-      // Turnover into 6 Again clears one.
-      if (typeIdx >= 0 && strikeIdx >= 0 && (name !== undefined || strikeMove !== undefined)) {
-        const type    = values[i][typeIdx];
-        const newName = name       !== undefined ? name       : values[i][nameIdx];
-        const stored  = strikeMove !== undefined ? strikeMove : values[i][strikeIdx];
-        sheet.getRange(i + 1, strikeIdx + 1).setValue(deriveStrikeMove(type, newName, stored));
-      }
-      return true;
-    }
+  const fits = i => String(values[i][timeIdx]) === String(time) && (!match ||
+    ((match.type == null || typeIdx < 0 || String(values[i][typeIdx]) === String(match.type)) &&
+     (match.name == null || nameIdx < 0 || String(values[i][nameIdx]) === String(match.name))));
+  let hit = -1;
+  if (match && match.row >= 2 && match.row <= values.length && fits(match.row - 1)) hit = match.row - 1;
+  else for (let r = 1; r < values.length; r++) if (fits(r)) { hit = r; break; }
+
+  if (hit < 0) return false;
+  const i = hit;
+  if (nameIdx    >= 0 && name    !== undefined) sheet.getRange(i + 1, nameIdx    + 1).setValue(name);
+  if (commentIdx >= 0 && comment !== undefined) sheet.getRange(i + 1, commentIdx + 1).setValue(comment);
+  if (detailIdx  >= 0 && detail  !== undefined) sheet.getRange(i + 1, detailIdx  + 1).setValue(detail);
+  // Re-derive whenever the Name or the Strike Move itself was part of this
+  // edit, so correcting a Try's Name repairs its move and turning a
+  // Turnover into 6 Again clears one.
+  if (typeIdx >= 0 && strikeIdx >= 0 && (name !== undefined || strikeMove !== undefined)) {
+    const type    = values[i][typeIdx];
+    const newName = name       !== undefined ? name       : values[i][nameIdx];
+    const stored  = strikeMove !== undefined ? strikeMove : values[i][strikeIdx];
+    sheet.getRange(i + 1, strikeIdx + 1).setValue(deriveStrikeMove(type, newName, stored));
   }
-  return false;
+  return true;
 }
 
 // ── Attach a YouTube URL to a game ─────────────────────────────
