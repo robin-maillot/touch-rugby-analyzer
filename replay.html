@@ -81,6 +81,15 @@
     .video > div, .video iframe { position: absolute; inset: 0; width: 100%; height: 100%; }
     .video .vid-msg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 0.85rem; text-align: center; padding: 16px; }
     .stage.with-video { grid-template-columns: minmax(240px, 0.75fr) minmax(0, 1.25fr); grid-template-areas: "pitch video" "pitch panel"; }
+    /* With the video on, the page may use the whole width of a big screen. */
+    main.wide { max-width: 1900px; }
+    /* Never taller than the window: the width follows the height it can have. */
+    .stage.with-video .video { width: min(100%, calc((100vh - 120px) * 16 / 9)); justify-self: center; }
+    @media (min-width: 1400px) {
+      /* Field, a big video, and the controls in their own column beside it. */
+      .stage.with-video { grid-template-columns: minmax(260px, 0.5fr) minmax(0, 1.7fr) 340px; grid-template-areas: "pitch video panel"; }
+      .stage.with-video .pitch svg { max-height: calc(100vh - 150px); }
+    }
     .stage.with-video .pitch { grid-area: pitch; }
     .stage.with-video .video { display: block; grid-area: video; }
     .stage.with-video .panel { grid-area: panel; }
@@ -503,6 +512,7 @@ function paintVideoToggle() {
     : speed > VIDEO_MAX_RATE ? `Video can't play at ${speed}× — it jumps to each moment when you pause or step`
     : 'Video and field play together';
   document.getElementById('stage').classList.toggle('with-video', can && videoOn);
+  document.querySelector('main').classList.toggle('wide', can && videoOn);
   document.getElementById('videoSync').classList.toggle('on', can && videoOn);
   paintDelay();
 }
