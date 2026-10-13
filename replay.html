@@ -69,6 +69,12 @@
     .vid-toggle button.on { border-color: var(--accent); background: var(--accent-soft); color: #fff; }
     .vid-toggle button:disabled { opacity: 0.45; cursor: not-allowed; }
     .vid-note { font-size: 0.7rem; color: var(--text-dim); }
+    .vid-sync { display: none; align-items: center; gap: 4px; margin-top: 8px; font-size: 0.74rem; color: var(--text-muted); flex-wrap: wrap; }
+    .vid-sync.on { display: flex; }
+    .vid-sync button { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; height: 28px; min-width: 40px; padding: 0 8px; font-size: 0.74rem; cursor: pointer; touch-action: manipulation; }
+    .vid-sync button:hover { border-color: var(--accent); }
+    .vid-sync b { min-width: 52px; text-align: center; color: var(--text); font-variant-numeric: tabular-nums; }
+    .vid-sync small { color: var(--text-dim); flex-basis: 100%; }
     /* Video side by side: field on the left, the video top right with the
        panel under it. */
     .video { display: none; background: #000; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; aspect-ratio: 16 / 9; position: relative; }
@@ -153,6 +159,15 @@
         <div class="speeds" id="speeds"></div>
         <input type="range" class="scrub" id="scrub" min="0" max="1" step="0.1" value="0" oninput="seek(+this.value)" aria-label="Game time">
         <div class="vid-toggle"><button id="videoBtn" onclick="toggleVideo()" disabled>📹 Video</button><span class="vid-note" id="videoNote">No video linked for this game</span></div>
+        <div class="vid-sync" id="videoSync">Sync
+          <button onclick="nudgeVideo(-1)" title="Show the video 1 s earlier">−1 s</button>
+          <button onclick="nudgeVideo(-0.5)" title="Show the video ½ s earlier">−½</button>
+          <b id="videoDelay">+0.0 s</b>
+          <button onclick="nudgeVideo(0.5)" title="Show the video ½ s later">+½</button>
+          <button onclick="nudgeVideo(1)" title="Show the video 1 s later">+1 s</button>
+          <button onclick="nudgeVideo(null)" title="Back to the game's own offset" aria-label="Reset the sync">↺</button>
+          <small>Video behind the field? Press +. Ahead? Press −. Saved for this game on this device.</small>
+        </div>
         <div class="hint">Space play / pause · ← → previous / next set · , . (or Shift+← →) previous / next touch · tap any touch to jump to it · the ball's path between tagged touches is estimated from their times</div>
       </div>
     </div>
@@ -409,13 +424,30 @@ let videoOn = false, vplayer = null;
 // moment after one of our own seeks, the 'playing' that causes is undone
 // rather than read as someone pressing play on the video.
 let videoQuietUntil = 0, videoStarted = false;
+// Set once the video has caught up with the replay after a seek; until then the
+// field keeps its own clock rather than reading back a video still landing.
+let videoSynced = false;
 try { videoOn = localStorage.getItem('tr.replay.video') === '1'; } catch {}
 const gameMeta = () => meta[game] || {};
 const hasVideo = () => !!(game && TR.player.providerFor(gameMeta()));
 const videoLive = () => videoOn && vplayer && vplayer.ready;
 const videoLeads = () => videoLive() && speed <= VIDEO_MAX_RATE;
-const toVideo = t => TR.player.videoTimeAt(gameMeta(), t);
-const fromVideo = v => v - ((Number(gameMeta().videoOffset)) || 0);
+// The game's stored offset, plus a per-game nudge from this device for when
+// the sync isn't quite right (Sync −/+). Positive shows the video later.
+let videoDelay = 0;
+const delayKey = () => 'tr.replay.delay.' + game;
+function loadDelay() { videoDelay = 0; try { videoDelay = Number(localStorage.getItem(delayKey())) || 0; } catch {} }
+const toVideo = t => TR.player.videoTimeAt(gameMeta(), t) + videoDelay;
+const fromVideo = v => v - ((Number(gameMeta().videoOffset)) || 0) - videoDelay;
+function paintDelay() {
+  document.getElementById('videoDelay').textContent = (videoDelay >= 0 ? '+' : '−') + Math.abs(videoDelay).toFixed(1) + ' s';
+}
+function nudgeVideo(d) {
+  videoDelay = d == null ? 0 : Math.round((videoDelay + d) * 10) / 10;
+  try { if (videoDelay) localStorage.setItem(delayKey(), String(videoDelay)); else localStorage.removeItem(delayKey()); } catch {}
+  paintDelay();
+  syncVideo();                                   // re-lands the video, playing or paused
+}
 
 function paintVideoToggle() {
   const btn = document.getElementById('videoBtn'), note = document.getElementById('videoNote');
@@ -427,10 +459,13 @@ function paintVideoToggle() {
     : speed > VIDEO_MAX_RATE ? `Video can't play at ${speed}× — it jumps to each moment when you pause or step`
     : 'Video and field play together';
   document.getElementById('stage').classList.toggle('with-video', can && videoOn);
+  document.getElementById('videoSync').classList.toggle('on', can && videoOn);
+  paintDelay();
 }
 
 function mountVideo() {
   unmountVideo();
+  loadDelay();
   if (!videoOn || !hasVideo()) { paintVideoToggle(); return; }
   const box = document.getElementById('videoBox');
   box.innerHTML = '<div></div>';
@@ -440,7 +475,11 @@ function mountVideo() {
     // Play / pause pressed on the video itself drives the replay too.
     onStateChange(st) {
       if (st === 'playing') videoStarted = true;
-      if (Date.now() < videoQuietUntil) { if (st === 'playing' && !(playing && videoLeads())) vplayer.pause(); return; }
+      if (Date.now() < videoQuietUntil) {
+        // It started because we seeked it: land it on the replay's moment and hold.
+        if (st === 'playing' && !(playing && videoLeads())) { vplayer.seek(Math.max(0, toVideo(T))); vplayer.pause(); }
+        return;
+      }
       if (st === 'playing' && !playing && speed <= VIDEO_MAX_RATE) { T = Math.max(tl.start, fromVideo(vplayer.getTime())); play(); }
       else if (st === 'playing' && !playing) vplayer.pause();              // too fast for the video to lead
       else if (st === 'paused' && playing && videoLeads()) pause();
@@ -463,10 +502,12 @@ function syncVideo() {
   if (!videoLive()) return;
   const v = toVideo(T), lead = playing && videoLeads();
   videoQuietUntil = Date.now() + 1500;
+  videoSynced = false;
   vplayer.seek(Math.max(0, v));                                    // before the recording: hold on its first frame
-  // A video that has never played ignores a seek it's paused straight after;
-  // it starts on the seek instead, and the quiet window pauses it there.
-  if ((!lead || v < 0) && videoStarted) vplayer.pause();
+  // A video that has never played ignores seeks until it does: start it, and
+  // the quiet window re-lands it on the moment and pauses it once it's going.
+  if (!videoStarted) vplayer.play();
+  else if (!lead || v < 0) vplayer.pause();
 }
 function startVideo() {
   if (!videoLive()) return;
@@ -478,7 +519,11 @@ function frame(ts) {
   if (!playing) return;
   const dt = lastFrame ? Math.min(0.25, (ts - lastFrame) / 1000) : 0;
   lastFrame = ts;
-  if (videoLeads() && toVideo(T) >= 0) T = Math.max(tl.start, fromVideo(vplayer.getTime()));
+  if (videoLeads() && toVideo(T) >= 0) {
+    const vt = fromVideo(vplayer.getTime());
+    if (videoSynced || Math.abs(vt - T) < 2) { videoSynced = true; T = Math.max(tl.start, vt); }
+    else T += dt * speed;                                          // the video is still landing
+  }
   else T = R.skipDead(tl, T + dt * speed);
   if (T >= tl.end) { T = tl.end; render(); pause(); return; }
   render();
