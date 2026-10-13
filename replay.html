@@ -52,6 +52,11 @@
     .touch-dots span { flex: 1; height: 6px; border-radius: 3px; background: var(--surface-3); }
     .touch-dots span.on { background: var(--accent); }
     .outcome { font-size: 0.82rem; font-weight: 600; min-height: 1.2em; }
+    .strikes { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+    .strikes:empty { display: none; }
+    .strikes span { font-size: 0.72rem; border: 1px solid var(--border); border-radius: 999px; padding: 2px 8px; color: var(--text-muted); }
+    .strikes span.on { color: var(--text); border-color: var(--accent); background: var(--accent-soft); }
+    .steps .mv { margin-left: 6px; font-size: 0.68rem; color: var(--accent); font-weight: 600; }
     .outcome.try { color: var(--green); } .outcome.error { color: var(--orange); }
     .outcome.pen { color: var(--yellow); } .outcome.sixth { color: var(--text-muted); }
 
@@ -61,6 +66,8 @@
     .steps li.now { color: var(--text); font-weight: 600; }
     .steps .t { width: 44px; font-variant-numeric: tabular-nums; flex: none; }
     .steps .m { margin-left: auto; font-variant-numeric: tabular-nums; }
+    .steps .nm { min-width: 0; }
+    .steps .cm { display: block; font-weight: 400; font-size: 0.72rem; color: var(--text-muted); white-space: normal; }
 
     .controls { display: grid; grid-template-columns: 48px 48px 72px 48px 48px; gap: 6px; }
     .controls button.vid { margin-left: 8px; }
@@ -85,10 +92,19 @@
     main.wide { max-width: 1900px; }
     /* Never taller than the window: the width follows the height it can have. */
     .stage.with-video .video { width: min(100%, calc((100vh - 120px) * 16 / 9)); justify-self: center; }
+    /* On its side the field is wide and short: it goes under the video (or
+       fills the column on its own), with the controls to the right. */
+    .stage.side { grid-template-columns: minmax(0, 1fr) 340px; }
+    .stage.side .pitch svg { max-height: calc(100vh - 170px); }
+    .stage.side.with-video { grid-template-columns: minmax(0, 1fr) 320px; grid-template-areas: "video panel" "pitch panel"; }
+    .stage.side.with-video .video { width: min(100%, calc(56vh * 16 / 9)); }
+    .stage.side.with-video .pitch svg { max-height: calc(44vh - 60px); }
     @media (min-width: 1400px) {
       /* Field, a big video, and the controls in their own column beside it. */
       .stage.with-video { grid-template-columns: minmax(260px, 0.5fr) minmax(0, 1.7fr) 340px; grid-template-areas: "pitch video panel"; }
       .stage.with-video .pitch svg { max-height: calc(100vh - 150px); }
+      .stage.side.with-video { grid-template-columns: minmax(0, 1fr) 340px; grid-template-areas: "video panel" "pitch panel"; }
+      .stage.side.with-video .pitch svg { max-height: calc(44vh - 60px); }
     }
     .stage.with-video .pitch { grid-area: pitch; }
     .stage.with-video .video { display: block; grid-area: video; }
@@ -109,6 +125,7 @@
     .chips button:disabled { opacity: 0.45; cursor: not-allowed; }
     .ruck-row { display: grid; grid-template-columns: 54px 1fr; gap: 6px; align-items: start; margin-bottom: 4px; }
     .ruck-row > span { font-size: 0.72rem; color: var(--text-muted); padding-top: 6px; }
+    .edit-card textarea.cmt { width: 100%; background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; font: inherit; font-size: 0.8rem; resize: vertical; }
     .edit-card input.num { width: 70px; background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; font-size: 0.8rem; }
     .edit-foot { display: flex; gap: 6px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
     .edit-foot button { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: 8px; height: 34px; padding: 0 12px; font-size: 0.8rem; cursor: pointer; }
@@ -116,19 +133,25 @@
     .edit-foot button:disabled { opacity: 0.45; cursor: not-allowed; }
     .edit-msg { font-size: 0.74rem; color: var(--text-muted); }
     .edit-msg.warn { color: var(--yellow); } .edit-msg.bad { color: var(--red); } .edit-msg.good { color: var(--green); }
-    .vid-toggle button#editBtn { margin-left: auto; }
+    .vid-toggle button#rotateBtn { margin-left: auto; }
     .steps li { cursor: pointer; }
     .steps li:hover { background: var(--surface-2); }
     .controls button, .speeds button { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: 8px; height: 42px; width: 100%; padding: 0; font-size: 1rem; cursor: pointer; touch-action: manipulation; }
     .controls button:hover, .speeds button:hover { border-color: var(--accent); }
     .controls button.play { background: var(--accent-strong); border-color: var(--accent-strong); color: #fff; }
-    .speeds { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin-top: 10px; }
+    .speeds { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin-top: 10px; }
     .speeds button { height: 30px; font-size: 0.75rem; }
     .speeds button.on { border-color: var(--accent); color: #fff; background: var(--accent-soft); }
     .scrub { width: 100%; margin-top: 10px; accent-color: var(--accent); }
     .hint { font-size: 0.7rem; color: var(--text-dim); margin-top: 6px; }
     @media (max-width: 820px) {
-      .stage, .stage.with-video { grid-template-columns: 1fr; grid-template-areas: "video" "pitch" "panel"; gap: 10px; }
+      .stage, .stage.with-video, .stage.side, .stage.side.with-video { grid-template-columns: 1fr; grid-template-areas: "video" "pitch" "panel"; gap: 10px; }
+      .stage.side.with-video .video { width: 100%; }
+      .stage.side .pitch svg { max-height: none; }
+      /* No keyboard on a phone; the shortcut hint and sync note only take room. */
+      .hint, .vid-sync small { display: none; }
+      /* Video, field and controls all on one phone screen. */
+      .stage.with-video .pitch svg, .stage.side.with-video .pitch svg { max-height: 26vh; }
       .pitch svg { max-height: 46vh; }
       main { padding: 10px; }
       #status { display: none; }
@@ -179,6 +202,7 @@
         <div class="set-head"><b id="setTeam"></b><span id="setNo"></span></div>
         <div class="touch-dots" id="dots"></div>
         <div class="outcome" id="outcome"></div>
+        <div class="strikes" id="strikes"></div>
         <ol class="steps" id="steps"></ol>
       </div>
       <div class="card ctl">
@@ -192,7 +216,8 @@
         <div class="speeds" id="speeds"></div>
         <input type="range" class="scrub" id="scrub" min="0" max="1" step="0.1" value="0" oninput="seek(+this.value)" aria-label="Game time">
         <div class="vid-toggle"><button id="videoBtn" onclick="toggleVideo()" disabled>📹 Video</button><span class="vid-note" id="videoNote">No video linked for this game</span>
-          <button id="editBtn" onclick="toggleEdit()" hidden title="Admins: move points and edit tags">✏️ Edit</button></div>
+          <button id="rotateBtn" onclick="toggleRotate()" title="Turn the field on its side">⟳ Rotate</button>
+          <button id="editBtn" onclick="toggleEdit()" hidden title="Admins: move points, edit tags and comments">✏️ Edit</button></div>
         <div class="vid-sync" id="videoSync">Sync
           <button onclick="nudgeVideo(-1)" title="Show the video 1 s earlier">−1 s</button>
           <button onclick="nudgeVideo(-0.5)" title="Show the video ½ s earlier">−½</button>
@@ -215,7 +240,7 @@ const R = TR.Replay;
 document.documentElement.style.setProperty('--t1', '#3b82f6');
 document.documentElement.style.setProperty('--t2', '#f59e0b');
 const COLOR = { 'Team 1': '#3b82f6', 'Team 2': '#f59e0b' };
-const SPEEDS = [1, 2, 4, 8, 16];
+const SPEEDS = [0.5, 1, 2, 4, 8, 16];
 const LEN = 140;                         // 70 m × 50 m → 140 × 100 units
 const vy = y => (100 - y) / 100 * LEN;   // y 100 (Team 1's attack) at the top
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -230,6 +255,9 @@ const LS = {
 let byGame = {};          // game name → its events, from action=all
 let meta = {};            // game name → list entry
 let order = [];           // playable game names, newest first
+// Rotated: the field on its side, Team 1 attacking left to right.
+let rotated = false;
+try { rotated = localStorage.getItem('tr.replay.rotated') === '1'; } catch {}
 let game = null, tl = null, T = 0, playing = false, speed = 1, lastFrame = 0, lastSetIdx = -2, listDirty = false;
 try { speed = SPEEDS.includes(+localStorage.getItem('tr.replay.speed')) ? +localStorage.getItem('tr.replay.speed') : 1; } catch {}
 
@@ -249,7 +277,8 @@ function ingest(rows) {
     list.push({ i: list.length, row: list.length + 2, timeStr: r[c.t] || '', t: R.toSecs(r[c.t]),
       type: (r[c.ty] || '').trim(), name: (r[c.nm] || '').trim(),
       owner: (r[c.po] || '').trim(), actor: (r[c.ao] || '').trim(), x: p ? p.x : null, y: p ? p.y : null,
-      detailRaw: raw, tags: TR.parseDetail(raw), move: c.sm >= 0 ? (r[c.sm] || '').trim() : '' });
+      detailRaw: raw, tags: TR.parseDetail(raw), move: c.sm >= 0 ? (r[c.sm] || '').trim() : '',
+      comment: TR.stripLegacyPos(c.cm >= 0 ? r[c.cm] : '') });
   });
 }
 
@@ -302,6 +331,24 @@ async function load() {
   }
 }
 
+function paintAttackKey() {
+  if (!game) return;
+  const [a, b] = rotated ? ['→', '←'] : ['↑', '↓'];
+  document.getElementById('keyUp').innerHTML = `<i style="background:${COLOR['Team 1']}"></i>${esc(teamName('Team 1'))} attack ${a}`;
+  document.getElementById('keyDown').innerHTML = `${esc(teamName('Team 2'))} attack ${b}<i style="background:${COLOR['Team 2']};margin:0 0 0 5px"></i>`;
+}
+// The page may use the whole width of a big screen with the video on or the
+// field on its side; an upright field alone is tall, not wide.
+function paintWidth() { document.querySelector('main').classList.toggle('wide', rotated || (hasVideo() && videoOn)); }
+
+function toggleRotate() {
+  rotated = !rotated;
+  try { localStorage.setItem('tr.replay.rotated', rotated ? '1' : ''); } catch {}
+  document.getElementById('rotateBtn').classList.toggle('on', rotated);
+  document.getElementById('stage').classList.toggle('side', rotated);
+  paintWidth(); paintAttackKey(); render();
+}
+
 // Rebuild the game on screen from byGame, keeping the moment and the selection.
 function refreshGame() {
   tl = R.buildTimeline(byGame[game]);
@@ -331,8 +378,7 @@ function pickGame(g) {
   document.getElementById('stage').style.display = '';
   document.getElementById('name1').textContent = teamName('Team 1');
   document.getElementById('name2').textContent = teamName('Team 2');
-  document.getElementById('keyUp').innerHTML = `<i style="background:${COLOR['Team 1']}"></i>${esc(teamName('Team 1'))} attack ↑`;
-  document.getElementById('keyDown').innerHTML = `${esc(teamName('Team 2'))} attack ↓<i style="background:${COLOR['Team 2']};margin:0 0 0 5px"></i>`;
+  paintAttackKey();
   const sc = document.getElementById('scrub');
   sc.min = tl.start; sc.max = tl.end;
   lastSetIdx = -2;
@@ -354,11 +400,27 @@ function fieldSVG() {
     <text x="50" y="${LEN + 10}" text-anchor="middle" font-size="3.2" fill="rgba(255,255,255,0.4)">${esc(teamName('Team 2'))} score here</text>`;
 }
 
+// Upright the field is 108 × 190 units with the score strip above it; on its
+// side, (x, y) → (LEN − y, x) turns it a quarter so Team 1 attacks to the
+// right, and the strip runs along the top of the long side.
+const VIEW = { up: '-4 -32 108 190', side: '-16 -20 172 126' };
+function placeField(inner) {
+  const g = rotated ? `<g id="fieldG" transform="matrix(0 1 -1 0 ${LEN} 0)">${inner}</g>` : `<g id="fieldG">${inner}</g>`;
+  return g + scoreSVG();
+}
+
+// A label centred on (x, y) in field units that stays upright when the field
+// is turned on its side.
+function label(x, y, size, fill, text) {
+  const rot = rotated ? ` transform="rotate(-90 ${x} ${y})"` : '';
+  return `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="central" font-size="${size}" font-weight="700" fill="${fill}" pointer-events="none"${rot}>${text}</text>`;
+}
+
 function endMarker(o, p, color) {
   const x = p.x, y = vy(p.y);
-  if (o === 'try') return `<circle cx="${x}" cy="${y}" r="4.2" fill="var(--green)" stroke="#fff" stroke-width="0.8"/><text x="${x}" y="${y + 1.6}" text-anchor="middle" font-size="4.4" font-weight="700" fill="#06210f">T</text>`;
+  if (o === 'try') return `<circle cx="${x}" cy="${y}" r="4.2" fill="var(--green)" stroke="#fff" stroke-width="0.8"/>` + label(x, y, 4.4, '#06210f', 'T');
   if (o === 'error') return `<path d="M${x - 3} ${y - 3}L${x + 3} ${y + 3}M${x + 3} ${y - 3}L${x - 3} ${y + 3}" stroke="var(--orange)" stroke-width="1.6"/>`;
-  if (o === 'pen') return `<rect x="${x - 3}" y="${y - 3}" width="6" height="6" rx="1" fill="var(--yellow)"/><text x="${x}" y="${y + 1.6}" text-anchor="middle" font-size="4.2" font-weight="700" fill="#2a1a00">P</text>`;
+  if (o === 'pen') return `<rect x="${x - 3}" y="${y - 3}" width="6" height="6" rx="1" fill="var(--yellow)"/>` + label(x, y, 4.2, '#2a1a00', 'P');
   if (o === 'sixth') return `<rect x="${x - 2.6}" y="${y - 2.6}" width="5.2" height="5.2" rx="1" fill="none" stroke="${color}" stroke-width="1.2"/>`;
   return '';
 }
@@ -375,7 +437,7 @@ function setSVG(set) {
     const hit = hitCircle(s, p, '');
     if (s.origin) return `<circle cx="${p.x}" cy="${vy(p.y)}" r="2.3" fill="#0b0e14" stroke="${color}" stroke-width="1"/>` + hit;
     return `<circle cx="${p.x}" cy="${vy(p.y)}" r="2.3" fill="${color}" stroke="#0b0e14" stroke-width="0.5"/>` +
-      (m ? `<text x="${p.x}" y="${vy(p.y) + 1.4}" text-anchor="middle" font-size="3.2" font-weight="700" fill="#0b0e14" pointer-events="none">${m[1]}</text>` : '') + hit;
+      (m ? label(p.x, vy(p.y), 3.2, '#0b0e14', m[1]) : '') + hit;
   }).join('');
   // Steps not reached yet: just a hit area each, so the faint path is clickable too.
   const ahead = set.steps.map((s, i) => i <= ball.step ? '' : hitCircle(s, pts[i], '')).join('');
@@ -394,7 +456,7 @@ function hitCircle(s, p, prefix) {
   const ev = s.origin || s.i == null ? '' : ` data-ev="${s.i}"`;
   const sel = editOn && !s.origin && s.i === editSel;
   return (sel ? `<circle cx="${p.x}" cy="${vy(p.y)}" r="4" fill="none" stroke="#facc15" stroke-width="1.1" pointer-events="none"/>` : '') +
-    `<circle data-t="${s.t}"${ev}${sel ? ' data-drag="1"' : ''} cx="${p.x}" cy="${vy(p.y)}" r="4.5" fill="transparent"><title>${prefix}${esc(s.name || s.type)} · ${mmss(s.t)}</title></circle>`;
+    `<circle data-t="${s.t}"${ev}${sel ? ' data-drag="1"' : ''} cx="${p.x}" cy="${vy(p.y)}" r="4.5" fill="transparent"><title>${prefix}${esc(s.name || s.type)} · ${mmss(s.t)}${s.comment ? ' — ' + esc(s.comment) : ''}</title></circle>`;
 }
 
 // The set after this one, whole and at half opacity under the current set,
@@ -409,7 +471,7 @@ function nextSetSVG(set) {
     const hit = hitCircle(s, p, 'Next set · ');
     if (s.origin) return `<circle cx="${p.x}" cy="${vy(p.y)}" r="2.1" fill="#0b0e14" stroke="${color}" stroke-width="0.9"/>` + hit;
     return `<circle cx="${p.x}" cy="${vy(p.y)}" r="2.1" fill="${color}"/>` +
-      (m ? `<text x="${p.x}" y="${vy(p.y) + 1.3}" text-anchor="middle" font-size="3" font-weight="700" fill="#0b0e14" pointer-events="none">${m[1]}</text>` : '') + hit;
+      (m ? label(p.x, vy(p.y), 3, '#0b0e14', m[1]) : '') + hit;
   }).join('');
   return `<g opacity="0.5" aria-label="Next set">
     <polyline points="${poly}" fill="none" stroke="${color}" stroke-width="1.1" stroke-linejoin="round"/>
@@ -424,7 +486,7 @@ function touchBadge(set, ball, b, color) {
   if (!n || ball.done) return '';
   const x = b.x + (b.x > 80 ? -6.5 : 6.5), y = vy(b.y) - 5.5;
   return `<g aria-label="Touch ${n}"><circle cx="${x}" cy="${y}" r="3.6" fill="${color}" stroke="#0b0e14" stroke-width="0.6"/>
-    <text x="${x}" y="${y + 1.6}" text-anchor="middle" font-size="4.6" font-weight="800" fill="#0b0e14">${n}</text></g>`;
+    ${label(x, y, 4.6, '#0b0e14', n)}</g>`;
 }
 
 // The scoreboard strip above the field: the score in team colours, and the
@@ -435,18 +497,20 @@ function scoreSVG() {
   // Long team names shrink to keep clear of the clock.
   const chars = `${teamName('Team 1')} ${sc['Team 1']} – ${sc['Team 2']} ${teamName('Team 2')}`.length;
   const size = Math.min(5, 5 * 26 / chars).toFixed(2);
-  return `<rect x="0" y="-31" width="100" height="11" rx="2" fill="rgba(11,14,20,0.85)" stroke="rgba(255,255,255,0.12)" stroke-width="0.4"/>
-    <text x="3" y="-23.6" font-size="${size}" font-weight="700">
+  const W = rotated ? LEN : 100, top = rotated ? -19 : -31;
+  return `<rect x="0" y="${top}" width="${W}" height="11" rx="2" fill="rgba(11,14,20,0.85)" stroke="rgba(255,255,255,0.12)" stroke-width="0.4"/>
+    <text x="3" y="${top + 7.4}" font-size="${size}" font-weight="700">
       <tspan fill="${COLOR['Team 1']}">${esc(teamName('Team 1'))} ${sc['Team 1']}</tspan><tspan fill="rgba(255,255,255,0.55)"> – </tspan><tspan fill="${COLOR['Team 2']}">${sc['Team 2']} ${esc(teamName('Team 2'))}</tspan>
     </text>
-    <text x="97" y="-23.6" text-anchor="end" font-size="3.8" fill="rgba(255,255,255,0.7)">${half}${mmss(T)}</text>`;
+    <text x="${W - 3}" y="${top + 7.4}" text-anchor="end" font-size="3.8" fill="rgba(255,255,255,0.7)">${half}${mmss(T)}</text>`;
 }
 
 function render() {
   if (!tl) return;
   const idx = R.setIndexAt(tl, T), set = tl.sets[Math.max(0, idx)];
   const svg = document.getElementById('field');
-  svg.innerHTML = fieldSVG() + scoreSVG() + nextSetSVG(tl.sets[idx + 1]) + (set && idx >= 0 ? setSVG(set) : '');
+  svg.setAttribute('viewBox', rotated ? VIEW.side : VIEW.up);
+  svg.innerHTML = placeField(fieldSVG() + nextSetSVG(tl.sets[idx + 1]) + (set && idx >= 0 ? setSVG(set) : ''));
 
   const sc = R.scoreAt(tl, T);
   document.getElementById('score').textContent = `${sc['Team 1']} – ${sc['Team 2']}`;
@@ -464,11 +528,17 @@ function render() {
   const oc = document.getElementById('outcome');
   oc.className = 'outcome ' + (ball.done ? set.outcome.key : '');
   oc.textContent = ball.done ? set.outcome.label : (n ? `Touch ${n}` : 'Set starts');
+  // The strike moves tagged in this set, with the touch each came on; lit once reached.
+  let cnt = 0;
+  const strikes = set.events.map(ev => { const before = cnt; cnt = TR.nextTouchCount(cnt, ev.type, ev.name);
+    return ev.move ? { move: ev.move, touch: ev.type === 'Touch' ? cnt : before, t: ev.t, type: ev.type } : null; }).filter(Boolean);
+  document.getElementById('strikes').innerHTML = strikes.map(k =>
+    `<span class="${k.t <= T ? 'on' : ''}" title="${esc(k.type)}">⚡ ${esc(k.move)}${k.touch ? ` · touch ${k.touch}` : ''}</span>`).join('');
   // The set's steps, the one just reached highlighted.
   if (idx !== lastSetIdx || listDirty) {
     listDirty = false;
     document.getElementById('steps').innerHTML = set.steps.map((s, i) =>
-      `<li data-i="${i}" data-t="${s.t}"${s.origin || s.i == null ? '' : ` data-ev="${s.i}"`} title="Jump to ${esc(s.name || s.type)}"><span class="t">${mmss(s.t)}</span><span>${esc(s.name || s.type)}</span><span class="m">${Math.round(s.y * 0.7)} m</span></li>`).join('');
+      `<li data-i="${i}" data-t="${s.t}"${s.origin || s.i == null ? '' : ` data-ev="${s.i}"`} title="Jump to ${esc(s.name || s.type)}"><span class="t">${mmss(s.t)}</span><span class="nm">${esc(s.name || s.type)}${s.move && s.type !== 'Try' ? `<span class="mv">⚡ ${esc(s.move)}</span>` : ''}${s.comment ? `<span class="cm">💬 ${esc(s.comment)}</span>` : ''}</span><span class="m">${Math.round(s.y * 0.7)} m</span></li>`).join('');
     lastSetIdx = idx;
   }
   document.querySelectorAll('#steps li').forEach(li => {
@@ -526,7 +596,7 @@ function paintVideoToggle() {
     : speed > VIDEO_MAX_RATE ? `Video can't play at ${speed}× — it jumps to each moment when you pause or step`
     : 'Video and field play together';
   document.getElementById('stage').classList.toggle('with-video', can && videoOn);
-  document.querySelector('main').classList.toggle('wide', can && videoOn);
+  paintWidth();
   document.getElementById('videoSync').classList.toggle('on', can && videoOn);
   paintDelay();
 }
@@ -633,7 +703,7 @@ function stepSet(dir) {
 
 function renderSpeeds() {
   document.getElementById('speeds').innerHTML = SPEEDS.map(s =>
-    `<button class="${s === speed ? 'on' : ''}" onclick="setSpeed(${s})" aria-pressed="${s === speed}">${s}×</button>`).join('');
+    `<button class="${s === speed ? 'on' : ''}" onclick="setSpeed(${s})" aria-pressed="${s === speed}">${s === 0.5 ? '½' : s}×</button>`).join('');
 }
 function setSpeed(s) {
   speed = s; try { localStorage.setItem('tr.replay.speed', String(s)); } catch {}
@@ -705,21 +775,22 @@ function selectEvent(i) { editSel = i; editMsg = { text: '', kind: '' }; renderE
 // Record a change to an event and redraw. `patch`: name, move, tags (merged), x / y.
 function editEvent(i, patch) {
   const e = evAt(i); if (!e) return;
-  if (!edits.has(i)) edits.set(i, { name: e.name, move: e.move, detailRaw: e.detailRaw, x: e.x, y: e.y, tags: { ...e.tags } });
+  if (!edits.has(i)) edits.set(i, { name: e.name, move: e.move, comment: e.comment, detailRaw: e.detailRaw, x: e.x, y: e.y, tags: { ...e.tags } });
   if ('name' in patch) e.name = patch.name;
+  if ('comment' in patch) e.comment = String(patch.comment || '').trim();
   if ('move' in patch) e.move = patch.move;
   if (patch.tags) { e.tags = { ...e.tags, ...patch.tags }; Object.keys(e.tags).forEach(k => { if (!e.tags[k]) delete e.tags[k]; }); }
   if ('x' in patch) { e.x = patch.x; e.y = patch.y; }
   if (e.x != null) e.tags.pos = `${+e.x.toFixed(1)},${+e.y.toFixed(1)}`;
   e.detailRaw = TR.formatDetail(e.tags);
   const o = edits.get(i);
-  if (o.name === e.name && o.move === e.move && o.detailRaw === e.detailRaw) edits.delete(i);   // back where it started
+  if (o.name === e.name && o.move === e.move && o.comment === e.comment && o.detailRaw === e.detailRaw) edits.delete(i);   // back where it started
   tl = R.buildTimeline(byGame[game]); listDirty = true;
   render(); renderEditCard();
 }
 function undoEvent(i) {
   const o = edits.get(i), e = evAt(i); if (!o || !e) return;
-  Object.assign(e, { name: o.name, move: o.move, detailRaw: o.detailRaw, x: o.x, y: o.y, tags: { ...o.tags } });
+  Object.assign(e, { name: o.name, move: o.move, comment: o.comment, detailRaw: o.detailRaw, x: o.x, y: o.y, tags: { ...o.tags } });
   edits.delete(i); tl = R.buildTimeline(byGame[game]); listDirty = true; render(); renderEditCard();
 }
 
@@ -753,6 +824,8 @@ function renderEditCard() {
       body += `<div class="lab">Strike move</div><div class="chips">` + chip(!e.move, 'None', `editEvent(${e.i},{move:''})`) +
         TR.STRIKE_MOVES.map(m => chip(e.move === m, m, `editEvent(${e.i},{move:${JSON.stringify(m).replace(/"/g, '&quot;')}})`)).join('') + `</div>`;
     }
+    body += `<div class="lab">Comment</div><textarea class="cmt" rows="2" placeholder="Add a comment…" aria-label="Comment"
+      onchange="editEvent(${e.i},{comment:this.value})">${esc(e.comment || '')}</textarea>`;
     body += `<div class="edit-foot">${changed ? `<button onclick="undoEvent(${e.i})">Undo this event</button>` : ''}</div>`;
   }
   const n = edits.size, blocked = [...edits.keys()].some(i => !canSaveEvent(evAt(i)));
@@ -769,6 +842,9 @@ async function saveEdits() {
     if (e.name !== o.name) c.name = e.name;
     if (e.move !== o.move) c.strikeMove = e.move;
     if (e.detailRaw !== o.detailRaw) c.detail = e.detailRaw;
+    // An older game kept the position in Comment ("@62,48"); writing the comment
+    // drops it there, so it goes to Detail with it (pos is always in detailRaw).
+    if (e.comment !== o.comment) { c.comment = e.comment; if (e.x != null) c.detail = e.detailRaw; }
     return c;
   });
   saving = true; editMsg = { text: '', kind: '' }; renderEditCard();
@@ -784,7 +860,7 @@ async function saveEdits() {
       await load();
       const back = changes.filter(c => {
         const e = (byGame[game] || []).find(x => x.row === c.row);
-        return e && (c.name == null || e.name === c.name) && (c.strikeMove == null || e.move === c.strikeMove) && (c.detail == null || e.detailRaw === c.detail);
+        return e && (c.name == null || e.name === c.name) && (c.strikeMove == null || e.move === c.strikeMove) && (c.detail == null || e.detailRaw === c.detail) && (c.comment == null || e.comment === c.comment);
       }).length;
       editMsg = back === changes.length
         ? { text: `Saved ${back} change${back === 1 ? '' : 's'} — confirmed in the sheet`, kind: 'good' }
@@ -807,7 +883,7 @@ fieldEl.addEventListener('pointermove', e => {
   if (!dragging) return;
   const ev = evAt(editSel); if (!ev) return;
   const p = fieldEl.createSVGPoint(); p.x = e.clientX; p.y = e.clientY;
-  const q = p.matrixTransform(fieldEl.getScreenCTM().inverse());
+  const q = p.matrixTransform(document.getElementById('fieldG').getScreenCTM().inverse());
   const sx = Math.max(0, Math.min(100, q.x)), sy = Math.max(0, Math.min(100, 100 - q.y / LEN * 100));
   const d = R.screenPos(ev.owner, sx, sy);                       // the 180° turn is its own inverse
   dragMoved = true;
@@ -817,6 +893,9 @@ const endDrag = () => { if (!dragging) return; dragging = false; fieldEl.classLi
 fieldEl.addEventListener('pointerup', endDrag);
 fieldEl.addEventListener('pointercancel', endDrag);
 if (isAdmin) document.getElementById('editBtn').hidden = false;
+document.getElementById('rotateBtn').classList.toggle('on', rotated);
+document.getElementById('stage').classList.toggle('side', rotated);
+paintWidth();
 
 renderSpeeds();
 load();
