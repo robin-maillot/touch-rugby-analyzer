@@ -1995,6 +1995,7 @@ console.log('Code.gs per-game cache');
     rows, getName: () => name,
     getDataRange: () => ({ getDisplayValues: () => { reads.push(name); return rows.map(r => r.slice()); } }),
     getLastRow: () => rows.length,
+    getRange: (r, c) => ({ setValue: v => { while (rows[r - 1].length < c) rows[r - 1].push(''); rows[r - 1][c - 1] = String(v); } }),
   });
   const H = ['Time','Possession Owner','Type','Name','To Review','Comment','Action Owner','Strike Move','Detail'];
   const games = {
@@ -2137,9 +2138,25 @@ console.log('Code.gs per-game cache');
     const rev = props.get('rev:gD');
     assert.ok(store.has('blk:gD:r' + rev) && store.has('sheet:gD:r' + rev));
   });
+  test('update_rows edits the row it was pointed at, not just the first with that time', () => {
+    const doPost = vm.runInContext('doPost', ctx);
+    games.gE = mkSheet('gE', [H, ['0:05','Team 1','Touch','Touch 3','','','Team 1','','pos:1,1'], ['0:05','Team 1','Turnover','6 Again','','','Team 2','','pos:2,2']]);
+    const post = changes => JSON.parse(doPost({ postData: { contents: JSON.stringify({ secret: 'adm', action: 'update_rows', changes }) } }).str);
+    let r = post([{ sheetName: 'gE', time: '0:05', detail: 'pos:20,20', row: 3, matchType: 'Turnover', matchName: '6 Again' }]);
+    assert.equal(r.updated, 1);
+    assert.equal(games.gE.rows[2][8], 'pos:20,20'); assert.equal(games.gE.rows[1][8], 'pos:1,1');
+    r = post([{ sheetName: 'gE', time: '0:05', detail: 'pos:30,30', row: 2, matchType: 'Turnover', matchName: '6 Again' }]);   // stale row number
+    assert.equal(games.gE.rows[2][8], 'pos:30,30'); assert.equal(games.gE.rows[1][8], 'pos:1,1');
+    r = post([{ sheetName: 'gE', time: '0:05', detail: 'pos:40,40', row: 3, matchType: 'Try', matchName: '32' }]);           // no such row
+    assert.equal(r.updated, 0); assert.equal(games.gE.rows[2][8], 'pos:30,30');
+    r = post([{ sheetName: 'gE', time: '0:05', detail: 'pos:5,5' }]);                                                      // old callers: first row with the time
+    assert.equal(games.gE.rows[1][8], 'pos:5,5');
+    assert.equal(JSON.parse(doPost({ postData: { contents: JSON.stringify({ secret: 'staff1', action: 'update_rows', changes: [] }) } }).str).ok, false);
+    delete games.gE;
+  });
   test('?action=build answers without a secret', () => {
     const b = get({ action: 'build' });
-    assert.match(b.build, /snapshot/); assert.equal(b.cache.small, true); assert.equal(b.cache.large, true);
+    assert.match(b.build, /row-match/); assert.ok([...b.caps].includes('row-match')); assert.equal(b.cache.small, true); assert.equal(b.cache.large, true);
   });
 }
 
