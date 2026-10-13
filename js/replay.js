@@ -159,6 +159,16 @@ TR.Replay = (() => {
     return T;
   }
 
+  // The time of the next (dir > 0) or previous (dir < 0) step anywhere in the
+  // game — a set's origin, each touch, how it ended — for stepping touch by
+  // touch across sets. null at either end.
+  function stepTime(tl, T, dir, eps = 0.05) {
+    const times = [...new Set(tl.sets.flatMap(s => s.steps.map(p => p.t)))].sort((a, b) => a - b);
+    if (dir > 0) { const t = times.find(x => x > T + eps); return t == null ? null : t; }
+    for (let i = times.length - 1; i >= 0; i--) if (times[i] < T - eps) return times[i];
+    return null;
+  }
+
   // Positions as drawn: Team 1 always attacks up the screen, Team 2 down, so a
   // replay never flips at a change of possession. Positions are recorded from
   // the attacking team's view, so Team 2's are turned through 180°.
@@ -166,5 +176,5 @@ TR.Replay = (() => {
     return owner === 'Team 2' ? { x: 100 - x, y: 100 - y } : { x, y };
   }
 
-  return { toSecs, buildTimeline, setIndexAt, ballAt, touchAt, scoreAt, halfAt, skipDead, screenPos, outcomeOf };
+  return { toSecs, buildTimeline, setIndexAt, ballAt, touchAt, scoreAt, halfAt, skipDead, stepTime, screenPos, outcomeOf };
 })();
