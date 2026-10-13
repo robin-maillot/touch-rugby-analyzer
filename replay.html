@@ -62,7 +62,25 @@
     .steps .t { width: 44px; font-variant-numeric: tabular-nums; flex: none; }
     .steps .m { margin-left: auto; font-variant-numeric: tabular-nums; }
 
-    .controls { display: grid; grid-template-columns: 56px 80px 56px; gap: 8px; }
+    .controls { display: grid; grid-template-columns: 48px 48px 72px 48px 48px; gap: 6px; }
+    .controls button.vid { margin-left: 8px; }
+    .vid-toggle { margin-top: 10px; display: flex; align-items: center; gap: 8px; font-size: 0.78rem; color: var(--text-muted); }
+    .vid-toggle button { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: 8px; height: 30px; padding: 0 12px; font-size: 0.78rem; cursor: pointer; }
+    .vid-toggle button.on { border-color: var(--accent); background: var(--accent-soft); color: #fff; }
+    .vid-toggle button:disabled { opacity: 0.45; cursor: not-allowed; }
+    .vid-note { font-size: 0.7rem; color: var(--text-dim); }
+    /* Video side by side: field on the left, the video top right with the
+       panel under it. */
+    .video { display: none; background: #000; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; aspect-ratio: 16 / 9; position: relative; }
+    .video > div, .video iframe { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .video .vid-msg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 0.85rem; text-align: center; padding: 16px; }
+    .stage.with-video { grid-template-columns: minmax(240px, 0.75fr) minmax(0, 1.25fr); grid-template-areas: "pitch video" "pitch panel"; }
+    .stage.with-video .pitch { grid-area: pitch; }
+    .stage.with-video .video { display: block; grid-area: video; }
+    .stage.with-video .panel { grid-area: panel; }
+    #field circle[data-t], #field g[data-t] { cursor: pointer; }
+    .steps li { cursor: pointer; }
+    .steps li:hover { background: var(--surface-2); }
     .controls button, .speeds button { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: 8px; height: 42px; width: 100%; padding: 0; font-size: 1rem; cursor: pointer; touch-action: manipulation; }
     .controls button:hover, .speeds button:hover { border-color: var(--accent); }
     .controls button.play { background: var(--accent-strong); border-color: var(--accent-strong); color: #fff; }
@@ -72,7 +90,7 @@
     .scrub { width: 100%; margin-top: 10px; accent-color: var(--accent); }
     .hint { font-size: 0.7rem; color: var(--text-dim); margin-top: 6px; }
     @media (max-width: 820px) {
-      .stage { grid-template-columns: 1fr; gap: 10px; }
+      .stage, .stage.with-video { grid-template-columns: 1fr; grid-template-areas: "video" "pitch" "panel"; gap: 10px; }
       .pitch svg { max-height: 46vh; }
       main { padding: 10px; }
       #status { display: none; }
@@ -83,6 +101,7 @@
   <script src="js/config.js"></script>
   <script src="js/events.js"></script>
   <script src="js/utils.js"></script>
+  <script src="js/player.js"></script>
   <script src="js/replay.js"></script>
 </head>
 <body>
@@ -107,6 +126,7 @@
       <div class="attack-key"><span id="keyUp"></span><span id="keyDown"></span></div>
       <svg id="field" viewBox="-4 -32 108 190" preserveAspectRatio="xMidYMid meet" aria-label="Field replay"></svg>
     </div>
+    <div class="video" id="videoBox"><div class="vid-msg">Loading the video…</div></div>
     <div class="panel">
       <div class="card">
         <div class="score">
@@ -125,12 +145,15 @@
       <div class="card ctl">
         <div class="controls">
           <button onclick="stepSet(-1)" title="Previous set (←)" aria-label="Previous set">⏮</button>
+          <button onclick="stepTouch(-1)" title="Previous touch (, or Shift+←)" aria-label="Previous touch">◂</button>
           <button class="play" id="playBtn" onclick="togglePlay()" title="Play / pause (space)">▶</button>
+          <button onclick="stepTouch(1)" title="Next touch (. or Shift+→)" aria-label="Next touch">▸</button>
           <button onclick="stepSet(1)" title="Next set (→)" aria-label="Next set">⏭</button>
         </div>
         <div class="speeds" id="speeds"></div>
         <input type="range" class="scrub" id="scrub" min="0" max="1" step="0.1" value="0" oninput="seek(+this.value)" aria-label="Game time">
-        <div class="hint">Space play / pause · ← → previous / next set · the ball's path between tagged touches is estimated from their times</div>
+        <div class="vid-toggle"><button id="videoBtn" onclick="toggleVideo()" disabled>📹 Video</button><span class="vid-note" id="videoNote">No video linked for this game</span></div>
+        <div class="hint">Space play / pause · ← → previous / next set · , . (or Shift+← →) previous / next touch · tap any touch to jump to it · the ball's path between tagged touches is estimated from their times</div>
       </div>
     </div>
   </div>
@@ -229,7 +252,7 @@ function teamName(k) { const m = meta[game] || {}; return (k === 'Team 1' ? m.te
 
 function pickGame(g) {
   pause();
-  if (!g || !byGame[g]) { game = null; history.replaceState(null, '', 'replay.html'); showEmpty('Pick a game to replay.'); return; }
+  if (!g || !byGame[g]) { game = null; unmountVideo(); history.replaceState(null, '', 'replay.html'); showEmpty('Pick a game to replay.'); return; }
   game = g;
   history.replaceState(null, '', `?game=${TR.enc(g)}`);
   tl = R.buildTimeline(byGame[g]);
@@ -244,6 +267,7 @@ function pickGame(g) {
   lastSetIdx = -2;
   T = tl.sets.length ? tl.sets[0].start : tl.start;
   render();
+  mountVideo();
 }
 
 // ── Drawing ────────────────────────────────────────────────────
@@ -276,15 +300,19 @@ function setSVG(set) {
   const nodes = set.steps.map((s, i) => {
     if (i > ball.step) return '';
     const p = pts[i], m = /Touch (\d)/.exec(s.name || '');
-    if (s.origin) return `<circle cx="${p.x}" cy="${vy(p.y)}" r="2.3" fill="#0b0e14" stroke="${color}" stroke-width="1"/>`;
+    const hit = `<circle data-t="${s.t}" cx="${p.x}" cy="${vy(p.y)}" r="4.5" fill="transparent"><title>${esc(s.name || s.type)} · ${mmss(s.t)}</title></circle>`;
+    if (s.origin) return `<circle cx="${p.x}" cy="${vy(p.y)}" r="2.3" fill="#0b0e14" stroke="${color}" stroke-width="1"/>` + hit;
     return `<circle cx="${p.x}" cy="${vy(p.y)}" r="2.3" fill="${color}" stroke="#0b0e14" stroke-width="0.5"/>` +
-      (m ? `<text x="${p.x}" y="${vy(p.y) + 1.4}" text-anchor="middle" font-size="3.2" font-weight="700" fill="#0b0e14">${m[1]}</text>` : '');
+      (m ? `<text x="${p.x}" y="${vy(p.y) + 1.4}" text-anchor="middle" font-size="3.2" font-weight="700" fill="#0b0e14" pointer-events="none">${m[1]}</text>` : '') + hit;
   }).join('');
+  // Steps not reached yet: just a hit area each, so the faint path is clickable too.
+  const ahead = set.steps.map((s, i) => i <= ball.step ? '' : `<circle data-t="${s.t}" cx="${pts[i].x}" cy="${vy(pts[i].y)}" r="4.5" fill="transparent"><title>${esc(s.name || s.type)} · ${mmss(s.t)}</title></circle>`).join('');
   const end = ball.done ? endMarker(set.outcome.key, pts[pts.length - 1], color) : '';
   return `<polyline points="${poly(pts)}" fill="none" stroke="${color}" stroke-opacity="0.22" stroke-width="1" stroke-dasharray="2 1.5"/>
     <polyline points="${poly(played)}" fill="none" stroke="${color}" stroke-width="1.4" stroke-linejoin="round"/>
     ${nodes}${end}
-    ${ball.done && set.outcome.key !== 'none' ? '' : `<circle cx="${b.x}" cy="${vy(b.y)}" r="3" fill="#fff" stroke="${color}" stroke-width="1.4"/>`}
+    ${ball.done && set.outcome.key !== 'none' ? '' : `<circle cx="${b.x}" cy="${vy(b.y)}" r="3" fill="#fff" stroke="${color}" stroke-width="1.4" pointer-events="none"/>`}
+    ${ahead}
     ${touchBadge(set, ball, b, color)}`;
 }
 
@@ -297,9 +325,10 @@ function nextSetSVG(set) {
   const poly = pts.map(p => `${p.x.toFixed(2)},${vy(p.y).toFixed(2)}`).join(' ');
   const nodes = set.steps.map((s, i) => {
     const p = pts[i], m = /Touch (\d)/.exec(s.name || '');
-    if (s.origin) return `<circle cx="${p.x}" cy="${vy(p.y)}" r="2.1" fill="#0b0e14" stroke="${color}" stroke-width="0.9"/>`;
+    const hit = `<circle data-t="${s.t}" cx="${p.x}" cy="${vy(p.y)}" r="4.5" fill="transparent"><title>Next set · ${esc(s.name || s.type)} · ${mmss(s.t)}</title></circle>`;
+    if (s.origin) return `<circle cx="${p.x}" cy="${vy(p.y)}" r="2.1" fill="#0b0e14" stroke="${color}" stroke-width="0.9"/>` + hit;
     return `<circle cx="${p.x}" cy="${vy(p.y)}" r="2.1" fill="${color}"/>` +
-      (m ? `<text x="${p.x}" y="${vy(p.y) + 1.3}" text-anchor="middle" font-size="3" font-weight="700" fill="#0b0e14">${m[1]}</text>` : '');
+      (m ? `<text x="${p.x}" y="${vy(p.y) + 1.3}" text-anchor="middle" font-size="3" font-weight="700" fill="#0b0e14" pointer-events="none">${m[1]}</text>` : '') + hit;
   }).join('');
   return `<g opacity="0.5" aria-label="Next set">
     <polyline points="${poly}" fill="none" stroke="${color}" stroke-width="1.1" stroke-linejoin="round"/>
@@ -357,7 +386,7 @@ function render() {
   // The set's steps, the one just reached highlighted.
   if (idx !== lastSetIdx) {
     document.getElementById('steps').innerHTML = set.steps.map((s, i) =>
-      `<li data-i="${i}"><span class="t">${mmss(s.t)}</span><span>${esc(s.name || s.type)}</span><span class="m">${Math.round(s.y * 0.7)} m</span></li>`).join('');
+      `<li data-i="${i}" data-t="${s.t}" title="Jump to ${esc(s.name || s.type)}"><span class="t">${mmss(s.t)}</span><span>${esc(s.name || s.type)}</span><span class="m">${Math.round(s.y * 0.7)} m</span></li>`).join('');
     lastSetIdx = idx;
   }
   document.querySelectorAll('#steps li').forEach(li => {
@@ -368,12 +397,89 @@ function render() {
   if (now && playing) now.scrollIntoView({ block: 'nearest' });
 }
 
+// ── Video side by side ─────────────────────────────────────────
+// At 1× and 2× the video is the clock: the replay reads the game time back
+// from it every frame, so field and video can't drift apart (dead time plays
+// out as it did). YouTube goes no faster than 2×, so at 4–16× only the field
+// runs, and the video jumps to the right moment whenever play stops or you
+// seek, step or tap a touch.
+const VIDEO_MAX_RATE = 2;
+let videoOn = false, vplayer = null;
+// YouTube starts a video that hasn't played yet when it's merely seeked. For a
+// moment after one of our own seeks, the 'playing' that causes is undone
+// rather than read as someone pressing play on the video.
+let videoQuietUntil = 0, videoStarted = false;
+try { videoOn = localStorage.getItem('tr.replay.video') === '1'; } catch {}
+const gameMeta = () => meta[game] || {};
+const hasVideo = () => !!(game && TR.player.providerFor(gameMeta()));
+const videoLive = () => videoOn && vplayer && vplayer.ready;
+const videoLeads = () => videoLive() && speed <= VIDEO_MAX_RATE;
+const toVideo = t => TR.player.videoTimeAt(gameMeta(), t);
+const fromVideo = v => v - ((Number(gameMeta().videoOffset)) || 0);
+
+function paintVideoToggle() {
+  const btn = document.getElementById('videoBtn'), note = document.getElementById('videoNote');
+  const can = hasVideo();
+  btn.disabled = !can;
+  btn.classList.toggle('on', can && videoOn);
+  note.textContent = !can ? 'No video linked for this game'
+    : !videoOn ? 'Show the game\'s video beside the field'
+    : speed > VIDEO_MAX_RATE ? `Video can't play at ${speed}× — it jumps to each moment when you pause or step`
+    : 'Video and field play together';
+  document.getElementById('stage').classList.toggle('with-video', can && videoOn);
+}
+
+function mountVideo() {
+  unmountVideo();
+  if (!videoOn || !hasVideo()) { paintVideoToggle(); return; }
+  const box = document.getElementById('videoBox');
+  box.innerHTML = '<div></div>';
+  vplayer = TR.player.create({ provider: 'youtube', container: box.firstElementChild,
+    videoId: TR.extractVideoId(gameMeta().youtubelink),
+    onReady() { syncVideo(); if (playing && videoLeads()) startVideo(); },
+    // Play / pause pressed on the video itself drives the replay too.
+    onStateChange(st) {
+      if (st === 'playing') videoStarted = true;
+      if (Date.now() < videoQuietUntil) { if (st === 'playing' && !(playing && videoLeads())) vplayer.pause(); return; }
+      if (st === 'playing' && !playing && speed <= VIDEO_MAX_RATE) { T = Math.max(tl.start, fromVideo(vplayer.getTime())); play(); }
+      else if (st === 'playing' && !playing) vplayer.pause();              // too fast for the video to lead
+      else if (st === 'paused' && playing && videoLeads()) pause();
+    } });
+  paintVideoToggle();
+}
+function unmountVideo() {
+  if (vplayer) { try { vplayer.destroy(); } catch {} vplayer = null; }
+  videoStarted = false;
+  const box = document.getElementById('videoBox');
+  if (box) box.innerHTML = '<div class="vid-msg">Loading the video…</div>';
+}
+function toggleVideo() {
+  videoOn = !videoOn;
+  try { localStorage.setItem('tr.replay.video', videoOn ? '1' : ''); } catch {}
+  if (videoOn) mountVideo(); else { unmountVideo(); paintVideoToggle(); }
+}
+// Put the video on the replay's moment (paused unless it's leading playback).
+function syncVideo() {
+  if (!videoLive()) return;
+  const v = toVideo(T), lead = playing && videoLeads();
+  videoQuietUntil = Date.now() + 1500;
+  vplayer.seek(Math.max(0, v));                                    // before the recording: hold on its first frame
+  // A video that has never played ignores a seek it's paused straight after;
+  // it starts on the seek instead, and the quiet window pauses it there.
+  if ((!lead || v < 0) && videoStarted) vplayer.pause();
+}
+function startVideo() {
+  if (!videoLive()) return;
+  syncVideo(); vplayer.setRate(speed); vplayer.play();
+}
+
 // ── Playback ───────────────────────────────────────────────────
 function frame(ts) {
   if (!playing) return;
   const dt = lastFrame ? Math.min(0.25, (ts - lastFrame) / 1000) : 0;
   lastFrame = ts;
-  T = R.skipDead(tl, T + dt * speed);
+  if (videoLeads() && toVideo(T) >= 0) T = Math.max(tl.start, fromVideo(vplayer.getTime()));
+  else T = R.skipDead(tl, T + dt * speed);
   if (T >= tl.end) { T = tl.end; render(); pause(); return; }
   render();
   requestAnimationFrame(frame);
@@ -383,14 +489,23 @@ function play() {
   if (T >= tl.end) T = tl.sets.length ? tl.sets[0].start : tl.start;
   playing = true; lastFrame = 0;
   document.getElementById('playBtn').textContent = '⏸';
+  if (videoLeads()) startVideo();
   requestAnimationFrame(frame);
 }
 function pause() {
   playing = false;
   const b = document.getElementById('playBtn'); if (b) b.textContent = '▶';
+  if (videoLive()) { vplayer.pause(); syncVideo(); }
 }
 function togglePlay() { playing ? pause() : play(); }
-function seek(t) { T = t; render(); }
+function seek(t) { T = t; render(); syncVideo(); }
+
+// Next / previous tagged touch, across sets.
+function stepTouch(dir) {
+  if (!tl) return;
+  const t = R.stepTime(tl, T, dir);
+  if (t != null) seek(t);
+}
 
 // Previous goes to the start of this set, or of the one before when already
 // at (or within a second of) its start.
@@ -400,20 +515,34 @@ function stepSet(dir) {
   if (dir > 0) idx = Math.min(tl.sets.length - 1, idx + 1);
   else if (idx >= 0 && T - tl.sets[idx].start <= 1) idx = Math.max(0, idx - 1);
   T = tl.sets[Math.max(0, idx)].start;
-  render();
+  render(); syncVideo();
 }
 
 function renderSpeeds() {
   document.getElementById('speeds').innerHTML = SPEEDS.map(s =>
     `<button class="${s === speed ? 'on' : ''}" onclick="setSpeed(${s})" aria-pressed="${s === speed}">${s}×</button>`).join('');
 }
-function setSpeed(s) { speed = s; try { localStorage.setItem('tr.replay.speed', String(s)); } catch {} renderSpeeds(); }
+function setSpeed(s) {
+  speed = s; try { localStorage.setItem('tr.replay.speed', String(s)); } catch {}
+  renderSpeeds(); paintVideoToggle();
+  // Crossing 2× while playing hands the clock to or from the video.
+  if (playing && videoLive()) { if (videoLeads()) startVideo(); else vplayer.pause(); }
+}
 
 document.addEventListener('keydown', e => {
   if (!tl || e.target.closest('select, input, textarea')) return;
   if (e.key === ' ') { e.preventDefault(); togglePlay(); }
+  else if (e.key === '.' || (e.key === 'ArrowRight' && e.shiftKey)) { e.preventDefault(); stepTouch(1); }
+  else if (e.key === ',' || (e.key === 'ArrowLeft' && e.shiftKey)) { e.preventDefault(); stepTouch(-1); }
   else if (e.key === 'ArrowRight') { e.preventDefault(); stepSet(1); }
   else if (e.key === 'ArrowLeft') { e.preventDefault(); stepSet(-1); }
+});
+// Tap a touch — on the field or in the list — to jump to it.
+document.getElementById('field').addEventListener('click', e => {
+  const n = e.target.closest('[data-t]'); if (n) seek(+n.dataset.t);
+});
+document.getElementById('steps').addEventListener('click', e => {
+  const n = e.target.closest('[data-t]'); if (n) seek(+n.dataset.t);
 });
 document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
 

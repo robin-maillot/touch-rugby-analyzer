@@ -2302,6 +2302,16 @@ console.log('TR.Replay');
     const s2 = tl.sets[3];                                           // after half time: the tap again
     assert.equal(s2.steps[0].origin, 'tap'); assert.equal(s2.steps[0].t, 25 * 60 + 1);
   });
+  test('stepping touch by touch, across sets', () => {
+    // set 1 steps: tap 0:00, 0:02, 0:06, try 0:10; set 2 (after the try): tap 0:28, 0:30, 0:34
+    assert.equal(R.stepTime(tl, 0, 1), 2);
+    assert.equal(R.stepTime(tl, 2, 1), 6);                           // from exactly on a step, the next one
+    assert.equal(R.stepTime(tl, 10, 1), 28);                         // over the set boundary
+    assert.equal(R.stepTime(tl, 6, -1), 2);
+    assert.equal(R.stepTime(tl, 4, -1), 2);                          // mid-glide back to the touch it left
+    assert.equal(R.stepTime(tl, 0, -1), null);
+    assert.equal(R.stepTime(tl, tl.end, 1), null);
+  });
   test('Team 2 is drawn attacking down the screen', () => {
     assert.deepEqual({ ...R.screenPos('Team 2', 20, 80) }, { x: 80, y: 20 });
     assert.deepEqual({ ...R.screenPos('Team 1', 20, 80) }, { x: 20, y: 80 });
