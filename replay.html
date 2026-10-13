@@ -95,6 +95,8 @@
     .stage.with-video .panel { grid-area: panel; }
     #field circle[data-t], #field g[data-t] { cursor: pointer; }
     #field.editing circle[data-drag] { cursor: grab; }
+    /* On a touch screen a drag would otherwise scroll the page and cancel itself. */
+    #field.editing { touch-action: none; }
     #field.editing.dragging, #field.editing.dragging * { cursor: grabbing; }
     .edit-card { display: none; }
     .edit-card.on { display: block; }
@@ -285,7 +287,12 @@ async function load() {
     const [ar, lr] = await Promise.all([api('action=all' + have(ca)), api('action=list' + have(cl))]);
     if (!ar.ok) throw new Error(ar.error);
     if (lr.ok && !lr.unchanged) { LS.set('list', lr); meta = {}; lr.sheets.forEach(s => { meta[s.name] = s; }); }
-    if (!ar.unchanged) { ingest(ar.rows); if (!LS.set('all', ar)) try { localStorage.removeItem('trl2_all'); } catch {} }
+    // Never over unsaved edits: they live in the events being replaced.
+    if (!ar.unchanged && !edits.size) {
+      ingest(ar.rows); if (!LS.set('all', ar)) try { localStorage.removeItem('trl2_all'); } catch {}
+      // The game on screen was drawn from the saved copy; redraw it from this.
+      if (game && byGame[game]) refreshGame();
+    }
     if (!ar.unchanged || (lr.ok && !lr.unchanged) || !ca) buildPicker();
   } catch (err) {
     const st = document.getElementById('status');
@@ -293,6 +300,13 @@ async function load() {
     st.classList.add('warn');
     if (!ca) showEmpty('Could not load games: ' + err.message);
   }
+}
+
+// Rebuild the game on screen from byGame, keeping the moment and the selection.
+function refreshGame() {
+  tl = R.buildTimeline(byGame[game]);
+  const sc = document.getElementById('scrub'); sc.min = tl.start; sc.max = tl.end;
+  listDirty = true; render(); renderEditCard();
 }
 
 function showEmpty(msg) {
@@ -762,9 +776,20 @@ async function saveEdits() {
     const res = await TR.postJson(TR.APPS_SCRIPT_URL, { secret: TR.secret(), action: 'update_rows', changes }, { retries: 1 });
     if (!res.ok) throw new Error(res.error || 'the sheet refused the change');
     const all = res.updated === changes.length;
-    editMsg = all ? { text: `Saved ${res.updated} change${res.updated === 1 ? '' : 's'} to the sheet`, kind: 'good' }
-                  : { text: `Saved ${res.updated} of ${changes.length} — the rest no longer match the sheet; reload the game`, kind: 'bad' };
     edits.clear();
+    if (!all) editMsg = { text: `Saved ${res.updated} of ${changes.length} — the rest no longer match the sheet; reload the game`, kind: 'bad' };
+    else {
+      // Read the game back from the server and check every change came back as sent.
+      editMsg = { text: `Saved ${res.updated} — checking the sheet…`, kind: '' }; renderEditCard();
+      await load();
+      const back = changes.filter(c => {
+        const e = (byGame[game] || []).find(x => x.row === c.row);
+        return e && (c.name == null || e.name === c.name) && (c.strikeMove == null || e.move === c.strikeMove) && (c.detail == null || e.detailRaw === c.detail);
+      }).length;
+      editMsg = back === changes.length
+        ? { text: `Saved ${back} change${back === 1 ? '' : 's'} — confirmed in the sheet`, kind: 'good' }
+        : { text: `Saved, but ${changes.length - back} didn't come back as sent — reload to check`, kind: 'warn' };
+    }
   } catch (err) {
     editMsg = { text: 'Not saved: ' + err.message, kind: 'bad' };
   } finally { saving = false; renderEditCard(); }
