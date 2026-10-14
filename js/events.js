@@ -7,7 +7,7 @@ TR.MENU = {
   'Penalty Defence': ['Offside', 'Hard Touch', 'In the Ruck', 'Not Moving Forward', 'Delay of Play', 'Backchat', '7 on the field', 'Other'],
   'Turnover':        ['Ball Down', '6th Touch', 'Dummy Touch', 'Bad Roll', 'In Touch', '6 Again', 'Interception', 'Other'],
   'Game Event':      ['Game Start', 'Game End'],
-  'Try':             ['Scoop', '21', '32', '23', '33', '32 - Cut', '32 - Long', '32 - Quicky', '32 - Scoop', '23 - Backdoor', '23 - Quicky', '23 - Scoop', '33 - Backdoor', '33 - Cut', '33 - Quicky', '33 - Scoop', 'French Flair', 'Interception', 'Other'],
+  'Try':             ['Scoop', '21', '32', '23', '33', '32 - Cut', '32 - Long', '32 - Quicky', '32 - Scoop', '32 - Split', '23 - Backdoor', '23 - Quicky', '23 - Scoop', '23 - Split', '33 - Backdoor', '33 - Cut', '33 - Quicky', '33 - Scoop', '33 - Split', 'French Flair', 'Interception', 'Other'],
   'To Review':       [],
 };
 
@@ -27,6 +27,20 @@ TR.isTurnover = (type, name) => {
 // these let a Turnover or Penalty Attack record the move that failed, so a try
 // rate per move can be computed. Sliced so a caller can't mutate TR.MENU.
 TR.STRIKE_MOVES      = TR.MENU['Try'].slice();
+
+// One way to pick a move everywhere — a try's, or the strike a touch, turnover
+// or penalty belonged to: the ruck first, then its combo. Anything that isn't a
+// ruck or a "ruck - combo" (Scoop, Interception, Other) sits under Other.
+TR.TRY_RUCKS = ['32', '23', '21', '33', 'French Flair'];
+TR.ruckOf = (name) => TR.TRY_RUCKS.find(r => name === r || String(name || '').startsWith(r + ' - ')) || 'Other';
+TR.strikeTree = () => {
+  const t = new Map([...TR.TRY_RUCKS, 'Other'].map(r => [r, []]));
+  TR.STRIKE_MOVES.forEach(n => t.get(TR.ruckOf(n)).push(n));
+  return t;
+};
+// The combo's own label under its ruck: "Cut" for "32 - Cut", "Just 32" for 32.
+TR.comboLabel = (name, ruck) => name === ruck && ruck !== 'Other' ? 'Just ' + ruck
+  : String(name).startsWith(ruck + ' - ') ? String(name).slice(ruck.length + 3) : name;
 TR.STRIKE_MOVE_TYPES = ['Try', 'Turnover', 'Penalty Attack'];
 
 // Every event type that can carry a called move. Wider than STRIKE_MOVE_TYPES,

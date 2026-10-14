@@ -2214,11 +2214,13 @@ function renderMoveSelect(a) {
   const show = TR.offersStrikeMove(a.type, a.name);
   wrap.style.display = show ? '' : 'none';
   if (!show) return;
-  const opts = ['', ...TR.STRIKE_MOVES];
   const cur  = a.strikeMove || '';
-  if (cur && !opts.includes(cur)) opts.splice(1, 0, cur);
-  sel.innerHTML = opts.map(o =>
-    `<option value="${o}"${o === cur ? ' selected' : ''}>${o || '— none —'}</option>`).join('');
+  const opt  = (v, label) => `<option value="${escapeHtml(v)}"${v === cur ? ' selected' : ''}>${escapeHtml(label)}</option>`;
+  // Grouped by ruck, the same order as the try picker and the move strip.
+  sel.innerHTML = opt('', '— none —') +
+    (cur && !TR.STRIKE_MOVES.includes(cur) ? opt(cur, cur) : '') +
+    [...tryTree()].filter(([, names]) => names.length).map(([ruck, names]) =>
+      `<optgroup label="${escapeHtml(ruck)}">` + names.map(n => opt(n, TR.comboLabel(n, ruck) === 'Just ' + ruck ? ruck : n)).join('') + `</optgroup>`).join('');
   markMoveState();
 }
 
@@ -3867,7 +3869,7 @@ function pickSubtype(name) {
 // With one or more on, the card splits: the move on the left, those details on
 // the right, every tap saving as it's made, and Done closes. With none on it
 // stays the one-pane picker that closes the moment the combo is picked.
-const TRY_RUCKS = ['32', '23', '21', '33', 'French Flair'];
+const TRY_RUCKS = TR.TRY_RUCKS;
 
 let tryPopup = localStorage.getItem('fieldTryPopup') === '1';
 let tryIdx   = null;
@@ -3891,17 +3893,8 @@ function setTryDetail(key, on) {
 
 // Ruck → the full names under it. Anything that isn't a ruck or a "ruck - combo"
 // (Scoop, Interception, Other) lands under Other.
-function tryTree() {
-  const names = TR.MENU['Try'] || [];
-  const tree  = new Map(TRY_RUCKS.map(r => [r, []]));
-  tree.set('Other', []);
-  names.forEach(n => {
-    const ruck = TRY_RUCKS.find(r => n === r || n.startsWith(r + ' - '));
-    tree.get(ruck || 'Other').push(n);
-  });
-  return tree;
-}
-const ruckOf = name => TRY_RUCKS.find(r => name === r || name.startsWith(r + ' - ')) || 'Other';
+const tryTree = TR.strikeTree;
+const ruckOf  = TR.ruckOf;
 
 function openTryPicker(idx) {
   const i = idx == null ? annotations.length - 1 : idx;
@@ -3946,7 +3939,7 @@ function tryPickerStep(ruck) {
   label.innerHTML = `${ruck} — ${ruck === 'Other' ? 'which one?' : 'which combo?'}${sel}`;
   grid.innerHTML = names.map(n => {
     const isPlain = n === ruck && ruck !== 'Other';
-    const text    = isPlain ? `Just ${ruck}` : n.startsWith(ruck + ' - ') ? n.slice(ruck.length + 3) : n;
+    const text    = TR.comboLabel(n, ruck);
     return `<button class="try-opt${isPlain ? ' plain' : ''}${n === picked ? ' on' : ''}" data-try="${n}">${text}` +
            (isPlain ? '<small>no combo</small>' : '') + `</button>`;
   }).join('');
@@ -4057,11 +4050,24 @@ function offerMoveStrip(idx) {
   const a = annotations[idx];
   if (!a) return;
   moveIdx = idx;
+  document.getElementById('pitchStatus').classList.add('move-strip');
+  moveStripStep(null);
+}
+
+// The same two steps as a try's move: the rucks, then a ruck's combos (one
+// with no combos — 21, French Flair — is picked outright).
+function moveStripStep(ruck) {
   const bar = document.getElementById('pitchStatus');
-  bar.classList.add('move-strip');
-  bar.innerHTML =
-    `<span class="sub-chip head">Move —</span>` +
-    TR.STRIKE_MOVES.map(m => `<button class="sub-chip" data-move="${m}">${m}</button>`).join('');
+  const tree = tryTree();
+  if (!ruck) {
+    bar.innerHTML = `<span class="sub-chip head">Move — which ruck?</span>` +
+      [...tree.keys()].filter(r => tree.get(r).length).map(r => `<button class="sub-chip" data-mruck="${r}">${r}</button>`).join('');
+  } else {
+    const names = tree.get(ruck) || [];
+    if (ruck !== 'Other' && names.length === 1) { pickStrikeMove(names[0]); return; }
+    bar.innerHTML = `<button class="sub-chip head" data-mruck="">‹ ${escapeHtml(ruck)}</button>` +
+      names.map(n => `<button class="sub-chip" data-move="${n}">${escapeHtml(TR.comboLabel(n, ruck))}</button>`).join('');
+  }
   restartMoveTimer();
 }
 
@@ -4271,6 +4277,8 @@ window.addEventListener('DOMContentLoaded', () => {
     if (chip) { pickSubtype(chip.dataset.sub); return; }
     const mv = ev.target.closest('[data-move]');
     if (mv) { pickStrikeMove(mv.dataset.move); return; }
+    const mr = ev.target.closest('[data-mruck]');
+    if (mr) { moveStripStep(mr.dataset.mruck || null); return; }
     // A tap anywhere else in the strip (the head label, the gaps between
     // chips) still counts as active interaction with it.
     restartMoveTimer();

@@ -745,13 +745,16 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) pause
 const isAdmin = TR.role() === 'admin';
 let editOn = false, editSel = null, serverCaps = null, saving = false, editMsg = { text: '', kind: '' };
 const edits = new Map();                 // event index → its values as last saved
-const TRY_RUCKS = ['32', '23', '21', '33', 'French Flair'];
-const ruckOf = n => TRY_RUCKS.find(r => n === r || n.startsWith(r + ' - ')) || 'Other';
-const tryTree = () => {
-  const t = new Map([...TRY_RUCKS, 'Other'].map(r => [r, []]));
-  (TR.MENU['Try'] || []).forEach(n => t.get(ruckOf(n)).push(n));
-  return t;
-};
+const ruckOf = TR.ruckOf, tryTree = TR.strikeTree;
+// The ruck-then-combo rows, for a try's move or the strike a touch belonged to.
+function strikeRows(e, field) {
+  const cur = field === 'name' ? e.name : e.move;
+  const call = n => `editEvent(${e.i},{${field}:${JSON.stringify(n).replace(/"/g, '&quot;')}})`;
+  return [...tryTree()].filter(([, names]) => names.length).map(([ruck, names]) =>
+    `<div class="ruck-row"><span>${esc(ruck)}</span><div class="chips">` +
+    names.map(n => `<button class="${n === cur ? 'on' : ''}" onclick="${call(n)}">${esc(TR.comboLabel(n, ruck) === 'Just ' + ruck ? ruck : TR.comboLabel(n, ruck))}</button>`).join('') +
+    `</div></div>`).join('');
+}
 const evAt = i => (byGame[game] || [])[i];
 const timeShared = e => (byGame[game] || []).some(o => o !== e && o.timeStr === e.timeStr);
 const canSaveEvent = e => (serverCaps || []).includes('row-match') || !timeShared(e);
@@ -808,11 +811,7 @@ function renderEditCard() {
       (e.x != null ? `<div class="sub">Drag the ringed point on the field to move it — now ${Math.round(e.y * 0.7)} m, ${Math.round(e.x)}% across.</div>` : `<div class="sub">No position recorded for this event.</div>`);
     if (!canSaveEvent(e)) body += `<div class="edit-msg warn">Another event has the same time (${esc(e.timeStr)}). Deploy the latest Apps Script before editing this one, or the wrong row could change.</div>`;
     if (e.type === 'Try') {
-      const cur = ruckOf(e.name);
-      body += `<div class="lab">Move — ruck, then combo</div>` + [...tryTree()].map(([ruck, names]) =>
-        `<div class="ruck-row"><span>${esc(ruck)}</span><div class="chips">` +
-        names.map(n => chip(n === e.name, n === ruck ? ruck : n.replace(ruck + ' - ', ''), `editEvent(${e.i},{name:${JSON.stringify(n).replace(/"/g, '&quot;')}})`)).join('') +
-        `</div></div>`).join('');
+      body += `<div class="lab">Move — ruck, then combo</div>` + strikeRows(e, 'name');
       const mid = e.tags.ch === TR.MIDDLE_CHANNEL;
       body += `<div class="lab">Side</div><div class="chips">` + (mid ? chip(true, 'Middle — scored in MM', '', true)
         : TR.DETAIL_SIDES.map(v => chip(e.tags.side === v, TR.sideLabel(v), `editEvent(${e.i},{tags:{side:${e.tags.side === v ? "''" : `'${v}'`}}})`)).join('')) + `</div>`;
@@ -821,8 +820,8 @@ function renderEditCard() {
       body += `<div class="lab">Scorer</div><input class="num" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3" value="${esc(e.tags.player || '')}"
         onchange="editEvent(${e.i},{tags:{player:this.value.replace(/\D+/g,'')}})" aria-label="Try scorer's number" placeholder="#">`;
     } else if (TR.STRIKE_MOVE_TYPES.includes(e.type) || e.type === 'Touch') {
-      body += `<div class="lab">Strike move</div><div class="chips">` + chip(!e.move, 'None', `editEvent(${e.i},{move:''})`) +
-        TR.STRIKE_MOVES.map(m => chip(e.move === m, m, `editEvent(${e.i},{move:${JSON.stringify(m).replace(/"/g, '&quot;')}})`)).join('') + `</div>`;
+      body += `<div class="lab">Strike — ruck, then combo</div>` + strikeRows(e, 'move') +
+        `<div class="chips" style="margin-top:4px">${chip(!e.move, 'No strike', `editEvent(${e.i},{move:''})`)}</div>`;
     }
     body += `<div class="lab">Comment</div><textarea class="cmt" rows="2" placeholder="Add a comment…" aria-label="Comment"
       onchange="editEvent(${e.i},{comment:this.value})">${esc(e.comment || '')}</textarea>`;

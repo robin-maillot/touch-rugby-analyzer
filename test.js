@@ -1614,6 +1614,24 @@ test('strips the legacy token, keeps the note', () => {
   assert.equal(TR.stripLegacyPos(null), '');
 });
 
+console.log('Strike moves: ruck, then combo');
+test('Split is a combo off 32, 23 and 33', () => {
+  ['32 - Split', '23 - Split', '33 - Split'].forEach(n => { assert.ok(TR.STRIKE_MOVES.includes(n)); assert.ok(TR.MENU['Try'].includes(n)); });
+});
+test('every move sits under its ruck, the rest under Other', () => {
+  const t = TR.strikeTree();
+  assert.deepEqual([...t.keys()].join('|'), '32|23|21|33|French Flair|Other');
+  assert.deepEqual([...t.get('32')].join('|'), '32|32 - Cut|32 - Long|32 - Quicky|32 - Scoop|32 - Split');
+  assert.deepEqual([...t.get('Other')].join('|'), 'Scoop|Interception|Other');
+  assert.equal([...t.values()].reduce((n, a) => n + a.length, 0), TR.STRIKE_MOVES.length);
+});
+test('combo labels', () => {
+  assert.equal(TR.comboLabel('33 - Split', '33'), 'Split');
+  assert.equal(TR.comboLabel('32', '32'), 'Just 32');
+  assert.equal(TR.comboLabel('Scoop', 'Other'), 'Scoop');
+  assert.equal(TR.ruckOf('23 - Split'), '23'); assert.equal(TR.ruckOf('Interception'), 'Other');
+});
+
 console.log('TR.detailLabel');
 test('labels the try tags', () => assert.equal(TR.detailLabel('pos:1,2; player:7; side:open; ch:ML'), '#7 · Open · ML'));
 test('partial tags', () => {
