@@ -217,6 +217,7 @@
         <input type="range" class="scrub" id="scrub" min="0" max="1" step="0.1" value="0" oninput="seek(+this.value)" aria-label="Game time">
         <div class="vid-toggle"><button id="videoBtn" onclick="toggleVideo()" disabled>📹 Video</button><span class="vid-note" id="videoNote">No video linked for this game</span>
           <button id="rotateBtn" onclick="toggleRotate()" title="Turn the field on its side">⟳ Rotate</button>
+          <button id="swapBtn" onclick="toggleSwap()" title="Swap the ends: the other team attacks up the screen">⇅ Swap ends</button>
           <button id="editBtn" onclick="toggleEdit()" hidden title="Admins: move points, edit tags and comments">✏️ Edit</button></div>
         <div class="vid-sync" id="videoSync">Sync
           <button onclick="nudgeVideo(-1)" title="Show the video 1 s earlier">−1 s</button>
@@ -257,6 +258,10 @@ let meta = {};            // game name → list entry
 let order = [];           // playable game names, newest first
 // Rotated: the field on its side, Team 1 attacking left to right.
 let rotated = false;
+// Ends swapped: the field turned 180°, so the first-named team attacks down
+// (or right to left on its side) — to match the side you watched it from.
+let swapped = false;
+try { swapped = localStorage.getItem('tr.replay.swapped') === '1'; } catch {}
 try { rotated = localStorage.getItem('tr.replay.rotated') === '1'; } catch {}
 let game = null, tl = null, T = 0, playing = false, speed = 1, lastFrame = 0, lastSetIdx = -2, listDirty = false;
 try { speed = SPEEDS.includes(+localStorage.getItem('tr.replay.speed')) ? +localStorage.getItem('tr.replay.speed') : 1; } catch {}
@@ -333,7 +338,7 @@ async function load() {
 
 function paintAttackKey() {
   if (!game) return;
-  const [a, b] = rotated ? ['→', '←'] : ['↑', '↓'];
+  const [a, b] = rotated ? (swapped ? ['←', '→'] : ['→', '←']) : (swapped ? ['↓', '↑'] : ['↑', '↓']);
   document.getElementById('keyUp').innerHTML = `<i style="background:${COLOR['Team 1']}"></i>${esc(teamName('Team 1'))} attack ${a}`;
   document.getElementById('keyDown').innerHTML = `${esc(teamName('Team 2'))} attack ${b}<i style="background:${COLOR['Team 2']};margin:0 0 0 5px"></i>`;
 }
@@ -341,10 +346,18 @@ function paintAttackKey() {
 // field on its side; an upright field alone is tall, not wide.
 function paintWidth() { document.querySelector('main').classList.toggle('wide', rotated || (hasVideo() && videoOn)); }
 
+function toggleSwap() {
+  swapped = !swapped;
+  try { localStorage.setItem('tr.replay.swapped', swapped ? '1' : ''); } catch {}
+  document.getElementById('swapBtn').classList.toggle('on', swapped);
+  paintAttackKey(); render();
+}
+
 function toggleRotate() {
   rotated = !rotated;
   try { localStorage.setItem('tr.replay.rotated', rotated ? '1' : ''); } catch {}
   document.getElementById('rotateBtn').classList.toggle('on', rotated);
+document.getElementById('swapBtn').classList.toggle('on', swapped);
   document.getElementById('stage').classList.toggle('side', rotated);
   paintWidth(); paintAttackKey(); render();
 }
@@ -396,8 +409,8 @@ function fieldSVG() {
     <rect x="0" y="0" width="100" height="${LEN}" fill="#12301f" stroke="rgba(255,255,255,0.5)" stroke-width="0.6"/>
     ${line(100, 0.75)}${line(0, 0.75)}${line(50, 0.5)}
     ${line(50 + ten, 0.28, true)}${line(50 - ten, 0.28, true)}${line(100 - seven, 0.22, true)}${line(seven, 0.22, true)}
-    <text x="50" y="-6" text-anchor="middle" font-size="3.2" fill="rgba(255,255,255,0.4)">${esc(teamName('Team 1'))} score here</text>
-    <text x="50" y="${LEN + 10}" text-anchor="middle" font-size="3.2" fill="rgba(255,255,255,0.4)">${esc(teamName('Team 2'))} score here</text>`;
+    <text x="50" y="-6" text-anchor="middle" font-size="3.2" fill="rgba(255,255,255,0.4)"${swapped ? ' transform="rotate(180 50 -7)"' : ''}>${esc(teamName('Team 1'))} score here</text>
+    <text x="50" y="${LEN + 10}" text-anchor="middle" font-size="3.2" fill="rgba(255,255,255,0.4)"${swapped ? ` transform="rotate(180 50 ${LEN + 9})"` : ''}>${esc(teamName('Team 2'))} score here</text>`;
 }
 
 // Upright the field is 108 × 190 units with the score strip above it; on its
@@ -405,14 +418,17 @@ function fieldSVG() {
 // right, and the strip runs along the top of the long side.
 const VIEW = { up: '-4 -32 108 190', side: '-16 -20 172 126' };
 function placeField(inner) {
-  const g = rotated ? `<g id="fieldG" transform="matrix(0 1 -1 0 ${LEN} 0)">${inner}</g>` : `<g id="fieldG">${inner}</g>`;
-  return g + scoreSVG();
+  // Applied right to left: the half-turn about the field's centre, then the quarter-turn.
+  const t = [rotated ? `matrix(0 1 -1 0 ${LEN} 0)` : '', swapped ? `rotate(180 50 ${LEN / 2})` : ''].filter(Boolean).join(' ');
+  return `<g id="fieldG"${t ? ` transform="${t}"` : ''}>${inner}</g>` + scoreSVG();
 }
+// How far the field is turned, so a label can turn back by as much.
+const fieldTurn = () => (rotated ? 90 : 0) + (swapped ? 180 : 0);
 
 // A label centred on (x, y) in field units that stays upright when the field
 // is turned on its side.
 function label(x, y, size, fill, text) {
-  const rot = rotated ? ` transform="rotate(-90 ${x} ${y})"` : '';
+  const rot = fieldTurn() ? ` transform="rotate(${-fieldTurn()} ${x} ${y})"` : '';
   return `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="central" font-size="${size}" font-weight="700" fill="${fill}" pointer-events="none"${rot}>${text}</text>`;
 }
 
