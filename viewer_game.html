@@ -35,7 +35,8 @@
   .stage #yt { position: absolute; inset: 0; }
   .stage #yt iframe { width: 100%; height: 100%; border: 0; }
   /* Blocks clicks on the YouTube player while the clip runs, so it can't be paused or scrubbed. */
-  .shield { position: absolute; inset: 0; z-index: 2; }
+  .shield { position: absolute; inset: 0; z-index: 2; touch-action: none; cursor: zoom-in; }
+  .stage #yt { transform-origin: 0 0; }
   .shield.off { display: none; }
   .overlay { position: absolute; inset: 0; z-index: 3; background: var(--bg); display: flex; flex-direction: column; justify-content: center; padding: 18px; overflow: auto; }
   .overlay[hidden] { display: none; }
@@ -99,7 +100,7 @@
   <section id="quiz" class="view" hidden>
     <div class="stage">
       <div id="yt"></div>
-      <div class="shield" id="shield"></div>
+      <div class="shield" id="shield" title="Scroll or pinch to zoom, drag to move, double-click to reset"></div>
       <div class="overlay" id="overlay" hidden>
         <div class="q" id="question"></div>
         <div class="opts" id="opts"></div>
@@ -229,6 +230,7 @@ function playClip(isReplay) {
   const vt = TR.player.videoTimeAt(m, ev.secs);
   const from = Math.max(0, vt - PRE), to = vt + POST;
   $('progress').textContent = `${idx + 1} / ${clips.length}`;
+  if (!isReplay && window.resetZoom) resetZoom();
   $('overlay').hidden = true;
   $('shield').classList.remove('off');
   $('status').textContent = isReplay ? 'Replaying…' : 'Watch carefully…';
@@ -334,6 +336,54 @@ function showResult() {
     }).join('') + '</tbody></table>' : '';
   show('result');
 }
+
+
+// ── Zoom: wheel / pinch, drag to pan, double-click to reset ─────
+// Scales the video inside the stage; the stage clips it. Only while a clip is
+// on screen — the question overlay sits above and takes the pointer itself.
+(function setupZoom() {
+  const stage = document.querySelector('.stage'), yt = $('yt'), pts = new Map();
+  let k = 1, x = 0, y = 0, pinch = null;
+  const apply = () => { yt.style.transform = `translate(${x}px,${y}px) scale(${k})`; };
+  const clamp = () => {
+    const w = stage.clientWidth, h = stage.clientHeight;
+    x = Math.min(0, Math.max(w - w * k, x)); y = Math.min(0, Math.max(h - h * k, y));
+  };
+  // Zoom to scale nk keeping the stage point (cx, cy) fixed under the finger/cursor.
+  const zoomAt = (nk, cx, cy) => {
+    nk = Math.min(6, Math.max(1, nk));
+    x = cx - (cx - x) * nk / k; y = cy - (cy - y) * nk / k; k = nk;
+    if (k === 1) { x = 0; y = 0; }
+    clamp(); apply();
+  };
+  window.resetZoom = () => { k = 1; x = 0; y = 0; pts.clear(); pinch = null; apply(); };
+  const local = e => { const r = stage.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  const live = () => $('overlay').hidden;
+  stage.addEventListener('wheel', e => {
+    if (!live()) return;
+    e.preventDefault();
+    const [cx, cy] = local(e);
+    zoomAt(k * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0025)), cx, cy);   // ctrl = trackpad pinch
+  }, { passive: false });
+  stage.addEventListener('pointerdown', e => {
+    if (!live()) return;
+    pts.set(e.pointerId, local(e));
+    try { stage.setPointerCapture(e.pointerId); } catch (_) {}
+    if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]), k }; }
+  });
+  stage.addEventListener('pointermove', e => {
+    if (!pts.has(e.pointerId)) return;
+    const [nx, ny] = local(e), [ox, oy] = pts.get(e.pointerId);
+    pts.set(e.pointerId, [nx, ny]);
+    if (pts.size === 2 && pinch) {
+      const [a, b] = [...pts.values()];
+      zoomAt(pinch.k * Math.hypot(a[0] - b[0], a[1] - b[1]) / pinch.d, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
+    } else if (pts.size === 1 && k > 1) { x += nx - ox; y += ny - oy; clamp(); apply(); }
+  });
+  const up = e => { pts.delete(e.pointerId); pinch = null; };
+  stage.addEventListener('pointerup', up); stage.addEventListener('pointercancel', up);
+  stage.addEventListener('dblclick', () => { if (live()) resetZoom(); });
+})();
 
 $('startBtn').onclick = start;
 $('nextBtn').onclick = next;
