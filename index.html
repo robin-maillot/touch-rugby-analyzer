@@ -230,6 +230,11 @@
         <div class="card-title">Event Editor</div>
         <div class="card-desc">Edit names, comments &amp; strike moves; make clips</div>
       </a>
+      <a class="nav-card" href="viewer_game.html" id="viewerGameCard" style="display:none">
+        <div class="card-icon">🎯</div>
+        <div class="card-title">Viewer Game</div>
+        <div class="card-desc">Guess the move or penalty from the clip</div>
+      </a>
       <a class="nav-card" href="admin.html" id="adminCard" style="display:none">
         <div class="card-icon">🛠️</div>
         <div class="card-title">Admin Sheet Editor</div>
@@ -392,6 +397,7 @@
       document.getElementById('fieldV2Card').style.display   = admin ? '' : 'none';
       document.getElementById('backfillCard').style.display  = staffOrAdmin ? '' : 'none';
       document.getElementById('adminCard').style.display     = admin ? '' : 'none';
+      document.getElementById('viewerGameCard').style.display = admin ? '' : 'none';
       document.getElementById('dashboardCard').style.display = admin ? '' : 'none';
       // The old viewer is now the Event Editor: it is the only place that edits
       // names, comments and strike moves, or cuts clips. Admin-only, as those

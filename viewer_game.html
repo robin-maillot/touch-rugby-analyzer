@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Viewer Game — Touch Rugby Analyzer</title>
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="css/theme.css">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; -webkit-font-smoothing: antialiased; }
+  header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 10px 20px; display: flex; align-items: center; gap: 14px; }
+  header .title { font-size: 0.9rem; color: var(--text-muted); }
+  header .progress { margin-left: auto; font-size: 0.85rem; color: var(--text-muted); }
+  main { max-width: 980px; margin: 0 auto; padding: 24px 16px 48px; }
+  h2 { font-size: 1.15rem; margin-bottom: 14px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 22px; }
+  .row { display: flex; align-items: center; gap: 10px; margin: 12px 0; flex-wrap: wrap; }
+  .row label { cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+  .row .count { color: var(--text-dim); font-size: 0.8rem; }
+  input[type=number] { width: 80px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 6px 8px; font-size: 0.95rem; }
+  input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); }
+  .btn { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); cursor: pointer; font-size: 0.95rem; padding: 10px 18px; font-family: inherit; }
+  .btn:hover:not(:disabled) { border-color: var(--accent); }
+  .btn:disabled { opacity: 0.5; cursor: default; }
+  .btn-primary { background: var(--accent-strong); border-color: var(--accent-strong); color: #fff; font-weight: 600; }
+  .note { color: var(--text-muted); font-size: 0.85rem; margin-top: 10px; }
+  .note.warn { color: var(--orange); }
+
+  .stage { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 10px; overflow: hidden; }
+  .stage #yt { position: absolute; inset: 0; }
+  .stage #yt iframe { width: 100%; height: 100%; border: 0; }
+  /* Blocks clicks on the YouTube player while the clip runs, so it can't be paused or scrubbed. */
+  .shield { position: absolute; inset: 0; z-index: 2; }
+  .shield.off { display: none; }
+  .overlay { position: absolute; inset: 0; z-index: 3; background: var(--bg); display: flex; flex-direction: column; justify-content: center; padding: 18px; overflow: auto; }
+  .overlay[hidden] { display: none; }
+  .q { font-size: 1.05rem; font-weight: 600; margin-bottom: 12px; }
+  .opts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  @media (max-width: 720px) { .opts { grid-template-columns: repeat(2, 1fr); } .stage { aspect-ratio: auto; min-height: 420px; } }
+  .opt { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); cursor: pointer; font-size: 0.95rem; padding: 14px 8px; font-family: inherit; }
+  .opt:hover:not(:disabled) { border-color: var(--accent); background: var(--surface-3); }
+  .opt:disabled { cursor: default; }
+  .opt.right { background: rgba(34,197,94,0.2); border-color: var(--good); }
+  .opt.wrong { background: rgba(239,68,68,0.2); border-color: var(--bad); }
+  .feedback { margin-top: 14px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .feedback .msg { font-weight: 600; }
+  .feedback .msg.ok { color: var(--good); }
+  .feedback .msg.ko { color: var(--bad); }
+  .actions { display: flex; gap: 10px; margin-top: 12px; }
+  .status { margin-top: 10px; font-size: 0.85rem; color: var(--text-muted); min-height: 1.2em; }
+
+  .score { font-size: 2.4rem; font-weight: 700; margin-bottom: 4px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 0.88rem; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border-light); vertical-align: top; }
+  th { color: var(--text-muted); font-weight: 500; }
+  td.bad { color: var(--bad); }
+  td.good { color: var(--good); }
+  a { color: var(--accent); }
+  .view[hidden] { display: none; }
+</style>
+<script src="js/config.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/events.js"></script>
+<script src="js/player.js"></script>
+</head>
+<body>
+<header>
+  <tr-logo></tr-logo>
+  <span class="title">Viewer Game</span>
+  <span class="progress" id="progress"></span>
+</header>
+
+<main>
+  <!-- ── Setup ─────────────────────────────────────────── -->
+  <section id="setup" class="view card">
+    <h2>What do you want to guess?</h2>
+    <div class="row">
+      <label><input type="checkbox" id="typeTry" checked> Try <span class="count" id="cntTry"></span></label>
+      <label><input type="checkbox" id="typePen"> Penalty <span class="count" id="cntPen"></span></label>
+    </div>
+    <div class="row">
+      <label for="nVideos">Number of videos</label>
+      <input type="number" id="nVideos" min="1" max="100" value="10">
+    </div>
+    <div class="row">
+      <label><input type="checkbox" id="allowReplay" checked> Allow replay before answering</label>
+    </div>
+    <div class="actions"><button class="btn btn-primary" id="startBtn" disabled>Loading events…</button></div>
+    <p class="note" id="setupNote"></p>
+    <p class="note">Each clip plays once: 15 s before the event, 5 s after. Then pick what it was — the move for a try, the reason for a penalty.</p>
+  </section>
+
+  <!-- ── Quiz ──────────────────────────────────────────── -->
+  <section id="quiz" class="view" hidden>
+    <div class="stage">
+      <div id="yt"></div>
+      <div class="shield" id="shield"></div>
+      <div class="overlay" id="overlay" hidden>
+        <div class="q" id="question"></div>
+        <div class="opts" id="opts"></div>
+        <div class="feedback" id="feedback" hidden>
+          <span class="msg" id="fbMsg"></span>
+          <button class="btn btn-primary" id="nextBtn">Next →</button>
+        </div>
+        <div class="actions" id="replayRow"><button class="btn" id="replayBtn">↺ Review the clip</button></div>
+      </div>
+    </div>
+    <div class="status" id="status"></div>
+    <div class="actions"><button class="btn" id="skipBtn">Skip clip ⏭</button></div>
+  </section>
+
+  <!-- ── Result ────────────────────────────────────────── -->
+  <section id="result" class="view card" hidden>
+    <div class="score" id="scoreLine"></div>
+    <p class="note" id="scoreNote"></p>
+    <div id="wrongWrap"></div>
+    <div class="actions" style="margin-top:18px">
+      <button class="btn btn-primary" id="againBtn">Play again</button>
+      <a class="btn" href="index.html" style="text-decoration:none">Menu</a>
+    </div>
+  </section>
+</main>
+
+<script>
+TR.auth('admin');
+
+const PRE = 15, POST = 5;             // seconds of footage before / after the event
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const $ = id => document.getElementById(id);
+const LS = {
+  get(k) { try { return JSON.parse(localStorage.getItem('trl2_' + k)); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem('trl2_' + k, JSON.stringify(v)); return true; } catch { return false; } },
+};
+const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const toSecs = s => { const p = String(s || '').split(':').map(Number); return p.some(isNaN) ? NaN : p.length === 3 ? p[0] * 3600 + p[1] * 60 + p[2] : p.length === 2 ? p[0] * 60 + p[1] : NaN; };
+
+// ── Data ────────────────────────────────────────────────────────
+let meta = {};            // game name → list entry (youtubelink, videoOffset…)
+let pool = [];            // every event that can be asked about
+
+// What can be asked: a Try is guessed by its move (its Name), a penalty by its
+// Name. Anything we couldn't offer as one of the choices is left out.
+const TRY_MOVES = () => TR.STRIKE_MOVES.filter(m => !TR.EXCLUDED_MOVES.includes(m));
+const PEN_TYPES = ['Penalty Attack', 'Penalty Defence'];
+function choicesFor(ev) {
+  if (ev.type === 'Try') return TRY_MOVES();
+  return (TR.MENU[ev.type] || []).slice();
+}
+const kindOf = ev => ev.type === 'Try' ? 'try' : 'pen';
+
+function ingest(rows) {
+  pool = [];
+  if (!rows || rows.length < 2) return;
+  const h = rows[0].map(x => String(x).trim().toLowerCase()), I = n => h.indexOf(n);
+  const c = { t: I('time'), ty: I('type'), nm: I('name'), g: I('game') };
+  rows.slice(1).forEach(r => {
+    const game = r[c.g], type = (r[c.ty] || '').trim(), name = (r[c.nm] || '').trim();
+    if (!game || (type !== 'Try' && !PEN_TYPES.includes(type))) return;
+    const m = meta[game];
+    if (!m || !TR.extractVideoId(m.youtubelink)) return;
+    const secs = toSecs(r[c.t]);
+    if (isNaN(secs)) return;
+    const ev = { game, type, name, secs, timeStr: r[c.t] };
+    if (!choicesFor(ev).includes(name) || name === 'Other') return;
+    if (!TR.player.hasVideoAt(m, secs)) return;
+    pool.push(ev);
+  });
+}
+
+function eligible() {
+  const tries = $('typeTry').checked, pens = $('typePen').checked;
+  return pool.filter(e => (e.type === 'Try' ? tries : pens));
+}
+function refreshSetup() {
+  $('cntTry').textContent = `(${pool.filter(e => e.type === 'Try').length} with video)`;
+  $('cntPen').textContent = `(${pool.filter(e => e.type !== 'Try').length} with video)`;
+  const n = eligible().length, btn = $('startBtn');
+  btn.disabled = n === 0;
+  btn.textContent = n ? 'Start' : (pool.length ? 'Pick at least one type' : 'No events with video');
+  const want = parseInt($('nVideos').value, 10) || 0;
+  $('setupNote').textContent = n && want > n ? `Only ${n} available — you'll get ${n}.` : '';
+  $('setupNote').className = 'note' + (n && want > n ? ' warn' : '');
+}
+
+async function load() {
+  const ca = LS.get('all'), cl = LS.get('list');
+  if (cl) cl.sheets.forEach(s => { meta[s.name] = s; });
+  if (ca) { ingest(ca.rows); refreshSetup(); }
+  try {
+    const have = c => c && c.version != null ? `&have=${TR.enc(String(c.version))}` : '';
+    const api = q => fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&${q}`, { cache: 'no-store' }).then(r => r.json());
+    const [ar, lr] = await Promise.all([api('action=all' + have(ca)), api('action=list' + have(cl))]);
+    if (!ar.ok) throw new Error(ar.error);
+    if (lr.ok && !lr.unchanged) { LS.set('list', lr); meta = {}; lr.sheets.forEach(s => { meta[s.name] = s; }); }
+    if (!ar.unchanged) { if (!LS.set('all', ar)) try { localStorage.removeItem('trl2_all'); } catch {} }
+    const rows = ar.unchanged ? (ca && ca.rows) : ar.rows;
+    ingest(rows); refreshSetup();
+  } catch (err) {
+    if (!ca) { $('startBtn').textContent = 'Could not load events'; $('setupNote').textContent = err.message; $('setupNote').className = 'note warn'; }
+    else { $('setupNote').textContent = 'Couldn’t refresh — using saved data.'; }
+  }
+}
+
+// ── Quiz state ──────────────────────────────────────────────────
+let clips = [], idx = 0, results = [], allowReplay = true;
+let player = null, curVideo = null, poll = null, answered = false;
+
+function show(view) { ['setup', 'quiz', 'result'].forEach(v => $(v).hidden = v !== view); }
+
+function start() {
+  const want = Math.max(1, parseInt($('nVideos').value, 10) || 10);
+  clips = shuffle(eligible()).slice(0, want);
+  allowReplay = $('allowReplay').checked;
+  idx = 0; results = [];
+  show('quiz');
+  playClip();
+}
+
+function stopPoll() { if (poll) { clearInterval(poll); poll = null; } }
+
+// Plays the current event's footage once, then hands over to the question.
+function playClip(isReplay) {
+  const ev = clips[idx], m = meta[ev.game];
+  const vt = TR.player.videoTimeAt(m, ev.secs);
+  const from = Math.max(0, vt - PRE), to = vt + POST;
+  $('progress').textContent = `${idx + 1} / ${clips.length}`;
+  $('overlay').hidden = true;
+  $('shield').classList.remove('off');
+  $('status').textContent = isReplay ? 'Replaying…' : 'Watch carefully…';
+  $('skipBtn').hidden = false;
+  stopPoll();
+
+  let armed = false, begun = Date.now();
+  const startPoll = () => {
+    stopPoll();
+    poll = setInterval(() => {
+      if (!player || !player.ready) return;
+      const t = player.getTime();
+      // Armed once the player has actually landed in the window — a replay
+      // starts with the clock still past the end from last time.
+      if (!armed) {
+        if (t >= from - 2 && t < to) armed = true;
+        else if (Date.now() - begun > 4000) { $('shield').classList.add('off'); $('status').textContent = 'Press play if the clip did not start.'; }
+        return;
+      }
+      if (t >= to) finishClip();
+    }, 200);
+  };
+  const go = () => { player.seek(from); player.play(); startPoll(); };
+
+  const vid = TR.extractVideoId(m.youtubelink);
+  if (player && vid === curVideo && player.ready) go();
+  else {
+    if (player) { player.destroy(); player = null; }
+    curVideo = vid;
+    player = TR.player.create({ provider: 'youtube', container: $('yt'), videoId: vid, onReady: go,
+      onStateChange: s => { if (s === 'ended') finishClip(); } });
+  }
+}
+
+let finishing = false;
+function finishClip() {
+  stopPoll();
+  if (finishing) return; finishing = true;
+  try { player && player.pause(); } catch (e) {}
+  $('shield').classList.remove('off');
+  $('skipBtn').hidden = true;
+  $('status').textContent = '';
+  askQuestion();
+  finishing = false;
+}
+
+function askQuestion() {
+  const ev = clips[idx];
+  answered = false;
+  // Try: the right move plus 7 others. Penalty: its full list of 8 reasons.
+  // The set is drawn once per clip; a review shows the same set, reshuffled.
+  if (!ev.optSet) ev.optSet = ev.type === 'Try'
+    ? [ev.name, ...shuffle(TRY_MOVES().filter(m => m !== ev.name)).slice(0, 7)]
+    : choicesFor(ev);
+  const opts = shuffle(ev.optSet);
+  $('question').textContent = ev.type === 'Try' ? 'Which move was this try scored from?'
+    : `What was the ${ev.type === 'Penalty Attack' ? 'attack' : 'defence'} penalty for?`;
+  const box = $('opts');
+  box.innerHTML = opts.map(o => `<button class="opt" data-v="${esc(o)}">${esc(o)}</button>`).join('');
+  box.querySelectorAll('.opt').forEach(b => b.onclick = () => answer(b.dataset.v));
+  $('feedback').hidden = true;
+  $('replayRow').hidden = !allowReplay;
+  $('overlay').hidden = false;
+}
+
+function answer(choice) {
+  if (answered) return;
+  answered = true;
+  const ev = clips[idx], ok = choice === ev.name;
+  results.push({ ev, choice, ok });
+  document.querySelectorAll('#opts .opt').forEach(b => {
+    b.disabled = true;
+    if (b.dataset.v === ev.name) b.classList.add('right');
+    else if (b.dataset.v === choice) b.classList.add('wrong');
+  });
+  $('replayRow').hidden = true;
+  const msg = $('fbMsg');
+  msg.className = 'msg ' + (ok ? 'ok' : 'ko');
+  msg.textContent = ok ? '✓ Correct!' : `✗ It was: ${ev.name}`;
+  $('nextBtn').textContent = idx + 1 < clips.length ? 'Next →' : 'See score';
+  $('feedback').hidden = false;
+}
+
+function next() {
+  idx++;
+  if (idx < clips.length) playClip(); else showResult();
+}
+
+function showResult() {
+  stopPoll();
+  if (player) { player.destroy(); player = null; curVideo = null; }
+  $('progress').textContent = '';
+  const good = results.filter(r => r.ok).length, wrong = results.filter(r => !r.ok);
+  $('scoreLine').textContent = `${good} / ${results.length}`;
+  $('scoreNote').textContent = wrong.length ? 'Here is what you missed:' : 'Perfect score!';
+  $('wrongWrap').innerHTML = wrong.length ? `<table><thead><tr><th>Game</th><th>Time</th><th>Your answer</th><th>Right answer</th><th></th></tr></thead><tbody>` +
+    wrong.map(r => {
+      const m = meta[r.ev.game] || { name: r.ev.game };
+      const link = TR.player.seekLink(m, r.ev.secs);
+      return `<tr><td>${esc(TR.sheetNameToLabel(m))}<br><span class="count">${esc(r.ev.type)}</span></td><td>${esc(r.ev.timeStr)}</td>` +
+        `<td class="bad">${esc(r.choice)}</td><td class="good">${esc(r.ev.name)}</td>` +
+        `<td>${link ? `<a href="${esc(link)}" target="_blank" rel="noopener">Watch</a>` : ''}</td></tr>`;
+    }).join('') + '</tbody></table>' : '';
+  show('result');
+}
+
+$('startBtn').onclick = start;
+$('nextBtn').onclick = next;
+$('replayBtn').onclick = () => playClip(true);
+$('skipBtn').onclick = finishClip;
+$('againBtn').onclick = () => { show('setup'); refreshSetup(); };
+['typeTry', 'typePen', 'nVideos'].forEach(id => $(id).addEventListener('input', refreshSetup));
+load();
+</script>
+</body>
+</html>
