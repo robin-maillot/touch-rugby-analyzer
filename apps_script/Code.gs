@@ -6,7 +6,7 @@ const CONTROL_SHEET_ID  = '1Km2QtYOKLW-HQudHcfvjEksAZykBbIFKhl4AuA-AEIo';
 const VALID_ROLES     = new Set(['viewer', 'staff', 'admin', 'tester']);
 // 'tester' (e.g. the beta_tester account) reaches the Viewer Game and nothing
 // else: it may only read the game list and event rows it needs for the quiz.
-const TESTER_ACTIONS  = new Set(['whoami', 'list', 'all', 'version']);
+const TESTER_ACTIONS  = new Set(['whoami', 'list', 'all', 'version']);   // reads; its one write is save_flag
 const GROUPS_SHEET    = '_groups';     // reserved tab name for group access table
 const METADATA_SHEET  = '_metadata';   // reserved tab name for game metadata
 const LIVE_SHEET      = '_live';       // reserved tab name for live game state
@@ -16,6 +16,13 @@ const ADMIN_SHEETS    = [GROUPS_SHEET, METADATA_SHEET, LIVE_SHEET];
 // User content, not control plane. Deliberately absent from ADMIN_SHEETS: the
 // admin sheet editor exists to repair the control tabs by hand, and putting
 // every account's playlists in one editable grid buys nothing.
+// Viewer Game flags: an append-only log of clips a player reported as unusable or
+// as having the wrong answer. Never edits game data — an admin reviews each one.
+const FLAGS_SHEET      = '_flags';
+const FLAG_HEADERS     = ['Flag Id', 'Flagged At', 'Flagged By', 'Role', 'Game', 'Time', 'Game Secs', 'Event Type', 'Event Name', 'Question', 'Reason', 'Current Answer', 'Proposed Answer', 'Comment', 'Status', 'Reviewed At'];
+const FLAG_REASONS     = new Set(['unusable', 'wrong_answer']);
+const FLAG_STATUSES    = new Set(['open', 'resolved', 'dismissed']);
+const FLAG_MAX_LEN     = 500;
 const PLAYLISTS_SHEET  = '_playlists';
 const PLAYLIST_HEADERS = ['Id', 'Owner', 'Name', 'Note', 'Refs', 'Updated At'];
 const PLAYLIST_MAX_REFS = 500;
@@ -92,6 +99,36 @@ function clearGroupsCache() {
 function isAdminSecret(secret) {
   const a = authFor(secret);
   return !!(a && a.role === 'admin');
+}
+
+// ── Flag helpers ───────────────────────────────────────────────
+// The _flags tab, created on first use. Every cell is written as plain text
+// (number format '@') so a time like 0:40 stays "0:40" instead of becoming a
+// time value, and sheetSafe() guards against formulas: this tab sits in the same
+// spreadsheet as _groups, and testers write free text into it.
+function flagsSheet() {
+  const ss = SpreadsheetApp.openById(CONTROL_SHEET_ID);
+  let sh = ss.getSheetByName(FLAGS_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(FLAGS_SHEET);
+    sh.appendRow(FLAG_HEADERS);
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+function readFlags() {
+  const values = flagsSheet().getDataRange().getDisplayValues();
+  if (values.length < 2) return [];
+  const h = values[0].map(x => String(x).trim());
+  const out = [];
+  for (let i = 1; i < values.length; i++) {
+    if (!values[i][0]) continue;
+    const f = { row: i + 1 };
+    FLAG_HEADERS.forEach(name => { const ci = h.indexOf(name); f[name] = ci >= 0 ? String(values[i][ci] || '') : ''; });
+    out.push(f);
+  }
+  return out;
 }
 
 // ── Playlist helpers ───────────────────────────────────────────
@@ -728,6 +765,12 @@ function doGet(e) {
       return json({ ok: true, playlists: mine });
     }
 
+    // action=list_flags → every Viewer Game flag, newest last (admin only, never cached).
+    if (e.parameter.action === 'list_flags') {
+      if (auth.role !== 'admin') return json({ ok: false, error: 'Admin access required.' });
+      return json({ ok: true, flags: readFlags() });
+    }
+
     // action=admin_sheet → raw grid (headers + data rows) of a control sheet,
     // for the admin sheet editor. Admin only; never cached (always live).
     if (e.parameter.action === 'admin_sheet') {
@@ -862,11 +905,48 @@ function doPost(e) {
     if (!auth) {
       return json({ ok: false, error: 'Unauthorized' });
     }
-    if (auth.role === 'tester') return json({ ok: false, error: 'Not available for this account.' });
+    if (auth.role === 'tester' && data.action !== 'save_flag') return json({ ok: false, error: 'Not available for this account.' });
     // Non-admin writers have their group auto-stamped onto the game's metadata
     // row (lazily creating the row + Groups column as needed). Admins skip this
     // — they should set Groups explicitly via backfill.
     const callerGroup = auth.role === 'admin' ? '' : (auth.group || '');
+
+    // action=save_flag → log a clip as unusable / wrong answer. Any signed-in
+    // role may flag (a tester's only write). Append-only: the caller's secret is
+    // never stored, only their group and role, and the game must be one they can
+    // see so a flag can't name arbitrary tabs.
+    if (data.action === 'save_flag') {
+      const reason = String(data.reason || '');
+      if (!FLAG_REASONS.has(reason)) return json({ ok: false, error: 'Unknown flag reason.' });
+      const game = String(data.game || '');
+      if (!game || !canSeeGame(auth, getMetadata()[game])) return json({ ok: false, error: 'Game not found.' });
+      const secs = Number(data.gameSecs);
+      if (!isFinite(secs) || secs < 0) return json({ ok: false, error: 'Bad event time.' });
+      const cut = v => sheetSafe(String(v == null ? '' : v).trim().slice(0, FLAG_MAX_LEN));
+      const proposed = cut(data.proposedAnswer);
+      if (reason === 'wrong_answer' && !proposed) return json({ ok: false, error: 'Pick the answer you think is right.' });
+      const id = Utilities.getUuid();
+      const row = [id, new Date().toISOString(), auth.group || '', auth.role, game, cut(data.time), String(secs),
+        cut(data.eventType), cut(data.eventName), cut(data.question), reason, cut(data.currentAnswer),
+        reason === 'wrong_answer' ? proposed : '', cut(data.comment), 'open', ''];
+      const sh = flagsSheet();
+      const r = sh.getLastRow() + 1;
+      sh.getRange(r, 1, 1, row.length).setNumberFormat('@').setValues([row]);
+      return json({ ok: true, id });
+    }
+
+    // action=update_flag_status → admin marks a flag open / resolved / dismissed.
+    // Rows are never deleted, so the row index found here stays valid.
+    if (data.action === 'update_flag_status') {
+      if (auth.role !== 'admin') return json({ ok: false, error: 'Admin access required.' });
+      const status = String(data.status || '');
+      if (!FLAG_STATUSES.has(status)) return json({ ok: false, error: 'Unknown status.' });
+      const f = readFlags().find(x => x['Flag Id'] === String(data.id || ''));
+      if (!f) return json({ ok: false, error: 'Flag not found.' });
+      flagsSheet().getRange(f.row, FLAG_HEADERS.indexOf('Status') + 1, 1, 2)
+        .setNumberFormat('@').setValues([[status, status === 'open' ? '' : new Date().toISOString()]]);
+      return json({ ok: true });
+    }
 
     // action=save_playlist → create, or replace one the caller owns. Any role
     // may own playlists, viewer included: a viewer is exactly the person
