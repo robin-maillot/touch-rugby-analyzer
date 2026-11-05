@@ -261,6 +261,7 @@ function getMetadata() {
 function canSeeGame(auth, gameMeta) {
   if (!auth) return false;
   if (auth.role === 'admin') return true;
+  if (auth.role === 'tester') return true;   // reads every game; TESTER_ACTIONS blocks all writes
   const gs = (gameMeta && gameMeta.groups) || [];
   if (gs.some(g => String(g).toUpperCase() === 'ALL')) return true;
   if (!auth.group) return false;
@@ -755,7 +756,7 @@ function doGet(e) {
 
     // Cache key suffix: include version + caller's role/group so writes auto-invalidate
     // (version bumps on cacheClear) and group A never sees group B's cached payload.
-    const cacheKeySuffix = ':v' + getSheetVersion() + ':' + (auth.role === 'admin' ? '*admin' : (auth.group || '*nogroup'));
+    const cacheKeySuffix = ':v' + getSheetVersion() + ':' + (auth.role === 'admin' ? '*admin' : auth.role === 'tester' ? '*tester' : (auth.group || '*nogroup'));
 
     // have=<version>: the client's copy is from this version, so answer
     // "unchanged" instead of the data — the version check and the fetch in one
