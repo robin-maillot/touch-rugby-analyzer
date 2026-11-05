@@ -16,7 +16,9 @@
   header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 10px 20px; display: flex; align-items: center; gap: 14px; }
   header .title { font-size: 0.9rem; color: var(--text-muted); }
   header .progress { margin-left: auto; font-size: 0.85rem; color: var(--text-muted); }
-  main { max-width: 980px; margin: 0 auto; padding: 24px 16px 48px; }
+  /* No cap on <main>: the quiz video may grow to the full window. Forms and tables keep a readable width. */
+  main { margin: 0 auto; padding: 16px 16px 32px; }
+  .view.card { max-width: 980px; margin: 0 auto; }
   h2 { font-size: 1.15rem; margin-bottom: 14px; }
   .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 22px; }
   .row { display: flex; align-items: center; gap: 10px; margin: 12px 0; flex-wrap: wrap; }
@@ -31,7 +33,8 @@
   .note { color: var(--text-muted); font-size: 0.85rem; margin-top: 10px; }
   .note.warn { color: var(--orange); }
 
-  .stage { position: relative; width: 100%; max-width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 10px; overflow: hidden; }
+  /* Default: as large as fits the window's height (never wider than the page). */
+  .stage { position: relative; width: min(100%, calc((100dvh - 190px) * 16 / 9)); max-width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 10px; overflow: hidden; }
   .stage #yt { position: absolute; inset: 0; }
   .stage #yt iframe { width: 100%; height: 100%; border: 0; }
   /* Covers the player so wheel / pinch zoom and drag can be caught (a cross-origin iframe would
