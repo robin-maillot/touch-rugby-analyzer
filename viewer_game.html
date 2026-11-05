@@ -38,6 +38,9 @@
   .shield { position: absolute; inset: 0; z-index: 2; touch-action: none; cursor: zoom-in; }
   .stage #yt { transform-origin: 0 0; }
   .shield.off { display: none; }
+  /* A hole over YouTube's "Skip ad" button (bottom-right, above the control bar) so
+     it stays clickable; the rest of the player — and the control bar — stay blocked. */
+  .shield { clip-path: polygon(evenodd, 0 0, 100% 0, 100% 100%, 0 100%, 0 0, 72% 58%, 100% 58%, 100% 84%, 72% 84%, 72% 58%); }
   .overlay { position: absolute; inset: 0; z-index: 3; background: var(--bg); display: flex; flex-direction: column; justify-content: center; padding: 18px; overflow: auto; }
   .overlay[hidden] { display: none; }
   .q { font-size: 1.05rem; font-weight: 600; margin-bottom: 12px; }
@@ -274,9 +277,11 @@ function playClip(isReplay) {
       const t = player.getTime();
       // Armed once the player has actually landed in the window — a replay
       // starts with the clock still past the end from last time.
+      // Unarmed for 4 s while paused means autoplay was blocked; an ad that is
+      // playing keeps the shield (apart from its skip-button hole).
       if (!armed) {
         if (t >= from - 2 && t < to) armed = true;
-        else if (Date.now() - begun > 4000) { $('shield').classList.add('off'); $('status').textContent = 'Press play if the clip did not start.'; }
+        else if (Date.now() - begun > 4000 && player.isPaused()) { $('shield').classList.add('off'); $('status').textContent = 'Press play if the clip did not start.'; }
         return;
       }
       if (t >= to) finishClip();
