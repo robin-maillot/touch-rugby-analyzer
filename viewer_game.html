@@ -65,6 +65,25 @@
   td.good { color: var(--good); }
   a { color: var(--accent); }
   .view[hidden] { display: none; }
+  .modal { position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,0.65); display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .modal[hidden] { display: none; }
+  .modal .card { width: 100%; max-width: 520px; max-height: 92vh; overflow: auto; }
+  .modal label.radio { display: flex; gap: 8px; align-items: center; margin: 8px 0; cursor: pointer; }
+  select, textarea { width: 100%; background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 8px; font-size: 0.95rem; font-family: inherit; margin-top: 6px; }
+  textarea { min-height: 80px; resize: vertical; }
+  .field-label { display: block; margin-top: 12px; color: var(--text-muted); font-size: 0.85rem; }
+  .err { color: var(--bad); font-size: 0.85rem; margin-top: 8px; min-height: 1.1em; }
+  .badge { display: inline-block; border-radius: 10px; padding: 1px 8px; font-size: 0.75rem; border: 1px solid var(--border); }
+  .badge.open { color: var(--orange); border-color: var(--orange); }
+  .badge.resolved { color: var(--good); border-color: var(--good); }
+  .badge.dismissed { color: var(--text-dim); }
+  tr.click { cursor: pointer; }
+  tr.click:hover td { background: var(--surface-2); }
+  tr.sel td { background: var(--accent-soft); }
+  .fstage { position: relative; width: 100%; max-width: 720px; aspect-ratio: 16 / 9; background: #000; border-radius: 10px; overflow: hidden; margin: 14px 0; }
+  .fstage > div, .fstage iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  .kv { display: grid; grid-template-columns: 130px 1fr; gap: 6px 12px; font-size: 0.92rem; margin: 6px 0; }
+  .kv dt { color: var(--text-muted); }
 </style>
 <script src="js/config.js"></script>
 <script src="js/utils.js"></script>
@@ -103,7 +122,8 @@
     <div class="row">
       <label><input type="checkbox" id="allowReplay" checked> Allow replay before answering</label>
     </div>
-    <div class="actions"><button class="btn btn-primary" id="startBtn" disabled>Loading events…</button></div>
+    <div class="actions"><button class="btn btn-primary" id="startBtn" disabled>Loading events…</button>
+      <button class="btn" id="flagsBtn" hidden>🚩 View flags</button></div>
     <p class="note" id="setupNote"></p>
     <p class="note">Each clip plays once, around the event. Then pick what it was — the move for a try, the reason for a penalty.</p>
   </section>
@@ -127,6 +147,7 @@
     <div class="actions">
       <button class="btn" id="skipBtn">Skip clip ⏭</button>
       <button class="btn" id="swapBtn" title="Poor quality or unusable? Swap in a different clip">🔄 Replace clip</button>
+      <button class="btn" id="flagBtn" title="Report an unusable clip or a wrong answer">🚩 Flag</button>
     </div>
   </section>
 
@@ -140,7 +161,43 @@
       <a class="btn" href="index.html" style="text-decoration:none">Menu</a>
     </div>
   </section>
+
+  <!-- ── Flags (admin) ─────────────────────────────────── -->
+  <section id="flags" class="view card" hidden>
+    <h2>Flags</h2>
+    <div class="row">
+      <label for="flagFilter">Show</label>
+      <select id="flagFilter" style="width:auto"><option value="open">Open</option><option value="all">All</option><option value="resolved">Resolved</option><option value="dismissed">Dismissed</option></select>
+      <button class="btn" id="flagsRefresh">↻ Refresh</button>
+      <button class="btn" id="flagsBack">← Back</button>
+    </div>
+    <p class="note" id="flagsNote"></p>
+    <div id="flagsTable"></div>
+    <div id="flagDetail" hidden>
+      <div class="fstage"><div id="fyt"></div></div>
+      <dl class="kv" id="flagKv"></dl>
+      <div class="actions" id="flagActions"></div>
+    </div>
+  </section>
 </main>
+
+<!-- ── Flag dialog ───────────────────────────────────── -->
+<div class="modal" id="flagModal" hidden>
+  <div class="card" role="dialog" aria-modal="true" aria-labelledby="flagTitle">
+    <h2 id="flagTitle">Flag this clip</h2>
+    <label class="radio"><input type="radio" name="flagReason" value="unusable" checked> Unusable video <span class="count">(wrong footage, poor quality…)</span></label>
+    <label class="radio"><input type="radio" name="flagReason" value="wrong_answer"> Wrong answer <span class="count">(the recorded answer is not what happens)</span></label>
+    <div id="flagProposeWrap" hidden>
+      <label class="field-label" for="flagPropose">What is the right answer?</label>
+      <select id="flagPropose"></select>
+      <p class="note" id="flagCurrent"></p>
+    </div>
+    <label class="field-label" for="flagComment">Comment (optional)</label>
+    <textarea id="flagComment" maxlength="500" placeholder="What is wrong with it?"></textarea>
+    <div class="err" id="flagErr"></div>
+    <div class="actions"><button class="btn btn-primary" id="flagSend">Send flag</button><button class="btn" id="flagCancel">Cancel</button></div>
+  </div>
+</div>
 
 <script>
 TR.auth('admin', { allow: ['tester'] });
@@ -236,7 +293,7 @@ let skipped = new Set();   // events swapped out as unusable — never offered a
 let clips = [], idx = 0, results = [], allowReplay = true;
 let player = null, curVideo = null, poll = null, answered = false;
 
-function show(view) { ['setup', 'quiz', 'result'].forEach(v => $(v).hidden = v !== view); }
+function show(view) { ['setup', 'quiz', 'result', 'flags'].forEach(v => $(v).hidden = v !== view); }
 
 function start() {
   const want = Math.max(1, parseInt($('nVideos').value, 10) || 10);
@@ -356,9 +413,17 @@ function answer(choice) {
 // trace in the score. With nothing left to swap in, the clip is just dropped.
 function replaceClip() {
   if (answered) return;
+  dropCurrent();
+}
+
+// Takes the current clip out of the quiz (and its score, if already answered)
+// and puts an unseen one in its place — or just shortens the quiz if none is left.
+function dropCurrent() {
   stopPoll();
   try { player && player.pause(); } catch (e) {}
-  skipped.add(clips[idx]);
+  const gone = clips[idx];
+  results = results.filter(r => r.ev !== gone);
+  skipped.add(gone);
   const fresh = shuffle(eligible().filter(e => !clips.includes(e) && !skipped.has(e)))[0];
   if (fresh) clips[idx] = fresh;
   else {
@@ -391,6 +456,112 @@ function showResult() {
   show('result');
 }
 
+
+// ── Flagging ────────────────────────────────────────────────────
+// A flag is a report, not an edit: it goes to the _flags sheet and the admin
+// decides. Either way the clip leaves this quiz and a fresh one takes its place.
+const allAnswersFor = ev => ev.kind === 'pen' ? (TR.MENU[ev.type] || []).slice() : TR.STRIKE_MOVES.slice();
+const questionOf = ev => ev.kind === 'try' ? 'Which move was this try scored from?'
+  : ev.kind === 'move' ? `Which move was being run when this ended in a ${ev.type === 'Touch' ? 'touch' : 'turnover'}?`
+  : `What was the ${ev.type === 'Penalty Attack' ? 'attack' : 'defence'} penalty for?`;
+let flagResume = false;
+
+function openFlag() {
+  const ev = clips[idx]; if (!ev) return;
+  // Pause a clip that is still playing; Cancel picks it up again.
+  flagResume = !answered && $('overlay').hidden && player && player.ready && !player.isPaused();
+  if (flagResume) player.pause();
+  document.querySelector('input[name=flagReason][value=unusable]').checked = true;
+  $('flagPropose').innerHTML = '<option value="">— pick the right answer —</option>' + allAnswersFor(ev).map(a => `<option>${esc(a)}</option>`).join('');
+  // The recorded answer is only shown once the player has answered, or flagging would give it away.
+  $('flagCurrent').textContent = answered ? `Recorded answer: ${ev.answer}` : '';
+  $('flagProposeWrap').hidden = true; $('flagComment').value = ''; $('flagErr').textContent = '';
+  $('flagSend').disabled = false; $('flagSend').textContent = 'Send flag';
+  $('flagModal').hidden = false;
+}
+function closeFlag(resume) {
+  $('flagModal').hidden = true;
+  if (resume && flagResume && player) player.play();
+  flagResume = false;
+}
+async function sendFlag() {
+  const ev = clips[idx], reason = document.querySelector('input[name=flagReason]:checked').value;
+  const proposed = $('flagPropose').value;
+  if (reason === 'wrong_answer' && !proposed) { $('flagErr').textContent = 'Pick the answer you think is right.'; return; }
+  $('flagSend').disabled = true; $('flagSend').textContent = 'Sending…'; $('flagErr').textContent = '';
+  try {
+    const res = await TR.postJson(TR.APPS_SCRIPT_URL, {
+      secret: TR.secret(), action: 'save_flag', reason, game: ev.game, time: ev.timeStr, gameSecs: ev.secs,
+      eventType: ev.type, eventName: ev.name, question: questionOf(ev), currentAnswer: ev.answer,
+      proposedAnswer: reason === 'wrong_answer' ? proposed : '', comment: $('flagComment').value,
+    });
+    if (!res.ok) throw new Error(res.error || 'The server refused the flag.');
+  } catch (err) {
+    $('flagErr').textContent = 'Could not send the flag: ' + err.message;
+    $('flagSend').disabled = false; $('flagSend').textContent = 'Try again';
+    return;
+  }
+  flagResume = false; closeFlag(false);
+  dropCurrent();
+}
+
+// ── Flags view (admin) ──────────────────────────────────────────
+let flagList = [], fplayer = null, selFlag = null;
+const flagKey = f => `${f['Game']}|${f['Game Secs']}|${f['Event Type']}`;
+const flagLabel = f => TR.sheetNameToLabel(meta[f['Game']] || { name: f['Game'] });
+
+async function loadFlags() {
+  $('flagsNote').textContent = 'Loading…';
+  try {
+    const r = await fetch(`${TR.APPS_SCRIPT_URL}?secret=${TR.enc(TR.secret())}&action=list_flags`, { cache: 'no-store' }).then(x => x.json());
+    if (!r.ok) throw new Error(r.error);
+    flagList = r.flags; $('flagsNote').textContent = '';
+  } catch (err) { flagList = []; $('flagsNote').textContent = 'Could not load flags: ' + err.message; }
+  renderFlags();
+}
+function renderFlags() {
+  const want = $('flagFilter').value, counts = {};
+  flagList.forEach(f => { counts[flagKey(f)] = (counts[flagKey(f)] || 0) + 1; });
+  const rows = flagList.filter(f => want === 'all' || f['Status'] === want).slice().reverse();
+  $('flagsTable').innerHTML = rows.length ? `<table><thead><tr><th>When</th><th>Game / event</th><th>Reason</th><th>Recorded → proposed</th><th>By</th><th>Status</th></tr></thead><tbody>` +
+    rows.map(f => `<tr class="click${selFlag === f['Flag Id'] ? ' sel' : ''}" data-id="${esc(f['Flag Id'])}">` +
+      `<td>${esc(f['Flagged At'].slice(0, 16).replace('T', ' '))}</td>` +
+      `<td>${esc(flagLabel(f))}<br><span class="count">${esc(f['Event Type'])} · ${esc(f['Time'])}${counts[flagKey(f)] > 1 ? ` · ×${counts[flagKey(f)]} flags` : ''}</span></td>` +
+      `<td>${f['Reason'] === 'unusable' ? 'Unusable' : 'Wrong answer'}${f['Comment'] ? ' 💬' : ''}</td>` +
+      `<td>${f['Reason'] === 'wrong_answer' ? `<span style="color:var(--bad)">${esc(f['Current Answer'])}</span> → <span style="color:var(--good)">${esc(f['Proposed Answer'])}</span>` : '—'}</td>` +
+      `<td>${esc(f['Flagged By'] || f['Role'])}</td><td><span class="badge ${esc(f['Status'])}">${esc(f['Status'])}</span></td></tr>`).join('') + '</tbody></table>'
+    : '<p class="note">No flags to show.</p>';
+  $('flagsTable').querySelectorAll('tr.click').forEach(tr => tr.onclick = () => openFlagDetail(tr.dataset.id));
+}
+function closeFlagPlayer() { if (fplayer) { fplayer.destroy(); fplayer = null; } }
+function openFlagDetail(id) {
+  const f = flagList.find(x => x['Flag Id'] === id); if (!f) return;
+  selFlag = id; renderFlags();
+  const m = meta[f['Game']], pre = TR.player.clampWindow($('preSecs').value, 15), post = TR.player.clampWindow($('postSecs').value, 5);
+  $('flagDetail').hidden = false;
+  closeFlagPlayer();
+  if (m && TR.extractVideoId(m.youtubelink)) {
+    const vt = TR.player.videoTimeAt(m, Number(f['Game Secs'])), from = Math.max(0, vt - pre);
+    fplayer = TR.player.create({ provider: 'youtube', container: $('fyt'), videoId: TR.extractVideoId(m.youtubelink),
+      onReady: () => { fplayer.seek(from); fplayer.play(); } });
+  } else $('fyt').innerHTML = '<p class="note" style="padding:20px">No video for this game.</p>';
+  const kv = [['Game', flagLabel(f)], ['Event', `${f['Event Type']} · ${f['Time']}`], ['Question', f['Question']],
+    ['Old answer', f['Current Answer']], ['Proposed answer', f['Reason'] === 'wrong_answer' ? f['Proposed Answer'] : '(video flagged as unusable)'],
+    ['Comment', f['Comment'] || '—'], ['Flagged', `${f['Flagged At'].slice(0, 16).replace('T', ' ')} by ${f['Flagged By'] || f['Role']}`], ['Status', f['Status']]];
+  $('flagKv').innerHTML = kv.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('');
+  $('flagActions').innerHTML = ['resolved', 'dismissed', 'open'].filter(st => st !== f['Status'])
+    .map(st => `<button class="btn" data-st="${st}">${st === 'open' ? 'Reopen' : st === 'resolved' ? '✓ Mark resolved' : 'Dismiss'}</button>`).join('');
+  $('flagActions').querySelectorAll('button').forEach(b => b.onclick = () => setFlagStatus(f, b.dataset.st, b));
+  $('flagDetail').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+async function setFlagStatus(f, status, btn) {
+  btn.disabled = true;
+  try {
+    const r = await TR.postJson(TR.APPS_SCRIPT_URL, { secret: TR.secret(), action: 'update_flag_status', id: f['Flag Id'], status });
+    if (!r.ok) throw new Error(r.error);
+    f['Status'] = status; renderFlags(); openFlagDetail(f['Flag Id']);
+  } catch (err) { $('flagsNote').textContent = 'Could not update: ' + err.message; btn.disabled = false; }
+}
 
 // ── Zoom: wheel / pinch, drag to pan, double-click to reset ─────
 // Scales the video inside the stage; the stage clips it. Only while a clip is
@@ -453,6 +624,15 @@ $('nextBtn').onclick = next;
 $('replayBtn').onclick = () => playClip(true);
 $('skipBtn').onclick = finishClip;
 $('swapBtn').onclick = replaceClip;
+$('flagBtn').onclick = openFlag;
+$('flagCancel').onclick = () => closeFlag(true);
+$('flagSend').onclick = sendFlag;
+document.querySelectorAll('input[name=flagReason]').forEach(r => r.onchange = () => { $('flagProposeWrap').hidden = r.value !== 'wrong_answer' || !r.checked; });
+if (TR.role() === 'admin') $('flagsBtn').hidden = false;
+$('flagsBtn').onclick = () => { show('flags'); $('flagDetail').hidden = true; selFlag = null; loadFlags(); };
+$('flagsBack').onclick = () => { closeFlagPlayer(); show('setup'); };
+$('flagsRefresh').onclick = loadFlags;
+$('flagFilter').onchange = renderFlags;
 $('againBtn').onclick = () => { show('setup'); refreshSetup(); };
 ['typeTry', 'typePen', 'typeMove', 'nVideos'].forEach(id => $(id).addEventListener('input', refreshSetup));
 load();
