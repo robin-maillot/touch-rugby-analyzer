@@ -17,7 +17,7 @@ TR.player = TR.player || {};
 (function () {
   // ── YouTube ───────────────────────────────────────────────────
   function createYouTube(opts) {
-    const { container, videoId, onReady, onStateChange } = opts;
+    const { container, videoId, onReady, onStateChange, playerVars } = opts;
     container.innerHTML = '<div></div>';
     const inner = container.firstElementChild;
     let yt = null;
@@ -27,7 +27,7 @@ TR.player = TR.player || {};
         videoId,
         width: '100%',
         height: '100%',
-        playerVars: { rel: 0, modestbranding: 1 },
+        playerVars: Object.assign({ rel: 0, modestbranding: 1 }, playerVars),
         events: {
           onReady: () => { ready = true; if (onReady) onReady(); },
           onStateChange: ev => {
