@@ -397,7 +397,9 @@
       document.getElementById('fieldV2Card').style.display   = admin ? '' : 'none';
       document.getElementById('backfillCard').style.display  = staffOrAdmin ? '' : 'none';
       document.getElementById('adminCard').style.display     = admin ? '' : 'none';
-      document.getElementById('viewerGameCard').style.display = admin ? '' : 'none';
+      document.getElementById('viewerGameCard').style.display = (admin || role === 'tester') ? '' : 'none';
+      // A tester account gets the game and nothing else.
+      if (role === 'tester') document.querySelectorAll('.nav-card').forEach(c => { c.style.display = c.id === 'viewerGameCard' ? '' : 'none'; });
       document.getElementById('dashboardCard').style.display = admin ? '' : 'none';
       // The old viewer is now the Event Editor: it is the only place that edits
       // names, comments and strike moves, or cuts clips. Admin-only, as those
