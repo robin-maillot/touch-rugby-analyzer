@@ -89,11 +89,20 @@
       <input type="number" id="nVideos" min="1" max="100" value="10">
     </div>
     <div class="row">
+      <label for="preSecs">Seconds before</label>
+      <input type="number" id="preSecs" min="0" max="120" value="15">
+      <label for="postSecs" style="margin-left:14px">after</label>
+      <input type="number" id="postSecs" min="0" max="120" value="5">
+    </div>
+    <div class="row">
+      <label><input type="checkbox" id="sound" checked> Sound on</label>
+    </div>
+    <div class="row">
       <label><input type="checkbox" id="allowReplay" checked> Allow replay before answering</label>
     </div>
     <div class="actions"><button class="btn btn-primary" id="startBtn" disabled>Loading events…</button></div>
     <p class="note" id="setupNote"></p>
-    <p class="note">Each clip plays once: 15 s before the event, 5 s after. Then pick what it was — the move for a try, the reason for a penalty.</p>
+    <p class="note">Each clip plays once, around the event. Then pick what it was — the move for a try, the reason for a penalty.</p>
   </section>
 
   <!-- ── Quiz ──────────────────────────────────────────── -->
@@ -112,7 +121,10 @@
       </div>
     </div>
     <div class="status" id="status"></div>
-    <div class="actions"><button class="btn" id="skipBtn">Skip clip ⏭</button></div>
+    <div class="actions">
+      <button class="btn" id="skipBtn">Skip clip ⏭</button>
+      <button class="btn" id="swapBtn" title="Poor quality or unusable? Swap in a different clip">🔄 Replace clip</button>
+    </div>
   </section>
 
   <!-- ── Result ────────────────────────────────────────── -->
@@ -128,9 +140,9 @@
 </main>
 
 <script>
-TR.auth('admin');
+TR.auth('admin', { allow: ['tester'] });
 
-const PRE = 15, POST = 5;             // seconds of footage before / after the event
+let PRE = 15, POST = 5;               // seconds of footage before / after the event (set at start)
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const $ = id => document.getElementById(id);
 const LS = {
@@ -208,6 +220,8 @@ async function load() {
 }
 
 // ── Quiz state ──────────────────────────────────────────────────
+let sound = true;
+let skipped = new Set();   // events swapped out as unusable — never offered again
 let clips = [], idx = 0, results = [], allowReplay = true;
 let player = null, curVideo = null, poll = null, answered = false;
 
@@ -217,6 +231,10 @@ function start() {
   const want = Math.max(1, parseInt($('nVideos').value, 10) || 10);
   clips = shuffle(eligible()).slice(0, want);
   allowReplay = $('allowReplay').checked;
+  PRE  = TR.player.clampWindow($('preSecs').value, 15);
+  POST = TR.player.clampWindow($('postSecs').value, 5);
+  skipped = new Set();
+  sound = $('sound').checked;
   idx = 0; results = [];
   show('quiz');
   playClip();
@@ -234,7 +252,9 @@ function playClip(isReplay) {
   $('overlay').hidden = true;
   $('shield').classList.remove('off');
   $('status').textContent = isReplay ? 'Replaying…' : 'Watch carefully…';
+  answered = false;
   $('skipBtn').hidden = false;
+  $('swapBtn').hidden = false;
   stopPoll();
 
   let armed = false, begun = Date.now();
@@ -253,7 +273,8 @@ function playClip(isReplay) {
       if (t >= to) finishClip();
     }, 200);
   };
-  const go = () => { player.seek(from); player.play(); startPoll(); };
+  const go = () => { if (player.setMuted) player.setMuted(!sound);   // absent on a stale cached player.js
+     player.seek(from); player.play(); startPoll(); };
 
   const vid = TR.extractVideoId(m.youtubelink);
   if (player && vid === curVideo && player.ready) go();
@@ -299,6 +320,7 @@ function askQuestion() {
 function answer(choice) {
   if (answered) return;
   answered = true;
+  $('swapBtn').hidden = true;
   const ev = clips[idx], ok = choice === ev.name;
   results.push({ ev, choice, ok });
   document.querySelectorAll('#opts .opt').forEach(b => {
@@ -312,6 +334,22 @@ function answer(choice) {
   msg.textContent = ok ? '✓ Correct!' : `✗ It was: ${ev.name}`;
   $('nextBtn').textContent = idx + 1 < clips.length ? 'Next →' : 'See score';
   $('feedback').hidden = false;
+}
+
+// Swaps the current clip for an unseen one of the chosen types. It leaves no
+// trace in the score. With nothing left to swap in, the clip is just dropped.
+function replaceClip() {
+  if (answered) return;
+  stopPoll();
+  try { player && player.pause(); } catch (e) {}
+  skipped.add(clips[idx]);
+  const fresh = shuffle(eligible().filter(e => !clips.includes(e) && !skipped.has(e)))[0];
+  if (fresh) clips[idx] = fresh;
+  else {
+    clips.splice(idx, 1);
+    if (idx >= clips.length) { showResult(); return; }
+  }
+  playClip();
 }
 
 function next() {
@@ -389,6 +427,7 @@ $('startBtn').onclick = start;
 $('nextBtn').onclick = next;
 $('replayBtn').onclick = () => playClip(true);
 $('skipBtn').onclick = finishClip;
+$('swapBtn').onclick = replaceClip;
 $('againBtn').onclick = () => { show('setup'); refreshSetup(); };
 ['typeTry', 'typePen', 'nVideos'].forEach(id => $(id).addEventListener('input', refreshSetup));
 load();

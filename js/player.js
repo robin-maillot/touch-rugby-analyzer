@@ -68,6 +68,7 @@ TR.player = TR.player || {};
       pause:       () => { if (yt) yt.pauseVideo(); },
       seek:        (t) => { if (yt) yt.seekTo(t, true); },
       setRate:     (r) => { if (yt) yt.setPlaybackRate(r); },
+      setMuted:    (m) => { if (yt) { if (m) yt.mute(); else yt.unMute(); } },
       destroy:     () => { if (yt) { yt.destroy(); yt = null; } container.innerHTML = ''; ready = false; }
     };
   }
@@ -95,6 +96,7 @@ TR.player = TR.player || {};
       pause:       () => vid.pause(),
       seek:        (t) => { vid.currentTime = t; },
       setRate:     (r) => { vid.playbackRate = r; },
+      setMuted:    (m) => { vid.muted = !!m; },
       destroy:     () => {
         vid.removeEventListener('loadedmetadata', onMeta);
         vid.removeEventListener('play',  onPlay);

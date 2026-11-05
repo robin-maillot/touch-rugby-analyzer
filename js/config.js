@@ -182,12 +182,25 @@ TR.auth = (required, opts) => {
     window.location.replace('index.html?next=' + encodeURIComponent(here));
     return;
   }
-  const rank = { anon: 0, viewer: 1, staff: 2, admin: 3 };
+  // 'tester' sits below viewer: it satisfies no level, and gets in only where a
+  // page names it in opts.allow (the Viewer Game).
+  const rank = { anon: 0, tester: 0.5, viewer: 1, staff: 2, admin: 3 };
   const need = { viewer: 1, staff: 2, admin: 3 };
+  if (opts && opts.allow && opts.allow.indexOf(TR.role()) >= 0) return;
   // Signed in but under-privileged → back to the menu with a "denied" note
   // (no next=, so a re-login can't bounce straight back into a loop).
   if ((rank[TR.role()] || 0) < (need[required] || 0)) window.location.replace('index.html?denied=1');
 };
+
+// A tester account sees the Viewer Game and nothing else: any other page sends
+// it there. (The server enforces the same limit; this just spares the dead ends.)
+(function keepTesterInGame() {
+  try {
+    if (sessionStorage.getItem('role') !== 'tester') return;
+    const here = location.pathname.split('/').pop() || 'index.html';
+    if (here !== 'viewer_game.html' && here !== 'index.html') window.location.replace('viewer_game.html');
+  } catch (e) {}
+})();
 
 // Wipe per-user localStorage caches (action=list / action=all / game_*) when
 // the password changes from what was in use last time these caches were written.

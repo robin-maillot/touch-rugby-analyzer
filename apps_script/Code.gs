@@ -3,7 +3,10 @@
 // CONTROL_SHEET_ID holds the three control-plane tabs: _groups, _metadata, _live.
 const SHEET_ID          = '1B9DwThGoINgicevtjoUDkeQBoGBCD6QFjL0oL7mAU-k';
 const CONTROL_SHEET_ID  = '1Km2QtYOKLW-HQudHcfvjEksAZykBbIFKhl4AuA-AEIo';
-const VALID_ROLES     = new Set(['viewer', 'staff', 'admin']);
+const VALID_ROLES     = new Set(['viewer', 'staff', 'admin', 'tester']);
+// 'tester' (e.g. the beta_tester account) reaches the Viewer Game and nothing
+// else: it may only read the game list and event rows it needs for the quiz.
+const TESTER_ACTIONS  = new Set(['whoami', 'list', 'all', 'version']);
 const GROUPS_SHEET    = '_groups';     // reserved tab name for group access table
 const METADATA_SHEET  = '_metadata';   // reserved tab name for game metadata
 const LIVE_SHEET      = '_live';       // reserved tab name for live game state
@@ -697,6 +700,9 @@ function doGet(e) {
     if (!auth) {
       return json({ ok: false, error: 'Unauthorized' });
     }
+    if (auth.role === 'tester' && !TESTER_ACTIONS.has(e.parameter.action)) {
+      return json({ ok: false, error: 'Not available for this account.' });
+    }
 
     // action=version → live spreadsheet-modified timestamp (never cached server-side).
     // Clients use this to skip the heavy action=all / action=list refetches when nothing changed.
@@ -855,6 +861,7 @@ function doPost(e) {
     if (!auth) {
       return json({ ok: false, error: 'Unauthorized' });
     }
+    if (auth.role === 'tester') return json({ ok: false, error: 'Not available for this account.' });
     // Non-admin writers have their group auto-stamped onto the game's metadata
     // row (lazily creating the row + Groups column as needed). Admins skip this
     // — they should set Groups explicitly via backfill.
