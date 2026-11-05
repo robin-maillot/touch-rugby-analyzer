@@ -34,13 +34,12 @@
   .stage { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 10px; overflow: hidden; }
   .stage #yt { position: absolute; inset: 0; }
   .stage #yt iframe { width: 100%; height: 100%; border: 0; }
-  /* Blocks clicks on the YouTube player while the clip runs, so it can't be paused or scrubbed. */
-  .shield { position: absolute; inset: 0; z-index: 2; touch-action: none; cursor: zoom-in; }
-  .stage #yt { transform-origin: 0 0; }
+  /* Covers the player so wheel / pinch zoom and drag can be caught (a cross-origin iframe would
+     swallow them). A tap on it plays / pauses through the API; YouTube's own controls and seek
+     bar are switched off, and the bottom-right corner is left open so "Skip ad" can be clicked. */
+  .shield { position: absolute; inset: 0; z-index: 2; touch-action: none; cursor: grab;
+            clip-path: polygon(evenodd, 0 0, 100% 0, 100% 100%, 0 100%, 0 0, 62% 50%, 100% 50%, 100% 100%, 62% 100%, 62% 50%); }
   .shield.off { display: none; }
-  /* A hole over YouTube's "Skip ad" button (bottom-right, above the control bar) so
-     it stays clickable; the rest of the player — and the control bar — stay blocked. */
-  .shield { clip-path: polygon(evenodd, 0 0, 100% 0, 100% 100%, 0 100%, 0 0, 72% 58%, 100% 58%, 100% 84%, 72% 84%, 72% 58%); }
   .overlay { position: absolute; inset: 0; z-index: 3; background: var(--bg); display: flex; flex-direction: column; justify-content: center; padding: 18px; overflow: auto; }
   .overlay[hidden] { display: none; }
   .q { font-size: 1.05rem; font-weight: 600; margin-bottom: 12px; }
@@ -113,7 +112,7 @@
   <section id="quiz" class="view" hidden>
     <div class="stage">
       <div id="yt"></div>
-      <div class="shield" id="shield" title="Scroll or pinch to zoom, drag to move, double-click to reset"></div>
+      <div class="shield" id="shield"></div>
       <div class="overlay" id="overlay" hidden>
         <div class="q" id="question"></div>
         <div class="opts" id="opts"></div>
@@ -277,13 +276,13 @@ function playClip(isReplay) {
       const t = player.getTime();
       // Armed once the player has actually landed in the window — a replay
       // starts with the clock still past the end from last time.
-      // Unarmed for 4 s while paused means autoplay was blocked; an ad that is
-      // playing keeps the shield (apart from its skip-button hole).
+      // Unarmed for 4 s while paused means autoplay was blocked.
       if (!armed) {
         if (t >= from - 2 && t < to) armed = true;
-        else if (Date.now() - begun > 4000 && player.isPaused()) { $('shield').classList.add('off'); $('status').textContent = 'Press play if the clip did not start.'; }
+        else if (Date.now() - begun > 4000 && player.isPaused()) $('status').textContent = 'Click the video to start the clip.';
         return;
       }
+      if (t < from - 1.5) { player.seek(from); return; }   // rewound past the start of the clip
       if (t >= to) finishClip();
     }, 200);
   };
@@ -296,6 +295,8 @@ function playClip(isReplay) {
     if (player) { player.destroy(); player = null; }
     curVideo = vid;
     player = TR.player.create({ provider: 'youtube', container: $('yt'), videoId: vid, onReady: go,
+      // No seek bar or controls, no keyboard seeking, no fullscreen: nothing to rewind with or copy a link from.
+      playerVars: { controls: 0, disablekb: 1, fs: 0, iv_load_policy: 3 },
       onStateChange: s => { if (s === 'ended') finishClip(); } });
   }
 }
@@ -433,7 +434,16 @@ function showResult() {
       zoomAt(pinch.k * Math.hypot(a[0] - b[0], a[1] - b[1]) / pinch.d, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
     } else if (pts.size === 1 && k > 1) { x += nx - ox; y += ny - oy; clamp(); apply(); }
   });
-  const up = e => { pts.delete(e.pointerId); pinch = null; };
+  // A tap (one finger or click, hardly moved, quick) plays / pauses the clip.
+  let tap = null;
+  stage.addEventListener('pointerdown', e => { tap = pts.size === 1 && live() ? { t: Date.now(), x: e.clientX, y: e.clientY } : null; });
+  const up = e => {
+    if (tap && pts.size === 1 && e.type === 'pointerup' && Date.now() - tap.t < 300 &&
+        Math.hypot(e.clientX - tap.x, e.clientY - tap.y) < 8 && player && player.ready) {
+      if (player.isPaused()) player.play(); else player.pause();
+    }
+    tap = null; pts.delete(e.pointerId); pinch = null;
+  };
   stage.addEventListener('pointerup', up); stage.addEventListener('pointercancel', up);
   stage.addEventListener('dblclick', () => { if (live()) resetZoom(); });
 })();
