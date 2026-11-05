@@ -83,6 +83,7 @@
     <div class="row">
       <label><input type="checkbox" id="typeTry" checked> Try <span class="count" id="cntTry"></span></label>
       <label><input type="checkbox" id="typePen"> Penalty <span class="count" id="cntPen"></span></label>
+      <label title="A touch or turnover that was tagged with the move being run"><input type="checkbox" id="typeMove"> Touch / turnover (move) <span class="count" id="cntMove"></span></label>
     </div>
     <div class="row">
       <label for="nVideos">Number of videos</label>
@@ -160,38 +161,46 @@ let pool = [];            // every event that can be asked about
 // Name. Anything we couldn't offer as one of the choices is left out.
 const TRY_MOVES = () => TR.STRIKE_MOVES.filter(m => !TR.EXCLUDED_MOVES.includes(m));
 const PEN_TYPES = ['Penalty Attack', 'Penalty Defence'];
+// kind: 'try' (guess the move), 'pen' (guess the reason), 'move' (a touch or
+// turnover tagged with the move it was running — guess that move).
+const MOVE_TYPES = ['Touch', 'Turnover'];
 function choicesFor(ev) {
-  if (ev.type === 'Try') return TRY_MOVES();
-  return (TR.MENU[ev.type] || []).slice();
+  if (ev.kind === 'pen') return (TR.MENU[ev.type] || []).slice();
+  return TRY_MOVES();
 }
-const kindOf = ev => ev.type === 'Try' ? 'try' : 'pen';
 
 function ingest(rows) {
   pool = [];
   if (!rows || rows.length < 2) return;
   const h = rows[0].map(x => String(x).trim().toLowerCase()), I = n => h.indexOf(n);
-  const c = { t: I('time'), ty: I('type'), nm: I('name'), g: I('game') };
+  const c = { t: I('time'), ty: I('type'), nm: I('name'), g: I('game'), sm: I('strike move') };
   rows.slice(1).forEach(r => {
     const game = r[c.g], type = (r[c.ty] || '').trim(), name = (r[c.nm] || '').trim();
-    if (!game || (type !== 'Try' && !PEN_TYPES.includes(type))) return;
+    if (!game) return;
+    const kind = type === 'Try' ? 'try' : PEN_TYPES.includes(type) ? 'pen' : MOVE_TYPES.includes(type) ? 'move' : null;
+    if (!kind) return;
     const m = meta[game];
     if (!m || !TR.extractVideoId(m.youtubelink)) return;
     const secs = toSecs(r[c.t]);
     if (isNaN(secs)) return;
-    const ev = { game, type, name, secs, timeStr: r[c.t] };
-    if (!choicesFor(ev).includes(name) || name === 'Other') return;
+    // What the viewer is asked to name: a try's move is its Name, a penalty's
+    // reason is its Name, a touch or turnover carries the move in Strike Move.
+    const answer = kind === 'move' ? (c.sm >= 0 ? (r[c.sm] || '').trim() : '') : name;
+    const ev = { game, type, name, kind, answer, secs, timeStr: r[c.t] };
+    if (!choicesFor(ev).includes(answer) || answer === 'Other') return;
     if (!TR.player.hasVideoAt(m, secs)) return;
     pool.push(ev);
   });
 }
 
 function eligible() {
-  const tries = $('typeTry').checked, pens = $('typePen').checked;
-  return pool.filter(e => (e.type === 'Try' ? tries : pens));
+  const on = { try: $('typeTry').checked, pen: $('typePen').checked, move: $('typeMove').checked };
+  return pool.filter(e => on[e.kind]);
 }
 function refreshSetup() {
-  $('cntTry').textContent = `(${pool.filter(e => e.type === 'Try').length} with video)`;
-  $('cntPen').textContent = `(${pool.filter(e => e.type !== 'Try').length} with video)`;
+  $('cntTry').textContent = `(${pool.filter(e => e.kind === 'try').length} with video)`;
+  $('cntPen').textContent = `(${pool.filter(e => e.kind === 'pen').length} with video)`;
+  $('cntMove').textContent = `(${pool.filter(e => e.kind === 'move').length} with video)`;
   const n = eligible().length, btn = $('startBtn');
   btn.disabled = n === 0;
   btn.textContent = n ? 'Start' : (pool.length ? 'Pick at least one type' : 'No events with video');
@@ -303,11 +312,12 @@ function askQuestion() {
   answered = false;
   // Try: the right move plus 7 others. Penalty: its full list of 8 reasons.
   // The set is drawn once per clip; a review shows the same set, reshuffled.
-  if (!ev.optSet) ev.optSet = ev.type === 'Try'
-    ? [ev.name, ...shuffle(TRY_MOVES().filter(m => m !== ev.name)).slice(0, 7)]
+  if (!ev.optSet) ev.optSet = ev.kind !== 'pen'
+    ? [ev.answer, ...shuffle(TRY_MOVES().filter(m => m !== ev.answer)).slice(0, 7)]
     : choicesFor(ev);
   const opts = shuffle(ev.optSet);
-  $('question').textContent = ev.type === 'Try' ? 'Which move was this try scored from?'
+  $('question').textContent = ev.kind === 'try' ? 'Which move was this try scored from?'
+    : ev.kind === 'move' ? `Which move was being run when this ended in a ${ev.type === 'Touch' ? 'touch' : 'turnover'}?`
     : `What was the ${ev.type === 'Penalty Attack' ? 'attack' : 'defence'} penalty for?`;
   const box = $('opts');
   box.innerHTML = opts.map(o => `<button class="opt" data-v="${esc(o)}">${esc(o)}</button>`).join('');
@@ -321,17 +331,17 @@ function answer(choice) {
   if (answered) return;
   answered = true;
   $('swapBtn').hidden = true;
-  const ev = clips[idx], ok = choice === ev.name;
+  const ev = clips[idx], ok = choice === ev.answer;
   results.push({ ev, choice, ok });
   document.querySelectorAll('#opts .opt').forEach(b => {
     b.disabled = true;
-    if (b.dataset.v === ev.name) b.classList.add('right');
+    if (b.dataset.v === ev.answer) b.classList.add('right');
     else if (b.dataset.v === choice) b.classList.add('wrong');
   });
   $('replayRow').hidden = true;
   const msg = $('fbMsg');
   msg.className = 'msg ' + (ok ? 'ok' : 'ko');
-  msg.textContent = ok ? '✓ Correct!' : `✗ It was: ${ev.name}`;
+  msg.textContent = ok ? '✓ Correct!' : `✗ It was: ${ev.answer}`;
   $('nextBtn').textContent = idx + 1 < clips.length ? 'Next →' : 'See score';
   $('feedback').hidden = false;
 }
@@ -368,8 +378,8 @@ function showResult() {
     wrong.map(r => {
       const m = meta[r.ev.game] || { name: r.ev.game };
       const link = TR.player.seekLink(m, r.ev.secs);
-      return `<tr><td>${esc(TR.sheetNameToLabel(m))}<br><span class="count">${esc(r.ev.type)}</span></td><td>${esc(r.ev.timeStr)}</td>` +
-        `<td class="bad">${esc(r.choice)}</td><td class="good">${esc(r.ev.name)}</td>` +
+      return `<tr><td>${esc(TR.sheetNameToLabel(m))}<br><span class="count">${esc(r.ev.type)}${r.ev.kind === 'move' ? ' (move)' : ''}</span></td><td>${esc(r.ev.timeStr)}</td>` +
+        `<td class="bad">${esc(r.choice)}</td><td class="good">${esc(r.ev.answer)}</td>` +
         `<td>${link ? `<a href="${esc(link)}" target="_blank" rel="noopener">Watch</a>` : ''}</td></tr>`;
     }).join('') + '</tbody></table>' : '';
   show('result');
@@ -429,7 +439,7 @@ $('replayBtn').onclick = () => playClip(true);
 $('skipBtn').onclick = finishClip;
 $('swapBtn').onclick = replaceClip;
 $('againBtn').onclick = () => { show('setup'); refreshSetup(); };
-['typeTry', 'typePen', 'nVideos'].forEach(id => $(id).addEventListener('input', refreshSetup));
+['typeTry', 'typePen', 'typeMove', 'nVideos'].forEach(id => $(id).addEventListener('input', refreshSetup));
 load();
 </script>
 </body>
