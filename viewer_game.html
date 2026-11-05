@@ -31,7 +31,7 @@
   .note { color: var(--text-muted); font-size: 0.85rem; margin-top: 10px; }
   .note.warn { color: var(--orange); }
 
-  .stage { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 10px; overflow: hidden; }
+  .stage { position: relative; width: 100%; max-width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 10px; overflow: hidden; }
   .stage #yt { position: absolute; inset: 0; }
   .stage #yt iframe { width: 100%; height: 100%; border: 0; }
   /* Covers the player so wheel / pinch zoom and drag can be caught (a cross-origin iframe would
@@ -44,7 +44,32 @@
   .overlay[hidden] { display: none; }
   .q { font-size: 1.05rem; font-weight: 600; margin-bottom: 12px; }
   .opts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-  @media (max-width: 720px) { .opts { grid-template-columns: repeat(2, 1fr); } .stage { aspect-ratio: auto; min-height: 420px; } }
+  @media (max-width: 720px) { .opts { grid-template-columns: repeat(2, 1fr); } }
+  /* Narrow portrait: the 16:9 box is too short to hold the options, so let it grow. */
+  @media (max-width: 720px) and (orientation: portrait) { .stage { aspect-ratio: auto; min-height: 420px; } }
+  /* Phone on its side: the video takes most of the screen — as large as the height allows —
+     with the buttons in a column beside it and the header reduced to the progress count. */
+  @media (orientation: landscape) and (max-height: 520px) {
+    main { max-width: none; padding: 6px 8px 4px; }
+    header { position: fixed; top: 4px; right: 8px; z-index: 5; padding: 0; background: none; border: 0; }
+    header tr-logo, header .title { display: none; }
+    #quiz { display: flex; gap: 8px; align-items: flex-start; }
+    .vwrap { flex: 1 1 auto; min-width: 0; }
+    .stage { width: min(100%, calc((100dvh - 44px) * 16 / 9)); }
+    .side { flex: 0 0 112px; }
+    .side .actions { flex-direction: column; }
+    .side .status { margin: 18px 0 4px; }
+    .opts { grid-template-columns: repeat(4, 1fr); gap: 6px; }
+    .opt { padding: 8px 4px; font-size: 0.85rem; }
+    .overlay { padding: 8px 12px; }
+    .q { margin-bottom: 6px; font-size: 0.95rem; }
+    .feedback { margin-top: 6px; }
+    .btn { padding: 6px 10px; font-size: 0.82rem; }
+  }
+  /* Grip under the video: drag to make it larger or smaller (double-click to reset). */
+  .grip { width: 100%; height: 26px; display: flex; justify-content: flex-end; touch-action: none; }
+  .grip span { width: 64px; height: 100%; cursor: nwse-resize; color: var(--text-dim); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; user-select: none; }
+  .grip span:hover { color: var(--text); }
   .opt { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); cursor: pointer; font-size: 0.95rem; padding: 14px 8px; font-family: inherit; }
   .opt:hover:not(:disabled) { border-color: var(--accent); background: var(--surface-3); }
   .opt:disabled { cursor: default; }
@@ -130,6 +155,7 @@
 
   <!-- ── Quiz ──────────────────────────────────────────── -->
   <section id="quiz" class="view" hidden>
+   <div class="vwrap">
     <div class="stage">
       <div id="yt"></div>
       <div class="shield" id="shield"></div>
@@ -143,12 +169,16 @@
         <div class="actions" id="replayRow"><button class="btn" id="replayBtn">↺ Review the clip</button></div>
       </div>
     </div>
+    <div class="grip" id="gripRow"><span id="grip" title="Drag to resize the video · double-click to reset" aria-label="Resize video">⇲</span></div>
+   </div>
+   <div class="side">
     <div class="status" id="status"></div>
     <div class="actions">
       <button class="btn" id="skipBtn">Skip clip ⏭</button>
       <button class="btn" id="swapBtn" title="Poor quality or unusable? Swap in a different clip">🔄 Replace clip</button>
       <button class="btn" id="flagBtn" title="Report an unusable clip or a wrong answer">🚩 Flag</button>
     </div>
+   </div>
   </section>
 
   <!-- ── Result ────────────────────────────────────────── -->
@@ -562,6 +592,40 @@ async function setFlagStatus(f, status, btn) {
     f['Status'] = status; renderFlags(); openFlagDetail(f['Flag Id']);
   } catch (err) { $('flagsNote').textContent = 'Could not update: ' + err.message; btn.disabled = false; }
 }
+
+// ── Resize: drag the grip under the video ───────────────────────
+// Sets the stage width in px (height follows from 16:9) and remembers it. With
+// nothing stored the CSS default applies — full width, or on a phone held
+// sideways as large as the screen's height allows.
+(function setupResize() {
+  const stage = document.querySelector('.stage'), grip = $('grip'), KEY = 'tr.vg.stageW';
+  const maxW = () => stage.parentElement.clientWidth;
+  const setW = w => { stage.style.width = Math.round(Math.min(maxW(), Math.max(240, w))) + 'px'; };
+  try { const w = +localStorage.getItem(KEY); if (w >= 240) { stage.style.width = w + 'px'; } } catch (e) {}
+  let drag = null;
+  grip.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    const r = stage.getBoundingClientRect();
+    drag = { x: e.clientX, y: e.clientY, w: r.width };
+    grip.setPointerCapture(e.pointerId);
+  });
+  grip.addEventListener('pointermove', e => {
+    if (!drag) return;
+    // How far it moved: across, or down (a pixel down is 16/9 pixels of width). The bigger move wins.
+    const dx = e.clientX - drag.x, dy = (e.clientY - drag.y) * 16 / 9;
+    setW(drag.w + (Math.abs(dx) >= Math.abs(dy) ? dx : dy));
+  });
+  const end = () => {
+    if (!drag) return; drag = null;
+    try { localStorage.setItem(KEY, String(stage.clientWidth)); } catch (e) {}
+    if (window.resetZoom) resetZoom();
+  };
+  grip.addEventListener('pointerup', end); grip.addEventListener('pointercancel', end);
+  grip.addEventListener('dblclick', () => {
+    stage.style.width = ''; try { localStorage.removeItem(KEY); } catch (e) {}
+  });
+  window.addEventListener('resize', () => { if (stage.style.width && stage.clientWidth > maxW()) stage.style.width = ''; });
+})();
 
 // ── Zoom: wheel / pinch, drag to pan, double-click to reset ─────
 // Scales the video inside the stage; the stage clips it. Only while a clip is
